@@ -78,9 +78,13 @@ class ForegroundLyricService : Service() {
         updateNotificationUI(DynamicLyricData.currentState, force = true)
 
         serviceScope.launch {
-            launch { DynamicLyricData.musicState.collect { updateNotificationUI(it, force = false) } }
-            launch { DynamicLyricData.progressFlow.collect { updateNotificationUI(DynamicLyricData.musicState.value, force = false) } }
-            launch { DynamicLyricData.whitelistState.collect { updateNotificationUI(DynamicLyricData.currentState, force = true) } }
+            kotlinx.coroutines.flow.combine(
+                DynamicLyricData.musicState,
+                DynamicLyricData.progressFlow,
+                DynamicLyricData.whitelistState
+            ) { state, _, _ -> state }.collect { state ->
+                updateNotificationUI(state, force = false)
+            }
         }
     }
 

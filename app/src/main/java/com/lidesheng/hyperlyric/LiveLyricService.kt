@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric
+package com.lidesheng.hyperlyric
 
 import android.annotation.SuppressLint
 import android.content.ComponentName
@@ -117,18 +117,38 @@ class LiveLyricService : NotificationListenerService() {
     }
 
     private fun updateCurrentController(controllers: List<MediaController>?) {
-        if (controllers.isNullOrEmpty()) return
+        if (controllers.isNullOrEmpty()) {
+            unregisterCurrentController()
+            clearLyricState()
+            return
+        }
 
         val targetController = controllers.find {
             it.playbackState?.state == PlaybackState.STATE_PLAYING
         } ?: controllers.first()
 
-        if (currentController?.packageName != targetController.packageName) {
-            currentController?.unregisterCallback(mediaCallback)
+        if (currentController?.sessionToken != targetController.sessionToken) {
+            unregisterCurrentController()
             currentController = targetController
             currentController?.registerCallback(mediaCallback)
             syncToGlobalData(targetController, forceUpdate = true)
         }
+    }
+
+    private fun unregisterCurrentController() {
+        try {
+            currentController?.unregisterCallback(mediaCallback)
+        } catch (_: Exception) {}
+        currentController = null
+    }
+
+    private fun clearLyricState() {
+        currentSongIdentifier = ""
+        isCurrentlyPlaying = false
+        DynamicLyricData.updateLoadingAlbumArt(false)
+        DynamicLyricData.updateFetchingLyrics(false)
+        DynamicLyricData.updateAnchor(0L, false)
+        DynamicLyricData.updateRightTitles(" ", " ", " ", " ", 0L, false, "")
     }
 
     private val mediaCallback = object : MediaController.Callback() {
@@ -136,7 +156,15 @@ class LiveLyricService : NotificationListenerService() {
             syncToGlobalData(currentController, forceUpdate = true)
         }
         override fun onPlaybackStateChanged(state: PlaybackState?) {
-            syncToGlobalData(currentController, forceUpdate = false)
+            syncToGlobalData(currentController, forceUpdate = true)
+            
+            val status = state?.state
+            if (status == PlaybackState.STATE_PAUSED || status == PlaybackState.STATE_STOPPED) {
+                try {
+                    val componentName = ComponentName(this@LiveLyricService, LiveLyricService::class.java)
+                    updateCurrentController(mediaSessionManager.getActiveSessions(componentName))
+                } catch (_: Exception) {}
+            }
         }
         override fun onSessionDestroyed() {
             try {
@@ -179,7 +207,6 @@ class LiveLyricService : NotificationListenerService() {
             progressJob = null
         }
         
-        DynamicLyricData.updateAnchor(position, isPlaying)
 
         val albumBitmap = if (isNewSong) {
             val raw = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
@@ -240,8 +267,23 @@ class LiveLyricService : NotificationListenerService() {
 
     private suspend fun processSyncData(data: SyncData) {
         val sp = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
-        if (sp.getBoolean(Constants.KEY_PAUSE_LISTENING, Constants.DEFAULT_PAUSE_LISTENING)) return
-        if (!DynamicLyricData.whitelistState.value.contains(data.currentPackageName)) return
+        val pauseListening = sp.getBoolean(Constants.KEY_PAUSE_LISTENING, Constants.DEFAULT_PAUSE_LISTENING)
+        val isWhitelisted = DynamicLyricData.whitelistState.value.contains(data.currentPackageName)
+
+        if (pauseListening || !isWhitelisted) {
+            isCurrentlyPlaying = false
+            DynamicLyricData.updateAnchor(data.position, false)
+            DynamicLyricData.updateRightTitles(
+                islandText = " ",
+                notificationText = " ",
+                newSongLyric = " ",
+                newSongInfo = " ",
+                newDuration = 0L,
+                newIsPlaying = false,
+                newPackageName = data.currentPackageName
+            )
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (now - lastPermissionCheckTime > permissionCheckInterval) {
@@ -249,6 +291,8 @@ class LiveLyricService : NotificationListenerService() {
             lastPermissionCheckTime = now
         }
         if (!cachedNotificationEnabled) return
+
+        DynamicLyricData.updateAnchor(data.position, data.isPlaying)
 
         if (data.isNewSong) {
             val progressColorEnabled = sp.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)
@@ -352,6 +396,10 @@ class LiveLyricService : NotificationListenerService() {
         }
     }
 
+    private var lastDispatchedIslandLeft = ""
+    private var lastDispatchedIsPlaying = false
+    private var lastDispatchedShowAlbum = false
+
     private fun dispatchLyricContent(targetText: String, data: SyncData) {
         val songLyric = if (currentLyricLines != null) targetText else data.rawTitle
         val pref = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
@@ -374,7 +422,13 @@ class LiveLyricService : NotificationListenerService() {
 
         val songInfo = if (currentLyricLines != null) "${data.artist} - ${data.rawTitle}" else data.artist
 
-        val newLabelBitmap = if (data.isPlaying && isSendNormalNotification && !disableLyricSplit) {
+        // Optimization: Reuse bitmap if text and state haven't changed
+        val shouldUpdateBitmap = data.isNewSong || 
+                                islandLeft != lastDispatchedIslandLeft || 
+                                data.isPlaying != lastDispatchedIsPlaying || 
+                                showIslandLeftAlbum != lastDispatchedShowAlbum
+
+        val newLabelBitmap = if (shouldUpdateBitmap && data.isPlaying && isSendNormalNotification && !disableLyricSplit) {
             if (islandLeft.isNotBlank()) {
                 if (showIslandLeftAlbum && data.albumBitmap != null && !data.albumBitmap.isRecycled) {
                     val textBitmap = generateTextBitmap(islandLeft)
@@ -385,12 +439,22 @@ class LiveLyricService : NotificationListenerService() {
                     generateTextBitmap(islandLeft)
                 }
             } else null
+        } else if (!shouldUpdateBitmap) {
+            previousLabelBitmap
         } else null
         
-        val oldBitmapToRecycle = previousLabelBitmap
-        previousLabelBitmap = newLabelBitmap
+        if (shouldUpdateBitmap) {
+            val oldBitmapToRecycle = previousLabelBitmap
+            if (oldBitmapToRecycle != null && oldBitmapToRecycle != newLabelBitmap && !oldBitmapToRecycle.isRecycled) {
+                oldBitmapToRecycle.recycle()
+            }
+            previousLabelBitmap = newLabelBitmap
+            lastDispatchedIslandLeft = islandLeft
+            lastDispatchedIsPlaying = data.isPlaying
+            lastDispatchedShowAlbum = showIslandLeftAlbum
+        }
 
-        DynamicLyricData.updateBitmaps(newLabelBitmap, data.albumBitmap, data.notificationAlbumBitmap)
+        DynamicLyricData.updateBitmaps(previousLabelBitmap, data.albumBitmap, data.notificationAlbumBitmap)
         DynamicLyricData.updateLeftTitles(islandLeft, finalNotificationLeft)
         DynamicLyricData.updateRightTitles(islandRight, finalNotificationRight, songLyric, songInfo, data.duration, data.isPlaying, data.currentPackageName, showIslandLeftAlbum)
 
@@ -400,9 +464,6 @@ class LiveLyricService : NotificationListenerService() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-        if (oldBitmapToRecycle != null && oldBitmapToRecycle != newLabelBitmap && !oldBitmapToRecycle.isRecycled) {
-            oldBitmapToRecycle.recycle()
         }
     }
 

@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric
+package com.lidesheng.hyperlyric
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -35,6 +35,27 @@ object NotificationManagerHelper {
         val labelBitmap: Bitmap? = null,
         val notificationAlbumBitmap: Bitmap? = null
     )
+
+    private var lastAlbumBitmap: Bitmap? = null
+    private var lastAlbumIcon: android.graphics.drawable.Icon? = null
+    private var lastLabelBitmap: Bitmap? = null
+    private var lastLabelIcon: androidx.core.graphics.drawable.IconCompat? = null
+
+    private fun getAlbumIcon(bitmap: Bitmap?): android.graphics.drawable.Icon? {
+        if (bitmap == null || bitmap.isRecycled) return null
+        if (bitmap === lastAlbumBitmap && lastAlbumIcon != null) return lastAlbumIcon
+        lastAlbumBitmap = bitmap
+        lastAlbumIcon = android.graphics.drawable.Icon.createWithBitmap(bitmap)
+        return lastAlbumIcon
+    }
+
+    private fun getLabelIcon(bitmap: Bitmap?): androidx.core.graphics.drawable.IconCompat? {
+        if (bitmap == null || bitmap.isRecycled) return null
+        if (bitmap === lastLabelBitmap && lastLabelIcon != null) return lastLabelIcon
+        lastLabelBitmap = bitmap
+        lastLabelIcon = androidx.core.graphics.drawable.IconCompat.createWithBitmap(bitmap)
+        return lastLabelIcon
+    }
 
     fun createNotificationChannel(notificationManager: NotificationManager) {
         if (notificationManager.getNotificationChannel(CHANNEL_ID) == null) {
@@ -112,11 +133,11 @@ object NotificationManagerHelper {
     ): Notification {
         val smallIconCompat = when {
             uiState.labelBitmap != null && !uiState.labelBitmap.isRecycled ->
-                androidx.core.graphics.drawable.IconCompat.createWithBitmap(uiState.labelBitmap)
+                getLabelIcon(uiState.labelBitmap) ?: androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
 
             (uiState.disableLyricSplit || uiState.showIslandLeftAlbum) &&
                     uiState.notificationAlbumBitmap != null && !uiState.notificationAlbumBitmap.isRecycled ->
-                androidx.core.graphics.drawable.IconCompat.createWithBitmap(uiState.notificationAlbumBitmap)
+                getLabelIcon(uiState.notificationAlbumBitmap) ?: androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
 
             else ->
                 androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
@@ -127,7 +148,7 @@ object NotificationManagerHelper {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
 
-        val albumIcon = uiState.notificationAlbumBitmap?.let { android.graphics.drawable.Icon.createWithBitmap(it) }
+        val albumIcon = getAlbumIcon(uiState.notificationAlbumBitmap)
         if (albumIcon != null) {
             builder.setLargeIcon(albumIcon)
         }
@@ -187,92 +208,19 @@ object NotificationManagerHelper {
         }
         
         val multiProgressJson = if (showProgress) {
-            """,
-                    "multiProgressInfo": {
-                        "title": "${escapeJson(uiState.songInfo)}",
-                        "progress": ${uiState.progress},
-                        "color": "$colorHex",
-                        "points": 0
-                    }"""
+            ",\"multiProgressInfo\":{\"title\":\"${escapeJson(uiState.songInfo)}\",\"progress\":${uiState.progress},\"color\":\"$colorHex\",\"points\":0}"
         } else ""
 
+        val islandTitle = escapeJson(if (uiState.disableLyricSplit) uiState.notificationTitleLeft else uiState.title)
         val imageTextInfoLeftJson = if (uiState.disableLyricSplit) {
-            """
-                "imageTextInfoLeft": {
-                    "type": 1,
-                    "picInfo": {
-                        "type": 1,
-                        "pic": "miui.focus.pic_album"
-                    }
-                }
-            """.trimIndent()
+            "\"imageTextInfoLeft\":{\"type\":1,\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\"}}"
         } else if (uiState.showIslandLeftAlbum) {
-            """
-                "imageTextInfoLeft": {
-                    "type": 1,
-                    "picInfo": {
-                        "type": 1,
-                        "pic": "miui.focus.pic_album"
-                    },
-                    "textInfo": {
-                        "title": "${escapeJson(uiState.islandTitleLeft)}"
-                    }
-                }
-            """.trimIndent()
+            "\"imageTextInfoLeft\":{\"type\":1,\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\"},\"textInfo\":{\"title\":\"${escapeJson(uiState.islandTitleLeft)}\"}}"
         } else {
-            """
-                "imageTextInfoLeft": {
-                    "type": 1,
-                    "textInfo": {
-                        "title": "${escapeJson(uiState.islandTitleLeft)}"
-                    }
-                }
-            """.trimIndent()
+            "\"imageTextInfoLeft\":{\"type\":1,\"textInfo\":{\"title\":\"${escapeJson(uiState.islandTitleLeft)}\"}}"
         }
 
-        val paramIslandJson = """
-            {
-                "param_v2": {
-                    "islandFirstFloat": false,
-                    "updatable": true,
-                    "param_island": {
-                        "islandProperty": 1,
-                        "bigIslandArea": {
-                            $imageTextInfoLeftJson,
-                            "textInfo": {
-                                "title": "${escapeJson(if (uiState.disableLyricSplit) uiState.notificationTitleLeft else uiState.title)}"
-                            }
-                        },
-                        "smallIslandArea": {
-                            "combinePicInfo": {
-                                "picInfo": {
-                                    "type": 1,
-                                    "pic": "miui.focus.pic_album"
-                                },
-                                "progressInfo": {
-                                    "progress": ${uiState.progress},
-                                    "colorReach": "$colorHex",
-                                    "isCCW": true
-                                }
-                            }
-                        }
-                    },
-                    "baseInfo": {
-                        "type": 2,
-                        "title": "${escapeJson(uiState.notificationTitleLeft)}",
-                        "content": "${escapeJson(uiState.notificationTitleRight)}",
-                        "showDivider": true
-                    },
-                    "picInfo": {
-                        "type": 1,
-                        "pic": "miui.focus.pic_album",
-                        "picDark": "miui.focus.pic_album"
-                    }$multiProgressJson,
-                    "aodTitle": "${escapeJson(uiState.notificationTitleLeft)}",
-                    "aodPic": "miui.focus.pic_album"
-                }
-            }
-        """.trimIndent()
+        val paramIslandJson = "{\"param_v2\":{\"islandFirstFloat\":false,\"updatable\":true,\"param_island\":{\"islandProperty\":1,\"bigIslandArea\":{$imageTextInfoLeftJson,\"textInfo\":{\"title\":\"$islandTitle\"}},\"smallIslandArea\":{\"combinePicInfo\":{\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\"},\"progressInfo\":{\"progress\":${uiState.progress},\"colorReach\":\"$colorHex\",\"isCCW\":true}}}},\"baseInfo\":{\"type\":2,\"title\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"content\":\"${escapeJson(uiState.notificationTitleRight)}\",\"showDivider\":true},\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\",\"picDark\":\"miui.focus.pic_album\"}$multiProgressJson,\"aodTitle\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"aodPic\":\"miui.focus.pic_album\"}}"
         
         val smallIconCompat = androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
 
@@ -297,7 +245,7 @@ object NotificationManagerHelper {
         if (uiState.color != 0) extras.putInt("mipush_focus_color", uiState.color)
 
         val picsBundle = Bundle()
-        val albumIcon = uiState.notificationAlbumBitmap?.let { android.graphics.drawable.Icon.createWithBitmap(it) } 
+        val albumIcon = getAlbumIcon(uiState.notificationAlbumBitmap)
             ?: android.graphics.drawable.Icon.createWithResource(context, R.drawable.lyrictile)
         picsBundle.putParcelable("miui.focus.pic_album", albumIcon)
         extras.putBundle("miui.focus.pics", picsBundle)
@@ -339,7 +287,19 @@ object NotificationManagerHelper {
 
 
     private fun escapeJson(text: String): String {
-        return text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+        if (text.isEmpty()) return ""
+        val sb = StringBuilder(text.length + 8)
+        for (c in text) {
+            when (c) {
+                '\\' -> sb.append("\\\\")
+                '\"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                else -> sb.append(c)
+            }
+        }
+        return sb.toString()
     }
 
     private fun getClickPendingIntent(context: Context, targetPackageName: String): PendingIntent? {
