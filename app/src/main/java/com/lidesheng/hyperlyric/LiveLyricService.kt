@@ -186,7 +186,11 @@ class LiveLyricService : NotificationListenerService() {
         val playbackState = controller.playbackState ?: return
         val currentPackageName = controller.packageName ?: ""
 
-        val rawTitle = (metadata.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "HyperLyric").substringBefore("\n")
+        val rawTitle = (metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
+            ?.lines()
+            ?.firstOrNull { it.isNotBlank() }
+            ?.trim()
+            ?: "Playing~")
         val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
         val album = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
         val duration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)

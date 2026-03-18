@@ -80,12 +80,21 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: "34.0.0"
 
+      - name: 生成发布描述 Generate Release Body
+        id: release_body
+        run: |
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "更新内容：" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B | grep -v '^[[:space:]]*$' | awk '{print NR "、" $0}' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: 发布 Release Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.version_name }}
           name: hyperlyric v${{ needs.check-version.outputs.version_name }}
+          body: ${{ steps.release_body.outputs.body }}
           draft: false
           prerelease: false
           generate_release_notes: true
