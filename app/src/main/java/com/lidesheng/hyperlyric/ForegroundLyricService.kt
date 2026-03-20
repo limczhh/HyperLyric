@@ -117,13 +117,15 @@ class ForegroundLyricService : Service() {
             notificationTitleRight = globalState.notificationTitleRight,
             albumBitmap = globalState.albumBitmap?.takeIf { !it.isRecycled },
             color = if (sp.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)) globalState.albumColor else 0xFF2C2C2C.toInt(),
+            colorEnd = if (sp.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)) globalState.albumColorEnd else 0xFF2C2C2C.toInt(),
             progress = progressPercent,
             isPlaying = globalState.isPlaying,
             targetPackageName = globalState.targetPackageName,
             showIslandLeftAlbum = globalState.showIslandLeftAlbum,
             disableLyricSplit = isDisableLyricSplit,
             labelBitmap = globalState.labelBitmap?.takeIf { !it.isRecycled },
-            notificationAlbumBitmap = globalState.notificationAlbumBitmap?.takeIf { !it.isRecycled }
+            notificationAlbumBitmap = globalState.notificationAlbumBitmap?.takeIf { !it.isRecycled },
+            focusNotificationType = sp.getInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, Constants.DEFAULT_FOCUS_NOTIFICATION_TYPE)
         )
 
         if (!force && currentUiState == lastUiState && isForeground) return

@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric
+package com.lidesheng.hyperlyric
 
 object Constants {
     const val PREF_NAME = "com.lidesheng.hyperlyric_preferences"
@@ -27,6 +27,7 @@ object Constants {
     const val KEY_PAUSE_LISTENING = "key_pause_listening"
     const val KEY_NOTIFICATION_CLICK_ACTION = "key_notification_click_action"
     const val KEY_PROGRESS_COLOR_ENABLED = "key_progress_color_enabled"
+    const val KEY_FOCUS_NOTIFICATION_TYPE = "key_focus_notification_type"
 
 
     const val DEFAULT_TEXT_SIZE = 13
@@ -51,4 +52,5 @@ object Constants {
     const val DEFAULT_PAUSE_LISTENING = false
     const val DEFAULT_NOTIFICATION_CLICK_ACTION = 0
     const val DEFAULT_PROGRESS_COLOR_ENABLED = true
+    const val DEFAULT_FOCUS_NOTIFICATION_TYPE = 0 // 0: OS3样式, 1: 兼容OS2
 }

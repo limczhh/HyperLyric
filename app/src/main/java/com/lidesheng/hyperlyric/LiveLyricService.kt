@@ -7,6 +7,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.MediaMetadata
 import android.media.session.MediaController
@@ -35,7 +38,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.ceil
-import androidx.core.graphics.withScale
+import androidx.core.graphics.toColorInt
+
 
 class LiveLyricService : NotificationListenerService() {
     private lateinit var mediaSessionManager: MediaSessionManager
@@ -45,8 +49,8 @@ class LiveLyricService : NotificationListenerService() {
     private var lastUpdateTime = 0L
     private val updateInterval = 100L
 
-    private val IMAGE_SHRINK_THRESHOLD = 10
-    private val DEFAULT_COLOR = Color.BLACK
+    private val ISLAND_BITMAP_HEIGHT = 128
+    private val DEFAULT_COLOR = "#E0E0E0".toColorInt()
     
     private var currentSongIdentifier = ""
 
@@ -62,9 +66,11 @@ class LiveLyricService : NotificationListenerService() {
     private val textPaint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 90f
             typeface = Typeface.DEFAULT_BOLD
             textAlign = Paint.Align.LEFT
+            textSize = 100f
+            val rawHeight = fontMetrics.descent - fontMetrics.ascent
+            textSize = 100f * (ISLAND_BITMAP_HEIGHT.toFloat() / rawHeight)
         }
     }
 
@@ -221,7 +227,7 @@ class LiveLyricService : NotificationListenerService() {
         }
 
         val notificationAlbumBitmap = if (isNewSong) {
-            albumBitmap?.let { scaleBitmapEfficiently(it) }
+            albumBitmap?.let { processAlbumBitmap(it) }
         } else {
             DynamicLyricData.currentState.notificationAlbumBitmap
         }
@@ -300,8 +306,8 @@ class LiveLyricService : NotificationListenerService() {
 
         if (data.isNewSong) {
             val progressColorEnabled = sp.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)
-            val extractedColor = if (progressColorEnabled) extractColorFromBitmap(data.albumBitmap) else DEFAULT_COLOR
-            DynamicLyricData.updateColor(extractedColor)
+            val colors = if (progressColorEnabled) extractColorsFromBitmap(data.albumBitmap) else ExtractedColors(DEFAULT_COLOR, DEFAULT_COLOR)
+            DynamicLyricData.updateColor(colors.dominant, colors.vibrant)
         }
 
         isCurrentlyPlaying = data.isPlaying
@@ -414,34 +420,39 @@ class LiveLyricService : NotificationListenerService() {
 
         val (islandLeft, islandRight, notificationLeft, notificationRight) = splitTitleByPixelWidth(songLyric, showIslandLeftAlbum)
 
-        val finalNotificationLeft: String
-        val finalNotificationRight: String
+        val finalIslandLeft: String
+        val finalIslandRight: String
         if (disableLyricSplit) {
-            finalNotificationLeft = songLyric
-            finalNotificationRight = " "
+            finalIslandLeft = ""
+            finalIslandRight = songLyric
         } else {
-            finalNotificationLeft = notificationLeft
-            finalNotificationRight = notificationRight
+            finalIslandLeft = islandLeft
+            finalIslandRight = islandRight
         }
+
+        // 通知栏：始终按自己的像素宽度分割，不受 disableLyricSplit 影响
+        val finalNotificationLeft = notificationLeft
 
         val songInfo = if (currentLyricLines != null) "${data.artist} - ${data.rawTitle}" else data.artist
 
-        // Optimization: Reuse bitmap if text and state haven't changed
-        val shouldUpdateBitmap = data.isNewSong || 
-                                islandLeft != lastDispatchedIslandLeft || 
+        val shouldUpdateBitmap = data.isNewSong ||
+                                finalIslandLeft != lastDispatchedIslandLeft || 
                                 data.isPlaying != lastDispatchedIsPlaying || 
                                 showIslandLeftAlbum != lastDispatchedShowAlbum
 
-        val newLabelBitmap = if (shouldUpdateBitmap && data.isPlaying && isSendNormalNotification && !disableLyricSplit) {
-            if (islandLeft.isNotBlank()) {
+        val newLabelBitmap = if (shouldUpdateBitmap && data.isPlaying && isSendNormalNotification) {
+            if (finalIslandLeft.isNotBlank()) {
                 if (showIslandLeftAlbum && data.albumBitmap != null && !data.albumBitmap.isRecycled) {
-                    val textBitmap = generateTextBitmap(islandLeft)
-                    val combined = combineBitmapsSideBySide(data.albumBitmap, textBitmap)
+                    val processedAlbum = data.notificationAlbumBitmap ?: processAlbumBitmap(data.albumBitmap)
+                    val textBitmap = generateTextBitmap(finalIslandLeft)
+                    val combined = combineBitmapsSideBySide(processedAlbum, textBitmap)
                     textBitmap.recycle()
                     combined
                 } else {
-                    generateTextBitmap(islandLeft)
+                    generateTextBitmap(finalIslandLeft)
                 }
+            } else if (showIslandLeftAlbum && data.albumBitmap != null && !data.albumBitmap.isRecycled) {
+                data.notificationAlbumBitmap ?: processAlbumBitmap(data.albumBitmap)
             } else null
         } else if (!shouldUpdateBitmap) {
             previousLabelBitmap
@@ -453,14 +464,16 @@ class LiveLyricService : NotificationListenerService() {
                 oldBitmapToRecycle.recycle()
             }
             previousLabelBitmap = newLabelBitmap
-            lastDispatchedIslandLeft = islandLeft
+            lastDispatchedIslandLeft = finalIslandLeft
             lastDispatchedIsPlaying = data.isPlaying
             lastDispatchedShowAlbum = showIslandLeftAlbum
         }
 
         DynamicLyricData.updateBitmaps(previousLabelBitmap, data.albumBitmap, data.notificationAlbumBitmap)
-        DynamicLyricData.updateLeftTitles(islandLeft, finalNotificationLeft)
-        DynamicLyricData.updateRightTitles(islandRight, finalNotificationRight, songLyric, songInfo, data.duration, data.isPlaying, data.currentPackageName, showIslandLeftAlbum)
+        DynamicLyricData.updateLeftTitles(finalIslandLeft, finalNotificationLeft)
+        DynamicLyricData.updateRightTitles(finalIslandRight,
+            notificationRight, songLyric, songInfo, data.duration, data.isPlaying, data.currentPackageName, showIslandLeftAlbum)
+
 
         if (data.isPlaying) {
             try {
@@ -502,65 +515,113 @@ class LiveLyricService : NotificationListenerService() {
     }
 
     private fun combineBitmapsSideBySide(album: Bitmap, textBitmap: Bitmap): Bitmap {
-        val targetHeight = textBitmap.height
-        val gap = (targetHeight * 0.1f).toInt().coerceAtLeast(1)
-        val totalWidth = targetHeight + gap + textBitmap.width
+        val gap = (ISLAND_BITMAP_HEIGHT * 0.1f).toInt().coerceAtLeast(1)
+        val totalWidth = album.width + gap + textBitmap.width
 
-        val result = createBitmap(totalWidth, targetHeight)
+        val result = createBitmap(totalWidth, ISLAND_BITMAP_HEIGHT)
         val canvas = Canvas(result)
 
-        canvas.drawBitmap(textBitmap, (targetHeight + gap).toFloat(), 0f, null)
-
-        val dstRect = android.graphics.Rect(0, 0, targetHeight, targetHeight)
-        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
-        canvas.drawBitmap(album, null, dstRect, bmpPaint)
+        canvas.drawBitmap(album, 0f, 0f, null)
+        val textY = (ISLAND_BITMAP_HEIGHT - textBitmap.height) / 2f
+        canvas.drawBitmap(textBitmap, (album.width + gap).toFloat(), textY, null)
 
         return result
     }
 
-    private fun generateTextBitmap(text: String): Bitmap {
-        val visualWeight = calculateTotalVisualWidth(text)
-        val fontMetrics = textPaint.fontMetrics
-        val textPhysicalHeight = ceil(fontMetrics.descent - fontMetrics.ascent).toInt()
-        val textPhysicalWidth = ceil(textPaint.measureText(text)).toInt()
+    private fun processAlbumBitmap(source: Bitmap, targetSize: Int = ISLAND_BITMAP_HEIGHT): Bitmap {
+        val w = source.width
+        val h = source.height
+        val cropSize = minOf(w, h)
+        val xOffset = (w - cropSize) / 2
+        val yOffset = (h - cropSize) / 2
 
-        val safeWidth = textPhysicalWidth.coerceAtLeast(1)
-        val safeHeight = textPhysicalHeight.coerceAtLeast(1)
+        val output = createBitmap(targetSize, targetSize)
+        val canvas = Canvas(output)
+        val cornerRadius = targetSize / 4f
+        val rectF = RectF(0f, 0f, targetSize.toFloat(), targetSize.toFloat())
 
-        val finalCanvasHeight = if (visualWeight <= IMAGE_SHRINK_THRESHOLD) {
-            safeHeight
-        } else {
-            (safeHeight * (visualWeight.toFloat() / IMAGE_SHRINK_THRESHOLD)).toInt()
+        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, maskPaint)
+
+        val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
         }
+        val srcRect = android.graphics.Rect(xOffset, yOffset, xOffset + cropSize, yOffset + cropSize)
+        val dstRect = android.graphics.Rect(0, 0, targetSize, targetSize)
+        canvas.drawBitmap(source, srcRect, dstRect, bitmapPaint)
 
-        val bitmap = createBitmap(safeWidth, finalCanvasHeight)
+        return output
+    }
+
+    private fun generateTextBitmap(text: String): Bitmap {
+        val fontMetrics = textPaint.fontMetrics
+        val textWidth = ceil(textPaint.measureText(text)).toInt().coerceAtLeast(1)
+
+        val bitmap = createBitmap(textWidth, ISLAND_BITMAP_HEIGHT)
         val canvas = Canvas(bitmap)
 
-        val centerY = finalCanvasHeight / 2f
+        val centerY = ISLAND_BITMAP_HEIGHT / 2f
         val textMiddleOffset = (fontMetrics.descent + fontMetrics.ascent) / 2f
-        val baselineY = centerY - textMiddleOffset
-
-        canvas.withScale(0.95f, 0.95f, safeWidth / 2f, finalCanvasHeight / 2f) {
-            drawText(text, 0f, baselineY, textPaint)
-        }
+        canvas.drawText(text, 0f, centerY - textMiddleOffset, textPaint)
 
         return bitmap
     }
 
-    private fun extractColorFromBitmap(bitmap: Bitmap?): Int {
-        if (bitmap == null || bitmap.isRecycled) return DEFAULT_COLOR
+    data class ExtractedColors(val dominant: Int, val vibrant: Int)
+
+    private fun extractColorsFromBitmap(bitmap: Bitmap?): ExtractedColors {
+        if (bitmap == null || bitmap.isRecycled) return ExtractedColors(DEFAULT_COLOR, DEFAULT_COLOR)
         return try {
             val targetBitmap = if (bitmap.width > 100 || bitmap.height > 100) {
                 bitmap.scale(100, 100, false)
             } else bitmap
-            
+
             val palette = Palette.from(targetBitmap).generate()
             if (targetBitmap != bitmap && !targetBitmap.isRecycled) targetBitmap.recycle()
+
+            val dominant = palette.getDominantColor(DEFAULT_COLOR)
+            var vibrant = palette.getVibrantColor(dominant)
             
-            palette.getVibrantColor(palette.getDominantColor(DEFAULT_COLOR))
+            if (isNearBlack(dominant) || isNearWhite(dominant)) {
+                vibrant = "#808080".toColorInt()
+            } else if (vibrant == dominant || isColorTooSimilar(dominant, vibrant)) {
+                vibrant = lightenColor(dominant)
+            }
+            
+            ExtractedColors(dominant, vibrant)
         } catch (_: Exception) {
-            DEFAULT_COLOR
+            ExtractedColors(DEFAULT_COLOR, DEFAULT_COLOR)
         }
+    }
+
+    private fun isNearBlack(color: Int): Boolean {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        return hsv[2] < 0.15f
+    }
+
+    private fun isNearWhite(color: Int): Boolean {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        return hsv[2] > 0.85f && hsv[1] < 0.15f
+    }
+
+    private fun isColorTooSimilar(color1: Int, color2: Int): Boolean {
+        val hsv1 = FloatArray(3)
+        val hsv2 = FloatArray(3)
+        Color.colorToHSV(color1, hsv1)
+        Color.colorToHSV(color2, hsv2)
+        
+        return abs(hsv1[0] - hsv2[0]) < 10 && abs(hsv1[1] - hsv2[1]) < 0.1f
+    }
+
+    private fun lightenColor(color: Int): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        hsv[2] = (hsv[2] * 1.4f).coerceAtMost(1.0f) // 提高亮度
+        hsv[1] = (hsv[1] * 0.8f) // 降低饱和度
+        return Color.HSVToColor(hsv)
     }
 
     data class LyricSplitResult(
@@ -582,7 +643,7 @@ class LiveLyricService : NotificationListenerService() {
 
         val totalWidth = textPaint.measureText(title)
         
-        val cutLimitRaw = if (showIslandLeftAlbum) 660f else 720f
+        val cutLimitRaw = if (showIslandLeftAlbum) 650f else 720f
         val leftTextLimitRaw = if (showIslandLeftAlbum) 280f else 360f
         
         val cutLimitPX = scalePxToInternalLimit(cutLimitRaw)
@@ -592,7 +653,7 @@ class LiveLyricService : NotificationListenerService() {
         var islandRight: String
 
         if (totalWidth <= cutLimitPX) {
-            val targetLeftWidth = if (showIslandLeftAlbum) (totalWidth / 2f) - scalePxToInternalLimit(10f) else totalWidth / 2f
+            val targetLeftWidth = if (showIslandLeftAlbum) (totalWidth / 2f) - scalePxToInternalLimit(60f) else totalWidth / 2f
             val cutIndex = computeSplitIndexByPixel(title, targetLeftWidth.coerceAtLeast(0f), leftTextLimitPX)
             islandLeft = title.substring(0, cutIndex).trim()
             islandRight = title.substring(cutIndex).trim()
@@ -607,7 +668,7 @@ class LiveLyricService : NotificationListenerService() {
             islandLeft = ""
         }
 
-        val focusNotificationLimitPX = scalePxToInternalLimit(700f)
+        val focusNotificationLimitPX = scalePxToInternalLimit(600f)
         var notificationLeft: String
         var notificationRight = " "
 
@@ -667,24 +728,6 @@ class LiveLyricService : NotificationListenerService() {
         idx = if (backDiff < forwardDiff) backSplit else forwardSplit
 
         return idx.coerceIn(0, text.length)
-    }
-
-    private fun calculateTotalVisualWidth(text: String): Int = text.sumOf { getCharVisualWidth(it) }
-    private fun getCharVisualWidth(c: Char): Int = if (c.code in 0..127) 1 else 2
-
-    private fun scaleBitmapEfficiently(bitmap: Bitmap, maxSize: Int = 128): Bitmap {
-        if (bitmap.isRecycled) return bitmap
-        val w = bitmap.width
-        val h = bitmap.height
-        if (w <= maxSize && h <= maxSize) return bitmap
-        val scale = maxSize.toFloat() / maxOf(w, h)
-        val newW = (w * scale).toInt().coerceAtLeast(1)
-        val newH = (h * scale).toInt().coerceAtLeast(1)
-        return try {
-            bitmap.scale(newW, newH)
-        } catch (_: Exception) {
-            bitmap
-        }
     }
 
     private fun safeCopyBitmap(bitmap: Bitmap?): Bitmap? {

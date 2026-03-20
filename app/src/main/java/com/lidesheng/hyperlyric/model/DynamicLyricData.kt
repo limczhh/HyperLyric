@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.model
+package com.lidesheng.hyperlyric.model
 
 import android.content.Context
 import com.lidesheng.hyperlyric.Constants
@@ -36,6 +36,7 @@ data class LyricState(
     val isPlaying: Boolean = false,
     val targetPackageName: String = "",
     val albumColor: Int = Color.BLACK,
+    val albumColorEnd: Int = Color.BLACK,
     val labelBitmap: Bitmap? = null,
     val albumBitmap: Bitmap? = null,
     val notificationAlbumBitmap: Bitmap? = null,
@@ -97,9 +98,10 @@ object DynamicLyricData {
         ) }
     }
 
-    fun updateColor(color: Int) {
-        _musicState.update { it.copy(albumColor = color) }
+    fun updateColor(color: Int, colorEnd: Int) {
+        _musicState.update { it.copy(albumColor = color, albumColorEnd = colorEnd) }
     }
+
 
     fun updateRightTitles(
         islandText: String,

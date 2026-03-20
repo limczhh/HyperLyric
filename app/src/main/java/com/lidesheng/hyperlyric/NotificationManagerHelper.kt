@@ -27,13 +27,15 @@ object NotificationManagerHelper {
         val notificationTitleRight: String = "",
         val albumBitmap: Bitmap? = null,
         val color: Int,
+        val colorEnd: Int,
         val progress: Int,
         val isPlaying: Boolean,
         val targetPackageName: String = "",
         val showIslandLeftAlbum: Boolean = false,
         val disableLyricSplit: Boolean = false,
         val labelBitmap: Bitmap? = null,
-        val notificationAlbumBitmap: Bitmap? = null
+        val notificationAlbumBitmap: Bitmap? = null,
+        val focusNotificationType: Int = 0
     )
 
     private var lastAlbumBitmap: Bitmap? = null
@@ -206,6 +208,12 @@ object NotificationManagerHelper {
         } else {
             "#2C2C2C"
         }
+
+        val colorEndHex = if (uiState.colorEnd != 0) {
+            String.format("#%06X", 0xFFFFFF and uiState.colorEnd)
+        } else {
+            "#2C2C2C"
+        }
         
         val multiProgressJson = if (showProgress) {
             ",\"multiProgressInfo\":{\"title\":\"${escapeJson(uiState.songInfo)}\",\"progress\":${uiState.progress},\"color\":\"$colorHex\",\"points\":0}"
@@ -220,7 +228,13 @@ object NotificationManagerHelper {
             "\"imageTextInfoLeft\":{\"type\":1,\"textInfo\":{\"title\":\"${escapeJson(uiState.islandTitleLeft)}\"}}"
         }
 
-        val paramIslandJson = "{\"param_v2\":{\"islandFirstFloat\":false,\"updatable\":true,\"param_island\":{\"islandProperty\":1,\"bigIslandArea\":{$imageTextInfoLeftJson,\"textInfo\":{\"title\":\"$islandTitle\"}},\"smallIslandArea\":{\"combinePicInfo\":{\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\"},\"progressInfo\":{\"progress\":${uiState.progress},\"colorReach\":\"$colorHex\",\"isCCW\":true}}}},\"baseInfo\":{\"type\":2,\"title\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"content\":\"${escapeJson(uiState.notificationTitleRight)}\",\"showDivider\":true},\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\",\"picDark\":\"miui.focus.pic_album\"}$multiProgressJson,\"aodTitle\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"aodPic\":\"miui.focus.pic_album\"}}"
+        val paramIslandJson = if (uiState.focusNotificationType == 1) {
+            // 兼容os2
+            "{\"param_v2\":{\"islandFirstFloat\":false,\"updatable\":true,\"param_island\":{\"islandProperty\":1,\"bigIslandArea\":{$imageTextInfoLeftJson,\"textInfo\":{\"title\":\"$islandTitle\"}},\"smallIslandArea\":{\"combinePicInfo\":{\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\"},\"progressInfo\":{\"progress\":${uiState.progress},\"colorReach\":\"$colorEndHex\",\"isCCW\":true}}}},\"baseInfo\":{\"title\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"content\":\"${escapeJson(uiState.songInfo)}\",\"type\":2},\"progressInfo\":{\"progress\":${uiState.progress},\"colorProgress\":\"$colorHex\",\"colorProgressEnd\":\"$colorEndHex\"},\"picInfo\":{\"type\":2,\"pic\":\"miui.focus.pic_album\",\"picDark\":\"miui.focus.pic_album\"}}}"
+        } else {
+            // os3
+            "{\"param_v2\":{\"islandFirstFloat\":false,\"updatable\":true,\"param_island\":{\"islandProperty\":1,\"bigIslandArea\":{$imageTextInfoLeftJson,\"textInfo\":{\"title\":\"$islandTitle\"}},\"smallIslandArea\":{\"combinePicInfo\":{\"picInfo\":{\"type\":1,\"pic\":\"miui.focus.pic_album\"},\"progressInfo\":{\"progress\":${uiState.progress},\"colorReach\":\"$colorEndHex\",\"isCCW\":true}}}},\"baseInfo\":{\"type\":2,\"title\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"content\":\"${escapeJson(uiState.notificationTitleRight)}\",\"showDivider\":true},\"picInfo\":{\"type\":2,\"pic\":\"miui.focus.pic_album\",\"picDark\":\"miui.focus.pic_album\"}$multiProgressJson,\"aodTitle\":\"${escapeJson(uiState.notificationTitleLeft)}\",\"aodPic\":\"miui.focus.pic_album\"}}"
+        }
         
         val smallIconCompat = androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
 

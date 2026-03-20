@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.ui
+package com.lidesheng.hyperlyric.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -482,6 +482,23 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                     )
 
                                     Card(modifier = Modifier.fillMaxWidth()) {
+                                        val focusStyleOptions = listOf("OS2", "OS3")
+                                        var focusNotificationType by remember {
+                                            mutableIntStateOf(prefs.getInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, Constants.DEFAULT_FOCUS_NOTIFICATION_TYPE))
+                                        }
+
+                                        SuperDropdown(
+                                            title = "焦点通知样式",
+                                            summary = "此功能仅作用于澎湃系统",
+                                            items = focusStyleOptions,
+                                            selectedIndex = 1 - focusNotificationType,
+                                            onSelectedIndexChange = { index ->
+                                                val storedValue = 1 - index
+                                                focusNotificationType = storedValue
+                                                prefs.edit { putInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, storedValue) }
+                                            }
+                                        )
+
                                         var notificationClickAction by remember {
                                             mutableIntStateOf(prefs.getInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, Constants.DEFAULT_NOTIFICATION_CLICK_ACTION))
                                         }
