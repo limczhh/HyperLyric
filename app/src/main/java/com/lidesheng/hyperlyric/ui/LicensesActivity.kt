@@ -84,6 +84,7 @@ class LicensesActivity : ComponentActivity() {
                 LicenseItem("Lyrico", "Replica0110", "https://github.com/Replica0110/Lyrico"),
                 LicenseItem("LDDC", "chenmozhijin", "https://github.com/chenmozhijin/LDDC"),
                 LicenseItem("HyperCeiler", "HyperCeiler团队", "https://github.com/ReChronoRain/HyperCeiler"),
+                LicenseItem("HyperOShape","xzakota","https://github.com/xzakota/HyperOShape")
             )
         }
 

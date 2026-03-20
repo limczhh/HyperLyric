@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.ui
+package com.lidesheng.hyperlyric.ui
 
 import android.content.Context
 import android.content.Intent
@@ -52,6 +52,7 @@ import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.net.toUri
 import com.lidesheng.hyperlyric.Constants
+import com.lidesheng.hyperlyric.root.ConfigSync
 import com.lidesheng.hyperlyric.Quotes
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.root.ShellUtils
@@ -329,6 +330,13 @@ fun MainScreen() {
                                             context.startActivity(Intent(context, WhitelistActivity::class.java))
                                         }
                                     )
+                                    SuperArrow(
+                                        title = "灵动岛歌词通知",
+                                        summary = "适用于无root设备",
+                                        onClick = {
+                                            context.startActivity(Intent(context, DynamicIslandNotificationActivity::class.java))
+                                        }
+                                    )
                                 }
                             }
 
@@ -342,11 +350,15 @@ fun MainScreen() {
                                     title = "重启系统界面",
                                     onClick = { showRestartDialog = true }
                                 )
-                                SuperArrow(
-                                    title = "灵动岛歌词通知",
-                                    summary = "适用于无root设备",
-                                    onClick = {
-                                        context.startActivity(Intent(context, DynamicIslandNotificationActivity::class.java))
+                                var removeFocusWhitelist by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_REMOVE_FOCUS_WHITELIST, Constants.DEFAULT_REMOVE_FOCUS_WHITELIST)) }
+                                SuperSwitch(
+                                    title = "移除焦点通知白名单",
+                                    summary = "不要和其他模块的相同功能冲突使用",
+                                    checked = removeFocusWhitelist,
+                                    onCheckedChange = {
+                                        removeFocusWhitelist = it
+                                        prefs.edit { putBoolean(Constants.KEY_REMOVE_FOCUS_WHITELIST, it) }
+                                        ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_REMOVE_FOCUS_WHITELIST, it)
                                     }
                                 )
                                 SuperArrow(
@@ -530,7 +542,7 @@ fun AboutContent(modifier: Modifier = Modifier) {
         )
         Card(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "授予root权限才能自定义配置和白名单，启用此模块并勾选系统界面，重启系统界面后即可使用。\n可在配置完成后移除root权限。",
+                text = "目前仅支持下拉小窗白名单hook，启用此模块并勾选系统界面，重启系统界面后即可使用。",
                 fontSize = 13.sp,
                 color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(16.dp),

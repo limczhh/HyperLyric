@@ -1,10 +1,9 @@
--keep class com.lidesheng.hyperlyric.root.MainHook { *; }
--keep class com.lidesheng.hyperlyric.root.MainHook$* { *; }
 -keep class com.lidesheng.hyperlyric.root.** { *; }
 -keep class com.lidesheng.hyperlyric.Constants { *; }
 
-# 保持 Xposed 库的接口不被混淆
--keep class de.robv.android.xposed.** { *; }
+# 保护 libxposed 库的接口不被混淆
+-keep class io.github.libxposed.api.** { *; }
+-keep interface io.github.libxposed.api.** { *; }
 
 # 保护 Kotlin 元数据
 -keep class kotlin.Metadata { *; }

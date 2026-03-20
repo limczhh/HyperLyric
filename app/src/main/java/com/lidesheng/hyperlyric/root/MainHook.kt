@@ -1,10 +1,7 @@
-﻿package com.lidesheng.hyperlyric.root
+package com.lidesheng.hyperlyric.root
 
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.Color
 import android.media.MediaMetadata
@@ -50,72 +47,8 @@ object MainHook {
         private val clipDisabledViews = WeakHashMap<View, Boolean>()
         private val layoutFixedContainers = WeakHashMap<ViewGroup, Boolean>()
 
-        private var isReceiverRegistered = false
-        private val configUpdateReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == "com.lidesheng.hyperlyric.UPDATE_SETTINGS") {
-                    val currentConfig = cachedConfig ?: return
-                    val extras = intent.extras ?: return
-
-                    var newSize = currentConfig.size
-                    var newMarquee = currentConfig.marquee
-                    var newHideNotch = currentConfig.hideNotch
-                    var newMaxLeftWidth = currentConfig.maxLeftWidth
-                    var newSpeed = currentConfig.speed
-                    var newDelay = currentConfig.delay
-                    var newAnimMode = currentConfig.animMode
-                    var newWhitelist = currentConfig.whitelist
-
-                    var changed = false
-
-                    for (key in extras.keySet()) {
-                        when (key) {
-                            "key_text_size" -> { newSize = extras.getInt(key); changed = true }
-                            "key_marquee_mode" -> { newMarquee = extras.getBoolean(key); changed = true }
-                            "key_hide_notch" -> { newHideNotch = extras.getBoolean(key); changed = true }
-                            "key_max_left_width" -> { newMaxLeftWidth = extras.getInt(key); changed = true }
-                            "marquee_speed" -> { newSpeed = extras.getInt(key); changed = true }
-                            "marquee_delay" -> { newDelay = extras.getInt(key); changed = true }
-                            "key_anim_mode" -> { newAnimMode = extras.getInt(key); changed = true }
-                            "key_whitelist_packages" -> {
-                                val array = extras.getStringArray(key)
-                                if (array != null) {
-                                    newWhitelist = array.toSet()
-                                    changed = true
-                                }
-                            }
-                        }
-                    }
-
-                    if (changed) {
-                        cachedConfig = ModuleConfig(
-                            size = newSize,
-                            marquee = newMarquee,
-                            hideNotch = newHideNotch,
-                            maxLeftWidth = newMaxLeftWidth,
-                            speed = newSpeed,
-                            delay = newDelay,
-                            animMode = newAnimMode,
-                            whitelist = newWhitelist
-                        )
-                        module.log("[HyperLyric] Config updated from broadcast!")
-
-                        // Force update if lyric is showing
-                        val state = activeIslandState ?: return
-                        if (state.isAlive()) {
-                            val tvLeft = state.tvLeft.get() ?: return
-                            val tvRight = state.tvRight.get() ?: return
-                            val bigIslandView = state.bigIslandView.get() ?: return
-                            val title = tvLeft.contentDescription?.toString() ?: ""
-                            applyLyricContent(tvLeft, tvRight, title, cachedConfig!!, context, bigIslandView)
-                        }
-                    }
-                }
-            }
-        }
-
-        // 保存 XposedModule 引用，供 Hooker 类使用
         internal lateinit var module: XposedModule
+        private var isListenerRegistered = false
 
         // 灵动岛活跃 View 的弱引用，用于实时推送歌词更新
         private data class ActiveIslandState(
@@ -145,8 +78,12 @@ object MainHook {
         fun hookSystemUIDynamicIsland(xposedModule: XposedModule, param: PackageLoadedParam) {
             module = xposedModule
             module.log("[HyperLyric] ★ hookSystemUIDynamicIsland start")
+            
+            // 首次加载初始化配置
+            getSmartConfig()
 
             try {
+                // ... (rest of hook logic remains same)
                 // 1. 尝试直接加载（如果类在 base classloader 中，这一步就成功了）
                 try {
                     val factoryClass = param.defaultClassLoader.loadClass("miui.systemui.dynamicisland.template.IslandTemplateFactory")
@@ -234,16 +171,6 @@ object MainHook {
                         val context = bigIslandView.context
                         val config = getSmartConfig()
 
-                        if (!isReceiverRegistered) {
-                            try {
-                                val filter = IntentFilter("com.lidesheng.hyperlyric.UPDATE_SETTINGS")
-                                context.registerReceiver(configUpdateReceiver, filter, Context.RECEIVER_EXPORTED)
-                                isReceiverRegistered = true
-                                module.log("[HyperLyric] Settings broadcast receiver registered in SystemUI")
-                            } catch (e: Exception) {
-                                module.log("[HyperLyric] [E] Failed to register receiver: ${e.message}")
-                            }
-                        }
 
                         if (mediaTracker == null) {
                             mediaTracker = MediaSessionTracker(context).apply {
@@ -336,6 +263,41 @@ object MainHook {
             return try {
                 // 使用 libxposed API 从宿主 Module (本 App) 获取共享配置，抛弃 Root
                 val prefs = module.getRemotePreferences("com.lidesheng.hyperlyric_preferences")
+
+                // 注册实时监听器，实现免重启更新
+                if (!isListenerRegistered) {
+                    prefs.registerOnSharedPreferenceChangeListener { p, key ->
+                        module.log("[HyperLyric] 远程配置项变更: $key")
+                        val newConfig = ModuleConfig(
+                            size = p.getInt("key_text_size", cachedConfig?.size ?: 13),
+                            marquee = p.getBoolean("key_marquee_mode", cachedConfig?.marquee ?: true),
+                            hideNotch = p.getBoolean("key_hide_notch", cachedConfig?.hideNotch ?: false),
+                            maxLeftWidth = p.getInt("key_max_left_width", cachedConfig?.maxLeftWidth ?: 240),
+                            speed = p.getInt("marquee_speed", cachedConfig?.speed ?: 100),
+                            delay = p.getInt("marquee_delay", cachedConfig?.delay ?: 1500),
+                            animMode = p.getInt("key_anim_mode", cachedConfig?.animMode ?: 0),
+                            whitelist = p.getStringSet("key_whitelist_packages", cachedConfig?.whitelist ?: emptySet()) ?: emptySet()
+                        )
+                        cachedConfig = newConfig
+
+                        // 立即推送到当前正在显示的 View
+                        activeIslandState?.let { state ->
+                            if (state.isAlive()) {
+                                try {
+                                    val tvLeft = state.tvLeft.get() ?: return@let
+                                    val tvRight = state.tvRight.get() ?: return@let
+                                    val bigIslandView = state.bigIslandView.get() ?: return@let
+                                    val context = tvLeft.context
+                                    val title = tvLeft.contentDescription?.toString() ?: ""
+                                    applyLyricContent(tvLeft, tvRight, title, newConfig, context, bigIslandView)
+                                } catch (e: Exception) {
+                                    module.log("[HyperLyric] 实时更新 View 失败: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+                    isListenerRegistered = true
+                }
 
                 ModuleConfig(
                     size = prefs.getInt("key_text_size", 13),

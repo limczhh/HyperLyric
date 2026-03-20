@@ -2,7 +2,7 @@ package com.lidesheng.hyperlyric.model
 
 import android.content.Context
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.root.*
+import com.lidesheng.hyperlyric.root.ConfigSync
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.core.content.edit
@@ -165,8 +165,6 @@ object DynamicLyricData {
             putStringSet(Constants.KEY_WHITELIST, set)
         }
 
-        scope.launch {
-            ConfigSyncHelper.syncFullConfigToSystem(context)
-        }
+        ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_WHITELIST, set)
     }
 }

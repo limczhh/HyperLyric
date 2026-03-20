@@ -12,8 +12,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="io.github.libxposed.permission.BIND_XPOSED_SERVICE" />
 
     <application
+        android:name=".root.ConfigSync"
         android:label="HyperLyric"
         android:description="@string/app_description"
         android:testOnly="false"
@@ -94,6 +96,11 @@
             android:name=".ui.LicensesActivity"
             android:exported="false" />
 
+        <provider
+            android:name="io.github.libxposed.service.XposedProvider"
+            android:authorities="com.lidesheng.hyperlyric.XposedService"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
     </application>
 
 </manifest>

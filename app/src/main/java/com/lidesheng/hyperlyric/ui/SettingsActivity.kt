@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.ui
+package com.lidesheng.hyperlyric.ui
 
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -37,17 +37,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
-import androidx.lifecycle.lifecycleScope
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.root.ConfigSyncHelper
+import com.lidesheng.hyperlyric.root.ConfigSync
 import com.lidesheng.hyperlyric.utils.ThemeUtils
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -136,7 +133,7 @@ class SettingsActivity : ComponentActivity() {
                     is Boolean -> putBoolean(key, value)
                 }
             }
-            saveConfigToSystem()
+            ConfigSync.syncPreference(Constants.PREF_NAME, key, value)
         }
 
         val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
@@ -470,10 +467,6 @@ class SettingsActivity : ComponentActivity() {
         return 0
     }
 
-    private fun saveConfigToSystem() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            ConfigSyncHelper.syncFullConfigToSystem(this@SettingsActivity)
-        }
-    }
+
 
 }

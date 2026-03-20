@@ -69,6 +69,7 @@ dependencies {
 
     // libxposed API
     compileOnly("io.github.libxposed:api:101.0.0")
+    implementation("io.github.libxposed:service:101.0.0")
 
     // --- 布局兼容 ---
     implementation(libs.androidx.constraintlayout)
