@@ -34,7 +34,7 @@ object Constants {
     const val DEFAULT_TEXT_SIZE = 13
     const val DEFAULT_MARQUEE = true
     const val DEFAULT_HIDE_NOTCH = false
-    const val DEFAULT_MAX_LEFT_WIDTH = 240
+    const val DEFAULT_MAX_LEFT_WIDTH = 100
     const val DEFAULT_MARQUEE_SPEED = 100
     const val DEFAULT_MARQUEE_DELAY = 1500
     const val DEFAULT_ANIM_MODE = 0

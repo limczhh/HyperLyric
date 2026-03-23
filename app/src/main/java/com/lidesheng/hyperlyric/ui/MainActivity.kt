@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
-import android.view.View
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,9 +50,9 @@ import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.net.toUri
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.root.ConfigSync
 import com.lidesheng.hyperlyric.Quotes
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.root.ConfigSync
 import com.lidesheng.hyperlyric.root.ShellUtils
 import com.lidesheng.hyperlyric.utils.ThemeUtils
 import dev.chrisbanes.haze.HazeState
@@ -94,7 +92,6 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -454,8 +451,6 @@ fun MainScreen() {
 @Composable
 fun AboutContent(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val view = LocalView.current
-
     val appVersion = remember {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -467,12 +462,6 @@ fun AboutContent(modifier: Modifier = Modifier) {
         }
     }
 
-    var notchWidth by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        view.post {
-            notchWidth = getNaturalCutoutWidth(view)
-        }
-    }
 
     val deviceModel = remember {
         getSystemProperty("ro.product.marketname") ?: Build.MODEL
@@ -513,7 +502,6 @@ fun AboutContent(modifier: Modifier = Modifier) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column {
                 BasicComponent(title = deviceModel, summary = "设备型号")
-                BasicComponent(title = "${notchWidth}px", summary = "缺口宽度")
                 BasicComponent(title = osVersion, summary = "系统版本")
                 BasicComponent(title = androidVersion, summary = "Android版本")
             }
@@ -611,14 +599,4 @@ fun getSystemProperty(key: String): String? {
     } catch (_: Exception) {
         null
     }
-}
-
-fun getNaturalCutoutWidth(view: View): Int {
-        val insets = view.rootWindowInsets?.displayCutout
-        insets?.boundingRects?.forEach { rect ->
-            if (abs((rect.left + rect.right) / 2 - view.resources.displayMetrics.widthPixels / 2) < 200) {
-                return rect.width()
-            }
-        }
-    return 0
 }
