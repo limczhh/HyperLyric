@@ -132,9 +132,11 @@ object NotificationManagerHelper {
         uiState: UiState,
         duration: Long
     ): Notification {
+        val prefs = context.getSharedPreferences(Constants.PREF_NAME, Context.MODE_PRIVATE)
+        val showAlbumSmallIcon = prefs.getBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, Constants.DEFAULT_NORMAL_NOTIFICATION_ALBUM)
+
         val smallIconCompat = when {
-            (uiState.disableLyricSplit || uiState.showIslandLeftAlbum) &&
-                    uiState.notificationAlbumBitmap != null && !uiState.notificationAlbumBitmap.isRecycled ->
+            showAlbumSmallIcon && uiState.notificationAlbumBitmap != null && !uiState.notificationAlbumBitmap.isRecycled ->
                 getLabelIcon(uiState.notificationAlbumBitmap) ?: androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
 
             else ->
@@ -156,7 +158,7 @@ object NotificationManagerHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(getClickPendingIntent(context, uiState.targetPackageName))
-            .setShortCriticalText(if (uiState.disableLyricSplit) uiState.notificationTitleLeft else uiState.title)
+            .setShortCriticalText(uiState.notificationTitleLeft)
             .setContentTitle(uiState.notificationTitleLeft)
             .setSubText(uiState.songInfo)
             .setContentText(uiState.notificationTitleRight)

@@ -477,6 +477,26 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                     }
 
                                     SmallTitle(
+                                        text = "实时通知胶囊设置",
+                                        insideMargin = PaddingValues(10.dp, 4.dp)
+                                    )
+                                    var normalNotificationAlbumEnabled by remember {
+                                        mutableStateOf(prefs.getBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, Constants.DEFAULT_NORMAL_NOTIFICATION_ALBUM))
+                                    }
+                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                        Column {
+                                            SuperSwitch(
+                                                title = "胶囊左侧专辑封面",
+                                                checked = normalNotificationAlbumEnabled,
+                                                onCheckedChange = { checked ->
+                                                    normalNotificationAlbumEnabled = checked
+                                                    prefs.edit { putBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, checked) }
+                                                }
+                                            )
+                                        }
+                                    }
+
+                                    SmallTitle(
                                         text = "通知设置",
                                         insideMargin = PaddingValues(10.dp, 4.dp)
                                     )
