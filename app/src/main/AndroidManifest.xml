@@ -61,7 +61,7 @@
         </activity>
 
         <service
-            android:name=".LiveLyricService"
+            android:name=".service.LiveLyricService"
             android:label="获取媒体信息权限"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
@@ -71,13 +71,13 @@
         </service>
 
         <service
-            android:name=".ForegroundLyricService"
+            android:name=".service.ForegroundLyricService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <service
-            android:name=".LyricTileService"
+            android:name=".service.LyricTileService"
             android:icon="@drawable/lyrictile"
             android:label="HyperLyric媒体信息监听"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"

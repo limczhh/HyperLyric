@@ -58,7 +58,6 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -77,9 +76,10 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDialog
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.RadioButtonPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -363,8 +363,7 @@ class HookSettingsActivity : ComponentActivity() {
                         scrollBehavior = scrollBehavior,
                         navigationIcon = {
                             IconButton(
-                                onClick = { finish() },
-                                modifier = Modifier.padding(start = 12.dp)
+                                onClick = { finish() }
                             ) {
                                 Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
                             }
@@ -560,7 +559,7 @@ class HookSettingsActivity : ComponentActivity() {
                             item {
                                 Column {
                                     Card(modifier = Modifier.fillMaxWidth()) {
-                                        SuperArrow(
+                                        ArrowPreference(
                                             title = "超级岛长度",
                                             endActions = {
                                                 Text(
@@ -595,7 +594,7 @@ class HookSettingsActivity : ComponentActivity() {
                                     )
                                     Card(modifier = Modifier.fillMaxWidth()) {
                                         Column(modifier = Modifier.fillMaxWidth()) {
-                                            SuperArrow(
+                                            ArrowPreference(
                                                 title = "大小",
                                                 endActions = {
                                                     Text(
@@ -618,7 +617,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     )
                                                 }
                                             )
-                                            SuperArrow(
+                                            ArrowPreference(
                                                 title = "字重",
                                                 endActions = {
                                                     Text(
@@ -641,7 +640,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     )
                                                 }
                                             )
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "粗体",
                                                 checked = fontBold,
                                                 onCheckedChange = {
@@ -649,7 +648,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     saveConfig(Constants.KEY_FONT_BOLD, it)
                                                 }
                                             )
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "斜体",
                                                 checked = fontItalic,
                                                 onCheckedChange = {
@@ -657,7 +656,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     saveConfig(Constants.KEY_FONT_ITALIC, it)
                                                 }
                                             )
-                                            SuperArrow(
+                                            ArrowPreference(
                                                 title = "多行模式下文字大小比例",
                                                 endActions = {
                                                     Text(
@@ -678,7 +677,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     )
                                                 }
                                             )
-                                            SuperArrow(
+                                            ArrowPreference(
                                                 title = "羽化边缘长度",
                                                 endActions = {
                                                     Text(
@@ -699,7 +698,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     )
                                                 }
                                             )
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "羽化进度样式",
                                                 checked = gradientStyle,
                                                 onCheckedChange = {
@@ -722,7 +721,7 @@ class HookSettingsActivity : ComponentActivity() {
                                     Card(modifier = Modifier.fillMaxWidth()) {
                                         Column {
                                             // 跑马灯部分
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "歌词滚动",
                                                 checked = marqueeMode,
                                                 onCheckedChange = {
@@ -732,7 +731,7 @@ class HookSettingsActivity : ComponentActivity() {
                                             )
                                             AnimatedVisibility(visible = marqueeMode) {
                                                 Column {
-                                                    SuperArrow(
+                                                    ArrowPreference(
                                                         title = "滚动速度",
                                                         endActions = {
                                                             Text(
@@ -753,7 +752,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                             )
                                                         }
                                                     )
-                                                    SuperArrow(
+                                                    ArrowPreference(
                                                         title = "初始滚动延迟",
                                                         endActions = {
                                                             Text(
@@ -774,7 +773,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                             )
                                                         }
                                                     )
-                                                    SuperSwitch(
+                                                    SwitchPreference(
                                                         title = "无限循环",
                                                         checked = marqueeInfinite,
                                                         onCheckedChange = {
@@ -782,7 +781,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                             saveConfig(Constants.KEY_MARQUEE_INFINITE, it)
                                                         }
                                                     )
-                                                    SuperArrow(
+                                                    ArrowPreference(
                                                         title = "循环间隔",
                                                         endActions = {
                                                             Text(
@@ -803,7 +802,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                             )
                                                         }
                                                     )
-                                                    SuperSwitch(
+                                                    SwitchPreference(
                                                         title = "结束时在末尾停止",
                                                         checked = marqueeStopEnd,
                                                         onCheckedChange = {
@@ -827,7 +826,7 @@ class HookSettingsActivity : ComponentActivity() {
                                     )
                                     Card(modifier = Modifier.fillMaxWidth()) {
                                         Column {
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "启用相对进度歌词",
                                                 checked = syllableRelative,
                                                 onCheckedChange = {
@@ -835,7 +834,7 @@ class HookSettingsActivity : ComponentActivity() {
                                                     saveConfig(Constants.KEY_SYLLABLE_RELATIVE, it)
                                                 }
                                             )
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "显示相对进度歌词高亮进度",
                                                 checked = syllableHighlight,
                                                 onCheckedChange = {
@@ -866,45 +865,32 @@ class HookSettingsActivity : ComponentActivity() {
                             )
                         ) {
                             item {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                                ) {
-                                    SuperSwitch(
-                                        title = "启用歌词切换动画",
-                                        summary = "利用 YoYo 引擎在切歌或换行时显示精美动画效果",
-                                        checked = animEnable,
-                                        onCheckedChange = {
-                                            animEnable = it
-                                            saveConfig(Constants.KEY_ANIM_ENABLE, it)
-                                        }
-                                    )
-                                }
-                            }
-                            item {
                                 SmallTitle(
-                                    text = "动画效果选择",
+                                    text = "歌词切换动画",
                                     insideMargin = PaddingValues(10.dp, 4.dp, 10.dp, 4.dp)
                                 )
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Column {
+                                        RadioButtonPreference(
+                                            title = "无动画",
+                                            selected = !animEnable,
+                                            onClick = {
+                                                animEnable = false
+                                                saveConfig(Constants.KEY_ANIM_ENABLE, false)
+                                            }
+                                        )
                                         val registry = io.github.proify.lyricon.lyric.view.yoyo.YoYoPresets.registry
                                         val keys = registry.keys.toList()
                                         keys.forEach { key ->
                                             val label = animLabelMap[key] ?: key
-                                            BasicComponent(
+                                            RadioButtonPreference(
                                                 title = label,
+                                                selected = animEnable && animId == key,
                                                 onClick = {
+                                                    animEnable = true
+                                                    saveConfig(Constants.KEY_ANIM_ENABLE, true)
                                                     animId = key
                                                     saveConfig(Constants.KEY_ANIM_ID, key)
-                                                },
-                                                endActions = {
-                                                    if (animId == key) {
-                                                        Text(
-                                                            text = "使用中",
-                                                            color = MiuixTheme.colorScheme.primary,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
                                                 }
                                             )
                                         }
@@ -1011,7 +997,7 @@ class HookSettingsActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "正在扫描已安装的歌词提供者...",
+                            "正在扫描...",
                             color = MiuixTheme.colorScheme.onSurfaceVariantActions
                         )
                     }

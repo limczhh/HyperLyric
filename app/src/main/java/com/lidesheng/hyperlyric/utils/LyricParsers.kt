@@ -1,9 +1,9 @@
 ﻿package com.lidesheng.hyperlyric.utils
 
-import com.lidesheng.hyperlyric.model.LyricsData
-import com.lidesheng.hyperlyric.model.LyricsLine
-import com.lidesheng.hyperlyric.model.LyricsResult
-import com.lidesheng.hyperlyric.model.LyricsWord
+import com.lidesheng.hyperlyric.online.model.LyricsData
+import com.lidesheng.hyperlyric.online.model.LyricsLine
+import com.lidesheng.hyperlyric.online.model.LyricsResult
+import com.lidesheng.hyperlyric.online.model.LyricsWord
 import java.util.regex.Pattern
 
 private object LrcParserUtils {

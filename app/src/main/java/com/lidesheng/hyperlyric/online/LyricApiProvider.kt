@@ -2,7 +2,7 @@
 
 import android.content.Context
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
-import com.lidesheng.hyperlyric.model.SearchSource
+import com.lidesheng.hyperlyric.online.model.SearchSource
 import com.lidesheng.hyperlyric.online.source.ne.NeApi
 import com.lidesheng.hyperlyric.online.source.ne.NeSource
 import com.lidesheng.hyperlyric.online.source.qm.QmApi

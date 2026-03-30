@@ -1,7 +1,7 @@
 ﻿package com.lidesheng.hyperlyric.online
 
 import android.content.Context
-import com.lidesheng.hyperlyric.model.SongSearchResult
+import com.lidesheng.hyperlyric.online.model.SongSearchResult
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 

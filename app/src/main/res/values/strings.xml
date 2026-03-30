@@ -2,4 +2,30 @@
 <resources>
     <string name="app_description">HyperOS3媒体超级岛完善模块</string>
     <string name="provider_release_home">https://github.com/proify/LyricProvider/releases</string>
+    <string name="yoyo_default">默认</string>
+    <string name="yoyo_fade_out_fade_in">渐隐渐现</string>
+    <string name="yoyo_fade_out_up_fade_in_up">向上渐隐＆向上渐现</string>
+    <string name="yoyo_fade_out_down_fade_in_down">向下渐隐＆向下渐现</string>
+    <string name="yoyo_fade_out_left_fade_in_right">向左渐隐＆右侧渐现</string>
+    <string name="yoyo_fade_out_left_fade_in_up">向左渐隐＆向上渐现</string>
+    <string name="yoyo_fade_out_left_zoom_in">向左渐隐＆缩放渐现</string>
+    <string name="yoyo_fade_out_left_landing">向左渐隐＆柔缓着陆</string>
+    <string name="yoyo_fade_out_right_fade_in_left">向右渐隐＆左侧渐现</string>
+    <string name="yoyo_fade_out_right_fade_in_up">向右渐隐＆向上渐现</string>
+    <string name="yoyo_fade_out_right_zoom_in">向右渐隐＆缩放渐现</string>
+    <string name="yoyo_fade_out_right_landing">向右渐隐＆聚焦着陆</string>
+    <string name="yoyo_fade_out_left_zoom_in_right">向左渐隐＆右侧缩放渐现</string>
+    <string name="yoyo_fade_out_right_zoom_in_left">向右渐隐＆左侧缩放渐现</string>
+    <string name="yoyo_slide_out_left_slide_in_right">左侧滑出＆右侧滑入</string>
+    <string name="yoyo_slide_out_left_fade_in_up">左侧滑出＆向上渐现</string>
+    <string name="yoyo_slide_out_left_zoom_in">左侧滑出＆缩放渐现</string>
+    <string name="yoyo_slide_out_left_landing">左侧滑出＆柔缓着陆</string>
+    <string name="yoyo_slide_out_right_slide_in_left">右侧滑出＆左侧滑入</string>
+    <string name="yoyo_slide_out_right_fade_in_up">右侧滑出＆向上渐现</string>
+    <string name="yoyo_slide_out_right_zoom_in">右侧滑出＆缩放渐现</string>
+    <string name="yoyo_slide_out_right_landing">右侧滑出＆柔缓着陆</string>
+    <string name="yoyo_flip_out_x_flip_in_x">X轴翻转</string>
+    <string name="yoyo_flip_out_y_flip_in_y">Y轴翻转</string>
+    <string name="yoyo_rotate_out_rotate_in">旋转</string>
+    <string name="yoyo_zoom_out_zoom_in">缩放</string>
 </resources>

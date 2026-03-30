@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.root
+package com.lidesheng.hyperlyric.root
 
 import android.annotation.SuppressLint
 import android.content.res.Resources
@@ -65,9 +65,6 @@ object UnlockIslandWhitelist {
 
         if (resId != 0) {
             targetResId = resId
-            module.log("[HyperLyric] 功能探测：系统已暴露白名单资源 ID: $resId")
-        } else {
-            module.log("[HyperLyric] 功能探测：系统底层未直接暴露 ID，进入运行时动态匹配模式。")
         }
 
         try {
@@ -76,7 +73,6 @@ object UnlockIslandWhitelist {
             )
             module.deoptimize(getStringArrayMethod)
             module.hook(getStringArrayMethod).intercept(GetStringArrayHooker())
-            module.log("[HyperLyric] 白名单方法 Hook 已注册 (探测模式)")
         } catch (e: Exception) {
             module.log("[HyperLyric] [E] 白名单 Hook 注册失败: ${e.message}")
         }
@@ -102,7 +98,6 @@ object UnlockIslandWhitelist {
                 val resName = resources.getResourceEntryName(resId)
                 if (resName == TARGET_RES_NAME) {
                     targetResId = resId
-                    module.log("[HyperLyric] 运行时探测成功，锁定白名单 ID: $resId")
                     return CUSTOM_WHITELIST
                 }
             } catch (_: Exception) {

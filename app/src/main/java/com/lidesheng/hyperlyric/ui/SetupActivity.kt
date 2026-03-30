@@ -44,7 +44,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.state.ToggleableState
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.model.DynamicLyricData
+import com.lidesheng.hyperlyric.online.model.DynamicLyricData
 import com.lidesheng.hyperlyric.root.ShellUtils
 import com.lidesheng.hyperlyric.utils.ThemeUtils
 import kotlinx.coroutines.delay
@@ -59,7 +59,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -293,7 +293,7 @@ fun PermissionPage(workMode: Int) {
         if (workMode == 0) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    SuperArrow(
+                    ArrowPreference(
                         title = "获取 Root 权限",
                         summary = if (isRootGranted.value) "已获得 Root 权限" else "执行 'su' 命令请求权限",
                         onClick = {
@@ -310,14 +310,14 @@ fun PermissionPage(workMode: Int) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column {
-                        SuperArrow(
+                        ArrowPreference(
                             title = "通知监听权限",
                             summary = if (isNotificationGranted.value) "权限已授予" else "读取播放状态和歌曲信息",
                             onClick = {
                                 context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                             }
                         )
-                        SuperArrow(
+                        ArrowPreference(
                             title = "发送通知权限",
                             summary = "允许app发送通知以显示歌词",
                             onClick = {

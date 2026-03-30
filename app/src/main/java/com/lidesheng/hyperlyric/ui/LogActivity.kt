@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.ui
+package com.lidesheng.hyperlyric.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -72,9 +72,9 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
 import top.yukonga.miuix.kmp.theme.LocalDismissState
-import top.yukonga.miuix.kmp.extra.SuperCheckbox
-import top.yukonga.miuix.kmp.extra.WindowDialog
-import top.yukonga.miuix.kmp.extra.WindowListPopup
+import top.yukonga.miuix.kmp.preference.CheckboxPreference
+import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.window.WindowListPopup
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Filter
@@ -345,8 +345,7 @@ class LogActivity : ComponentActivity() {
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(
-                            onClick = { finish() },
-                            modifier = Modifier.padding(start = 12.dp)
+                            onClick = { finish() }
                         ) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
                         }
@@ -683,7 +682,7 @@ class LogActivity : ComponentActivity() {
         ) {
             val firstLine = entry.message.lines().firstOrNull() ?: ""
             val displaySummary = firstLine.take(20) + if(entry.message.lines().size > 1 || firstLine.length > 20) "..." else ""
-            SuperCheckbox(
+            CheckboxPreference(
                 title = entry.timestamp,
                 summary = displaySummary,
                 checked = isChecked,

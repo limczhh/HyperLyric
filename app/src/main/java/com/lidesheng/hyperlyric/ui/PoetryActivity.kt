@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.ui
+package com.lidesheng.hyperlyric.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -101,8 +101,7 @@ class PoetryActivity : ComponentActivity() {
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(
-                            onClick = { finish() },
-                            modifier = Modifier.padding(start = 12.dp)
+                            onClick = { finish() }
                         ) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
                         }

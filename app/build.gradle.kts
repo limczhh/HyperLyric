@@ -86,9 +86,12 @@ dependencies {
     implementation(libs.androidx.activity.compose)
 
     // --- MIUI X 组件库 ---
-    implementation(libs.miuix.android)
+    implementation(libs.miuix.ui.android)
+    implementation(libs.miuix.preference.android)
+    implementation(libs.miuix.blur.android)
     implementation(libs.miuix.icons.android)
     implementation(libs.haze)
+
 
     // --- 调试工具 ---
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -99,4 +102,8 @@ dependencies {
     implementation(libs.squareup.okhttp3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.retrofit2.kotlinx.serialization.converter)
+
+    // --- 动画库 (YoYo) ---
+    implementation("com.daimajia.androidanimations:library:2.4@aar")
+    implementation("com.daimajia.easing:library:2.4@aar")
 }

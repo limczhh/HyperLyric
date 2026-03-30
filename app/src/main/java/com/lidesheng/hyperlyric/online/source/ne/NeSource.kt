@@ -4,10 +4,10 @@ import android.content.Context
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
-import com.lidesheng.hyperlyric.model.LyricsResult
-import com.lidesheng.hyperlyric.model.SearchSource
-import com.lidesheng.hyperlyric.model.SongSearchResult
-import com.lidesheng.hyperlyric.model.Source
+import com.lidesheng.hyperlyric.online.model.LyricsResult
+import com.lidesheng.hyperlyric.online.model.SearchSource
+import com.lidesheng.hyperlyric.online.model.SongSearchResult
+import com.lidesheng.hyperlyric.online.model.Source
 import com.lidesheng.hyperlyric.utils.NeCryptoUtils
 import com.lidesheng.hyperlyric.utils.YrcParser
 import kotlinx.coroutines.Dispatchers

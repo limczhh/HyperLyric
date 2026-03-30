@@ -2,11 +2,11 @@
 
 
 import android.util.Base64
-import com.lidesheng.hyperlyric.model.LyricsResult
-import com.lidesheng.hyperlyric.model.LyricsData
-import com.lidesheng.hyperlyric.model.SearchSource
-import com.lidesheng.hyperlyric.model.SongSearchResult
-import com.lidesheng.hyperlyric.model.Source
+import com.lidesheng.hyperlyric.online.model.LyricsResult
+import com.lidesheng.hyperlyric.online.model.LyricsData
+import com.lidesheng.hyperlyric.online.model.SearchSource
+import com.lidesheng.hyperlyric.online.model.SongSearchResult
+import com.lidesheng.hyperlyric.online.model.Source
 import com.lidesheng.hyperlyric.utils.QmCryptoUtils
 import com.lidesheng.hyperlyric.utils.QrcParser
 import kotlinx.coroutines.Dispatchers

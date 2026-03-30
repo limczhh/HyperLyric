@@ -34,7 +34,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -98,8 +98,7 @@ class LicensesActivity : ComponentActivity() {
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(
-                            onClick = { finish() },
-                            modifier = Modifier.padding(start = 12.dp)
+                            onClick = { finish() }
                         ) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
                         }
@@ -137,7 +136,7 @@ class LicensesActivity : ComponentActivity() {
                     ) {
                         Column {
                             licenses.forEach { license ->
-                                SuperArrow(
+                                ArrowPreference(
                                     title = license.name,
                                     summary = license.author,
                                     onClick = {

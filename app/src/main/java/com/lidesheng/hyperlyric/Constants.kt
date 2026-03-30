@@ -10,6 +10,8 @@ object Constants {
     const val KEY_MARQUEE_SPEED = "marquee_speed"
     const val KEY_MARQUEE_DELAY = "marquee_delay"
     const val KEY_ANIM_MODE = "key_anim_mode"
+    const val KEY_ANIM_ENABLE = "key_anim_enable"
+    const val KEY_ANIM_ID = "key_anim_id"
     const val KEY_WHITELIST = "key_whitelist_packages"
     const val KEY_PERSISTENT_FOREGROUND = "key_persistent_foreground"
     const val KEY_ONLINE_LYRIC_ENABLED = "key_online_lyric_enabled"
@@ -29,6 +31,7 @@ object Constants {
     const val KEY_PROGRESS_COLOR_ENABLED = "key_progress_color_enabled"
     const val KEY_FOCUS_NOTIFICATION_TYPE = "key_focus_notification_type"
     const val KEY_REMOVE_FOCUS_WHITELIST = "remove_focus_whitelist"
+    const val KEY_NORMAL_NOTIFICATION_ALBUM = "key_normal_notification_album"
 
 
     const val DEFAULT_TEXT_SIZE = 13
@@ -38,6 +41,8 @@ object Constants {
     const val DEFAULT_MARQUEE_SPEED = 100
     const val DEFAULT_MARQUEE_DELAY = 1500
     const val DEFAULT_ANIM_MODE = 0
+    const val DEFAULT_ANIM_ENABLE = false
+    const val DEFAULT_ANIM_ID = "yoyo_default"
     const val DEFAULT_ONLINE_LYRIC_ENABLED = false
     const val DEFAULT_ONLINE_LYRIC_CACHE_LIMIT = 200
     const val DEFAULT_THEME_MODE = 0
@@ -55,6 +60,7 @@ object Constants {
     const val DEFAULT_PROGRESS_COLOR_ENABLED = true
     const val DEFAULT_FOCUS_NOTIFICATION_TYPE = 0 // 0: OS3样式, 1: 兼容OS2
     const val DEFAULT_REMOVE_FOCUS_WHITELIST = false
+    const val DEFAULT_NORMAL_NOTIFICATION_ALBUM = false
 
     // 歌词显示 - 新增
     const val KEY_FONT_WEIGHT = "key_font_weight"
@@ -62,7 +68,6 @@ object Constants {
     const val KEY_FONT_ITALIC = "key_font_italic"
     const val KEY_FADING_EDGE_LENGTH = "key_fading_edge_length"
     const val KEY_GRADIENT_PROGRESS = "key_gradient_progress"
-    const val KEY_PLACEHOLDER_FORMAT = "key_placeholder_format"
 
     // 特殊功能 - 新增
     const val KEY_MARQUEE_LOOP_DELAY = "key_marquee_loop_delay"
@@ -80,7 +85,6 @@ object Constants {
     const val DEFAULT_FONT_ITALIC = false
     const val DEFAULT_FADING_EDGE_LENGTH = 10
     const val DEFAULT_GRADIENT_PROGRESS = true
-    const val DEFAULT_PLACEHOLDER_FORMAT = 2 // 0: None, 1: Name, 2: Name+Artist
 
     const val DEFAULT_MARQUEE_MODE = true
     const val DEFAULT_MARQUEE_LOOP_DELAY = 700

@@ -78,9 +78,9 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperDialog
-import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.extended.Info
@@ -231,12 +231,17 @@ fun MainScreen() {
             }
         }
     ) { padding ->
-        SuperDialog(
+        WindowDialog(
             title = "是否重启系统界面？",
-            summary = "更新应用后才需要重启哦",
             show = showRestartDialog,
             onDismissRequest = { showRestartDialog = false }
         ) {
+            Text(
+                text = "更新应用后才需要重启哦",
+                modifier = Modifier.padding(bottom = 16.dp),
+                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                fontSize = 14.sp
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -311,14 +316,14 @@ fun MainScreen() {
 
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
-                                    SuperArrow(
+                                    ArrowPreference(
                                         title = "小米超级岛hook自定义配置",
                                         summary = "需要root，仅支持HyperOS3设备",
                                         onClick = {
                                             context.startActivity(Intent(context, HookSettingsActivity::class.java))
                                         }
                                     )
-                                    SuperArrow(
+                                    ArrowPreference(
                                         title = "灵动岛歌词通知",
                                         summary = "适用于无root设备",
                                         onClick = {
@@ -335,12 +340,12 @@ fun MainScreen() {
 
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
-                                    SuperArrow(
+                                    ArrowPreference(
                                         title = "重启系统界面",
                                         onClick = { showRestartDialog = true }
                                     )
                                     var removeFocusWhitelist by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_REMOVE_FOCUS_WHITELIST, Constants.DEFAULT_REMOVE_FOCUS_WHITELIST)) }
-                                    SuperSwitch(
+                                    SwitchPreference(
                                         title = "移除焦点通知白名单",
                                         summary = "不要和其他模块的相同功能冲突使用",
                                         checked = removeFocusWhitelist,
@@ -356,7 +361,7 @@ fun MainScreen() {
                             Spacer(modifier = Modifier.height(20.dp))
 
                             Card(modifier = Modifier.fillMaxWidth()) {
-                                SuperArrow(
+                                ArrowPreference(
                                     title = "应用设置",
                                     summary = "个性化、备份与恢复等",
                                     onClick = {
@@ -519,7 +524,7 @@ fun AboutContent(modifier: Modifier = Modifier) {
                     }
                 }
             )
-            SuperArrow(
+            ArrowPreference(
                 title = "项目引用与参考",
                 summary = "感谢@FrancOS 和@于逸风 的帮助，以及一些没列出的项目",
                 onClick = {

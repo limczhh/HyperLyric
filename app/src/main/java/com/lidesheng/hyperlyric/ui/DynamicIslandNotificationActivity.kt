@@ -43,9 +43,9 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.compose.runtime.collectAsState
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.ForegroundLyricService
-import com.lidesheng.hyperlyric.LyricTileService
-import com.lidesheng.hyperlyric.model.DynamicLyricData
+import com.lidesheng.hyperlyric.service.ForegroundLyricService
+import com.lidesheng.hyperlyric.service.LyricTileService
+import com.lidesheng.hyperlyric.online.model.DynamicLyricData
 import com.lidesheng.hyperlyric.utils.ThemeUtils
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -65,10 +65,10 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperDropdown
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDialog
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -184,8 +184,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                         scrollBehavior = scrollBehavior,
                         navigationIcon = {
                             IconButton(
-                                onClick = { finish() },
-                                modifier = Modifier.padding(start = 12.dp)
+                                onClick = { finish() }
                             ) {
                                 Icon(imageVector = MiuixIcons.Back, contentDescription = "后退")
                             }
@@ -349,7 +348,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                         )
                                         Card(modifier = Modifier.fillMaxWidth()) {
                                             Column {
-                                                SuperArrow(
+                                                ArrowPreference(
                                                     title = "发送歌词通知权限",
                                                     summary = "要与\u201c获取歌词信息权限\u201d同时开启使用",
                                                     onClick = {
@@ -360,7 +359,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                         }
                                                     }
                                                 )
-                                                SuperArrow(
+                                                ArrowPreference(
                                                     title = "获取歌词信息权限",
                                                     onClick = {
                                                         try {
@@ -402,7 +401,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
 
                                         Card(modifier = Modifier.fillMaxWidth()) {
                                             Column {
-                                                SuperSwitch(
+                                                SwitchPreference(
                                                     title = "暂停媒体监听",
                                                     summary = "关闭所有歌词通知发送",
                                                     checked = pauseListening,
@@ -410,12 +409,12 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                         pauseListening = checked
                                                         prefs.edit { putBoolean(Constants.KEY_PAUSE_LISTENING, checked) }
                                                         val intent = Intent(context, ForegroundLyricService::class.java).apply {
-                                                            action = if (checked) LyricTileService.ACTION_PAUSE_Toggled else LyricTileService.ACTION_RESUME_Toggled
+                                                            action = if (checked) LyricTileService.ACTION_PAUSE_TOGGLED else LyricTileService.ACTION_RESUME_TOGGLED
                                                         }
                                                         context.startService(intent)
                                                     }
                                                 )
-                                                SuperSwitch(
+                                                SwitchPreference(
                                                     title = "发送实时通知",
                                                     checked = sendNormalEnabled,
                                                     onCheckedChange = { checked ->
@@ -423,7 +422,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                         prefs.edit { putBoolean(Constants.KEY_SEND_NORMAL_NOTIFICATION, checked) }
                                                     }
                                                 )
-                                                SuperSwitch(
+                                                SwitchPreference(
                                                     title = "发送焦点通知",
                                                     checked = sendFocusEnabled,
                                                     onCheckedChange = { checked ->
@@ -440,7 +439,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                         )
                                         Card(modifier = Modifier.fillMaxWidth()) {
                                             Column {
-                                                SuperArrow(
+                                                ArrowPreference(
                                                     title = "应用自启动",
                                                     onClick = {
                                                         try {
@@ -463,7 +462,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                         }
                                                     }
                                                 )
-                                                SuperArrow(
+                                                ArrowPreference(
                                                     title = "忽略电池优化",
                                                     onClick = {
                                                         try {
@@ -486,7 +485,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                         }
                                                     }
                                                 )
-                                                SuperSwitch(
+                                                SwitchPreference(
                                                     title = "保持后台运行",
                                                     summary = "如果没有通知发送，可手动开关一遍该功能强行唤醒服务",
                                                     checked = persistentEnabled,
@@ -505,7 +504,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                         }
                                                     }
                                                 )
-                                                SuperSwitch(
+                                                SwitchPreference(
                                                     title = "获取在线歌词",
                                                     summary = "实验性功能，谨慎启用\n开启后可关闭音乐软件车载蓝牙功能",
                                                     checked = onlineLyricEnabled,
@@ -517,7 +516,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                     }
                                                 )
                                                 if (onlineLyricEnabled) {
-                                                    SuperArrow(
+                                                    ArrowPreference(
                                                         title = "在线歌词缓存上限",
                                                         summary = "$onlineLyricCacheLimit 首",
                                                         onClick = {
@@ -560,7 +559,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                     }
                                     Card(modifier = Modifier.fillMaxWidth()) {
                                         Column {
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "超级岛左侧专辑封面",
                                                 checked = islandLeftAlbumEnabled,
                                                 onCheckedChange = { checked ->
@@ -573,7 +572,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                                 }
                                             )
                                             AnimatedVisibility(visible = islandLeftAlbumEnabled) {
-                                                SuperSwitch(
+                                                SwitchPreference(
                                                     title = "关闭歌词分割",
                                                     checked = disableLyricSplitEnabled,
                                                     onCheckedChange = { checked ->
@@ -594,7 +593,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                     }
                                     Card(modifier = Modifier.fillMaxWidth()) {
                                         Column {
-                                            SuperSwitch(
+                                            SwitchPreference(
                                                 title = "胶囊左侧专辑封面",
                                                 checked = normalNotificationAlbumEnabled,
                                                 onCheckedChange = { checked ->
@@ -616,7 +615,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                             mutableIntStateOf(prefs.getInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, Constants.DEFAULT_FOCUS_NOTIFICATION_TYPE))
                                         }
 
-                                        SuperDropdown(
+                                        WindowDropdownPreference(
                                             title = "焦点通知样式",
                                             summary = "此功能仅作用于澎湃系统",
                                             items = focusStyleOptions,
@@ -633,7 +632,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                         }
                                         val clickOptions = listOf("暂停音乐（默认）", "打开HyperLyric", "打开正在播放的媒体应用")
 
-                                        SuperDropdown(
+                                        WindowDropdownPreference(
                                             title = "点击通知",
                                             items = clickOptions,
                                             selectedIndex = notificationClickAction,
@@ -646,7 +645,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                                         var progressColorEnabled by remember {
                                             mutableStateOf(prefs.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED))
                                         }
-                                        SuperSwitch(
+                                        SwitchPreference(
                                             title = "进度条强调色",
                                             summary = "切歌后生效",
                                             checked = progressColorEnabled,
@@ -676,7 +675,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                             ) {
                                 item {
                                     Card(modifier = Modifier.fillMaxWidth()) {
-                                        SuperArrow(
+                                        ArrowPreference(
                                             title = "添加白名单应用",
                                             onClick = {
                                                 tempWhitelistInput = ""

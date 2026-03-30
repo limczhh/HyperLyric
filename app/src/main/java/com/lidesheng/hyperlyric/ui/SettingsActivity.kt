@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,9 +40,9 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperDropdown
-import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -201,8 +200,7 @@ class SettingsActivity : ComponentActivity() {
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(
-                            onClick = { finish() },
-                            modifier = Modifier.padding(start = 12.dp)
+                            onClick = { finish() }
                         ) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
                         }
@@ -240,7 +238,7 @@ class SettingsActivity : ComponentActivity() {
                         var themeMode by remember { mutableIntStateOf(prefs.getInt(Constants.KEY_THEME_MODE, Constants.DEFAULT_THEME_MODE)) }
                         val themeOptions = listOf("跟随系统", "浅色", "深色", "跟随系统（莫奈）", "浅色（莫奈）", "深色（莫奈）")
 
-                        SuperDropdown(
+                        WindowDropdownPreference(
                             title = "主题颜色",
                             items = themeOptions,
                             selectedIndex = themeMode,
@@ -254,7 +252,7 @@ class SettingsActivity : ComponentActivity() {
                             var monetColorIndex by remember { mutableIntStateOf(prefs.getInt(Constants.KEY_MONET_COLOR, Constants.DEFAULT_MONET_COLOR)) }
                             val monetOptions = listOf("默认", "蓝色", "绿色", "红色", "黄色", "橙色", "紫色", "粉色")
 
-                            SuperDropdown(
+                            WindowDropdownPreference(
                                 title = "强调色",
                                 items = monetOptions,
                                 selectedIndex = monetColorIndex,
@@ -266,7 +264,7 @@ class SettingsActivity : ComponentActivity() {
                         }
 
                         var floatingNavBarEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_FLOATING_NAV_BAR, Constants.DEFAULT_FLOATING_NAV_BAR)) }
-                        SuperSwitch(
+                        SwitchPreference(
                             title = "悬浮底栏",
                             checked = floatingNavBarEnabled,
                             onCheckedChange = {
@@ -276,7 +274,7 @@ class SettingsActivity : ComponentActivity() {
                         )
 
                         var excludeFromRecents by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_EXCLUDE_FROM_RECENTS, Constants.DEFAULT_EXCLUDE_FROM_RECENTS)) }
-                        SuperSwitch(
+                        SwitchPreference(
                             title = "隐藏后台卡片",
                             checked = excludeFromRecents,
                             onCheckedChange = {
@@ -296,7 +294,7 @@ class SettingsActivity : ComponentActivity() {
                     )
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column {
-                            SuperArrow(
+                            ArrowPreference(
                                 title = "备份",
                                 onClick = {
                                     val dateTime = LocalDateTime.now()
@@ -304,7 +302,7 @@ class SettingsActivity : ComponentActivity() {
                                     backupLauncher.launch("hyperlyric_backup_$dateTime.json")
                                 }
                             )
-                            SuperArrow(
+                            ArrowPreference(
                                 title = "恢复",
                                 onClick = {
                                     restoreLauncher.launch(arrayOf("application/json"))
@@ -318,7 +316,7 @@ class SettingsActivity : ComponentActivity() {
                         insideMargin = PaddingValues(10.dp, 4.dp)
                     )
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        SuperArrow(
+                        ArrowPreference(
                             title = "查看模块日志",
                             onClick = {
                                 context.startActivity(android.content.Intent(context, LogActivity::class.java))
