@@ -31,6 +31,7 @@ object Constants {
     const val KEY_PROGRESS_COLOR_ENABLED = "key_progress_color_enabled"
     const val KEY_FOCUS_NOTIFICATION_TYPE = "key_focus_notification_type"
     const val KEY_REMOVE_FOCUS_WHITELIST = "remove_focus_whitelist"
+    const val KEY_REMOVE_ISLAND_WHITELIST = "remove_island_whitelist"
     const val KEY_NORMAL_NOTIFICATION_ALBUM = "key_normal_notification_album"
 
 
@@ -60,6 +61,7 @@ object Constants {
     const val DEFAULT_PROGRESS_COLOR_ENABLED = true
     const val DEFAULT_FOCUS_NOTIFICATION_TYPE = 0 // 0: OS3样式, 1: 兼容OS2
     const val DEFAULT_REMOVE_FOCUS_WHITELIST = false
+    const val DEFAULT_REMOVE_ISLAND_WHITELIST = false
     const val DEFAULT_NORMAL_NOTIFICATION_ALBUM = false
 
     // 歌词显示 - 新增

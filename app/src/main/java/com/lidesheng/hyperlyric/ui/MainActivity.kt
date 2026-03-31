@@ -350,6 +350,16 @@ fun MainScreen() {
                                             ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_REMOVE_FOCUS_WHITELIST, it)
                                         }
                                     )
+                                    var removeIslandWhitelist by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_REMOVE_ISLAND_WHITELIST, Constants.DEFAULT_REMOVE_ISLAND_WHITELIST)) }
+                                    SwitchPreference(
+                                        title = "移除下拉小窗白名单",
+                                        checked = removeIslandWhitelist,
+                                        onCheckedChange = {
+                                            removeIslandWhitelist = it
+                                            prefs.edit { putBoolean(Constants.KEY_REMOVE_ISLAND_WHITELIST, it) }
+                                            ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_REMOVE_ISLAND_WHITELIST, it)
+                                        }
+                                    )
                                 }
                             }
 

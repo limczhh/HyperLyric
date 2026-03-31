@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.root
 
 import android.util.Log
+import com.lidesheng.hyperlyric.Constants
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -34,7 +35,12 @@ object UnlockIslandWhitelist {
     }
 
     class ReturnTrueHooker : Hooker {
-        override fun intercept(chain: Chain): Any {
+        override fun intercept(chain: Chain): Any? {
+            val prefs = module.getRemotePreferences(Constants.PREF_NAME)
+            val enabled = prefs.getBoolean(Constants.KEY_REMOVE_ISLAND_WHITELIST, Constants.DEFAULT_REMOVE_ISLAND_WHITELIST)
+            if (!enabled) {
+                return chain.proceed()
+            }
             // 直接放行，覆盖系统及云控白名单校验
             return true
         }
