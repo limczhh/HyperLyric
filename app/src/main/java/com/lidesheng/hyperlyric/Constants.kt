@@ -18,8 +18,7 @@ object Constants {
     const val KEY_ENABLE_DYNAMIC_ISLAND = "key_enable_dynamic_island"
 
     // Notification & Hook Features
-    const val KEY_SEND_NORMAL_NOTIFICATION = "key_send_normal_notification"
-    const val KEY_SEND_FOCUS_NOTIFICATION = "key_send_focus_notification"
+    const val KEY_NOTIFICATION_TYPE = "key_notification_type"
     const val KEY_FOCUS_NOTIFICATION_TYPE = "key_focus_notification_type"
     const val KEY_NORMAL_NOTIFICATION_ALBUM = "key_normal_notification_album"
     const val KEY_ISLAND_LEFT_ALBUM = "key_island_left_album"
@@ -75,8 +74,7 @@ object Constants {
     const val DEFAULT_ENABLE_DYNAMIC_ISLAND = false
 
     // Notification Defaults
-    const val DEFAULT_SEND_NORMAL_NOTIFICATION = true
-    const val DEFAULT_SEND_FOCUS_NOTIFICATION = true
+    const val DEFAULT_NOTIFICATION_TYPE = 0 // 0: 实时通知, 1: 焦点通知
     const val DEFAULT_FOCUS_NOTIFICATION_TYPE = 0 // 0: OS3样式, 1: 兼容OS2
     const val DEFAULT_NORMAL_NOTIFICATION_ALBUM = false
     const val DEFAULT_ISLAND_LEFT_ALBUM = false

@@ -67,6 +67,7 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
@@ -134,7 +135,7 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
         var showCacheLimitDialog by remember { mutableStateOf(false) }
         var tempCacheLimit by remember { mutableStateOf(onlineLyricCacheLimit.toString()) }
 
-        val tabs = listOf("基础设置", "个性化设置", "歌词白名单")
+        val tabs = listOf("自定义配置", "歌词白名单")
         val pagerState = rememberPagerState { tabs.size }
         val coroutineScope = rememberCoroutineScope()
 
@@ -331,33 +332,123 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                             ) {
                                 item {
                                     Column {
-                                        // Permission UI moved to MainActivity
+                                        var notificationType by remember {
+                                            mutableIntStateOf(prefs.getInt(Constants.KEY_NOTIFICATION_TYPE, Constants.DEFAULT_NOTIFICATION_TYPE))
+                                        }
+                                        val notificationTypeOptions = listOf("实时通知", "焦点通知")
+                                        Card(modifier = Modifier.fillMaxWidth()) {
+                                            OverlayDropdownPreference(
+                                                title = "通知类型",
+                                                items = notificationTypeOptions,
+                                                selectedIndex = notificationType,
+                                                onSelectedIndexChange = { index ->
+                                                    notificationType = index
+                                                    prefs.edit { putInt(Constants.KEY_NOTIFICATION_TYPE, index) }
+                                                }
+                                            )
+                                        }
+
                                         SmallTitle(
-                                            text = "通知管理",
+                                            text = "灵动岛设置",
                                             insideMargin = PaddingValues(10.dp, 4.dp)
                                         )
-                                        var sendNormalEnabled by remember {
-                                            mutableStateOf(prefs.getBoolean(Constants.KEY_SEND_NORMAL_NOTIFICATION, Constants.DEFAULT_SEND_NORMAL_NOTIFICATION))
+                                        var islandLeftAlbumEnabled by remember {
+                                            mutableStateOf(prefs.getBoolean(Constants.KEY_ISLAND_LEFT_ALBUM, Constants.DEFAULT_ISLAND_LEFT_ALBUM))
                                         }
-                                        var sendFocusEnabled by remember {
-                                            mutableStateOf(prefs.getBoolean(Constants.KEY_SEND_FOCUS_NOTIFICATION, Constants.DEFAULT_SEND_FOCUS_NOTIFICATION))
+                                        var normalNotificationAlbumEnabled by remember {
+                                            mutableStateOf(prefs.getBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, Constants.DEFAULT_NORMAL_NOTIFICATION_ALBUM))
+                                        }
+                                        var disableLyricSplitEnabled by remember {
+                                            mutableStateOf(prefs.getBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, Constants.DEFAULT_DISABLE_LYRIC_SPLIT))
                                         }
                                         Card(modifier = Modifier.fillMaxWidth()) {
                                             Column {
-                                                SwitchPreference(
-                                                    title = "发送实时通知",
-                                                    checked = sendNormalEnabled,
-                                                    onCheckedChange = { checked ->
-                                                        sendNormalEnabled = checked
-                                                        prefs.edit { putBoolean(Constants.KEY_SEND_NORMAL_NOTIFICATION, checked) }
+                                                AnimatedVisibility(visible = notificationType == 1) {
+                                                    Column {
+                                                        SwitchPreference(
+                                                            title = "超级岛左侧专辑封面",
+                                                            checked = islandLeftAlbumEnabled,
+                                                            onCheckedChange = { checked ->
+                                                                islandLeftAlbumEnabled = checked
+                                                                prefs.edit { putBoolean(Constants.KEY_ISLAND_LEFT_ALBUM, checked) }
+                                                                if (!checked) {
+                                                                    disableLyricSplitEnabled = false
+                                                                    prefs.edit { putBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, false) }
+                                                                }
+                                                            }
+                                                        )
+                                                        SwitchPreference(
+                                                            title = "关闭歌词分割",
+                                                            checked = disableLyricSplitEnabled,
+                                                            onCheckedChange = { checked ->
+                                                                disableLyricSplitEnabled = checked
+                                                                prefs.edit { putBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, checked) }
+                                                            },
+                                                            enabled = islandLeftAlbumEnabled
+                                                        )
                                                     }
-                                                )
-                                                SwitchPreference(
-                                                    title = "发送焦点通知",
-                                                    checked = sendFocusEnabled,
-                                                    onCheckedChange = { checked ->
-                                                        sendFocusEnabled = checked
-                                                        prefs.edit { putBoolean(Constants.KEY_SEND_FOCUS_NOTIFICATION, checked) }
+                                                }
+                                                AnimatedVisibility(visible = notificationType == 0) {
+                                                    SwitchPreference(
+                                                        title = "胶囊左侧专辑封面",
+                                                        checked = normalNotificationAlbumEnabled,
+                                                        onCheckedChange = { checked ->
+                                                            normalNotificationAlbumEnabled = checked
+                                                            prefs.edit { putBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, checked) }
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        SmallTitle(
+                                            text = "通知设置",
+                                            insideMargin = PaddingValues(10.dp, 4.dp)
+                                        )
+
+                                        Card(modifier = Modifier.fillMaxWidth()) {
+                                            var notificationClickAction by remember {
+                                                mutableIntStateOf(prefs.getInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, Constants.DEFAULT_NOTIFICATION_CLICK_ACTION))
+                                            }
+                                            val clickOptions = listOf("暂停音乐（默认）", "打开HyperLyric", "打开正在播放的媒体应用")
+
+                                            WindowDropdownPreference(
+                                                title = "点击通知",
+                                                items = clickOptions,
+                                                selectedIndex = notificationClickAction,
+                                                onSelectedIndexChange = {
+                                                    notificationClickAction = it
+                                                    prefs.edit { putInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, it) }
+                                                }
+                                            )
+
+                                            var progressColorEnabled by remember {
+                                                mutableStateOf(prefs.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED))
+                                            }
+                                            SwitchPreference(
+                                                title = "进度条强调色",
+                                                summary = "切歌后生效",
+                                                checked = progressColorEnabled,
+                                                onCheckedChange = { checked ->
+                                                    progressColorEnabled = checked
+                                                    prefs.edit { putBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, checked) }
+                                                }
+                                            )
+
+                                            val focusStyleOptions = listOf("OS2", "OS3")
+                                            var focusNotificationType by remember {
+                                                mutableIntStateOf(prefs.getInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, Constants.DEFAULT_FOCUS_NOTIFICATION_TYPE))
+                                            }
+
+                                            AnimatedVisibility(visible = notificationType == 1) {
+                                                WindowDropdownPreference(
+                                                    title = "焦点通知样式",
+                                                    items = focusStyleOptions,
+                                                    selectedIndex = 1 - focusNotificationType,
+                                                    onSelectedIndexChange = { index ->
+                                                        val storedValue = 1 - index
+                                                        focusNotificationType = storedValue
+                                                        prefs.edit { putInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, storedValue) }
                                                     }
                                                 )
                                             }
@@ -462,133 +553,6 @@ class DynamicIslandNotificationActivity : ComponentActivity() {
                             }
                         }
                         1 -> {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .scrollEndHaptic()
-                                    .hazeSource(state = hazeState)
-                                    .overScrollVertical()
-                                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                                contentPadding = PaddingValues(
-                                    top = padding.calculateTopPadding(),
-                                    start = 12.dp,
-                                    end = 12.dp,
-                                    bottom = padding.calculateBottomPadding()
-                                )
-                            ) {
-                                item {
-                                    SmallTitle(
-                                        text = "小米超级岛设置",
-                                        insideMargin = PaddingValues(10.dp, 4.dp)
-                                    )
-                                    var islandLeftAlbumEnabled by remember {
-                                        mutableStateOf(prefs.getBoolean(Constants.KEY_ISLAND_LEFT_ALBUM, Constants.DEFAULT_ISLAND_LEFT_ALBUM))
-                                    }
-                                    var disableLyricSplitEnabled by remember {
-                                        mutableStateOf(prefs.getBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, Constants.DEFAULT_DISABLE_LYRIC_SPLIT))
-                                    }
-                                    Card(modifier = Modifier.fillMaxWidth()) {
-                                        Column {
-                                            SwitchPreference(
-                                                title = "超级岛左侧专辑封面",
-                                                checked = islandLeftAlbumEnabled,
-                                                onCheckedChange = { checked ->
-                                                    islandLeftAlbumEnabled = checked
-                                                    prefs.edit { putBoolean(Constants.KEY_ISLAND_LEFT_ALBUM, checked) }
-                                                    if (!checked) {
-                                                        disableLyricSplitEnabled = false
-                                                        prefs.edit { putBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, false) }
-                                                    }
-                                                }
-                                            )
-                                            AnimatedVisibility(visible = islandLeftAlbumEnabled) {
-                                                SwitchPreference(
-                                                    title = "关闭歌词分割",
-                                                    checked = disableLyricSplitEnabled,
-                                                    onCheckedChange = { checked ->
-                                                        disableLyricSplitEnabled = checked
-                                                        prefs.edit { putBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, checked) }
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    SmallTitle(
-                                        text = "实时通知胶囊设置",
-                                        insideMargin = PaddingValues(10.dp, 4.dp)
-                                    )
-                                    var normalNotificationAlbumEnabled by remember {
-                                        mutableStateOf(prefs.getBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, Constants.DEFAULT_NORMAL_NOTIFICATION_ALBUM))
-                                    }
-                                    Card(modifier = Modifier.fillMaxWidth()) {
-                                        Column {
-                                            SwitchPreference(
-                                                title = "胶囊左侧专辑封面",
-                                                checked = normalNotificationAlbumEnabled,
-                                                onCheckedChange = { checked ->
-                                                    normalNotificationAlbumEnabled = checked
-                                                    prefs.edit { putBoolean(Constants.KEY_NORMAL_NOTIFICATION_ALBUM, checked) }
-                                                }
-                                            )
-                                        }
-                                    }
-
-                                    SmallTitle(
-                                        text = "通知设置",
-                                        insideMargin = PaddingValues(10.dp, 4.dp)
-                                    )
-
-                                    Card(modifier = Modifier.fillMaxWidth()) {
-                                        val focusStyleOptions = listOf("OS2", "OS3")
-                                        var focusNotificationType by remember {
-                                            mutableIntStateOf(prefs.getInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, Constants.DEFAULT_FOCUS_NOTIFICATION_TYPE))
-                                        }
-
-                                        WindowDropdownPreference(
-                                            title = "焦点通知样式",
-                                            summary = "此功能仅作用于澎湃系统",
-                                            items = focusStyleOptions,
-                                            selectedIndex = 1 - focusNotificationType,
-                                            onSelectedIndexChange = { index ->
-                                                val storedValue = 1 - index
-                                                focusNotificationType = storedValue
-                                                prefs.edit { putInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, storedValue) }
-                                            }
-                                        )
-
-                                        var notificationClickAction by remember {
-                                            mutableIntStateOf(prefs.getInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, Constants.DEFAULT_NOTIFICATION_CLICK_ACTION))
-                                        }
-                                        val clickOptions = listOf("暂停音乐（默认）", "打开HyperLyric", "打开正在播放的媒体应用")
-
-                                        WindowDropdownPreference(
-                                            title = "点击通知",
-                                            items = clickOptions,
-                                            selectedIndex = notificationClickAction,
-                                            onSelectedIndexChange = {
-                                                notificationClickAction = it
-                                                prefs.edit { putInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, it) }
-                                            }
-                                        )
-
-                                        var progressColorEnabled by remember {
-                                            mutableStateOf(prefs.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED))
-                                        }
-                                        SwitchPreference(
-                                            title = "进度条强调色",
-                                            summary = "切歌后生效",
-                                            checked = progressColorEnabled,
-                                            onCheckedChange = { checked ->
-                                                progressColorEnabled = checked
-                                                prefs.edit { putBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, checked) }
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        2 -> {
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize()

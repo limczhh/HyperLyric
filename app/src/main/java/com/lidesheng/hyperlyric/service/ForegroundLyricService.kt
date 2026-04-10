@@ -24,13 +24,9 @@ class ForegroundLyricService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private val isNormalEnabled: Boolean
+    private val notificationType: Int
         get() = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
-            .getBoolean(Constants.KEY_SEND_NORMAL_NOTIFICATION, Constants.DEFAULT_SEND_NORMAL_NOTIFICATION)
-
-    private val isFocusEnabled: Boolean
-        get() = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
-            .getBoolean(Constants.KEY_SEND_FOCUS_NOTIFICATION, Constants.DEFAULT_SEND_FOCUS_NOTIFICATION)
+            .getInt(Constants.KEY_NOTIFICATION_TYPE, Constants.DEFAULT_NOTIFICATION_TYPE)
 
     private val isDisableLyricSplit: Boolean
         get() = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
@@ -178,23 +174,19 @@ class ForegroundLyricService : Service() {
     }
 
     private fun dispatchNotifications(uiState: NotificationManagerHelper.UiState, duration: Long, isScreenOn: Boolean) {
-        if (isNormalEnabled) {
-            val notification = NotificationManagerHelper.buildNormalNotification(this, uiState, duration)
-            notifyWrapper(NotificationManagerHelper.NORMAL_NOTIFICATION_ID, notification)
-            
-            if (isFocusEnabled) {
-                NotificationManagerHelper.buildAndSendFocusNotification(this, notificationManager, uiState, isScreenOn)
-            } else {
+        when (notificationType) {
+            0 -> {
+                // 实时通知
+                val notification = NotificationManagerHelper.buildNormalNotification(this, uiState, duration)
+                notifyWrapper(NotificationManagerHelper.NORMAL_NOTIFICATION_ID, notification)
                 NotificationManagerHelper.cancelFocusNotification(notificationManager)
             }
-        } else if (isFocusEnabled) {
-            val focusNotification = NotificationManagerHelper.buildFocusNotification(this, uiState, isScreenOn)
-            notifyWrapper(NotificationManagerHelper.FOCUS_NOTIFICATION_ID, focusNotification)
-            NotificationManagerHelper.cancelNormalNotification(notificationManager)
-        } else {
-            NotificationManagerHelper.cancelNormalNotification(notificationManager)
-            NotificationManagerHelper.cancelFocusNotification(notificationManager)
-            if (isPersistentEnabled) switchToPersistentNotification() else stopWithCleanup()
+            1 -> {
+                // 焦点通知
+                val focusNotification = NotificationManagerHelper.buildFocusNotification(this, uiState, isScreenOn)
+                notifyWrapper(NotificationManagerHelper.FOCUS_NOTIFICATION_ID, focusNotification)
+                NotificationManagerHelper.cancelNormalNotification(notificationManager)
+            }
         }
     }
 

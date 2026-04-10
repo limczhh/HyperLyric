@@ -116,6 +116,11 @@ class SettingsActivity : ComponentActivity() {
                     val key = keys.next()
                     val value = config.get(key)
 
+                    // 过滤已废弃的键值对，避免老备份产生脏数据
+                    if (key == "key_send_normal_notification" || key == "key_send_focus_notification") {
+                        continue
+                    }
+
                     if (key == Constants.KEY_WHITELIST) {
                         val raw = value.toString()
                         val set = if (raw.isBlank()) emptySet() else raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
@@ -139,6 +144,12 @@ class SettingsActivity : ComponentActivity() {
                                 Constants.KEY_ANIM_MODE -> value.coerceIn(0, 4)
                                 Constants.KEY_ONLINE_LYRIC_CACHE_LIMIT -> value.coerceIn(1, 1000)
                                 Constants.KEY_NOTIFICATION_CLICK_ACTION -> value.coerceIn(0, 2)
+                                Constants.KEY_WORK_MODE -> value.coerceIn(0, 1)
+                                Constants.KEY_THEME_MODE -> value.coerceIn(0, 5)
+                                Constants.KEY_MONET_COLOR -> value.coerceIn(0, 7)
+                                Constants.KEY_NOTIFICATION_TYPE -> value.coerceIn(0, 1)
+                                Constants.KEY_FOCUS_NOTIFICATION_TYPE -> value.coerceIn(0, 1)
+                                Constants.KEY_FONT_WEIGHT -> value.coerceIn(100, 900)
                                 else -> value
                             }
                             putInt(key, boundedValue)
