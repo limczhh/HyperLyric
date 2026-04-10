@@ -256,7 +256,7 @@ fun MainScreen() {
     ) { padding ->
         WindowDialog(
             title = "是否重启系统界面？",
-            summary = "更新应用后才需要重启哦",
+            summary = "重启后也要重启音乐软件哦",
             show = showRestartDialog,
             onDismissRequest = { showRestartDialog = false }
         ) {
@@ -608,32 +608,14 @@ fun AboutContent(modifier: Modifier = Modifier) {
         }
 
         SmallTitle(
-            text = "无root模式使用提示",
-            insideMargin = PaddingValues(10.dp, 4.dp)
-        )
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            insideMargin = PaddingValues(16.dp),
-        )
-        {
-            Column {
-                Text(
-                    text = "需要将音乐软件包名加入白名单，并在音乐软件里打开蓝牙歌词功能，连接蓝牙设备\n\n已支持 Salt Player、QQ音乐\n更多应用等你发现...",
-                    style = MiuixTheme.textStyles.body2
-                )
-            }
-        }
-
-        SmallTitle(
-            text = "hook模式使用提示",
+            text = "使用提示",
             insideMargin = PaddingValues(10.dp, 4.dp)
         )
         Card(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "前往github下载对应歌词提供器并勾选推荐应用，重启系统界面和音乐软件后即可使用。",
-                style = MiuixTheme.textStyles.body2,
-                modifier = Modifier.padding(16.dp),
-            )
+            Column {
+                BasicComponent(title = "小米超级岛歌词模式", summary = "前往github下载对应歌词提供器并勾选推荐应用，重启系统界面和音乐软件后即可使用。")
+                BasicComponent(title = "灵动岛歌词通知模式", summary = "将音乐软件包名加入白名单，并在音乐软件里打开蓝牙歌词功能，连接蓝牙设备\n已支持 Salt Player，更多应用等你发现...")
+            }
         }
 
         SmallTitle(
