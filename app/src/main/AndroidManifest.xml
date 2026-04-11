@@ -7,9 +7,6 @@
 
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
-        tools:ignore="ForegroundServicesPolicy" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="io.github.libxposed.permission.BIND_XPOSED_SERVICE" />
@@ -70,15 +67,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name=".service.ForegroundLyricService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Displaying real-time music lyrics in notification" />
-        </service>
 
         <service
             android:name=".service.LyricTileService"

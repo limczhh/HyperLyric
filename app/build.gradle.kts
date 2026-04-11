@@ -11,7 +11,7 @@ android {
     compileSdk = 37
     defaultConfig {
         applicationId = "com.lidesheng.hyperlyric"
-        minSdk = 31
+        minSdk = 33
         targetSdk = 36
         versionCode = 1927
         versionName = "5.0"

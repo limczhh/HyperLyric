@@ -54,7 +54,7 @@ import com.lidesheng.hyperlyric.Quotes
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.root.ConfigSync
 import com.lidesheng.hyperlyric.root.ShellUtils
-import com.lidesheng.hyperlyric.service.ForegroundLyricService
+import com.lidesheng.hyperlyric.service.LiveLyricService
 import com.lidesheng.hyperlyric.utils.ThemeUtils
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -192,7 +192,7 @@ fun MainScreen() {
         val isDynamicIslandEnabled = prefs.getBoolean(Constants.KEY_ENABLE_DYNAMIC_ISLAND, Constants.DEFAULT_ENABLE_DYNAMIC_ISLAND)
 
         if (hasListenerPermission && isDynamicIslandEnabled) {
-            ForegroundLyricService.ensureListenerBound(context)
+            LiveLyricService.ensureListenerBound(context)
         }
     }
 
@@ -376,10 +376,7 @@ fun MainScreen() {
                                                     enableDynamicIsland = true
                                                     prefs.edit { putBoolean(Constants.KEY_ENABLE_DYNAMIC_ISLAND, true) }
                                                     ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_ENABLE_DYNAMIC_ISLAND, true)
-                                                    val intent = Intent(context, ForegroundLyricService::class.java).apply {
-                                                        action = com.lidesheng.hyperlyric.service.LyricTileService.ACTION_RESUME_TOGGLED
-                                                    }
-                                                    context.startService(intent)
+                                                    LiveLyricService.ensureListenerBound(context)
                                                 } else {
                                                     showPermissionSheet = true
                                                 }
@@ -387,10 +384,6 @@ fun MainScreen() {
                                                 enableDynamicIsland = false
                                                 prefs.edit { putBoolean(Constants.KEY_ENABLE_DYNAMIC_ISLAND, false) }
                                                 ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_ENABLE_DYNAMIC_ISLAND, false)
-                                                val intent = Intent(context, ForegroundLyricService::class.java).apply {
-                                                    action = com.lidesheng.hyperlyric.service.LyricTileService.ACTION_PAUSE_TOGGLED
-                                                }
-                                                context.startService(intent)
                                             }
                                         }
                                     )
@@ -503,10 +496,7 @@ fun MainScreen() {
                     enableDynamicIsland = true
                     prefs.edit { putBoolean(Constants.KEY_ENABLE_DYNAMIC_ISLAND, true) }
                     ConfigSync.syncPreference(Constants.PREF_NAME, Constants.KEY_ENABLE_DYNAMIC_ISLAND, true)
-                    val intent = Intent(context, ForegroundLyricService::class.java).apply {
-                        action = com.lidesheng.hyperlyric.service.LyricTileService.ACTION_RESUME_TOGGLED
-                    }
-                    context.startService(intent)
+                    LiveLyricService.ensureListenerBound(context)
                 } else {
                     Toast.makeText(context, "权限还未授予", Toast.LENGTH_SHORT).show()
                 }

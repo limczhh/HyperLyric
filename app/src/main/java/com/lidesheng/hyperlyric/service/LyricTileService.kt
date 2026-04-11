@@ -2,7 +2,6 @@ package com.lidesheng.hyperlyric.service
 import com.lidesheng.hyperlyric.Constants
 
 
-import android.content.Intent
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.core.content.edit
@@ -36,16 +35,14 @@ class LyricTileService : TileService() {
         
         prefs.edit { putBoolean(Constants.KEY_ENABLE_DYNAMIC_ISLAND, nextState) }
         
-        val intent = Intent(this, ForegroundLyricService::class.java).apply {
-            action = if (nextState) ACTION_RESUME_TOGGLED else ACTION_PAUSE_TOGGLED
+        // 不再需要发 Intent 给 ForegroundLyricService，
+        // LiveLyricService 内的 NotificationPresenter 会通过 Flow 自动感知开关变化。
+        // 如果 LiveLyricService 未连接，尝试重新绑定。
+        if (nextState) {
+            LiveLyricService.ensureListenerBound(this)
         }
-        startService(intent)
         
         updateTileState()
     }
 
-    companion object {
-        const val ACTION_PAUSE_TOGGLED = "com.lidesheng.hyperlyric.ACTION_PAUSE_TOGGLED"
-        const val ACTION_RESUME_TOGGLED = "com.lidesheng.hyperlyric.ACTION_RESUME_TOGGLED"
-    }
 }

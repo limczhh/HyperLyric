@@ -1,16 +1,11 @@
 package com.lidesheng.hyperlyric.service
 
-import com.lidesheng.hyperlyric.Constants
 import android.annotation.SuppressLint
 import android.content.ComponentName
-import android.content.Intent
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.MediaMetadata
 import android.media.session.MediaController
@@ -19,13 +14,12 @@ import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.util.TypedValue
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
-import androidx.palette.graphics.Palette
-import com.lidesheng.hyperlyric.online.model.DynamicLyricData
+import androidx.core.graphics.toColorInt
+import com.lidesheng.hyperlyric.Constants
 import com.lidesheng.hyperlyric.online.LrcCacheManager
 import com.lidesheng.hyperlyric.online.LrcLine
 import com.lidesheng.hyperlyric.online.OnlineLyricTargeter
+import com.lidesheng.hyperlyric.online.model.DynamicLyricData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,8 +31,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.abs
-import androidx.core.graphics.toColorInt
 
 
 class LiveLyricService : NotificationListenerService() {
@@ -47,8 +39,7 @@ class LiveLyricService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val islandBitmapHeight = 128
-    private val defaultColor = "#E0E0E0".toColorInt()
-    
+
     private var currentSongIdentifier = ""
 
     private var bitmapRetryJob: Job? = null
@@ -95,13 +86,32 @@ class LiveLyricService : NotificationListenerService() {
     private var lastDispatchedLrc: String = ""
     private var currentSyncData: SyncData? = null
 
+    // ─── 解耦模块：通知展示调度器 ─────────────────────────
+    private lateinit var notificationPresenter: NotificationPresenter
+
         override fun onCreate() {
         super.onCreate()
         mediaSessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
         cachedNotificationEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
 
+        // 初始化通知展示模块
+        notificationPresenter = NotificationPresenter(this, serviceScope)
+        notificationPresenter.register()
+        DynamicLyricData.initWhitelist(this)
+
         serviceScope.launch(Dispatchers.Default) {
             lyricUpdateFlow.collectLatest { data -> processSyncData(data) }
+        }
+
+        // 订阅状态变化，驱动通知展示
+        serviceScope.launch {
+            kotlinx.coroutines.flow.combine(
+                DynamicLyricData.musicState,
+                DynamicLyricData.progressFlow,
+                DynamicLyricData.whitelistState
+            ) { state, _, _ -> state }.collect { state ->
+                notificationPresenter.updateState(state, force = false)
+            }
         }
     }
 
@@ -168,6 +178,7 @@ class LiveLyricService : NotificationListenerService() {
         DynamicLyricData.updateFetchingLyrics(false)
         DynamicLyricData.updateAnchor(0L, false)
         DynamicLyricData.updateRightTitles(" ", " ", " ", " ", 0L, false, "")
+        notificationPresenter.clearNotifications()
     }
 
     private val mediaCallback = object : MediaController.Callback() {
@@ -224,17 +235,17 @@ class LiveLyricService : NotificationListenerService() {
             progressJob = null
         }
         
-
+        // 使用 AlbumImageProcessor 处理图片
         val albumBitmap = if (isNewSong) {
             val raw = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                 ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
-            safeCopyBitmap(raw)
+            AlbumImageProcessor.safeCopyBitmap(raw)
         } else {
             DynamicLyricData.currentState.albumBitmap
         }
 
         val notificationAlbumBitmap = if (isNewSong) {
-            albumBitmap?.let { processAlbumBitmap(it) }
+            albumBitmap?.let { AlbumImageProcessor.processAlbumBitmap(it) }
         } else {
             DynamicLyricData.currentState.notificationAlbumBitmap
         }
@@ -312,9 +323,13 @@ class LiveLyricService : NotificationListenerService() {
 
         DynamicLyricData.updateAnchor(data.position, data.isPlaying)
 
+        // 使用 AlbumImageProcessor 做取色，仅在开关打开时
         if (data.isNewSong) {
             val progressColorEnabled = sp.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)
-            val colors = if (progressColorEnabled) extractColorsFromBitmap(data.albumBitmap) else ExtractedColors(defaultColor, defaultColor)
+            val colors = if (progressColorEnabled) AlbumImageProcessor.extractColors(data.albumBitmap) else AlbumImageProcessor.ExtractedColors(
+                "#E0E0E0".toColorInt(),
+                "#E0E0E0".toColorInt()
+            )
             DynamicLyricData.updateColor(colors.dominant, colors.vibrant)
         }
 
@@ -457,15 +472,6 @@ class LiveLyricService : NotificationListenerService() {
         DynamicLyricData.updateLeftTitles(finalIslandLeft, finalNotificationLeft)
         DynamicLyricData.updateRightTitles(finalIslandRight,
             notificationRight, songLyric, songInfo, data.duration, data.isPlaying, data.currentPackageName, showIslandLeftAlbum)
-
-
-        if (data.isPlaying) {
-            try {
-                startForegroundService(Intent(this@LiveLyricService, ForegroundLyricService::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 
     private fun parseLrc(lrcText: String): List<LrcLine> {
@@ -496,90 +502,6 @@ class LiveLyricService : NotificationListenerService() {
             val ms = (totalMs % 1000) / 10
             String.format("[%02d:%02d.%02d]%s", min, sec, ms, line.content)
         }
-    }
-
-
-    private fun processAlbumBitmap(source: Bitmap, targetSize: Int = islandBitmapHeight): Bitmap {
-        val w = source.width
-        val h = source.height
-        val cropSize = minOf(w, h)
-        val xOffset = (w - cropSize) / 2
-        val yOffset = (h - cropSize) / 2
-
-        val output = createBitmap(targetSize, targetSize)
-        val canvas = Canvas(output)
-        val cornerRadius = targetSize / 4f
-        val rectF = RectF(0f, 0f, targetSize.toFloat(), targetSize.toFloat())
-
-        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, maskPaint)
-
-        val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isFilterBitmap = true
-            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-        }
-        val srcRect = android.graphics.Rect(xOffset, yOffset, xOffset + cropSize, yOffset + cropSize)
-        val dstRect = android.graphics.Rect(0, 0, targetSize, targetSize)
-        canvas.drawBitmap(source, srcRect, dstRect, bitmapPaint)
-
-        return output
-    }
-
-
-    data class ExtractedColors(val dominant: Int, val vibrant: Int)
-
-    private fun extractColorsFromBitmap(bitmap: Bitmap?): ExtractedColors {
-        if (bitmap == null || bitmap.isRecycled) return ExtractedColors(defaultColor, defaultColor)
-        return try {
-            val targetBitmap = if (bitmap.width > 100 || bitmap.height > 100) {
-                bitmap.scale(100, 100, false)
-            } else bitmap
-
-            val palette = Palette.from(targetBitmap).generate()
-            if (targetBitmap != bitmap && !targetBitmap.isRecycled) targetBitmap.recycle()
-
-            val dominant = palette.getDominantColor(defaultColor)
-            var vibrant = palette.getVibrantColor(dominant)
-            
-            if (isNearBlack(dominant) || isNearWhite(dominant)) {
-                vibrant = "#808080".toColorInt()
-            } else if (vibrant == dominant || isColorTooSimilar(dominant, vibrant)) {
-                vibrant = lightenColor(dominant)
-            }
-            
-            ExtractedColors(dominant, vibrant)
-        } catch (_: Exception) {
-            ExtractedColors(defaultColor, defaultColor)
-        }
-    }
-
-    private fun isNearBlack(color: Int): Boolean {
-        val hsv = FloatArray(3)
-        Color.colorToHSV(color, hsv)
-        return hsv[2] < 0.15f
-    }
-
-    private fun isNearWhite(color: Int): Boolean {
-        val hsv = FloatArray(3)
-        Color.colorToHSV(color, hsv)
-        return hsv[2] > 0.85f && hsv[1] < 0.15f
-    }
-
-    private fun isColorTooSimilar(color1: Int, color2: Int): Boolean {
-        val hsv1 = FloatArray(3)
-        val hsv2 = FloatArray(3)
-        Color.colorToHSV(color1, hsv1)
-        Color.colorToHSV(color2, hsv2)
-        
-        return abs(hsv1[0] - hsv2[0]) < 10 && abs(hsv1[1] - hsv2[1]) < 0.1f
-    }
-
-    private fun lightenColor(color: Int): Int {
-        val hsv = FloatArray(3)
-        Color.colorToHSV(color, hsv)
-        hsv[2] = (hsv[2] * 1.4f).coerceAtMost(1.0f) // 提高亮度
-        hsv[1] = (hsv[1] * 0.8f) // 降低饱和度
-        return Color.HSVToColor(hsv)
     }
 
     data class LyricSplitResult(
@@ -677,31 +599,41 @@ class LiveLyricService : NotificationListenerService() {
 
         val forwardLeftLen = forwardSplit
         val forwardRightLen = text.length - forwardSplit
-        val forwardDiff = abs(forwardLeftLen - forwardRightLen)
+        val forwardDiff = kotlin.math.abs(forwardLeftLen - forwardRightLen)
 
         val backLeftLen = backSplit
         val backRightLen = text.length - backSplit
-        val backDiff = abs(backLeftLen - backRightLen)
+        val backDiff = kotlin.math.abs(backLeftLen - backRightLen)
 
         idx = if (backDiff < forwardDiff) backSplit else forwardSplit
 
         return idx.coerceIn(0, text.length)
     }
 
-    private fun safeCopyBitmap(bitmap: Bitmap?): Bitmap? {
-        if (bitmap == null || bitmap.isRecycled) return null
-        return try {
-            bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
+        notificationPresenter.unregister()
+        notificationPresenter.clearNotifications()
         serviceScope.cancel()
         tickerJob?.cancel()
         progressJob?.cancel()
         unregisterAllControllers()
     }
-  }
+
+    companion object {
+        /**
+         * 静默重连 NotificationListenerService。
+         * 通过先禁用再启用组件，触发系统重新绑定监听服务。
+         * 用于解决杀后台后监听器假死的问题。
+         */
+        fun ensureListenerBound(context: Context) {
+            try {
+                val pm = context.packageManager
+                val cn = ComponentName(context, LiveLyricService::class.java)
+                pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, android.content.pm.PackageManager.DONT_KILL_APP)
+                pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP)
+                requestRebind(cn)
+            } catch (_: Exception) { }
+        }
+    }
+}
