@@ -11,9 +11,9 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 1921,
-      "versionName": "4.8",
-      "outputFile": "HyperLyric-v4.8.1921-release.apk"
+      "versionCode": 1927,
+      "versionName": "5.0",
+      "outputFile": "HyperLyric-v5.0.1927-release.apk"
     }
   ],
   "elementType": "File",
@@ -22,14 +22,14 @@
       "minApi": 28,
       "maxApi": 30,
       "baselineProfiles": [
-        "baselineProfiles/1/HyperLyric-v4.8.1921-release.dm"
+        "baselineProfiles/1/HyperLyric-v5.0.1927-release.dm"
       ]
     },
     {
       "minApi": 31,
       "maxApi": 2147483647,
       "baselineProfiles": [
-        "baselineProfiles/0/HyperLyric-v4.8.1921-release.dm"
+        "baselineProfiles/0/HyperLyric-v5.0.1927-release.dm"
       ]
     }
   ],
