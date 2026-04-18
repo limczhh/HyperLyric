@@ -1,9 +1,11 @@
 package com.lidesheng.hyperlyric.root
+ 
+ import com.lidesheng.hyperlyric.root.utils.log
+ import com.lidesheng.hyperlyric.root.utils.logError
 
 import android.annotation.SuppressLint
 import android.content.res.Resources
 import android.graphics.Color
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -49,7 +51,7 @@ object HookIslandLyric {
                 doHookRealContentViews(param.defaultClassLoader)
             } catch (_: Exception) {}
         } catch (e: Exception) {
-            module.log(Log.ERROR, "HyperLyric", "hookSystemUIDynamicIsland 异常: ${e.message}")
+            logError("hookSystemUIDynamicIsland 异常", e)
         }
     }
 
@@ -203,7 +205,7 @@ object HookIslandLyric {
                             viewClass.getMethod("setBigIslandViewWidthHasSmallIsland", Int::class.javaPrimitiveType).invoke(islandView, totalWidth)
                             viewClass.getMethod("setBigIslandXHasSmallIsland", Int::class.javaPrimitiveType).invoke(islandView, newX)
                         } catch (e: Exception) {
-                            module.log(Log.ERROR, "HyperLyric", "Failed to force island width target: ${e.message}")
+                            logError("Failed to force island width target", e)
                         }
                     }
                     // ★ 暂停时：什么都不做，让系统自己算出的原生值直接传给动画引擎

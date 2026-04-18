@@ -4,7 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.util.Log
+import com.lidesheng.hyperlyric.root.utils.log
+import com.lidesheng.hyperlyric.root.utils.logError
 import com.lidesheng.hyperlyric.Constants
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -18,36 +19,29 @@ import io.github.proify.lyricon.central.util.ScreenStateMonitor
 import io.github.proify.lyricon.lyric.model.Song
 import io.github.proify.lyricon.provider.ProviderInfo
 
-/**
- * Modern Xposed API 101 入口
- */
 class HookEntry : XposedModule() {
-
-    private val tag = "HyperLyricEntry"
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         super.onModuleLoaded(param)
-        Log.i(tag, "onModuleLoaded: HyperLyric 模块已初始化 (API 101)")
+        log("onModuleLoaded: HyperLyric 模块已初始化 (API 101)")
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
         val packageName = param.packageName
-        Log.i(tag, "onPackageLoaded: $packageName")
+        log("onPackageLoaded: $packageName")
         
         if (packageName == "com.android.systemui") {
-            // 系统 UI 级别的 Hook
             try {
                 UnlockIslandWhitelist.hook(this, param.defaultClassLoader)
                 UnlockFocusWhitelist.hook(this, param.defaultClassLoader)
             } catch (e: Exception) {
-                 Log.e(tag, "Failed to hook white-lists: ${e.message}")
+                 logError("Failed to hook white-lists", e)
             }
 
-            // 读取超级岛开关，关闭时跳过 Hook 注入（需重启系统界面生效）
             val prefs = getRemotePreferences(Constants.PREF_NAME)
             val isSuperIslandEnabled = prefs.getBoolean(Constants.KEY_ENABLE_SUPER_ISLAND, Constants.DEFAULT_ENABLE_SUPER_ISLAND)
             if (!isSuperIslandEnabled) {
-                Log.i(tag, "Super Island is disabled, skipping island hooks.")
+                log("Super Island is disabled, skipping island hooks.")
                 return
             }
 
@@ -57,9 +51,9 @@ class HookEntry : XposedModule() {
                 val onCreateMethod = appClass.getDeclaredMethod("onCreate")
                 deoptimize(onCreateMethod)
                 hook(onCreateMethod).intercept(AppCreateHooker())
-                Log.i(tag, "Hooked Application.onCreate for com.android.systemui")
+                log("Hooked Application.onCreate for com.android.systemui")
             } catch (e: Exception) {
-                Log.e(tag, "Failed to hook Application.onCreate: ${e.message}")
+                logError("Failed to hook Application.onCreate", e)
             }
 
             // 核心：拦截 ClassLoader 构造，以捕捉 miui.systemui.plugin 等动态加载的插件
@@ -69,20 +63,19 @@ class HookEntry : XposedModule() {
                     deoptimize(constructor)
                     hook(constructor).intercept(ClassLoaderHooker())
                 }
-                Log.i(tag, "Hooked BaseDexClassLoader constructors successfully")
+                log("Hooked BaseDexClassLoader constructors successfully")
             } catch (e: Exception) {
-                Log.e(tag, "Failed to hook ClassLoader constructors: ${e.message}")
+                logError("Failed to hook ClassLoader constructors", e)
             }
 
         } else if (packageName == "miui.systemui.plugin") {
-            // 虽然是插件，但如果 LSPosed 能够直接识别该包加载，则尝试直接注入
             val prefs = getRemotePreferences(Constants.PREF_NAME)
             val isSuperIslandEnabled = prefs.getBoolean(Constants.KEY_ENABLE_SUPER_ISLAND, Constants.DEFAULT_ENABLE_SUPER_ISLAND)
             if (!isSuperIslandEnabled) {
-                Log.i(tag, "Super Island is disabled, skipping plugin hook.")
+                log("Super Island is disabled, skipping plugin hook.")
                 return
             }
-            Log.i(tag, "miui.systemui.plugin package loaded directly, attempting hook...")
+            log("miui.systemui.plugin package loaded directly, attempting hook...")
             UniversalIslandHook.hook(this, param.defaultClassLoader)
         }
     }
@@ -94,8 +87,6 @@ class HookEntry : XposedModule() {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
             val cl = chain.thisObject as? ClassLoader ?: return result
-            
-            // 尝试在每一个新创建的类加载器中寻找超级岛逻辑
             UniversalIslandHook.hook(this@HookEntry, cl)
             return result
         }
@@ -104,7 +95,7 @@ class HookEntry : XposedModule() {
     /**
      * Application 生命周期劫持
      */
-    inner class AppCreateHooker : Hooker {
+    class AppCreateHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
             val app = chain.thisObject as? android.app.Application
             if (app != null) {
@@ -112,9 +103,9 @@ class HookEntry : XposedModule() {
                     initializeLyricon(app)
                     registerActivePlayerListener()
                     registerRefreshReceiver(app)
-                    Log.i(tag, "Lyricon environment initialized in SystemUI")
+                    log("Lyricon environment initialized in SystemUI")
                 } catch (e: Exception) {
-                    Log.e(tag, "Receiver init failed: ${e.message}")
+                    logError("Receiver init failed", e)
                 }
             }
             return chain.proceed()
@@ -171,7 +162,7 @@ class HookEntry : XposedModule() {
             val filter = IntentFilter("com.lidesheng.hyperlyric.REFRESH_ISLAND")
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    Log.i(tag, "Received REFRESH_ISLAND broadcast, refreshing island...")
+                    log("Received REFRESH_ISLAND broadcast, refreshing island...")
                     UniversalIslandHook.refreshActiveIsland()
                 }
             }

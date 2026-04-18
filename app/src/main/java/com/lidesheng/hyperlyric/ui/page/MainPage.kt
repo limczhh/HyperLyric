@@ -53,8 +53,8 @@ import androidx.core.net.toUri
 import com.lidesheng.hyperlyric.Constants
 import com.lidesheng.hyperlyric.Quotes
 import com.lidesheng.hyperlyric.R
-import com.lidesheng.hyperlyric.root.ConfigSync
-import com.lidesheng.hyperlyric.root.ShellUtils
+import com.lidesheng.hyperlyric.root.utils.ConfigSync
+import com.lidesheng.hyperlyric.root.utils.ShellUtils
 import com.lidesheng.hyperlyric.service.LiveLyricService
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route

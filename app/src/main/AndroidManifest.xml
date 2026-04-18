@@ -16,7 +16,7 @@
         tools:ignore="QueryAllPackagesPermission" />
 
     <application
-        android:name=".root.ConfigSync"
+        android:name=".root.utils.ConfigSync"
         android:label="HyperLyric"
         android:description="@string/app_description"
         android:testOnly="false"

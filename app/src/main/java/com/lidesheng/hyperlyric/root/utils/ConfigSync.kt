@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.root
+package com.lidesheng.hyperlyric.root.utils
 
 import android.app.Application
 import android.content.Context

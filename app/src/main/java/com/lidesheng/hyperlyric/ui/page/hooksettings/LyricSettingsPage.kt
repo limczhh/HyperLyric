@@ -29,7 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.root.ConfigSync
+import com.lidesheng.hyperlyric.root.utils.ConfigSync
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle

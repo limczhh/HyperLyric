@@ -1,6 +1,6 @@
 package com.lidesheng.hyperlyric.root
 
-import android.util.Log
+import com.lidesheng.hyperlyric.root.utils.log
 import com.lidesheng.hyperlyric.Constants
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -28,7 +28,7 @@ object UnlockIslandWhitelist {
                 if (method.name == "mediaIslandSupportMiniWindow") {
                     module.deoptimize(method)
                     module.hook(method).intercept(ReturnTrueHooker())
-                    Log.i("HyperLyric", "[Whitelist] 成功拦截下发方法 mediaIslandSupportMiniWindow")
+                    log("[Whitelist] 成功拦截下发方法 mediaIslandSupportMiniWindow")
                 }
             }
         }

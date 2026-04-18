@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.os.SystemClock
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.Constants
-import com.lidesheng.hyperlyric.root.ConfigSync
+import com.lidesheng.hyperlyric.root.utils.ConfigSync
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
