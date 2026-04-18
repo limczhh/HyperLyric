@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.source.qm
+package com.lidesheng.hyperlyric.online.source.qm
 
 
 import android.util.Base64
@@ -7,8 +7,8 @@ import com.lidesheng.hyperlyric.online.model.LyricsData
 import com.lidesheng.hyperlyric.online.model.SearchSource
 import com.lidesheng.hyperlyric.online.model.SongSearchResult
 import com.lidesheng.hyperlyric.online.model.Source
-import com.lidesheng.hyperlyric.utils.QmCryptoUtils
-import com.lidesheng.hyperlyric.utils.QrcParser
+import com.lidesheng.hyperlyric.online.utils.QmCryptoUtils
+import com.lidesheng.hyperlyric.online.utils.QrcParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject

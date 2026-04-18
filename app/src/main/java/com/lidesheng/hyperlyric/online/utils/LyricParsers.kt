@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.utils
+package com.lidesheng.hyperlyric.online.utils
 
 import com.lidesheng.hyperlyric.online.model.LyricsData
 import com.lidesheng.hyperlyric.online.model.LyricsLine

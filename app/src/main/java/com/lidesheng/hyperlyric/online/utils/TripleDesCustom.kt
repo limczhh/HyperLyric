@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.utils
+package com.lidesheng.hyperlyric.online.utils
 
 object TripleDesCustom {
 

@@ -26,9 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
-import com.lidesheng.hyperlyric.utils.LyricModule
-import com.lidesheng.hyperlyric.utils.LyricProviderManager
-import com.lidesheng.hyperlyric.utils.ProviderUiState
+import com.lidesheng.hyperlyric.ui.utils.LyricModule
+import com.lidesheng.hyperlyric.ui.utils.LyricProviderManager
+import com.lidesheng.hyperlyric.ui.utils.ProviderUiState
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint

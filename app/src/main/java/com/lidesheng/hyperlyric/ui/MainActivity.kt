@@ -7,11 +7,11 @@ import androidx.activity.enableEdgeToEdge
 import com.lidesheng.hyperlyric.Constants
 import com.lidesheng.hyperlyric.ui.navigation.AppNavigation
 import com.lidesheng.hyperlyric.ui.navigation.Route
-import com.lidesheng.hyperlyric.utils.ThemeUtils
+import com.lidesheng.hyperlyric.ui.utils.ThemeUtils
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        com.lidesheng.hyperlyric.utils.AppUtils.initPredictiveBackGesture(application)
+        com.lidesheng.hyperlyric.ui.utils.AppUtils.initPredictiveBackGesture(application)
         super.onCreate(savedInstanceState)
         
         val prefs = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)

@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.utils
+package com.lidesheng.hyperlyric.online.utils
 
 import android.annotation.SuppressLint
 import android.util.Log

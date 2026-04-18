@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.source.ne
+package com.lidesheng.hyperlyric.online.source.ne
 
 import android.content.Context
 import android.util.Base64
@@ -8,8 +8,8 @@ import com.lidesheng.hyperlyric.online.model.LyricsResult
 import com.lidesheng.hyperlyric.online.model.SearchSource
 import com.lidesheng.hyperlyric.online.model.SongSearchResult
 import com.lidesheng.hyperlyric.online.model.Source
-import com.lidesheng.hyperlyric.utils.NeCryptoUtils
-import com.lidesheng.hyperlyric.utils.YrcParser
+import com.lidesheng.hyperlyric.online.utils.NeCryptoUtils
+import com.lidesheng.hyperlyric.online.utils.YrcParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
