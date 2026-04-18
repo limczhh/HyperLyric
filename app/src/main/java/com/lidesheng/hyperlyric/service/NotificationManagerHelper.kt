@@ -162,7 +162,7 @@ object NotificationManagerHelper {
         showProgress: Boolean = true
     ): Notification {
         val paramIslandJson = FocusNotificationBuilder(uiState, showProgress).build()
-        
+
         val smallIconCompat = androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_FOCUS)

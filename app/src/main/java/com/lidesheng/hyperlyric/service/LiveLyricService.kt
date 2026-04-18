@@ -69,6 +69,7 @@ class LiveLyricService : NotificationListenerService() {
         val rawTitle: String,
         val artist: String,
         val album: String,
+        val title: String,
         val duration: Long,
         val position: Long,
         val isPlaying: Boolean,
@@ -250,6 +251,14 @@ class LiveLyricService : NotificationListenerService() {
             DynamicLyricData.currentState.notificationAlbumBitmap
         }
 
+        val (cleanTitle, cleanArtist) = if (artist.contains(" - ")) {
+            val t = artist.substringAfterLast(" - ").trim()
+            val a = artist.substringBeforeLast(" - ").trim()
+            Pair(t, a)
+        } else {
+            Pair(rawTitle, artist)
+        }
+
         if (isNewSong && albumBitmap == null) {
             scheduleBitmapRetry(controller)
         } else if (isNewSong) {
@@ -258,7 +267,8 @@ class LiveLyricService : NotificationListenerService() {
 
         lyricUpdateFlow.tryEmit(
             SyncData(
-                rawTitle, artist, album, duration, position, isPlaying,
+                cleanTitle, cleanArtist, album, rawTitle,
+                duration, position, isPlaying,
                 currentPackageName, isNewSong, albumBitmap, notificationAlbumBitmap, newIdentifier
             )
         )
@@ -405,6 +415,9 @@ class LiveLyricService : NotificationListenerService() {
 
     private fun launchProgressScheduler() {
         progressJob?.cancel()
+        val sp = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
+        if (!sp.getBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, Constants.DEFAULT_ISLAND_SHOW_PROGRESS)) return
+        
         if (!isCurrentlyPlaying) return
         val duration = currentSyncData?.duration ?: return
         if (duration <= 0) return
@@ -438,9 +451,10 @@ class LiveLyricService : NotificationListenerService() {
         val pref = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
 
         val showIslandLeftAlbum = pref.getBoolean(Constants.KEY_ISLAND_LEFT_ALBUM, Constants.DEFAULT_ISLAND_LEFT_ALBUM)
+        val showAlbumArt = pref.getBoolean(Constants.KEY_SHOW_ALBUM_ART, Constants.DEFAULT_SHOW_ALBUM_ART)
         val disableLyricSplit = pref.getBoolean(Constants.KEY_DISABLE_LYRIC_SPLIT, Constants.DEFAULT_DISABLE_LYRIC_SPLIT)
 
-        val (islandLeft, islandRight, notificationLeft, notificationRight) = splitTitleByPixelWidth(songLyric, showIslandLeftAlbum)
+        val (islandLeft, islandRight, notificationLeft, notificationRight) = splitTitleByPixelWidth(songLyric, showIslandLeftAlbum, showAlbumArt)
 
         val finalIslandLeft: String
         val finalIslandRight: String
@@ -455,7 +469,17 @@ class LiveLyricService : NotificationListenerService() {
         // 通知栏：始终按自己的像素宽度分割，不受 disableLyricSplit 影响
         val finalNotificationLeft = notificationLeft
 
-        val songInfo = if (currentLyricLines != null) "${data.artist} - ${data.rawTitle}" else data.artist
+        val titleStyle = pref.getInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, Constants.DEFAULT_NORMAL_NOTIFICATION_TITLE_STYLE)
+        val songInfo = when (titleStyle) {
+            0 -> ""
+            1 -> data.title
+            2 -> data.artist
+            3 -> data.album
+            4 -> "${data.title} - ${data.artist}"
+            5 -> "${data.artist} - ${data.title}"
+            6 -> "${data.artist} - ${data.album}"
+            else -> ""
+        }
 
         val shouldUpdateBitmap = data.isNewSong ||
                                 finalIslandLeft != lastDispatchedIslandLeft || 
@@ -518,7 +542,7 @@ class LiveLyricService : NotificationListenerService() {
         return targetLimitPx * (textPaint.textSize / defaultSizePx.coerceAtLeast(1f))
     }
 
-    private fun splitTitleByPixelWidth(title: String, showIslandLeftAlbum: Boolean = false): LyricSplitResult {
+    private fun splitTitleByPixelWidth(title: String, showIslandLeftAlbum: Boolean = false, showAlbumArt: Boolean = true): LyricSplitResult {
         if (title.isBlank()) return LyricSplitResult("", "HyperLyric", "", "HyperLyric")
 
         val totalWidth = textPaint.measureText(title)
@@ -548,7 +572,8 @@ class LiveLyricService : NotificationListenerService() {
             islandLeft = ""
         }
 
-        val focusNotificationLimitPX = scalePxToInternalLimit(600f)
+        val focusLimitRaw = if (showAlbumArt) 560f else 680f
+        val focusNotificationLimitPX = scalePxToInternalLimit(focusLimitRaw)
         var notificationLeft: String
         var notificationRight = " "
 

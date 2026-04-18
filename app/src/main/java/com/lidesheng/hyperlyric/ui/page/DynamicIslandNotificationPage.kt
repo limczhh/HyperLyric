@@ -219,7 +219,7 @@ fun DynamicIslandNotificationPage() {
                                     WindowDropdownPreference(title = "点击通知", items = clickOptions, selectedIndex = notificationClickAction, onSelectedIndexChange = { notificationClickAction = it; prefs.edit { putInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, it) } })
 
                                     var showProgressEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, Constants.DEFAULT_ISLAND_SHOW_PROGRESS)) }
-                                    SwitchPreference(title = "显示进度条", summary = "仅通过澎湃3设备测试，其他系统切勿关闭", checked = showProgressEnabled, onCheckedChange = { checked -> showProgressEnabled = checked; prefs.edit { putBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, checked) } })
+                                    SwitchPreference(title = "显示进度条", summary = "其他系统切勿关闭！仅通过澎湃3设备测试", checked = showProgressEnabled, onCheckedChange = { checked -> showProgressEnabled = checked; prefs.edit { putBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, checked) } })
 
                                     AnimatedVisibility(visible = showProgressEnabled) {
                                         var progressColorEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)) }
@@ -233,6 +233,12 @@ fun DynamicIslandNotificationPage() {
                                     var focusNotificationType by remember { mutableIntStateOf(prefs.getInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, Constants.DEFAULT_FOCUS_NOTIFICATION_TYPE)) }
                                     AnimatedVisibility(visible = notificationType == 1) {
                                         WindowDropdownPreference(title = "焦点通知样式", items = focusStyleOptions, selectedIndex = 1 - focusNotificationType, onSelectedIndexChange = { index -> val storedValue = 1 - index; focusNotificationType = storedValue; prefs.edit { putInt(Constants.KEY_FOCUS_NOTIFICATION_TYPE, storedValue) } })
+                                    }
+
+                                    val normalTitleOptions = listOf("无", "标题", "艺术家", "专辑", "标题 - 艺术家", "艺术家 - 标题", "艺术家 - 专辑")
+                                    var normalNotificationTitleStyle by remember { mutableIntStateOf(prefs.getInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, Constants.DEFAULT_NORMAL_NOTIFICATION_TITLE_STYLE)) }
+                                    AnimatedVisibility(visible = notificationType == 0) {
+                                        WindowDropdownPreference(title = "实时通知标题", items = normalTitleOptions, selectedIndex = normalNotificationTitleStyle, onSelectedIndexChange = { normalNotificationTitleStyle = it; prefs.edit { putInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, it) } })
                                     }
                                 }
 

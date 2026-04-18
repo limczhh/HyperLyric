@@ -22,6 +22,7 @@ object Constants {
     const val KEY_NOTIFICATION_TYPE = "key_notification_type"
     const val KEY_FOCUS_NOTIFICATION_TYPE = "key_focus_notification_type"
     const val KEY_NORMAL_NOTIFICATION_ALBUM = "key_normal_notification_album"
+    const val KEY_NORMAL_NOTIFICATION_TITLE_STYLE = "key_normal_notification_title_style"
     const val KEY_ISLAND_LEFT_ALBUM = "key_island_left_album"
     const val KEY_SHOW_ALBUM_ART = "key_show_album_art"
     const val KEY_ISLAND_SHOW_PROGRESS = "key_island_show_progress"
@@ -88,6 +89,7 @@ object Constants {
     const val DEFAULT_NOTIFICATION_TYPE = 0 // 0: 实时通知, 1: 焦点通知
     const val DEFAULT_FOCUS_NOTIFICATION_TYPE = 0 // 0: OS3样式, 1: 兼容OS2
     const val DEFAULT_NORMAL_NOTIFICATION_ALBUM = false
+    const val DEFAULT_NORMAL_NOTIFICATION_TITLE_STYLE = 4
     const val DEFAULT_ISLAND_LEFT_ALBUM = false
     const val DEFAULT_SHOW_ALBUM_ART = true
     const val DEFAULT_ISLAND_SHOW_PROGRESS = true
