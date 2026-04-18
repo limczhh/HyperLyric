@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.lidesheng.hyperlyric.ui.page.MainPage
 import com.lidesheng.hyperlyric.ui.page.SetupPage
@@ -49,9 +50,9 @@ fun AppNavigation(startRoute: Route) {
                 entry<Route.Poetry> { PoetryPage() }
             }
         }
-        
         val entries = rememberDecoratedNavEntries(
             backStack = backStack, 
+            entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
             entryProvider = entryProvider
         )
         

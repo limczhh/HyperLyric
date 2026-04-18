@@ -562,8 +562,8 @@ fun AboutContent(modifier: Modifier = Modifier) {
         )
         Card(modifier = Modifier.fillMaxWidth()) {
             Column {
-                BasicComponent(title = "小米超级岛歌词模式", summary = "前往github下载对应歌词提供器并勾选推荐应用，重启系统界面和音乐软件后即可使用。")
-                BasicComponent(title = "通知型灵动岛歌词模式", summary = "将音乐软件包名加入白名单，并在音乐软件里打开蓝牙歌词功能，连接蓝牙设备\n已支持 Salt Player，更多应用等你发现...")
+                BasicComponent(title = "小米超级岛歌词", summary = "前往github下载对应歌词提供器并勾选推荐应用，重启系统界面和音乐软件后即可使用。")
+                BasicComponent(title = "通知型灵动岛歌词", summary = "将音乐软件包名加入白名单，并在音乐软件里打开蓝牙歌词功能，连接蓝牙设备\n已支持 Salt Player，更多应用等你发现...")
             }
         }
 

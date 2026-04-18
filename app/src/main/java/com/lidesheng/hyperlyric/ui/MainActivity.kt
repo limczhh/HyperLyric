@@ -11,6 +11,7 @@ import com.lidesheng.hyperlyric.utils.ThemeUtils
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.lidesheng.hyperlyric.utils.AppUtils.initPredictiveBackGesture(application)
         super.onCreate(savedInstanceState)
         
         val prefs = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)

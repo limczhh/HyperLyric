@@ -12,7 +12,7 @@ miuix = "0.9.0"
 palette = "1.0.0"
 haze = "1.7.2"
 kotlin = "2.3.0"
-androidx-navigation3 = "1.1.0-rc01"
+androidx-navigation3 = "1.1.0"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 kotlinxSerializationJson = "1.6.3"
@@ -20,6 +20,7 @@ retrofitSerializationConverter = "1.0.0"
 libxposed = "101.0.0"
 daimajia-animations = "2.4"
 daimajia-easing = "2.4"
+hiddenapibypass = "4.3"
 
 
 [libraries]
@@ -30,6 +31,7 @@ androidx-activity = { group = "androidx.activity", name = "activity", version.re
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-palette-ktx = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
+hiddenapibypass = { group = "org.lsposed.hiddenapibypass", name = "hiddenapibypass", version.ref = "hiddenapibypass" }
 
 # --- Compose 核心 (BOM) ---
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

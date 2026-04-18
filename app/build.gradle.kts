@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.palette.ktx)
+    implementation(libs.hiddenapibypass)
 
     // libxposed API
     compileOnly(libs.libxposed.api)

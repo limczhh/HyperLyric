@@ -267,6 +267,25 @@ fun SettingsPage() {
                         )
                     }
 
+                    var predictiveBackGestureEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_PREDICTIVE_BACK_GESTURE, Constants.DEFAULT_PREDICTIVE_BACK_GESTURE)) }
+                    val activity = androidx.activity.compose.LocalActivity.current
+                    SwitchPreference(
+                        title = "预测性返回手势",
+                        checked = predictiveBackGestureEnabled,
+                        onCheckedChange = {
+                            predictiveBackGestureEnabled = it
+                            prefs.edit { putBoolean(Constants.KEY_PREDICTIVE_BACK_GESTURE, it) }
+                            runCatching {
+                                org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions("Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback")
+                                val applicationInfoClass = android.content.pm.ApplicationInfo::class.java
+                                val method = applicationInfoClass.getDeclaredMethod("setEnableOnBackInvokedCallback", Boolean::class.javaPrimitiveType)
+                                method.isAccessible = true
+                                method.invoke(context.applicationInfo, it)
+                            }
+                            activity?.recreate()
+                        }
+                    )
+
                     var floatingNavBarEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_FLOATING_NAV_BAR, Constants.DEFAULT_FLOATING_NAV_BAR)) }
                     SwitchPreference(
                         title = "悬浮底栏",
