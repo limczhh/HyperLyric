@@ -66,10 +66,10 @@ class LiveLyricService : NotificationListenerService() {
         MutableSharedFlow<SyncData>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     private data class SyncData(
-        val rawTitle: String,
-        val artist: String,
-        val album: String,
-        val title: String,
+        val identityTitle: String,
+        val identityArtist: String,
+        val identityAlbum: String,
+        val dynamicTitle: String,
         val duration: Long,
         val position: Long,
         val isPlaying: Boolean,
@@ -251,7 +251,7 @@ class LiveLyricService : NotificationListenerService() {
             DynamicLyricData.currentState.notificationAlbumBitmap
         }
 
-        val (cleanTitle, cleanArtist) = if (artist.contains(" - ")) {
+        val (identityTitle, identityArtist) = if (artist.contains(" - ")) {
             val t = artist.substringAfterLast(" - ").trim()
             val a = artist.substringBeforeLast(" - ").trim()
             Pair(t, a)
@@ -267,7 +267,7 @@ class LiveLyricService : NotificationListenerService() {
 
         lyricUpdateFlow.tryEmit(
             SyncData(
-                cleanTitle, cleanArtist, album, rawTitle,
+                identityTitle, identityArtist, album, rawTitle,
                 duration, position, isPlaying,
                 currentPackageName, isNewSong, albumBitmap, notificationAlbumBitmap, newIdentifier
             )
@@ -286,7 +286,7 @@ class LiveLyricService : NotificationListenerService() {
                 val bitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                     ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
                 if (bitmap != null) {
-                    if (controller.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != currentSyncData?.rawTitle) {
+                    if (controller.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != currentSyncData?.dynamicTitle) {
                         break
                     }
                     DynamicLyricData.updateLoadingAlbumArt(false)
@@ -353,11 +353,11 @@ class LiveLyricService : NotificationListenerService() {
             if (sp.getBoolean(Constants.KEY_ONLINE_LYRIC_ENABLED, Constants.DEFAULT_ONLINE_LYRIC_ENABLED)) {
                 DynamicLyricData.updateFetchingLyrics(true)
                 val lines = withContext(Dispatchers.IO) {
-                    var l = LrcCacheManager.getLyricFromCache(this@LiveLyricService, data.rawTitle, data.artist)?.let { parseLrc(it) }
+                    var l = LrcCacheManager.getLyricFromCache(this@LiveLyricService, data.identityTitle, data.identityArtist)?.let { parseLrc(it) }
                     if (l.isNullOrEmpty()) {
-                        l = OnlineLyricTargeter.fetchBestLyric(this@LiveLyricService, data.currentPackageName, data.rawTitle, data.artist, data.duration)
+                        l = OnlineLyricTargeter.fetchBestLyric(this@LiveLyricService, data.currentPackageName, data.identityTitle, data.identityArtist, data.duration)
                         if (!l.isNullOrEmpty()) {
-                            LrcCacheManager.saveLyricToCache(this@LiveLyricService, data.rawTitle, data.artist, buildLrcString(l))
+                            LrcCacheManager.saveLyricToCache(this@LiveLyricService, data.identityTitle, data.identityArtist, buildLrcString(l))
                         }
                     }
                     l
@@ -372,15 +372,15 @@ class LiveLyricService : NotificationListenerService() {
                     }
                 } else {
                     if (currentSongIdentifier == data.identifier) {
-                        dispatchLyricContent(data.rawTitle, data)
+                        dispatchLyricContent(data.dynamicTitle, data)
                         launchProgressScheduler()
                     }
                 }
             } else {
-                dispatchLyricContent(data.rawTitle, data)
+                dispatchLyricContent(data.dynamicTitle, data)
             }
         } else {
-            if (currentLyricLines != null) launchLyricScheduler() else dispatchLyricContent(data.rawTitle, data)
+            if (currentLyricLines != null) launchLyricScheduler() else dispatchLyricContent(data.dynamicTitle, data)
             launchProgressScheduler()
         }
     }
@@ -388,27 +388,22 @@ class LiveLyricService : NotificationListenerService() {
     private fun launchLyricScheduler() {
         tickerJob?.cancel()
         val lines = currentLyricLines ?: return
-        val data = currentSyncData ?: return
         
         tickerJob = serviceScope.launch {
             while (true) {
+                val data = currentSyncData ?: break
                 val currentPos = with(DynamicLyricData) { musicState.value.getCurrentPosition() }
+                
                 val currentLineIndex = lines.indexOfLast { it.startTimeMs <= currentPos }
-                val targetLine = if (currentLineIndex != -1) lines[currentLineIndex].content else data.rawTitle
+                val targetLine = if (currentLineIndex != -1) lines[currentLineIndex].content else data.dynamicTitle
                 
                 if (targetLine != lastDispatchedLrc) {
                     lastDispatchedLrc = targetLine
                     dispatchLyricContent(targetLine, data)
                 }
-                
-                if (!isCurrentlyPlaying) break
 
-                val nextLineIndex = currentLineIndex + 1
-                if (nextLineIndex < lines.size) {
-                    val nextLineStartTime = lines[nextLineIndex].startTimeMs
-                    val delayMs = (nextLineStartTime - currentPos).coerceAtLeast(10L)
-                    delay(delayMs)
-                } else break
+                if (!data.isPlaying) break
+                delay(150)
             }
         }
     }
@@ -418,13 +413,13 @@ class LiveLyricService : NotificationListenerService() {
         val sp = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
         if (!sp.getBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, Constants.DEFAULT_ISLAND_SHOW_PROGRESS)) return
         
-        if (!isCurrentlyPlaying) return
-        val duration = currentSyncData?.duration ?: return
-        if (duration <= 0) return
-
         progressJob = serviceScope.launch {
             var lastPercent = -1
             while (true) {
+                val data = currentSyncData ?: break
+                val duration = data.duration
+                if (!data.isPlaying || duration <= 1000) break
+
                 val currentPos = with(DynamicLyricData) { musicState.value.getCurrentPosition() }
                 val currentPercent = ((currentPos.toDouble() / duration.toDouble()) * 100).toInt().coerceIn(0, 100)
                 
@@ -432,12 +427,9 @@ class LiveLyricService : NotificationListenerService() {
                     DynamicLyricData.emitProgress(currentPercent.toFloat())
                     lastPercent = currentPercent
                 }
-
-                if (currentPercent >= 100) break
                 
-                val nextPercentPos = ((currentPercent + 1).toDouble() / 100.0 * duration).toLong()
-                val delayMs = (nextPercentPos - currentPos).coerceIn(500L, 2000L)
-                delay(delayMs)
+                if (currentPercent >= 100) break
+                delay(1000)
             }
         }
     }
@@ -447,7 +439,7 @@ class LiveLyricService : NotificationListenerService() {
     private var lastDispatchedShowAlbum = false
 
     private fun dispatchLyricContent(targetText: String, data: SyncData) {
-        val songLyric = if (currentLyricLines != null) targetText else data.rawTitle
+        val songLyric = if (currentLyricLines != null) targetText else data.dynamicTitle
         val pref = getSharedPreferences(Constants.PREF_NAME, MODE_PRIVATE)
 
         val showIslandLeftAlbum = pref.getBoolean(Constants.KEY_ISLAND_LEFT_ALBUM, Constants.DEFAULT_ISLAND_LEFT_ALBUM)
@@ -472,12 +464,12 @@ class LiveLyricService : NotificationListenerService() {
         val titleStyle = pref.getInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, Constants.DEFAULT_NORMAL_NOTIFICATION_TITLE_STYLE)
         val songInfo = when (titleStyle) {
             0 -> ""
-            1 -> data.title
-            2 -> data.artist
-            3 -> data.album
-            4 -> "${data.title} - ${data.artist}"
-            5 -> "${data.artist} - ${data.title}"
-            6 -> "${data.artist} - ${data.album}"
+            1 -> data.identityTitle
+            2 -> data.identityArtist
+            3 -> data.identityAlbum
+            4 -> "${data.identityTitle} - ${data.identityArtist}"
+            5 -> "${data.identityArtist} - ${data.identityTitle}"
+            6 -> "${data.identityArtist} - ${data.identityAlbum}"
             else -> ""
         }
 

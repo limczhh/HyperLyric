@@ -237,9 +237,7 @@ fun DynamicIslandNotificationPage() {
 
                                     val normalTitleOptions = listOf("无", "标题", "艺术家", "专辑", "标题 - 艺术家", "艺术家 - 标题", "艺术家 - 专辑")
                                     var normalNotificationTitleStyle by remember { mutableIntStateOf(prefs.getInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, Constants.DEFAULT_NORMAL_NOTIFICATION_TITLE_STYLE)) }
-                                    AnimatedVisibility(visible = notificationType == 0) {
-                                        WindowDropdownPreference(title = "实时通知标题", items = normalTitleOptions, selectedIndex = normalNotificationTitleStyle, onSelectedIndexChange = { normalNotificationTitleStyle = it; prefs.edit { putInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, it) } })
-                                    }
+                                    WindowDropdownPreference(title = "歌曲信息", items = normalTitleOptions, selectedIndex = normalNotificationTitleStyle, onSelectedIndexChange = { normalNotificationTitleStyle = it; prefs.edit { putInt(Constants.KEY_NORMAL_NOTIFICATION_TITLE_STYLE, it) } })
                                 }
 
                                 SmallTitle(text = "高级功能", insideMargin = PaddingValues(10.dp, 4.dp))
