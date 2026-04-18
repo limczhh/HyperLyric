@@ -160,7 +160,9 @@ class NotificationPresenter(
             }
             1 -> {
                 // 焦点通知
-                val focusNotification = NotificationManagerHelper.buildFocusNotification(context, uiState, isScreenOn)
+                val sp = context.getSharedPreferences(Constants.PREF_NAME, Context.MODE_PRIVATE)
+                val showProgressSetting = sp.getBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, Constants.DEFAULT_ISLAND_SHOW_PROGRESS)
+                val focusNotification = NotificationManagerHelper.buildFocusNotification(context, uiState, isScreenOn && showProgressSetting)
                 notifyWrapper(NotificationManagerHelper.FOCUS_NOTIFICATION_ID, focusNotification)
                 NotificationManagerHelper.cancelNormalNotification(notificationManager)
             }

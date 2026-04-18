@@ -97,12 +97,14 @@ class FocusNotificationBuilder(
         val combinePicInfo = JSONObject()
         combinePicInfo.put("picInfo", buildPicInfo(1))
         
-        val progressInfo = JSONObject()
-        progressInfo.put("progress", uiState.progress)
-        progressInfo.put("colorReach", getColorHex(uiState.colorEnd))
-        progressInfo.put("isCCW", true)
+        if (showProgress) {
+            val progressInfo = JSONObject()
+            progressInfo.put("progress", uiState.progress)
+            progressInfo.put("colorReach", getColorHex(uiState.colorEnd))
+            progressInfo.put("isCCW", true)
+            combinePicInfo.put("progressInfo", progressInfo)
+        }
         
-        combinePicInfo.put("progressInfo", progressInfo)
         json.put("combinePicInfo", combinePicInfo)
         return json
     }

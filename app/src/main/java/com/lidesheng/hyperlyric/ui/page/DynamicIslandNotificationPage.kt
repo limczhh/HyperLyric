@@ -218,8 +218,13 @@ fun DynamicIslandNotificationPage() {
                                     val clickOptions = listOf("暂停音乐（默认）", "打开HyperLyric", "打开正在播放的媒体应用")
                                     WindowDropdownPreference(title = "点击通知", items = clickOptions, selectedIndex = notificationClickAction, onSelectedIndexChange = { notificationClickAction = it; prefs.edit { putInt(Constants.KEY_NOTIFICATION_CLICK_ACTION, it) } })
 
-                                    var progressColorEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)) }
-                                    SwitchPreference(title = "进度条强调色", summary = "切歌后生效", checked = progressColorEnabled, onCheckedChange = { checked -> progressColorEnabled = checked; prefs.edit { putBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, checked) } })
+                                    var showProgressEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, Constants.DEFAULT_ISLAND_SHOW_PROGRESS)) }
+                                    SwitchPreference(title = "显示进度条", checked = showProgressEnabled, onCheckedChange = { checked -> showProgressEnabled = checked; prefs.edit { putBoolean(Constants.KEY_ISLAND_SHOW_PROGRESS, checked) } })
+
+                                    AnimatedVisibility(visible = showProgressEnabled) {
+                                        var progressColorEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, Constants.DEFAULT_PROGRESS_COLOR_ENABLED)) }
+                                        SwitchPreference(title = "进度条强调色", summary = "切歌后生效", checked = progressColorEnabled, onCheckedChange = { checked -> progressColorEnabled = checked; prefs.edit { putBoolean(Constants.KEY_PROGRESS_COLOR_ENABLED, checked) } })
+                                    }
 
                                     var showAlbumArtEnabled by remember { mutableStateOf(prefs.getBoolean(Constants.KEY_SHOW_ALBUM_ART, Constants.DEFAULT_SHOW_ALBUM_ART)) }
                                     SwitchPreference(title = "显示专辑封面", checked = showAlbumArtEnabled, onCheckedChange = { checked -> showAlbumArtEnabled = checked; prefs.edit { putBoolean(Constants.KEY_SHOW_ALBUM_ART, checked) } })
