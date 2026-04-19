@@ -1,5 +1,6 @@
 -keep class com.lidesheng.hyperlyric.root.** { *; }
--keep class com.lidesheng.hyperlyric.Constants { *; }
+-keep class com.lidesheng.hyperlyric.ui.utils.Constants { *; }
+-keep class com.lidesheng.hyperlyric.service.Constants { *; }
 
 # 保护 libxposed 库的接口不被混淆
 -keep class io.github.libxposed.api.** { *; }
