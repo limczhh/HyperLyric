@@ -1,663 +1,515 @@
 package com.lidesheng.hyperlyric.root
- 
- import com.lidesheng.hyperlyric.root.utils.log
- import com.lidesheng.hyperlyric.root.utils.logError
 
 import android.annotation.SuppressLint
-import android.content.res.Resources
+import android.content.SharedPreferences
 import android.graphics.Color
+import android.graphics.Typeface
+import com.lidesheng.hyperlyric.root.utils.log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.TextView
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
+import com.lidesheng.hyperlyric.root.utils.DynamicFinder
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
-import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
-import androidx.core.graphics.toColorInt
-import io.github.proify.lyricon.lyric.view.yoyo.animateUpdate
+import io.github.proify.lyricon.lyric.model.RichLyricLine
+import io.github.proify.lyricon.lyric.view.RichLyricLineConfig
+import io.github.proify.lyricon.lyric.view.RichLyricLineView
 import io.github.proify.lyricon.lyric.view.yoyo.YoYoPresets
+import io.github.proify.lyricon.lyric.view.yoyo.animateUpdate
 
 object HookIslandLyric {
-    internal lateinit var module: XposedModule
-    private val TARGET_PACKAGES = arrayOf("com.android.systemui", "miui.systemui.plugin")
+    lateinit var module: XposedModule
 
+    var activeContentView: java.lang.ref.WeakReference<View>? = null
+    
     @Volatile
     private var isHookedSuccess = false
-
-    private const val TAG_LEFT = "hyperlyric_injected_left"
-    private const val TAG_RIGHT = "hyperlyric_injected_right"
-
+    
     private val activeIslandPkgNames = java.util.Collections.synchronizedMap(java.util.WeakHashMap<View, String>())
 
-    fun hookSystemUIDynamicIsland(xposedModule: XposedModule, param: PackageLoadedParam) {
-        module = xposedModule
-        try {
-            val classLoadersToHook = arrayOf("dalvik.system.BaseDexClassLoader", "dalvik.system.PathClassLoader", "dalvik.system.DexClassLoader")
-            for (clName in classLoadersToHook) {
-                try {
-                    val clazz = Class.forName(clName)
-                    for (c in clazz.declaredConstructors) {
-                        module.deoptimize(c)
-                        module.hook(c).intercept(DexClassLoaderHooker())
-                    }
-                } catch (_: Exception) {}
-            }
-            try {
-                doHookRealContentViews(param.defaultClassLoader)
-            } catch (_: Exception) {}
-        } catch (e: Exception) {
-            logError("hookSystemUIDynamicIsland 异常", e)
-        }
-    }
-
-    @Synchronized
-    private fun doHookRealContentViews(cl: ClassLoader) {
+    @SuppressLint("DiscouragedPrivateApi", "PrivateApi")
+    fun hook(xposedModule: XposedModule, cl: ClassLoader) {
         if (isHookedSuccess) return
-        var hooked = false
-        val classesToHook = arrayOf(
-            "miui.systemui.dynamicisland.window.content.DynamicIslandContentView",
-            "miui.systemui.dynamicisland.window.content.DynamicIslandContentFakeView"
-        )
-        for (className in classesToHook) {
-            try {
-                val clazz = cl.loadClass(className)
-                val targetMethod = clazz.declaredMethods.firstOrNull { it.name == "updateBigIslandView" }
-                if (targetMethod != null) {
-                    module.deoptimize(targetMethod)
-                    module.hook(targetMethod).intercept(UpdateBigIslandHooker())
-                    hooked = true
-                }
-            } catch (_: Exception) {
-            }
-        }
+        module = xposedModule
+        
+
+        val islandPkg = "miui.systemui.dynamicisland"
+        log("Entering Preference-Aware Mode.")
+
 
         try {
-            val baseClass = cl.loadClass("miui.systemui.dynamicisland.window.content.DynamicIslandBaseContentView")
-            val animMethod = baseClass.declaredMethods.firstOrNull { it.name == "updateBigIslandLayoutWithAnim" }
-            if (animMethod != null) {
-                module.deoptimize(animMethod)
-                module.hook(animMethod).intercept(UpdateIslandAnimHooker())
-                hooked = true
-            }
-        } catch (_: Exception) {
-        }
-
-        if (hooked) {
-            isHookedSuccess = true
-        }
-    }
-
-    class DexClassLoaderHooker : Hooker {
-        override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
-            if (isHookedSuccess) return result
-            try {
-                val cl = chain.thisObject as? ClassLoader ?: return result
-                doHookRealContentViews(cl)
-            } catch (_: Exception) {}
-            return result
-        }
-    }
-
-    // =====================================================================
-    // Hook 1: updateBigIslandView 的 after-hook
-    // 职责：仅注入/移除自定义文字内容
-    // 禁止：修改 layoutParams.width、调用 calculateBigIslandWidth、forceMeasure
-    // =====================================================================
-    class UpdateBigIslandHooker : Hooker {
-        override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
-            try {
-                val islandView = chain.thisObject as? ViewGroup ?: return result
-                val islandData = chain.args.getOrNull(0)
-
-                var pkgName = ""
-                var systemTitle = ""
-                try {
-                    if (islandData != null) {
-                        val getExtrasMethod = islandData.javaClass.getMethod("getExtras")
-                        val extras = getExtrasMethod.invoke(islandData) as? android.os.Bundle
-                        pkgName = extras?.getString("miui.pkg.name") ?: ""
-                        systemTitle = extras?.getString("miui.title") ?: ""
-                    }
-                } catch (_: Exception) {}
-
-                if (pkgName.isNotEmpty()) {
-                    activeIslandPkgNames[islandView] = pkgName
-                    if (LyriconDataBridge.activePackageName == pkgName && LyriconDataBridge.currentSongName.isNullOrBlank() && systemTitle.isNotEmpty()) {
-                         LyriconDataBridge.currentSongName = systemTitle
-                    }
-                } else {
-                    pkgName = activeIslandPkgNames[islandView] ?: ""
-                }
-                if (pkgName.isEmpty()) return result
-
-                // ★ 关键：只处理我们正在追踪的音乐包名，不干涉其他 APP 的灵动岛
-                val lyriconPkg = LyriconDataBridge.activePackageName
-                if (lyriconPkg != pkgName) return result
-
-                val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                val islandLength = prefs.getInt(RootConstants.KEY_HOOK_MAX_LEFT_WIDTH, RootConstants.DEFAULT_HOOK_MAX_LEFT_WIDTH)
-                val songName = LyriconDataBridge.currentSongName ?: systemTitle
-                val lyricText = LyriconDataBridge.currentLyric
-
-                if (LyriconDataBridge.isPlaying && !lyricText.isNullOrBlank()) {
-                    injectTextToIsland(islandView, songName, lyricText, pkgName, islandLength)
-                } else {
-                    // 暂停或歌词未到：仅隐藏自定义视图，不碰系统宽度
-                    clearTextFromIsland(islandView, islandView.context.resources)
-                }
-                // ★ 不调用 calculateBigIslandWidth —— 系统刚才已经自己算过了
-
-            } catch (_: Exception) {}
-            return result
-        }
-    }
-
-    // =====================================================================
-    // Hook 2: updateBigIslandLayoutWithAnim 的 before-hook
-    // 职责：在播放时覆写动画目标宽度字段，暂停时完全放行让系统原生值生效
-    // =====================================================================
-    class UpdateIslandAnimHooker : Hooker {
-        override fun intercept(chain: Chain): Any? {
-            try {
-                // arg [4] is DynamicIslandContentView
-                val islandView = chain.args.getOrNull(4) as? ViewGroup
-
-                if (islandView != null) {
-                    val pkgName = activeIslandPkgNames[islandView]
-                    val lyriconPkg = LyriconDataBridge.activePackageName
-                    val lyricText = LyriconDataBridge.currentLyric
-                    val hasLyricInfo = !lyricText.isNullOrBlank()
-                    
-                    // 仅当正在播放 且 存在有效的歌词内容时，才强制拉大灵动岛
-                    if (!pkgName.isNullOrEmpty() && pkgName == lyriconPkg && LyriconDataBridge.isPlaying && hasLyricInfo) {
-                        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                        val islandLengthDp = prefs.getInt(RootConstants.KEY_HOOK_MAX_LEFT_WIDTH, RootConstants.DEFAULT_HOOK_MAX_LEFT_WIDTH)
-                        val density = islandView.resources.displayMetrics.density
-
-                        val fixedLeftWidthPx = (islandLengthDp * density).toInt()
-                        val fixedRightWidthPx = (islandLengthDp * density).toInt()
-
+            val contentViewClass = DynamicFinder.findClassByConstantString(cl, "$islandPkg.window.content", "DynamicIslandContentView")
+                ?: cl.loadClass("$islandPkg.window.content.DynamicIslandContentView")
+            
+            contentViewClass.methods.forEach { method ->
+                val name = method.name
+                if (name == "updateBigIslandView") {
+                    try {
+                        module.deoptimize(method)
+                        module.hook(method).intercept(UpdateBigIslandHooker())
+                    } catch (_: Exception) {}
+                } else if (name.contains("Width") || name.contains("BigIslandX")) {
+                    if (method.parameterTypes.any { it == Int::class.javaPrimitiveType || it == Float::class.javaPrimitiveType }) {
                         try {
-                            val viewClass = islandView.javaClass
-                            val cutoutWidth = viewClass.getMethod("getCutoutWidth").invoke(islandView) as Int
-
-                            // 总宽度 = 物理开孔宽度 + 左文本宽度 + 右文本宽度
-                            val totalWidth = cutoutWidth + fixedLeftWidthPx + fixedRightWidthPx
-
-                            // 居中 X 坐标
-                            val displayWidth = islandView.resources.displayMetrics.widthPixels
-                            val newX = (displayWidth - totalWidth) / 2
-
-                            viewClass.getMethod("setBigIslandLeftWidth", Int::class.javaPrimitiveType).invoke(islandView, fixedLeftWidthPx)
-                            viewClass.getMethod("setBigIslandRightWidth", Int::class.javaPrimitiveType).invoke(islandView, fixedRightWidthPx)
-                            viewClass.getMethod("setBigIslandViewWidth", Int::class.javaPrimitiveType).invoke(islandView, totalWidth)
-                            viewClass.getMethod("setBigIslandX", Int::class.javaPrimitiveType).invoke(islandView, newX)
-
-                            viewClass.getMethod("setBigIslandLeftWidthHasSmallIsland", Int::class.javaPrimitiveType).invoke(islandView, fixedLeftWidthPx)
-                            viewClass.getMethod("setBigIslandRightWidthHasSmallIsland", Int::class.javaPrimitiveType).invoke(islandView, fixedRightWidthPx)
-                            viewClass.getMethod("setBigIslandViewWidthHasSmallIsland", Int::class.javaPrimitiveType).invoke(islandView, totalWidth)
-                            viewClass.getMethod("setBigIslandXHasSmallIsland", Int::class.javaPrimitiveType).invoke(islandView, newX)
-                        } catch (e: Exception) {
-                            logError("Failed to force island width target", e)
-                        }
+                            module.deoptimize(method)
+                            module.hook(method).intercept(ViewSetterHooker(name))
+                        } catch (_: Exception) {}
                     }
-                    // ★ 暂停时：什么都不做，让系统自己算出的原生值直接传给动画引擎
+                }
+            }
+        } catch (_: Exception) {}
+
+        isHookedSuccess = true
+    }
+
+    class ViewSetterHooker(private val methodName: String) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            try {
+                val arg0 = chain.args[0]
+                val view = chain.thisObject as? View ?: return chain.proceed()
+                
+                val pkgName = activeIslandPkgNames[view]
+                val activePkg = LyriconDataBridge.activePackageName
+                
+                // 增加校验：包名匹配 且 在歌词白名单中开启
+                if (pkgName != null && pkgName == activePkg && isPackageHookEnabled(activePkg)) {
+                    activeContentView = java.lang.ref.WeakReference(view)
+                    
+                    val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+                    val resources = view.resources
+                    val density = resources.displayMetrics.density
+
+                    val leftLen = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH)
+                    val rightLen = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH)
+
+                    val leftPx = (leftLen * density).toInt()
+                    val rightPx = (rightLen * density).toInt()
+
+                    val cutoutWidth = try { view.javaClass.getMethod("getCutoutWidth").invoke(view) as? Int } catch(_:Exception){null} ?: (80 * density).toInt()
+                    val sW = resources.displayMetrics.widthPixels
+                    
+                    val newViewWidth = leftPx + rightPx + cutoutWidth
+                    val newX = (sW / 2) - (cutoutWidth / 2) - leftPx
+
+                    val valueToSet = when {
+                        methodName.contains("LeftWidth") -> leftPx
+                        methodName.contains("RightWidth") -> rightPx
+                        methodName.contains("ViewWidth") -> newViewWidth
+                        methodName.contains("BigIslandX") -> newX
+                        else -> null
+                    }
+                    
+                    if (valueToSet != null) {
+                        if (arg0 is Int) chain.args[0] = valueToSet
+                        else if (arg0 is Float) chain.args[0] = valueToSet.toFloat()
+                    }
                 }
             } catch (_: Exception) {}
             return chain.proceed()
         }
     }
 
-    // =====================================================================
-    // 外部回调入口：歌词/歌曲变更时更新所有活跃岛屿
-    // 这里可以安全地 calculateBigIslandWidth，因为这是独立事件而非系统内部调用
-    // =====================================================================
-    internal fun updateAllActiveIslands(newTitle: String, activePkg: String) {
-        val iterator = activeIslandPkgNames.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            val islandView = entry.key as? ViewGroup
-            val pkg = entry.value
-            if (islandView != null && islandView.isAttachedToWindow) {
-                if (pkg == activePkg) {
-                    val currentSong = if (LyriconDataBridge.activePackageName == pkg) LyriconDataBridge.currentSongName ?: "" else ""
-                    val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                    val islandLength = prefs.getInt(RootConstants.KEY_HOOK_MAX_LEFT_WIDTH, RootConstants.DEFAULT_HOOK_MAX_LEFT_WIDTH)
-                    islandView.post {
-                        val hasLyricInfo = !newTitle.isBlank()
-                        if (LyriconDataBridge.isPlaying && hasLyricInfo) {
-                            injectTextToIsland(islandView, currentSong, newTitle, pkg, islandLength)
-                        } else {
-                            clearTextFromIsland(islandView, islandView.context.resources)
-                        }
-                        // 歌词/状态变了 → 触发系统完整重算链路
-                        triggerSystemRelayout(islandView)
-                    }
-                }
-            } else {
-                iterator.remove()
+    class UpdateBigIslandHooker : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val result = chain.proceed()
+            val viewGroup = chain.thisObject as? ViewGroup ?: return result
+            
+            val islandData = chain.args.getOrNull(0)
+            var pkgName = ""
+            if (islandData != null) {
+                try {
+                    val getExtrasMethod = islandData.javaClass.getMethod("getExtras")
+                    val extras = getExtrasMethod.invoke(islandData) as? android.os.Bundle
+                    pkgName = extras?.getString("miui.pkg.name") ?: ""
+                } catch (_: Exception) {}
             }
+            
+            if (pkgName.isNotEmpty()) {
+                activeIslandPkgNames[viewGroup] = pkgName
+            } else {
+                pkgName = activeIslandPkgNames[viewGroup] ?: ""
+            }
+
+            val activePkg = LyriconDataBridge.activePackageName
+            
+            // 增加校验：包名匹配 且 在歌词白名单中开启
+            if (pkgName.isEmpty() || pkgName != activePkg || !isPackageHookEnabled(activePkg)) return result
+
+            activeContentView = java.lang.ref.WeakReference(viewGroup)
+
+            val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+            applySettings(viewGroup)
+            
+            val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
+            val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
+            
+            injectToSlot(viewGroup, "island_container_module_image_text_1", "HYPERLYRIC_LEFT_VIEW", leftMode, prefs, pkgName)
+            injectToSlot(viewGroup, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
+
+            return result
         }
     }
 
-    // =====================================================================
-    // 设置变更时强制刷新：清除旧注入 → 用新宽度重新注入 → 触发系统重算
-    // =====================================================================
-    internal fun refreshAllActiveIslands() {
-        val activePkg = LyriconDataBridge.activePackageName ?: return
-        val lyricText = LyriconDataBridge.currentLyric
-        val songName = LyriconDataBridge.currentSongName ?: ""
-
-        val iterator = activeIslandPkgNames.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            val islandView = entry.key as? ViewGroup
-            val pkg = entry.value
-            if (islandView != null && islandView.isAttachedToWindow) {
-                if (pkg == activePkg) {
-                    islandView.post {
-                        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                        val islandLength = prefs.getInt(RootConstants.KEY_HOOK_MAX_LEFT_WIDTH, RootConstants.DEFAULT_HOOK_MAX_LEFT_WIDTH)
-
-                        // 先清除旧的注入（包括恢复旧宽度的 tag）
-                        clearTextFromIsland(islandView, islandView.context.resources)
-                        
-                        // 强制清空内部自定义视图缓存，确保使用最新配置重建
-                        arrayOf("island_container_module_image_text_1" to TAG_LEFT, "island_container_module_image_text_2" to TAG_RIGHT).forEach { (idName, tagStr) ->
-                            val outerId = findId(idName, islandView.context.resources)
-                            if (outerId != 0) {
-                                val outerContainer = islandView.findViewById<ViewGroup>(outerId)
-                                if (outerContainer != null) {
-                                    val textContainerId = findId("island_container_module_text", islandView.context.resources)
-                                    val targetContainer = if (textContainerId != 0) outerContainer.findViewById(textContainerId) ?: outerContainer else outerContainer
-                                    val frame = targetContainer.findViewWithTag<FrameLayout>("${tagStr}_container")
-                                    frame?.removeAllViews() // 强制下次 ensureTextInContainer 时重建
-                                }
-                            }
-                        }
-
-                        if (LyriconDataBridge.isPlaying && !lyricText.isNullOrBlank()) {
-                            // 用新的宽度重新注入
-                            injectTextToIsland(islandView, songName, lyricText, pkg, islandLength)
-                        }
-
-                        // 触发系统完整的 宽度计算 → 布局更新 → 动画 链路
-                        triggerSystemRelayout(islandView)
-                    }
-                }
-            } else {
-                iterator.remove()
-            }
-        }
+    private fun isPackageHookEnabled(packageName: String?): Boolean {
+        if (packageName.isNullOrEmpty()) return false
+        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+        val whitelist = prefs.getStringSet(RootConstants.KEY_HOOK_WHITELIST, emptySet()) ?: emptySet()
+        return whitelist.contains(packageName)
     }
 
-    // =====================================================================
-    // 安全触发系统的 宽度计算 → 布局更新 → 动画 完整链路
-    // 尝试多个方法名称，确保至少一个触发成功
-    // =====================================================================
     private fun triggerSystemRelayout(islandView: ViewGroup) {
         val viewClass = islandView.javaClass
+        try {
+            viewClass.getMethod("updateBigIslandViewWidth").invoke(islandView)
+            return
+        } catch (_: Exception) {}
+
+        try {
+            viewClass.getMethod("calculateBigIslandWidth").invoke(islandView)
+        } catch (_: Exception) {}
+    }
+
+    private fun applySettings(rootView: ViewGroup) {
+        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+        val showAlbum = prefs.getBoolean(RootConstants.KEY_HOOK_ISLAND_LEFT_ALBUM, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_ALBUM)
+        val showRhythm = prefs.getBoolean(RootConstants.KEY_HOOK_ISLAND_RIGHT_ICON, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_ICON)
         
-        // 优先尝试 updateBigIslandViewWidth()，这是系统最高层入口
-        // 它内部会调用 calculateBigIslandWidth() → updateBigIslandLayout() → updateBigIslandLayoutWithAnim()
+
+        toggleContainer(rootView, "island_container_module_image_text_1", "island_container_module_icon", showAlbum)
+        toggleContainer(rootView, "island_container_module_image_text_2", "island_container_module_icon", showRhythm)
+        
+        toggleContainer(rootView, "island_container_module_image_text_1", "island_container_module_text", true)
+        toggleContainer(rootView, "island_container_module_image_text_2", "island_container_module_text", true)
+
+        if (!showAlbum) {
+            clearTextContainerMargin(rootView, "island_container_module_image_text_1", clearStart = true, clearEnd = false)
+        }
+        if (!showRhythm) {
+            clearTextContainerMargin(rootView, "island_container_module_image_text_2", clearStart = false, clearEnd = true)
+        }
+    }
+
+
+    @SuppressLint("DiscouragedApi")
+    private fun toggleContainer(root: ViewGroup, parentName: String, containerName: String, show: Boolean) {
         try {
-            val method = viewClass.getMethod("updateBigIslandViewWidth")
-            method.invoke(islandView)
-            return
+            val res = root.resources
+            val pkgNames = arrayOf("miui.systemui.plugin", "com.android.systemui")
+            
+            var parent: ViewGroup? = null
+            for (pkg in pkgNames) {
+                val id = res.getIdentifier(parentName, "id", pkg)
+                if (id != 0) {
+                    parent = root.findViewById(id)
+                    if (parent != null) break
+                }
+            }
+            
+            if (parent != null) {
+                for (pkg in pkgNames) {
+                    val id = res.getIdentifier(containerName, "id", pkg)
+                    if (id != 0) {
+                        parent.findViewById<View>(id)?.visibility = if (show) View.VISIBLE else View.GONE
+                    }
+                }
+            }
         } catch (_: Exception) {}
-
-        // 降级尝试 calculateBigIslandWidth()
-        try {
-            val method = viewClass.getMethod("calculateBigIslandWidth")
-            method.invoke(islandView)
-        } catch (_: Exception) {}
-    }
-
-    // =====================================================================
-    // 播放状态变化回调：暂停时清理文字并触发系统重算让岛收缩
-    // =====================================================================
-    internal fun onPlaybackStateChanged(isPlaying: Boolean) {
-        val activePkg = LyriconDataBridge.activePackageName ?: return
-        val iterator = activeIslandPkgNames.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            val islandView = entry.key as? ViewGroup
-            val pkg = entry.value
-            if (islandView != null && islandView.isAttachedToWindow) {
-                if (pkg == activePkg) {
-                    islandView.post {
-                        if (isPlaying) {
-                            // 恢复播放：如果有歌词就注入
-                            val lyricText = LyriconDataBridge.currentLyric
-                            val songName = LyriconDataBridge.currentSongName ?: ""
-                            val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                            val islandLength = prefs.getInt(RootConstants.KEY_HOOK_MAX_LEFT_WIDTH, RootConstants.DEFAULT_HOOK_MAX_LEFT_WIDTH)
-                            if (!lyricText.isNullOrBlank()) {
-                                injectTextToIsland(islandView, songName, lyricText, pkg, islandLength)
-                            }
-                        } else {
-                            // 暂停：隐藏自定义文字
-                            clearTextFromIsland(islandView, islandView.context.resources)
-                        }
-                        // 触发系统重算，让岛自然伸缩
-                        triggerSystemRelayout(islandView)
-                    }
-                }
-            } else {
-                iterator.remove()
-            }
-        }
-    }
-
-    internal fun updateActiveIslandsPosition(position: Long, activePkg: String) {
-        val iterator = activeIslandPkgNames.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            val islandView = entry.key as? ViewGroup
-            val pkg = entry.value
-            if (islandView != null && islandView.isAttachedToWindow) {
-                if (pkg == activePkg) {
-                    val frameId = findId("island_container_module_image_text_2", islandView.context.resources)
-                    if (frameId != 0) {
-                        val tv = islandView.findViewById<ViewGroup>(frameId)?.findViewWithTag<io.github.proify.lyricon.lyric.view.RichLyricLineView>(TAG_RIGHT)
-                        tv?.setPosition(position)
-                    }
-                }
-            } else {
-                iterator.remove()
-            }
-        }
-    }
-
-    // =====================================================================
-    // 文字注入：往灵动岛容器中塞入自定义文本视图
-    // =====================================================================
-    private fun injectTextToIsland(bigIslandView: ViewGroup, leftTitle: String, rightTitle: String, pkgName: String, islandLength: Int) {
-        if (leftTitle.isBlank() && rightTitle.isBlank()) return
-        val context = bigIslandView.context
-        val res = context.resources
-
-        val iconId = findId("island_fix_icon", res)
-        val hasFixIcon = iconId != 0 && bigIslandView.findViewById<ImageView>(iconId) != null
-
-        val isMusicApp = pkgName.contains("music") || pkgName.contains("player") || pkgName.contains("kugou") || pkgName.contains("kuwo")
-        if (!hasFixIcon && pkgName.isNotEmpty() && !isMusicApp) {
-            return
-        }
-
-        val leftTv = ensureTextInContainer(bigIslandView, res, "island_container_module_image_text_1", TAG_LEFT, islandLength)
-        val rightTv = ensureTextInContainer(bigIslandView, res, "island_container_module_image_text_2", TAG_RIGHT, islandLength)
-
-        var needInvalidate = false
-
-        if (leftTv is TextView && leftTv.text?.toString() != leftTitle) {
-            leftTv.text = leftTitle
-            needInvalidate = true
-        }
-
-        if (rightTv is io.github.proify.lyricon.lyric.view.RichLyricLineView) {
-            val currentLine = LyriconDataBridge.currentLyricLine
-            if (rightTv.line != currentLine) {
-                val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                val isAnimEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ANIM_ENABLE, RootConstants.DEFAULT_HOOK_ANIM_ENABLE)
-                val animId = prefs.getString(RootConstants.KEY_HOOK_ANIM_ID, RootConstants.DEFAULT_HOOK_ANIM_ID)
-
-                needInvalidate = true
-
-                val applyLineExt: io.github.proify.lyricon.lyric.view.RichLyricLineView.() -> Unit = {
-                    line = currentLine
-                    post { 
-                        if (prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)) {
-                            tryStartMarquee()
-                        } else {
-                            stopMarquee()
-                        }
-                    }
-                }
-
-                if (isAnimEnabled) {
-                    val preset = YoYoPresets.getById(animId) ?: YoYoPresets.Default
-                    rightTv.animateUpdate(preset, applyLineExt)
-                } else {
-                    rightTv.applyLineExt()
-                }
-            }
-        }
-
-        if (needInvalidate) {
-            bigIslandView.post {
-                leftTv?.requestLayout()
-                rightTv?.requestLayout()
-                leftTv?.invalidate()
-                rightTv?.invalidate()
-                bigIslandView.requestLayout()
-                bigIslandView.invalidate()
-            }
-        }
-    }
-
-    // =====================================================================
-    // 清理自定义视图：仅隐藏我们注入的 Frame，恢复原生图标
-    // ★ 不修改 layoutParams.width，不调用 calculateBigIslandWidth
-    // =====================================================================
-    private fun clearTextFromIsland(root: ViewGroup, res: Resources) {
-        val leftId = findId("island_container_module_image_text_1", res)
-        val rightId = findId("island_container_module_image_text_2", res)
-
-        // 隐藏我们注入的自定义 Frame，恢复容器原始宽度
-        arrayOf(TAG_LEFT to leftId, TAG_RIGHT to rightId).forEach { (tagStr, outerId) ->
-            if (outerId != 0) {
-                val outerContainer = root.findViewById<ViewGroup>(outerId)
-                if (outerContainer != null) {
-                    val textContainerId = findId("island_container_module_text", res)
-                    val targetContainer = if (textContainerId != 0) outerContainer.findViewById(textContainerId) ?: outerContainer else outerContainer
-
-                    // 恢复原始宽度（若曾被我们修改）
-                    val key = "lyricon_orig_width".hashCode()
-                    val origWidth = targetContainer.getTag(key) as? Int
-                    if (origWidth != null) {
-                        val lp = targetContainer.layoutParams
-                        if (lp != null) {
-                            lp.width = origWidth
-                            targetContainer.layoutParams = lp
-                        }
-                    }
-
-                    // 清除调试底色
-                    targetContainer.background = null
-
-                    // 隐藏我们的自定义 Frame
-                    val frame = targetContainer.findViewWithTag<View>("${tagStr}_container")
-                    frame?.visibility = View.GONE
-                }
-            }
-        }
-
-        // 恢复右侧系统原生图标
-        if (rightId != 0) {
-            val rightOuter = root.findViewById<ViewGroup>(rightId)
-            val iconContainerId = findId("island_container_module_icon", res)
-            if (iconContainerId != 0 && rightOuter != null) {
-                rightOuter.findViewById<View>(iconContainerId)?.visibility = View.VISIBLE
-            }
-        }
-    }
-
-    // =====================================================================
-    // 确保文本容器存在并配置好
-    // =====================================================================
-    private fun ensureTextInContainer(
-        root: ViewGroup,
-        res: Resources,
-        outerContainerIdName: String,
-        tagStr: String,
-        islandLength: Int
-    ): View? {
-        val outerId = findId(outerContainerIdName, res)
-        if (outerId == 0) return null
-        val outerContainer = root.findViewById<ViewGroup>(outerId) ?: return null
-
-        if (tagStr == TAG_RIGHT) {
-            val iconContainerId = findId("island_container_module_icon", res)
-            if (iconContainerId != 0) {
-                outerContainer.findViewById<View>(iconContainerId)?.visibility = View.GONE
-            }
-        }
-
-        val textContainerId = findId("island_container_module_text", res)
-        val targetContainer = if (textContainerId != 0) outerContainer.findViewById(textContainerId) ?: outerContainer else outerContainer
-
-        targetContainer.visibility = View.VISIBLE
-
-        val fixedWidthPx = if (tagStr == TAG_LEFT) {
-            // 扣除左侧封面的空间
-            ((islandLength - 30).coerceAtLeast(0) * res.displayMetrics.density).toInt()
-        } else {
-            // 右侧预留圆角空间
-            ((islandLength - 10).coerceAtLeast(0) * res.displayMetrics.density).toInt()
-        }
-
-        val lpTarget = targetContainer.layoutParams
-        if (lpTarget != null) {
-            val key = "lyricon_orig_width".hashCode()
-            if (targetContainer.getTag(key) == null) {
-                targetContainer.setTag(key, lpTarget.width)
-            }
-            lpTarget.width = fixedWidthPx
-            targetContainer.layoutParams = lpTarget
-        }
-
-        val containerTag = "${tagStr}_container"
-        var frame = targetContainer.findViewWithTag<FrameLayout>(containerTag)
-        if (frame == null) {
-            frame = FrameLayout(targetContainer.context).apply {
-                tag = containerTag
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ).apply {
-                    gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                }
-            }
-            targetContainer.addView(frame)
-        }
-
-        var customTv = frame.findViewWithTag<View>(tagStr)
-        if (customTv == null) {
-            if (tagStr == TAG_RIGHT) {
-                val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                customTv = io.github.proify.lyricon.lyric.view.RichLyricLineView(frame.context).apply {
-                    tag = tagStr
-                    layoutParams = FrameLayout.LayoutParams(
-                        fixedWidthPx,
-                        FrameLayout.LayoutParams.WRAP_CONTENT,
-                        Gravity.CENTER_VERTICAL
-                    )
-                    
-                    val config = io.github.proify.lyricon.lyric.view.RichLyricLineConfig().apply {
-                        fadingEdgeLength = prefs.getInt(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, RootConstants.DEFAULT_HOOK_FADING_EDGE_LENGTH)
-                        gradientProgressStyle = prefs.getBoolean(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS)
-                        
-                        placeholderFormat = io.github.proify.lyricon.lyric.view.PlaceholderFormat.NONE
-                        
-                        val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
-                        val fontWeight = prefs.getInt(RootConstants.KEY_HOOK_FONT_WEIGHT, RootConstants.DEFAULT_HOOK_FONT_WEIGHT)
-                        val fontItalic = prefs.getBoolean(RootConstants.KEY_HOOK_FONT_ITALIC, RootConstants.DEFAULT_HOOK_FONT_ITALIC)
-                        
-                        val tf =
-                            android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, fontWeight, fontItalic)
-                        val isTranslationVisible = LyriconDataBridge.isDisplayTranslation
-                        
-                        val textSizeRatio = prefs.getFloat(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO)
-                        val primarySizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat(), res.displayMetrics)
-                        primary.textSize = primarySizePx
-                        primary.typeface = tf
-                        secondary.textSize = if (isTranslationVisible) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fontSize * textSizeRatio, res.displayMetrics) else 0f
-                        secondary.typeface = tf
-                        if (!isTranslationVisible) {
-                            secondary.textColor = intArrayOf(Color.TRANSPARENT)
-                        }
-                        
-                        primary.enableRelativeProgress = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_RELATIVE, RootConstants.DEFAULT_HOOK_SYLLABLE_RELATIVE)
-                        primary.enableRelativeProgressHighlight = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT, RootConstants.DEFAULT_HOOK_SYLLABLE_HIGHLIGHT)
-                        primary.isScrollOnly = false
-                        
-                        syllable.enableSustainGlow = true
-                        
-                        val isMarqueeEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)
-                        marquee.disableSyllableScroll = !isMarqueeEnabled
-                        if (isMarqueeEnabled) {
-                            marquee.scrollSpeed = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_SPEED).toFloat()
-                            marquee.initialDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_DELAY)
-                            marquee.loopDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_LOOP_DELAY)
-                            val infinite = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_INFINITE)
-                            marquee.repeatCount = if (infinite) -1 else 1
-                            marquee.stopAtEnd = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_STOP_END, RootConstants.DEFAULT_HOOK_MARQUEE_STOP_END)
-                        } else {
-                            marquee.repeatCount = 0
-                            marquee.scrollSpeed = 0f
-                        }
-                    }
-
-                    setStyle(config)
-                    updateColor(intArrayOf(Color.WHITE), intArrayOf("#4CFFFFFF".toColorInt()), intArrayOf(Color.WHITE))
-                }
-            } else {
-                val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
-                customTv = TextView(frame.context).apply {
-                    tag = tagStr
-                    setTextColor(Color.WHITE)
-                    
-                    val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
-                    val fontWeight = prefs.getInt(RootConstants.KEY_HOOK_FONT_WEIGHT, RootConstants.DEFAULT_HOOK_FONT_WEIGHT)
-                    val fontItalic = prefs.getBoolean(RootConstants.KEY_HOOK_FONT_ITALIC, RootConstants.DEFAULT_HOOK_FONT_ITALIC)
-                    
-                    val tf =
-                        android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, fontWeight, fontItalic)
-
-                    typeface = tf
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat())
-                    
-                    isSingleLine = true
-                    ellipsize = null
-                    
-                    val fadingEdgeDP = prefs.getInt(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, RootConstants.DEFAULT_HOOK_FADING_EDGE_LENGTH)
-                    isHorizontalFadingEdgeEnabled = fadingEdgeDP > 0
-                    setFadingEdgeLength(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fadingEdgeDP.toFloat(), res.displayMetrics).toInt())
-
-                    layoutParams = FrameLayout.LayoutParams(
-                        fixedWidthPx,
-                        FrameLayout.LayoutParams.WRAP_CONTENT,
-                        Gravity.CENTER_VERTICAL
-                    )
-                }
-            }
-            frame.addView(customTv)
-        }
-        frame.visibility = View.VISIBLE
-
-        customTv.visibility = View.VISIBLE
-        if (tagStr == TAG_RIGHT) {
-            customTv.isSelected = true
-        }
-        return customTv
     }
 
     @SuppressLint("DiscouragedApi")
-    private fun findId(name: String, res: Resources): Int {
-        for (pkg in TARGET_PACKAGES) {
-            val id = try { res.getIdentifier(name, "id", pkg) } catch (_: Exception) { 0 }
-            if (id != 0) return id
-        }
-        return 0
+    private fun clearTextContainerMargin(root: ViewGroup, parentName: String, clearStart: Boolean, clearEnd: Boolean) {
+        try {
+            val res = root.resources
+            val pkgNames = arrayOf("miui.systemui.plugin", "com.android.systemui")
+            
+            var parent: ViewGroup? = null
+            for (pkg in pkgNames) {
+                val id = res.getIdentifier(parentName, "id", pkg)
+                if (id != 0) {
+                    parent = root.findViewById(id)
+                    if (parent != null) break
+                }
+            }
+            
+            if (parent != null) {
+                for (pkg in pkgNames) {
+                    val id = res.getIdentifier("island_container_module_text", "id", pkg)
+                    if (id != 0) {
+                        val textContainer = parent.findViewById<View>(id)
+                        if (textContainer != null) {
+                            val lp = textContainer.layoutParams as? ViewGroup.MarginLayoutParams
+                            if (lp != null) {
+                                if (clearStart) lp.marginStart = 0
+                                if (clearEnd) lp.marginEnd = 0
+                                textContainer.layoutParams = lp
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
     }
 
+    @SuppressLint("DiscouragedApi")
+    private fun injectToSlot(rootView: ViewGroup, parentName: String, tag: String, mode: Int, prefs: SharedPreferences, pkgName: String) {
+        val res = rootView.resources
+        val slotId = res.getIdentifier(parentName, "id", "miui.systemui.plugin")
+        if (slotId == 0) return
+        val parent = rootView.findViewById<ViewGroup>(slotId) ?: return
+        
+        val textSlotId = res.getIdentifier("island_container_module_text", "id", "miui.systemui.plugin")
+        val container = if (textSlotId != 0) parent.findViewById(textSlotId) ?: parent else parent
+
+        var targetView = container.findViewWithTag<View>(tag)
+        
+        if (mode == 0) {
+            targetView?.visibility = View.GONE
+            return
+        }
+
+        val lyriconSongName = LyriconDataBridge.currentSongName
+        var metadataSongName = ""
+        var finalArtistName = ""
+        var finalAlbumName = ""
+
+        val targetPkg = LyriconDataBridge.activePackageName ?: pkgName
+        if (targetPkg.isNotEmpty()) {
+            try {
+                val mediaSessionManager = rootView.context.getSystemService(android.content.Context.MEDIA_SESSION_SERVICE) as android.media.session.MediaSessionManager
+                val controllers = mediaSessionManager.getActiveSessions(null)
+                val controller = controllers.find { it.packageName == targetPkg }
+                val mMetadata = controller?.metadata
+                if (mMetadata != null) {
+                    metadataSongName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
+                    finalArtistName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+                    finalAlbumName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""
+                }
+            } catch (_: Exception) {}
+        }
+
+        val singleModeText = when(mode) {
+            1 -> metadataSongName
+            2 -> lyriconSongName ?: ""
+            3 -> finalArtistName
+            4 -> finalAlbumName
+            5 -> if (finalArtistName.isEmpty()) lyriconSongName ?: "" else "${lyriconSongName ?: ""} - $finalArtistName"
+            else -> ""
+        }
+
+        if (mode in 1..8) {
+            if (targetView !is RichLyricLineView) {
+                targetView?.let { container.removeView(it) }
+                targetView = RichLyricLineView(rootView.context).apply {
+                    this.tag = tag
+                }
+                container.addView(targetView)
+            }
+            configureRichLyricView(targetView, prefs, res, mode)
+            
+            targetView.line = when(mode) {
+                1, 2, 3, 4, 5 -> RichLyricLine(text = singleModeText, words = emptyList())
+                6 -> RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = finalArtistName, secondaryWords = emptyList())
+                7 -> {
+                    val sec = if (finalAlbumName.isEmpty()) finalArtistName else "$finalArtistName - $finalAlbumName"
+                    RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = sec, secondaryWords = emptyList())
+                }
+                8 -> LyriconDataBridge.currentLyricLine ?: RichLyricLine(text = lyriconSongName, words = emptyList())
+                else -> null
+            }
+        }
+
+        val density = res.displayMetrics.density
+        val isLeft = parentName.contains("1")
+        val maxWidthDp = if (isLeft) prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH)
+                         else prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH)
+        val pL = if (isLeft) prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_PADDING_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_PADDING_LEFT)
+                 else prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_PADDING_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_PADDING_LEFT)
+        val pR = if (isLeft) prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_PADDING_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_PADDING_RIGHT)
+                 else prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_PADDING_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_PADDING_RIGHT)
+
+        targetView.layoutParams = FrameLayout.LayoutParams((maxWidthDp * density).toInt(), FrameLayout.LayoutParams.MATCH_PARENT).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        targetView.setPadding((pL * density).toInt(), 0, (pR * density).toInt(), 0)
+        targetView.visibility = View.VISIBLE
+    }
+
+    // removed configureTextView
+
+    private fun configureRichLyricView(view: RichLyricLineView, prefs: SharedPreferences, res: android.content.res.Resources, mode: Int) {
+        val config = RichLyricLineConfig().apply {
+            fadingEdgeLength = prefs.getInt(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, RootConstants.DEFAULT_HOOK_FADING_EDGE_LENGTH)
+            gradientProgressStyle = prefs.getBoolean(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS)
+            
+            placeholderFormat = io.github.proify.lyricon.lyric.view.PlaceholderFormat.NONE
+            
+            val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
+            val fontWeight = prefs.getInt(RootConstants.KEY_HOOK_FONT_WEIGHT, RootConstants.DEFAULT_HOOK_FONT_WEIGHT)
+            val fontItalic = prefs.getBoolean(RootConstants.KEY_HOOK_FONT_ITALIC, RootConstants.DEFAULT_HOOK_FONT_ITALIC)
+            val tf = Typeface.create(Typeface.DEFAULT, fontWeight, fontItalic)
+            
+            val textSizeRatio = prefs.getFloat(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO)
+            val primarySizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat(), res.displayMetrics)
+            
+            primary.textSize = primarySizePx
+            primary.typeface = tf
+
+            val isMetadataDualLine = (mode == 6 || mode == 7)
+            val isTranslationVisible = LyriconDataBridge.isDisplayTranslation
+            val showSecondary = isMetadataDualLine || isTranslationVisible
+            
+            secondary.textSize = if (showSecondary) primarySizePx * textSizeRatio else 0f
+            secondary.typeface = tf
+            if (!showSecondary) {
+                secondary.textColor = intArrayOf(Color.TRANSPARENT)
+            }
+            
+            primary.enableRelativeProgress = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_RELATIVE, RootConstants.DEFAULT_HOOK_SYLLABLE_RELATIVE)
+            primary.enableRelativeProgressHighlight = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT, RootConstants.DEFAULT_HOOK_SYLLABLE_HIGHLIGHT)
+            primary.isScrollOnly = false
+            
+            syllable.enableSustainGlow = true
+            
+            val isMarqueeEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)
+            marquee.disableSyllableScroll = !isMarqueeEnabled
+            if (isMarqueeEnabled) {
+                marquee.scrollSpeed = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_SPEED).toFloat()
+                marquee.initialDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_DELAY)
+                marquee.loopDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_LOOP_DELAY)
+                val infinite = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_INFINITE)
+                marquee.repeatCount = if (infinite) -1 else 1
+                marquee.stopAtEnd = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_STOP_END, RootConstants.DEFAULT_HOOK_MARQUEE_STOP_END)
+            } else {
+                marquee.repeatCount = 0
+                marquee.scrollSpeed = 0f
+            }
+        }
+        view.setStyle(config)
+        view.updateColor(intArrayOf(Color.WHITE), intArrayOf(0x4CFFFFFF), intArrayOf(Color.WHITE))
+    }
+
+    fun refreshActiveIsland() {
+        val iterator = activeIslandPkgNames.entries.iterator()
+        val activePkg = LyriconDataBridge.activePackageName ?: return
+        
+        // 增加白名单校验
+        if (!isPackageHookEnabled(activePkg)) return
+
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            val cv = entry.key as? ViewGroup
+            val pkgName = entry.value
+
+            if (cv != null && cv.isAttachedToWindow) {
+                if (pkgName == activePkg) {
+                    cv.post {
+                        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+                        cv.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
+                        cv.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
+                        applySettings(cv)
+                        val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
+                        val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
+                        injectToSlot(cv, "island_container_module_image_text_1", "HYPERLYRIC_LEFT_VIEW", leftMode, prefs, pkgName)
+                        injectToSlot(cv, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
+                        triggerSystemRelayout(cv)
+                    }
+                }
+            } else {
+                iterator.remove()
+            }
+        }
+    }
+
+    fun updateLyricLine() {
+        val iterator = activeIslandPkgNames.entries.iterator()
+        val activePkg = LyriconDataBridge.activePackageName ?: return
+        
+        // 增加白名单校验
+        if (!isPackageHookEnabled(activePkg)) return
+
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            val cv = entry.key as? ViewGroup
+            val pkgName = entry.value
+
+            if (cv != null && cv.isAttachedToWindow) {
+                if (pkgName == activePkg) {
+                    val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+                    updateLyricInSlot(cv, "HYPERLYRIC_LEFT_VIEW", prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT), prefs)
+                    updateLyricInSlot(cv, "HYPERLYRIC_RIGHT_VIEW", prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT), prefs)
+                }
+            } else {
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun updateLyricInSlot(cv: ViewGroup, tag: String, mode: Int, prefs: SharedPreferences) {
+        if (mode != 8) return
+        val view = cv.findViewWithTag<RichLyricLineView>(tag) ?: return
+        val targetLine = LyriconDataBridge.currentLyricLine
+
+        cv.post {
+            val isAnimEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ANIM_ENABLE, RootConstants.DEFAULT_HOOK_ANIM_ENABLE)
+            val animId = prefs.getString(RootConstants.KEY_HOOK_ANIM_ID, RootConstants.DEFAULT_HOOK_ANIM_ID)
+
+            val applyLine: RichLyricLineView.() -> Unit = {
+                line = targetLine
+                post {
+                    if (prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)) {
+                        tryStartMarquee()
+                    } else {
+                        stopMarquee()
+                    }
+                }
+            }
+
+            if (isAnimEnabled) {
+                val preset = YoYoPresets.getById(animId) ?: YoYoPresets.Default
+                view.animateUpdate(preset, applyLine)
+            } else {
+                view.applyLine()
+            }
+        }
+    }
+
+    /**
+     * 播放进度同步到 RichLyricLineView，驱动逐字/逐音节高亮
+     */
+    fun updatePosition(position: Long) {
+        val iterator = activeIslandPkgNames.entries.iterator()
+        val activePkg = LyriconDataBridge.activePackageName ?: return
+        
+        // 增加白名单校验
+        if (!isPackageHookEnabled(activePkg)) return
+
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            val cv = entry.key as? ViewGroup
+            val pkgName = entry.value
+
+            if (cv != null && cv.isAttachedToWindow) {
+                if (pkgName == activePkg) {
+                    cv.post {
+                        cv.findViewWithTag<RichLyricLineView>("HYPERLYRIC_LEFT_VIEW")?.setPosition(position)
+                        cv.findViewWithTag<RichLyricLineView>("HYPERLYRIC_RIGHT_VIEW")?.setPosition(position)
+                    }
+                }
+            } else {
+                iterator.remove()
+            }
+        }
+    }
+
+    /**
+     * 播放/暂停状态变化回调
+     */
+    fun onPlaybackStateChanged(isPlaying: Boolean) {
+        refreshActiveIsland()
+    }
 }

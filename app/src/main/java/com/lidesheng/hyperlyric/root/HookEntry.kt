@@ -77,7 +77,7 @@ class HookEntry : XposedModule() {
                 return
             }
             log("miui.systemui.plugin package loaded directly, attempting hook...")
-            UniversalIslandHook.hook(this, param.defaultClassLoader)
+            HookIslandLyric.hook(this, param.defaultClassLoader)
         }
     }
 
@@ -88,7 +88,7 @@ class HookEntry : XposedModule() {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
             val cl = chain.thisObject as? ClassLoader ?: return result
-            UniversalIslandHook.hook(this@HookEntry, cl)
+            HookIslandLyric.hook(this@HookEntry, cl)
             return result
         }
     }
@@ -127,32 +127,32 @@ class HookEntry : XposedModule() {
 
                 override fun onSongChanged(song: Song?) {
                     LyriconDataBridge.updateSong(song)
-                    UniversalIslandHook.refreshActiveIsland()
+                    HookIslandLyric.refreshActiveIsland()
                 }
 
                 override fun onPlaybackStateChanged(isPlaying: Boolean) {
                     LyriconDataBridge.isPlaying = isPlaying
-                    UniversalIslandHook.onPlaybackStateChanged(isPlaying)
+                    HookIslandLyric.onPlaybackStateChanged(isPlaying)
                 }
 
                 override fun onPositionChanged(position: Long) {
                     val lyricChanged = LyriconDataBridge.updatePosition(position)
                     if (lyricChanged) {
-                        UniversalIslandHook.updateLyricLine()
+                        HookIslandLyric.updateLyricLine()
                     }
-                    UniversalIslandHook.updatePosition(position)
+                    HookIslandLyric.updatePosition(position)
                 }
 
                 override fun onSeekTo(position: Long) {}
 
                 override fun onSendText(text: String?) {
                     LyriconDataBridge.updateLyric(text)
-                    UniversalIslandHook.updateLyricLine()
+                    HookIslandLyric.updateLyricLine()
                 }
 
                 override fun onDisplayTranslationChanged(isDisplayTranslation: Boolean) {
                     LyriconDataBridge.isDisplayTranslation = isDisplayTranslation
-                    UniversalIslandHook.refreshActiveIsland()
+                    HookIslandLyric.refreshActiveIsland()
                 }
 
                 override fun onDisplayRomaChanged(displayRoma: Boolean) {}
@@ -164,7 +164,7 @@ class HookEntry : XposedModule() {
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     log("Received REFRESH_ISLAND broadcast, refreshing island...")
-                    UniversalIslandHook.refreshActiveIsland()
+                    HookIslandLyric.refreshActiveIsland()
                 }
             }
             app.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
