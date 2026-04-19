@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_description">词屿是一个完善HyperOS3媒体超级岛的模块，带来更好的体验</string>
+    <string name="app_description">在 HyperOS3 媒体超级岛上体验歌词，以带来更好的体验</string>
     <string name="provider_release_home">https://github.com/proify/LyricProvider/releases</string>
 </resources>
