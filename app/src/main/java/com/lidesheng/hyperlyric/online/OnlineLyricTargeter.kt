@@ -24,7 +24,7 @@ object OnlineLyricTargeter {
         val sources = when (pkgName) {
             "com.netease.cloudmusic" -> listOf(ne, qm)
             "com.tencent.qqmusic" -> listOf(qm, ne)
-            else -> listOf(ne, qm)
+            else -> listOf(qm, ne)
         }
 
         val keyword = "$title $artist"
