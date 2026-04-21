@@ -122,7 +122,7 @@ object NotificationManagerHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(getClickPendingIntent(context, uiState.targetPackageName))
-            .setShortCriticalText(uiState.notificationTitleLeft)
+            .setShortCriticalText(uiState.title)
             .setContentTitle(uiState.notificationTitleLeft)
             .setSubText(uiState.songInfo)
             .setContentText(uiState.notificationTitleRight)

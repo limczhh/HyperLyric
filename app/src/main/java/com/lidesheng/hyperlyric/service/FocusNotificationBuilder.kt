@@ -45,7 +45,7 @@ class FocusNotificationBuilder(
         }
 
         // 5. AOD / 状态栏
-        paramV2.put("aodTitle", uiState.notificationTitleLeft)
+        paramV2.put("aodTitle", uiState.title)
         paramV2.put("aodPic", "miui.focus.pic_album")
 
         root.put("param_v2", paramV2)
@@ -85,7 +85,7 @@ class FocusNotificationBuilder(
 
         // 大岛主文本区 (右侧)
         val islandTitleText = JSONObject()
-        islandTitleText.put("title", if (uiState.disableLyricSplit) uiState.notificationTitleLeft else uiState.title)
+        islandTitleText.put("title", uiState.title)
         json.put("textInfo", islandTitleText)
         
         return json

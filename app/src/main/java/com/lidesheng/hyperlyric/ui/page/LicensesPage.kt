@@ -67,6 +67,8 @@ fun LicensesPage() {
             LicenseItem("kotlinx.serialization", "Kotlin", "https://github.com/Kotlin/kotlinx.serialization"),
             LicenseItem("Jetpack Compose", "Google", "https://developer.android.com/jetpack/compose"),
             LicenseItem("Lyrico", "Replica0110", "https://github.com/Replica0110/Lyrico"),
+            LicenseItem("opencc4j", "houbb", "https://github.com/houbb/opencc4j"),
+            LicenseItem("OpenCC", "BYVoid", "https://github.com/BYVoid/OpenCC"),
             LicenseItem("LDDC", "chenmozhijin", "https://github.com/chenmozhijin/LDDC"),
             LicenseItem("HyperCeiler", "HyperCeiler团队", "https://github.com/ReChronoRain/HyperCeiler"),
             LicenseItem("HyperOShape","xzakota","https://github.com/xzakota/HyperOShape")

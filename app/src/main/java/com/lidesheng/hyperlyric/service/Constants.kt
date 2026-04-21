@@ -15,6 +15,8 @@ object Constants {
     const val KEY_NOTIFICATION_PROGRESS_COLOR = "key_notification_progress_color"
     const val KEY_NOTIFICATION_ALBUM = "key_notification_album"
     const val KEY_NOTIFICATION_ISLAND_DISABLE_LYRIC_SPLIT = "key_notification_island_disable_lyric_split"
+    const val KEY_NOTIFICATION_ISLAND_LIMIT_WIDTH = "key_notification_island_limit_width"
+    const val KEY_NOTIFICATION_ISLAND_MAX_WIDTH = "key_notification_island_max_width"
     const val KEY_ONLINE_LYRIC_CACHE_LIMIT = "key_online_lyric_cache_limit"
     const val KEY_ONLINE_LYRIC_ENABLED = "key_online_lyric_enabled"
 
@@ -30,6 +32,8 @@ object Constants {
     const val DEFAULT_NOTIFICATION_PROGRESS_COLOR = true
     const val DEFAULT_NOTIFICATION_ALBUM = true
     const val DEFAULT_NOTIFICATION_ISLAND_DISABLE_LYRIC_SPLIT = false
+    const val DEFAULT_NOTIFICATION_ISLAND_LIMIT_WIDTH = false
+    const val DEFAULT_NOTIFICATION_ISLAND_MAX_WIDTH = 720
     const val DEFAULT_ONLINE_LYRIC_CACHE_LIMIT = 200
     const val DEFAULT_ONLINE_LYRIC_ENABLED = false
 }

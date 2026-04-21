@@ -12,7 +12,6 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
-import android.util.TypedValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.toColorInt
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
@@ -22,6 +21,7 @@ import com.lidesheng.hyperlyric.online.LrcCacheManager
 import com.lidesheng.hyperlyric.online.LrcLine
 import com.lidesheng.hyperlyric.online.OnlineLyricTargeter
 import com.lidesheng.hyperlyric.online.model.DynamicLyricData
+import com.lidesheng.hyperlyric.service.utils.LyricSplitter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -91,17 +91,19 @@ class LiveLyricService : NotificationListenerService() {
     private var lastDispatchedLrc: String = ""
     private var currentSyncData: SyncData? = null
 
-    // ─── 解耦模块：通知展示调度器 ─────────────────────────
+    // ─── 解耦模块：通知展示与分割器 ───────────────────────
     private lateinit var notificationPresenter: NotificationPresenter
+    private lateinit var lyricSplitter: LyricSplitter
 
         override fun onCreate() {
         super.onCreate()
         mediaSessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
         cachedNotificationEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
 
-        // 初始化通知展示模块
+        // 初始化通知与分割器模块
         notificationPresenter = NotificationPresenter(this, serviceScope)
         notificationPresenter.register()
+        lyricSplitter = LyricSplitter(textPaint, resources.displayMetrics)
         DynamicLyricData.initWhitelist(this)
 
         serviceScope.launch(Dispatchers.Default) {
@@ -450,21 +452,24 @@ class LiveLyricService : NotificationListenerService() {
         val showIslandLeftAlbum = pref.getBoolean(ServiceConstants.KEY_NOTIFICATION_ISLAND_LEFT_ALBUM, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_LEFT_ALBUM)
         val showAlbumArt = pref.getBoolean(ServiceConstants.KEY_NOTIFICATION_ALBUM, ServiceConstants.DEFAULT_NOTIFICATION_ALBUM)
         val disableLyricSplit = pref.getBoolean(ServiceConstants.KEY_NOTIFICATION_ISLAND_DISABLE_LYRIC_SPLIT, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_DISABLE_LYRIC_SPLIT)
+        val limitMaxWidth = pref.getBoolean(ServiceConstants.KEY_NOTIFICATION_ISLAND_LIMIT_WIDTH, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_LIMIT_WIDTH)
+        val maxWidth = pref.getInt(ServiceConstants.KEY_NOTIFICATION_ISLAND_MAX_WIDTH, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_MAX_WIDTH)
 
-        val (islandLeft, islandRight, notificationLeft, notificationRight) = splitTitleByPixelWidth(songLyric, showIslandLeftAlbum, showAlbumArt)
+        val splitResult = lyricSplitter.split(
+            songLyric,
+            LyricSplitter.Config(
+                showIslandLeftAlbum = showIslandLeftAlbum,
+                showAlbumArt = showAlbumArt,
+                disableLyricSplit = disableLyricSplit,
+                limitMaxWidth = limitMaxWidth,
+                maxWidth = maxWidth
+            )
+        )
 
-        val finalIslandLeft: String
-        val finalIslandRight: String
-        if (disableLyricSplit) {
-            finalIslandLeft = ""
-            finalIslandRight = songLyric
-        } else {
-            finalIslandLeft = islandLeft
-            finalIslandRight = islandRight
-        }
-
-        // 通知栏：始终按自己的像素宽度分割，不受 disableLyricSplit 影响
-        val finalNotificationLeft = notificationLeft
+        val finalIslandLeft = splitResult.islandLeft
+        val finalIslandRight = splitResult.islandRight
+        val finalNotificationLeft = splitResult.notificationLeft
+        val finalNotificationRight = splitResult.notificationRight
 
         val titleStyle = pref.getInt(ServiceConstants.KEY_NOTIFICATION_TITLE_STYLE, ServiceConstants.DEFAULT_NOTIFICATION_TITLE_STYLE)
         val songInfo = when (titleStyle) {
@@ -492,7 +497,7 @@ class LiveLyricService : NotificationListenerService() {
         DynamicLyricData.updateBitmaps(data.albumBitmap, data.notificationAlbumBitmap)
         DynamicLyricData.updateLeftTitles(finalIslandLeft, finalNotificationLeft)
         DynamicLyricData.updateRightTitles(finalIslandRight,
-            notificationRight, songLyric, songInfo, data.duration, data.isPlaying, data.currentPackageName, showIslandLeftAlbum)
+            finalNotificationRight, songLyric, songInfo, data.duration, data.isPlaying, data.currentPackageName, showIslandLeftAlbum)
     }
 
     private fun parseLrc(lrcText: String): List<LrcLine> {
@@ -524,114 +529,7 @@ class LiveLyricService : NotificationListenerService() {
             String.format("[%02d:%02d.%02d]%s", min, sec, ms, line.content)
         }
     }
-
-    data class LyricSplitResult(
-        val islandLeft: String,
-        val islandRight: String,
-        val notificationLeft: String,
-        val notificationRight: String
-    )
-
-
-    private val defaultSizePx by lazy { TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 13f, resources.displayMetrics) }
     
-    private fun scalePxToInternalLimit(targetLimitPx: Float): Float {
-        return targetLimitPx * (textPaint.textSize / defaultSizePx.coerceAtLeast(1f))
-    }
-
-    private fun splitTitleByPixelWidth(title: String, showIslandLeftAlbum: Boolean = false, showAlbumArt: Boolean = true): LyricSplitResult {
-        if (title.isBlank()) return LyricSplitResult("", "HyperLyric", "", "HyperLyric")
-
-        val totalWidth = textPaint.measureText(title)
-        
-        val cutLimitRaw = if (showIslandLeftAlbum) 650f else 720f
-        val leftTextLimitRaw = if (showIslandLeftAlbum) 280f else 360f
-        
-        val cutLimitPX = scalePxToInternalLimit(cutLimitRaw)
-        val leftTextLimitPX = scalePxToInternalLimit(leftTextLimitRaw)
-        
-        var islandLeft: String
-        var islandRight: String
-
-        if (totalWidth <= cutLimitPX) {
-            val targetLeftWidth = if (showIslandLeftAlbum) (totalWidth / 2f) - scalePxToInternalLimit(60f) else totalWidth / 2f
-            val cutIndex = computeSplitIndexByPixel(title, targetLeftWidth.coerceAtLeast(0f), leftTextLimitPX)
-            islandLeft = title.substring(0, cutIndex).trim()
-            islandRight = title.substring(cutIndex).trim()
-        } else {
-            val cutIndex = computeSplitIndexByPixel(title, leftTextLimitPX, leftTextLimitPX)
-            islandLeft = title.substring(0, cutIndex).trim()
-            islandRight = title.substring(cutIndex).trim()
-        }
-
-        if (islandRight.isEmpty() && islandLeft.isNotEmpty()) {
-            islandRight = islandLeft
-            islandLeft = ""
-        }
-
-        val focusLimitRaw = if (showAlbumArt) 560f else 680f
-        val focusNotificationLimitPX = scalePxToInternalLimit(focusLimitRaw)
-        var notificationLeft: String
-        var notificationRight = " "
-
-        if (totalWidth <= focusNotificationLimitPX) {
-            notificationLeft = title
-        } else {
-            val cutIndex = computeSplitIndexByPixel(title, focusNotificationLimitPX, focusNotificationLimitPX)
-            notificationLeft = title.substring(0, cutIndex).trim()
-            notificationRight = title.substring(cutIndex).trim()
-        }
-
-        return LyricSplitResult(islandLeft, islandRight, notificationLeft, notificationRight)
-    }
-
-    private fun computeSplitIndexByPixel(title: String, targetWidthPx: Float, maxLeftPx: Float): Int {
-        var splitIndex = textPaint.breakText(title, true, targetWidthPx, null)
-
-        if (splitIndex < title.length && textPaint.measureText(title, 0, splitIndex) < targetWidthPx) {
-            if (textPaint.measureText(title, 0, splitIndex + 1) <= maxLeftPx) {
-                splitIndex++
-            }
-        }
-        
-        splitIndex = splitIndex.coerceIn(0, title.length)
-
-        return adjustForWordBoundary(title, splitIndex, maxLeftPx)
-    }
-
-    private fun adjustForWordBoundary(text: String, originalIndex: Int, maxLimitPx: Float): Int {
-        var idx = originalIndex
-        if (idx <= 0 || idx >= text.length) return idx.coerceIn(0, text.length)
-
-        val isAsciiAlnum = { c: Char -> c.isLetterOrDigit() && c.code < 128 }
-        
-        if (!isAsciiAlnum(text[idx - 1]) || !isAsciiAlnum(text[idx])) return idx
-
-        var backSplit = idx
-        while (backSplit > 0 && isAsciiAlnum(text[backSplit - 1])) backSplit--
-
-        var forwardSplit = idx
-        while (forwardSplit < text.length && isAsciiAlnum(text[forwardSplit])) forwardSplit++
-
-        val forwardPx = textPaint.measureText(text, 0, forwardSplit)
-
-        if (forwardPx > maxLimitPx) {
-             return backSplit
-        }
-
-        val forwardLeftLen = forwardSplit
-        val forwardRightLen = text.length - forwardSplit
-        val forwardDiff = kotlin.math.abs(forwardLeftLen - forwardRightLen)
-
-        val backLeftLen = backSplit
-        val backRightLen = text.length - backSplit
-        val backDiff = kotlin.math.abs(backLeftLen - backRightLen)
-
-        idx = if (backDiff < forwardDiff) backSplit else forwardSplit
-
-        return idx.coerceIn(0, text.length)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         notificationPresenter.unregister()

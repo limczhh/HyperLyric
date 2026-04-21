@@ -53,9 +53,11 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -89,6 +91,8 @@ fun DynamicIslandNotificationPage() {
 
     var onlineLyricEnabled by remember { mutableStateOf(prefs.getBoolean(ServiceConstants.KEY_ONLINE_LYRIC_ENABLED, ServiceConstants.DEFAULT_ONLINE_LYRIC_ENABLED)) }
     var onlineLyricCacheLimit by remember { mutableIntStateOf(prefs.getInt(ServiceConstants.KEY_ONLINE_LYRIC_CACHE_LIMIT, ServiceConstants.DEFAULT_ONLINE_LYRIC_CACHE_LIMIT)) }
+    var limitWidthEnabled by remember { mutableStateOf(prefs.getBoolean(ServiceConstants.KEY_NOTIFICATION_ISLAND_LIMIT_WIDTH, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_LIMIT_WIDTH)) }
+    var maxWidth by remember { mutableIntStateOf(prefs.getInt(ServiceConstants.KEY_NOTIFICATION_ISLAND_MAX_WIDTH, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_MAX_WIDTH)) }
     var showCacheLimitDialog by remember { mutableStateOf(false) }
     var tempCacheLimit by remember { mutableStateOf(onlineLyricCacheLimit.toString()) }
 
@@ -208,7 +212,31 @@ fun DynamicIslandNotificationPage() {
                                             }
                                         }
                                         AnimatedVisibility(visible = notificationType == 0) {
-                                            SwitchPreference(title = "胶囊左侧专辑封面", checked = normalNotificationAlbumEnabled, onCheckedChange = { checked -> normalNotificationAlbumEnabled = checked; prefs.edit { putBoolean(ServiceConstants.KEY_NOTIFICATION_LIVE_ALBUM, checked) } })
+                                            Column {
+                                                SwitchPreference(title = "胶囊左侧专辑封面", checked = normalNotificationAlbumEnabled, onCheckedChange = { checked -> normalNotificationAlbumEnabled = checked; prefs.edit { putBoolean(ServiceConstants.KEY_NOTIFICATION_LIVE_ALBUM, checked) } })
+                                            }
+                                        }
+                                        SwitchPreference(
+                                            title = "限制最大宽度",
+                                            summary = "实验性功能",
+                                            checked = limitWidthEnabled,
+                                            onCheckedChange = { checked -> limitWidthEnabled = checked; prefs.edit { putBoolean(ServiceConstants.KEY_NOTIFICATION_ISLAND_LIMIT_WIDTH, checked) } }
+                                        )
+                                        AnimatedVisibility(visible = limitWidthEnabled){
+                                            BasicComponent  (
+                                                title = "过长的文字将被舍弃",
+                                                summary = "参考：一个汉字大概50",
+                                                endActions  = { Text("$maxWidth", fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) },
+                                                bottomAction = {
+                                                    Slider(
+                                                        value = maxWidth.toFloat(),
+                                                        onValueChange = {
+                                                            maxWidth = it.toInt()
+                                                            prefs.edit { putInt(ServiceConstants.KEY_NOTIFICATION_ISLAND_MAX_WIDTH, it.toInt()) } },
+                                                        valueRange = 100f..720f
+                                                    )
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -306,7 +334,11 @@ fun DynamicIslandNotificationPage() {
                                     }
                                 }
                             } else {
-                                Card(modifier = Modifier.fillMaxWidth()) { top.yukonga.miuix.kmp.basic.Text(text = "暂无白名单应用", color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.padding(16.dp)) }
+                                Card(modifier = Modifier.fillMaxWidth()) {
+                                    BasicComponent(
+                                        title = "暂无白名单应用",
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.height(20.dp))
                         }
