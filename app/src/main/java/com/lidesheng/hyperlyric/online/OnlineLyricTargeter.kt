@@ -1,7 +1,8 @@
-﻿package com.lidesheng.hyperlyric.online
+package com.lidesheng.hyperlyric.online
 
 import android.content.Context
 import com.lidesheng.hyperlyric.online.model.SongSearchResult
+import com.lidesheng.hyperlyric.online.utils.ChineseUtils
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
@@ -29,8 +30,8 @@ object OnlineLyricTargeter {
 
         val keyword = "$title $artist"
         
-        val cleanLocalTitle = cleanString(title)
-        val localArtists = artist.split("&", ",", "，", "、").map { cleanString(it) }
+        val cleanLocalTitle = cleanString(context, title)
+        val localArtists = artist.split("&", ",", "，", "、").map { cleanString(context, it) }
         val featureKeywords = listOf("live", "remastered", "翻唱", "cover")
         val localFeatures = featureKeywords.filter { title.lowercase().contains(it) }
         
@@ -48,7 +49,7 @@ object OnlineLyricTargeter {
             var bestSong: SongSearchResult? = null
 
             for (song in results) {
-                val score = calculateScore(song, cleanLocalTitle, localArtists, localFeatures, durationMs)
+                val score = calculateScore(context, song, cleanLocalTitle, localArtists, localFeatures, durationMs)
                 if (score > bestScore) {
                     bestScore = score
                     bestSong = song
@@ -83,6 +84,7 @@ object OnlineLyricTargeter {
     }
 
     private fun calculateScore(
+        context: Context,
         song: SongSearchResult,
         cleanLocalTitle: String,
         localArtists: List<String>,
@@ -100,13 +102,13 @@ object OnlineLyricTargeter {
             }
         }
 
-        val cleanSongTitle = cleanString(song.title)
+        val cleanSongTitle = cleanString(context, song.title)
 
         if (cleanLocalTitle == cleanSongTitle || cleanSongTitle.contains(cleanLocalTitle) || cleanLocalTitle.contains(cleanSongTitle)) {
             score += 50
         }
 
-        val songArtists = song.artist.split("&", ",", "，", "、").map { cleanString(it) }
+        val songArtists = song.artist.split("&", ",", "，", "、").map { cleanString(context, it) }
         
         val hasCommonArtist = localArtists.any { lArtist -> songArtists.any { sArtist -> lArtist == sArtist || sArtist.contains(lArtist) || lArtist.contains(sArtist) } }
         if (hasCommonArtist) {
@@ -125,7 +127,8 @@ object OnlineLyricTargeter {
         return score
     }
 
-    private fun cleanString(input: String): String {
-        return input.replace(Regex("\\(.*?\\)|\\[.*?]|\\{.*?\\}"), "").trim().lowercase()
+    private fun cleanString(context: Context, input: String): String {
+        val cleaned = input.replace(Regex("\\(.*?\\)|\\[.*?]|\\{.*?\\}"), "").trim().lowercase()
+        return ChineseUtils.toSimplified(context, cleaned)
     }
 }
