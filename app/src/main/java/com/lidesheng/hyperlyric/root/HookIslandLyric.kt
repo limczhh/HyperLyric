@@ -91,7 +91,7 @@ object HookIslandLyric {
                 if (pkgName != null && pkgName == activePkg && isPackageHookEnabled(activePkg)) {
                     activeContentView = java.lang.ref.WeakReference(view)
                     
-                    val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+                    val prefs = (module as HookEntry).prefs
                     val resources = view.resources
                     val density = resources.displayMetrics.density
 
@@ -156,7 +156,7 @@ object HookIslandLyric {
 
             activeContentView = java.lang.ref.WeakReference(viewGroup)
 
-            val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+            val prefs = (module as HookEntry).prefs
             applySettings(viewGroup)
             
             val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
@@ -171,7 +171,7 @@ object HookIslandLyric {
 
     private fun isPackageHookEnabled(packageName: String?): Boolean {
         if (packageName.isNullOrEmpty()) return false
-        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+        val prefs = (module as HookEntry).prefs
         // 通过已添加列表判断用户是否配置过白名单
         // 如果 addedList 为空，说明用户从未添加过任何应用，默认不放行
         val addedList = prefs.getStringSet(RootConstants.KEY_HOOK_ADDED_LIST, null)
@@ -194,7 +194,7 @@ object HookIslandLyric {
     }
 
     private fun applySettings(rootView: ViewGroup) {
-        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+        val prefs = (module as HookEntry).prefs
         val showAlbum = prefs.getBoolean(RootConstants.KEY_HOOK_ISLAND_LEFT_ALBUM, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_ALBUM)
         val showRhythm = prefs.getBoolean(RootConstants.KEY_HOOK_ISLAND_RIGHT_ICON, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_ICON)
         
@@ -427,7 +427,7 @@ object HookIslandLyric {
             if (cv != null && cv.isAttachedToWindow) {
                 if (pkgName == activePkg) {
                     cv.post {
-                        val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+                        val prefs = (module as HookEntry).prefs
                         cv.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         cv.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         applySettings(cv)
@@ -458,7 +458,7 @@ object HookIslandLyric {
 
             if (cv != null && cv.isAttachedToWindow) {
                 if (pkgName == activePkg) {
-                    val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+                    val prefs = (module as HookEntry).prefs
                     updateLyricInSlot(cv, "HYPERLYRIC_LEFT_VIEW", prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT), prefs)
                     updateLyricInSlot(cv, "HYPERLYRIC_RIGHT_VIEW", prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT), prefs)
                 }

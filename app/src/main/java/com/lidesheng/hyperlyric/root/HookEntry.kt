@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.root
+package com.lidesheng.hyperlyric.root
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -22,6 +22,16 @@ import io.github.proify.lyricon.provider.ProviderInfo
 
 class HookEntry : XposedModule() {
 
+    private var _prefs: android.content.SharedPreferences? = null
+
+    val prefs: android.content.SharedPreferences
+        get() {
+            if (_prefs == null) {
+                _prefs = getRemotePreferences(UIConstants.PREF_NAME)
+            }
+            return _prefs!!
+        }
+
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         super.onModuleLoaded(param)
         com.lidesheng.hyperlyric.root.utils.globalXposedModule = this
@@ -39,7 +49,6 @@ class HookEntry : XposedModule() {
                  xLogError("Failed to hook white-lists", e)
             }
 
-            val prefs = getRemotePreferences(UIConstants.PREF_NAME)
             val isSuperIslandEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)
             
             if (!isSuperIslandEnabled) {
@@ -71,7 +80,6 @@ class HookEntry : XposedModule() {
             }
 
         } else if (packageName == "miui.systemui.plugin") {
-            val prefs = getRemotePreferences(UIConstants.PREF_NAME)
             val isSuperIslandEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)
             
             if (!isSuperIslandEnabled) {

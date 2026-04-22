@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.root
+package com.lidesheng.hyperlyric.root
 
 import android.content.Context
 import android.os.Bundle
@@ -82,7 +82,7 @@ object UnlockFocusWhitelist {
 
     class ReturnTrueHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+            val prefs = (module as HookEntry).prefs
             val enabled = prefs.getBoolean(RootConstants.KEY_HOOK_REMOVE_FOCUS_WHITELIST, RootConstants.DEFAULT_HOOK_REMOVE_FOCUS_WHITELIST)
             if (!enabled) {
                 return chain.proceed()
@@ -93,7 +93,7 @@ object UnlockFocusWhitelist {
 
     class AuthResultHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+            val prefs = (module as HookEntry).prefs
             val enabled = prefs.getBoolean(RootConstants.KEY_HOOK_REMOVE_FOCUS_WHITELIST, RootConstants.DEFAULT_HOOK_REMOVE_FOCUS_WHITELIST)
             if (!enabled) {
                 return chain.proceed()

@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.root
+package com.lidesheng.hyperlyric.root
 
 import com.lidesheng.hyperlyric.root.utils.xLog
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
@@ -37,7 +37,7 @@ object UnlockIslandWhitelist {
 
     class ReturnTrueHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val prefs = module.getRemotePreferences(UIConstants.PREF_NAME)
+            val prefs = (module as HookEntry).prefs
             val enabled = prefs.getBoolean(RootConstants.KEY_HOOK_REMOVE_ISLAND_WHITELIST, RootConstants.DEFAULT_HOOK_REMOVE_ISLAND_WHITELIST)
             if (!enabled) {
                 return chain.proceed()
