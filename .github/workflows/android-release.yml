@@ -73,7 +73,9 @@ jobs:
       - name: 整理 APK Prepare APKs
         run: |
           mkdir -p app/build/outputs/apk/release
-          find app/build/outputs/apk -name "*.apk" -exec cp {} app/build/outputs/apk/release/ \;
+          # 显式拷贝，防止同名文件覆盖
+          cp app/build/outputs/apk/online/release/*.apk app/build/outputs/apk/release/online-release-unsigned.apk
+          cp app/build/outputs/apk/offline/release/*.apk app/build/outputs/apk/release/offline-release-unsigned.apk
 
       - name: 签名 APK Sign APK
         id: sign_app
@@ -90,9 +92,9 @@ jobs:
       - name: 重命名 APK Rename APK
         run: |
           VERSION_NAME="${{ needs.check-version.outputs.version_name }}"
-          # 在汇总目录中查找并重命名，确保不带任何多余后缀
-          find app/build/outputs/apk/release/ -name "*online*" -exec mv {} HyperLyric-v${VERSION_NAME}-online.apk \;
-          find app/build/outputs/apk/release/ -name "*offline*" -exec mv {} HyperLyric-v${VERSION_NAME}-offline.apk \;
+          # 在汇总目录中根据签名后的特征重命名
+          mv app/build/outputs/apk/release/online-release-unsigned-signed.apk HyperLyric-v${VERSION_NAME}-online.apk || mv app/build/outputs/apk/release/online-release-unsigned.apk HyperLyric-v${VERSION_NAME}-online.apk
+          mv app/build/outputs/apk/release/offline-release-unsigned-signed.apk HyperLyric-v${VERSION_NAME}-offline.apk || mv app/build/outputs/apk/release/offline-release-unsigned.apk HyperLyric-v${VERSION_NAME}-offline.apk
 
       - name: 生成发布描述 Generate Release Body
         id: release_body

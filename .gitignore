@@ -14,5 +14,6 @@ local.properties
 小米超级岛反编译相关/
 app/build/
 app/release/
+app/offline/
 app/src/androidTest
 app/src/test
