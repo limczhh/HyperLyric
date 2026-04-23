@@ -70,11 +70,16 @@ jobs:
       - name: 编译打包 Build APK
         run: ./gradlew assembleOnlineRelease assembleOfflineRelease
 
+      - name: 整理 APK Prepare APKs
+        run: |
+          mkdir -p app/build/outputs/apk/release
+          find app/build/outputs/apk -name "*.apk" -exec cp {} app/build/outputs/apk/release/ \;
+
       - name: 签名 APK Sign APK
         id: sign_app
         uses: r0adkll/sign-android-release@v1
         with:
-          releaseDirectory: app/build/outputs/apk
+          releaseDirectory: app/build/outputs/apk/release
           signingKeyBase64: ${{ secrets.SIGNING_KEY }}
           alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -85,10 +90,9 @@ jobs:
       - name: 重命名 APK Rename APK
         run: |
           VERSION_NAME="${{ needs.check-version.outputs.version_name }}"
-          # 查找并重命名 online 版本，确保不带任何多余后缀
-          find app/build/outputs/apk/online/release/ -name "*.apk" -exec mv {} HyperLyric-v${VERSION_NAME}-online.apk \;
-          # 查找并重命名 offline 版本，确保不带任何多余后缀
-          find app/build/outputs/apk/offline/release/ -name "*.apk" -exec mv {} HyperLyric-v${VERSION_NAME}-offline.apk \;
+          # 在汇总目录中查找并重命名，确保不带任何多余后缀
+          find app/build/outputs/apk/release/ -name "*online*" -exec mv {} HyperLyric-v${VERSION_NAME}-online.apk \;
+          find app/build/outputs/apk/release/ -name "*offline*" -exec mv {} HyperLyric-v${VERSION_NAME}-offline.apk \;
 
       - name: 生成发布描述 Generate Release Body
         id: release_body
@@ -117,4 +121,4 @@ jobs:
             HyperLyric-v${{ needs.check-version.outputs.version_name }}-online.apk
             HyperLyric-v${{ needs.check-version.outputs.version_name }}-offline.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
