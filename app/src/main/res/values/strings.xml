@@ -239,6 +239,10 @@
     <string name="option_content_lyricon_title_plus_artist_album">lyricon标题+艺术家-专辑</string>
     <string name="option_content_lyricon_lyric">lyricon歌词</string>
     <string name="format_padding_pair">%1$d,%2$d</string>
+    <string name="title_behavior_after_pause">暂停音乐后行为</string>
+    <string name="option_after_pause_default">恢复默认</string>
+    <string name="option_after_pause_destroy">销毁</string>
+    <string name="option_after_pause_keep">保持不变</string>
 
     <!-- ———————————————————————— Shared ———————————————————————— -->
     <string name="filter">筛选</string>

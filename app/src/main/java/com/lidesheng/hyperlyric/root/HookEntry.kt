@@ -172,11 +172,21 @@ class HookEntry : XposedModule() {
         }
 
         private fun registerRefreshReceiver(app: android.app.Application) {
-            val filter = IntentFilter("com.lidesheng.hyperlyric.REFRESH_ISLAND")
+            val filter = IntentFilter()
+            filter.addAction("com.lidesheng.hyperlyric.REFRESH_ISLAND")
+            filter.addAction("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM")
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    xLog("Received REFRESH_ISLAND broadcast, refreshing island...")
-                    HookIslandLyric.refreshActiveIsland()
+                    when (intent?.action) {
+                        "com.lidesheng.hyperlyric.REFRESH_ISLAND" -> {
+                            xLog("Received REFRESH_ISLAND broadcast, refreshing island...")
+                            HookIslandLyric.refreshActiveIsland()
+                        }
+                        "com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM" -> {
+                            xLog("Received UPDATE_LYRIC_ANIM broadcast, updating lyric line...")
+                            HookIslandLyric.updateLyricLine()
+                        }
+                    }
                 }
             }
             app.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)

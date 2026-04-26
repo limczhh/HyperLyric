@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.root.utils
+package com.lidesheng.hyperlyric.root.utils
 
 object Constants {
     // ================= HOOK & SUPER ISLAND KEYS =================
@@ -15,6 +15,7 @@ object Constants {
     const val KEY_HOOK_ISLAND_RIGHT_PADDING_RIGHT = "key_hook_island_right_padding_right"
     const val KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH = "key_hook_island_left_content_max_width"
     const val KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH = "key_hook_island_right_content_max_width"
+    const val KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE = "key_hook_island_behavior_after_pause"
     
     const val KEY_HOOK_MAX_LEFT_WIDTH = "key_hook_max_left_width"
     const val KEY_HOOK_REMOVE_FOCUS_WHITELIST = "key_hook_remove_focus_whitelist"
@@ -65,6 +66,7 @@ object Constants {
     const val DEFAULT_HOOK_ISLAND_RIGHT_PADDING_RIGHT = 0
     const val DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH = 80
     const val DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH = 100
+    const val DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE = 0
 
 
     const val DEFAULT_HOOK_TEXT_SIZE = 12

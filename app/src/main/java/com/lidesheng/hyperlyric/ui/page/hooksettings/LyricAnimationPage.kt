@@ -90,7 +90,7 @@ fun LyricAnimationPage() {
             }
         }
         ConfigSync.syncPreference(UIConstants.PREF_NAME, key, value)
-        context.sendBroadcast(Intent("com.lidesheng.hyperlyric.REFRESH_ISLAND"))
+        context.sendBroadcast(Intent("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM"))
     }
 
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())

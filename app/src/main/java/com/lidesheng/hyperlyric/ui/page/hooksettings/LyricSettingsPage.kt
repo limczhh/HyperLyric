@@ -107,10 +107,20 @@ fun LyricSettingsPage() {
             RootConstants.KEY_HOOK_FONT_WEIGHT,
             RootConstants.KEY_HOOK_FONT_BOLD,
             RootConstants.KEY_HOOK_FONT_ITALIC,
-            RootConstants.KEY_HOOK_FADING_EDGE_LENGTH
+            RootConstants.KEY_HOOK_FADING_EDGE_LENGTH,
+            RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
+            RootConstants.KEY_HOOK_GRADIENT_PROGRESS,
+            RootConstants.KEY_HOOK_MARQUEE_MODE,
+            RootConstants.KEY_HOOK_MARQUEE_SPEED,
+            RootConstants.KEY_HOOK_MARQUEE_DELAY,
+            RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY,
+            RootConstants.KEY_HOOK_MARQUEE_INFINITE,
+            RootConstants.KEY_HOOK_MARQUEE_STOP_END,
+            RootConstants.KEY_HOOK_SYLLABLE_RELATIVE,
+            RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT
         )
         if (key in refreshKeys) {
-            context.sendBroadcast(Intent("com.lidesheng.hyperlyric.REFRESH_ISLAND"))
+            context.sendBroadcast(Intent("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM"))
         }
     }
 

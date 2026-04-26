@@ -239,6 +239,10 @@
     <string name="option_content_lyricon_title_plus_artist_album">Lyricon Title + Artist - Album</string>
     <string name="option_content_lyricon_lyric">Lyricon Lyric</string>
     <string name="format_padding_pair">%1$d,%2$d</string>
+    <string name="title_behavior_after_pause">Behavior after music paused</string>
+    <string name="option_after_pause_default">Restore default</string>
+    <string name="option_after_pause_destroy">Destroy</string>
+    <string name="option_after_pause_keep">Keep unchanged</string>
 
     <!-- ———————————————————————— Shared ———————————————————————— -->
     <string name="filter">Filter</string>

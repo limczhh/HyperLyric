@@ -10,7 +10,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
 import com.lidesheng.hyperlyric.root.utils.DynamicFinder
 import com.lidesheng.hyperlyric.root.utils.xLogError
@@ -59,18 +58,17 @@ object HookIslandLyric {
                     } catch (e: Exception) {
                         xLogError("Failed to hook updateBigIslandView", e)
                     }
-                } else if (name.contains("Width") || name.contains("BigIslandX")) {
-                    if (method.parameterTypes.any { it == Int::class.javaPrimitiveType || it == Float::class.javaPrimitiveType }) {
-                        try {
-                            module.deoptimize(method)
-                            module.hook(method).intercept(ViewSetterHooker(name))
-                        } catch (e: Exception) {
-                            xLogError("Failed to hook $name", e)
-                        }
+                } else if (name == "calculateBigIslandWidth") {
+                    try {
+                        module.deoptimize(method)
+                        module.hook(method).intercept(PreInjectHooker())
+                    } catch (e: Exception) {
+                        xLogError("Failed to hook calculateBigIslandWidth", e)
                     }
                 }
             }
-            
+
+
             isHookedSuccess = true
             xLog("HyperLyric active: Super Island hooked successfully")
         } catch (e: Exception) {
@@ -78,49 +76,27 @@ object HookIslandLyric {
         }
     }
 
-    class ViewSetterHooker(private val methodName: String) : Hooker {
+    class PreInjectHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
             try {
-                val arg0 = chain.args[0]
-                val view = chain.thisObject as? View ?: return chain.proceed()
-                
-                val pkgName = activeIslandPkgNames[view]
-                val activePkg = LyriconDataBridge.activePackageName
-                
-                // 增加校验：包名匹配 且 在歌词白名单中开启
-                if (pkgName != null && pkgName == activePkg && isPackageHookEnabled(activePkg)) {
-                    activeContentView = java.lang.ref.WeakReference(view)
+                val islandView = chain.thisObject as? ViewGroup
+                if (islandView != null) {
+                    val pkgName = activeIslandPkgNames[islandView]
+                    val activePkg = LyriconDataBridge.activePackageName
                     
-                    val prefs = (module as HookEntry).prefs
-                    val resources = view.resources
-                    val density = resources.displayMetrics.density
-
-                    val leftLen = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH)
-                    val rightLen = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH)
-
-                    val leftPx = (leftLen * density).toInt()
-                    val rightPx = (rightLen * density).toInt()
-
-                    val cutoutWidth = try { view.javaClass.getMethod("getCutoutWidth").invoke(view) as? Int } catch(_:Exception){null} ?: (80 * density).toInt()
-                    val sW = resources.displayMetrics.widthPixels
-                    
-                    val newViewWidth = leftPx + rightPx + cutoutWidth
-                    val newX = (sW / 2) - (cutoutWidth / 2) - leftPx
-
-                    val valueToSet = when {
-                        methodName.contains("LeftWidth") -> leftPx
-                        methodName.contains("RightWidth") -> rightPx
-                        methodName.contains("ViewWidth") -> newViewWidth
-                        methodName.contains("BigIslandX") -> newX
-                        else -> null
-                    }
-                    
-                    if (valueToSet != null) {
-                        if (arg0 is Int) chain.args[0] = valueToSet
-                        else if (arg0 is Float) chain.args[0] = valueToSet.toFloat()
+                    if (pkgName != null && pkgName == activePkg && isPackageHookEnabled(activePkg)) {
+                        val prefs = (module as HookEntry).prefs
+                        applySettings(islandView)
+                        val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
+                        val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
+                        
+                        injectToSlot(islandView, "island_container_module_image_text_1", "HYPERLYRIC_LEFT_VIEW", leftMode, prefs, pkgName)
+                        injectToSlot(islandView, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                xLogError("Exception in PreInjectHooker", e)
+            }
             return chain.proceed()
         }
     }
@@ -157,8 +133,8 @@ object HookIslandLyric {
             activeContentView = java.lang.ref.WeakReference(viewGroup)
 
             val prefs = (module as HookEntry).prefs
-            applySettings(viewGroup)
             
+            applySettings(viewGroup)
             val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
             val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
             
@@ -320,28 +296,6 @@ object HookIslandLyric {
             else -> ""
         }
 
-        if (mode in 1..8) {
-            if (targetView !is RichLyricLineView) {
-                targetView?.let { container.removeView(it) }
-                targetView = RichLyricLineView(rootView.context).apply {
-                    this.tag = tag
-                }
-                container.addView(targetView)
-            }
-            configureRichLyricView(targetView, prefs, res, mode)
-            
-            targetView.line = when(mode) {
-                1, 2, 3, 4, 5 -> RichLyricLine(text = singleModeText, words = emptyList())
-                6 -> RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = finalArtistName, secondaryWords = emptyList())
-                7 -> {
-                    val sec = if (finalAlbumName.isEmpty()) finalArtistName else "$finalArtistName - $finalAlbumName"
-                    RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = sec, secondaryWords = emptyList())
-                }
-                8 -> LyriconDataBridge.currentLyricLine ?: RichLyricLine(text = lyriconSongName, words = emptyList())
-                else -> null
-            }
-        }
-
         val density = res.displayMetrics.density
         val isLeft = parentName.contains("1")
         val maxWidthDp = if (isLeft) prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH)
@@ -351,11 +305,85 @@ object HookIslandLyric {
         val pR = if (isLeft) prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_PADDING_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_PADDING_RIGHT)
                  else prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_PADDING_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_PADDING_RIGHT)
 
-        targetView.layoutParams = FrameLayout.LayoutParams((maxWidthDp * density).toInt(), FrameLayout.LayoutParams.MATCH_PARENT).apply {
-            gravity = Gravity.CENTER_VERTICAL
+        if (mode in 1..8) {
+            val wrapperTag = tag + "_WRAPPER"
+            var wrapperView = container.findViewWithTag<FrameLayout>(wrapperTag)
+            
+            if (wrapperView == null) {
+                targetView?.let { container.removeView(it) }
+                
+                wrapperView = object : FrameLayout(rootView.context) {
+                    var maxWidthPx = -1
+                    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                        val givenWidth = MeasureSpec.getSize(widthMeasureSpec)
+                        val newWidth = if (maxWidthPx > 0 && (givenWidth == 0 || givenWidth > maxWidthPx)) maxWidthPx else givenWidth
+                        super.onMeasure(MeasureSpec.makeMeasureSpec(newWidth, MeasureSpec.AT_MOST), heightMeasureSpec)
+                    }
+                }.apply {
+                    this.tag = wrapperTag
+                }
+                
+                targetView = RichLyricLineView(rootView.context).apply {
+                    this.tag = tag
+                }
+                wrapperView.addView(targetView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                })
+                
+                container.addView(wrapperView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                })
+            } else {
+                targetView = wrapperView.findViewWithTag(tag) as? RichLyricLineView
+                if (targetView == null) {
+                    wrapperView.removeAllViews()
+                    targetView = RichLyricLineView(rootView.context).apply {
+                        this.tag = tag
+                    }
+                    wrapperView.addView(targetView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT).apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                    })
+                }
+            }
+
+            try {
+                val maxField = wrapperView.javaClass.getDeclaredField("maxWidthPx")
+                maxField.isAccessible = true
+                maxField.setInt(wrapperView, (maxWidthDp * density).toInt())
+            } catch (_: Exception) {}
+
+            val richView = targetView as RichLyricLineView
+            configureRichLyricView(richView, prefs, res, mode)
+            
+            // 设置内边距和可见性，必须在 measure/layout 之前，否则会导致一帧的位移抖动
+            richView.setPadding((pL * density).toInt(), 0, (pR * density).toInt(), 0)
+            richView.visibility = View.VISIBLE
+            
+            richView.line = when(mode) {
+                1, 2, 3, 4, 5 -> RichLyricLine(text = singleModeText, words = emptyList())
+                6 -> RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = finalArtistName, secondaryWords = emptyList())
+                7 -> {
+                    val sec = if (finalAlbumName.isEmpty()) finalArtistName else "$finalArtistName - $finalAlbumName"
+                    RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = sec, secondaryWords = emptyList())
+                }
+                8 -> LyriconDataBridge.currentLyricLine ?: RichLyricLine(text = lyriconSongName, words = emptyList())
+                else -> null
+            }
+
+            // 强制隐藏原生容器中除我们 wrapperView 之外的所有原生文本视图
+            for (i in 0 until container.childCount) {
+                val child = container.getChildAt(i)
+                if (child != wrapperView) {
+                    child.visibility = View.GONE
+                }
+            }
+            
+            // 强制即时测排 (Force Immediate Layout)
+            val msW = View.MeasureSpec.makeMeasureSpec((maxWidthDp * density).toInt(), View.MeasureSpec.AT_MOST)
+            val msH = View.MeasureSpec.makeMeasureSpec(container.height, if (container.height > 0) View.MeasureSpec.EXACTLY else View.MeasureSpec.UNSPECIFIED)
+            wrapperView.measure(msW, msH)
+            wrapperView.layout(0, 0, wrapperView.measuredWidth, wrapperView.measuredHeight)
         }
-        targetView.setPadding((pL * density).toInt(), 0, (pR * density).toInt(), 0)
-        targetView.visibility = View.VISIBLE
     }
 
     // removed configureTextView
@@ -474,6 +502,7 @@ object HookIslandLyric {
         val targetLine = LyriconDataBridge.currentLyricLine
 
         cv.post {
+            configureRichLyricView(view, prefs, cv.resources, mode)
             val isAnimEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ANIM_ENABLE, RootConstants.DEFAULT_HOOK_ANIM_ENABLE)
             val animId = prefs.getString(RootConstants.KEY_HOOK_ANIM_ID, RootConstants.DEFAULT_HOOK_ANIM_ID)
 

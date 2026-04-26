@@ -78,6 +78,7 @@ fun SuperIslandSettingsPage() {
     var rightPaddingRight by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_PADDING_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_PADDING_RIGHT)) }
     var leftContentWidth by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH)) }
     var rightContentWidth by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH)) }
+    var afterPauseBehavior by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)) }
 
     var showLeftPaddingDialog by remember { mutableStateOf(false) }
     var showRightPaddingDialog by remember { mutableStateOf(false) }
@@ -102,7 +103,8 @@ fun SuperIslandSettingsPage() {
             RootConstants.KEY_HOOK_ISLAND_RIGHT_PADDING_LEFT,
             RootConstants.KEY_HOOK_ISLAND_RIGHT_PADDING_RIGHT,
             RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH,
-            RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH
+            RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH,
+            RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE
         )
         if (key in refreshKeys) {
             context.sendBroadcast(Intent("com.lidesheng.hyperlyric.REFRESH_ISLAND"))
@@ -120,6 +122,14 @@ fun SuperIslandSettingsPage() {
         R.string.option_content_lyricon_lyric
     )
     val contentOptions = contentOptionResList.map { stringResource(id = it) }
+
+    val afterPauseOptionResList = listOf(
+        R.string.option_after_pause_default,
+        R.string.option_after_pause_destroy,
+        R.string.option_after_pause_keep
+    )
+    val afterPauseOptions = afterPauseOptionResList.map { stringResource(id = it) }
+
 
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
     val hazeState = remember { HazeState() }
@@ -259,6 +269,18 @@ fun SuperIslandSettingsPage() {
                             }
                         )
                     }
+                }
+                SmallTitle(text = stringResource(id = R.string.title_special_features), insideMargin = PaddingValues(10.dp, 4.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    OverlayDropdownPreference(
+                        title = stringResource(id = R.string.title_behavior_after_pause),
+                        items = afterPauseOptions,
+                        selectedIndex = afterPauseBehavior,
+                        onSelectedIndexChange = {
+                            afterPauseBehavior = it
+                            saveConfig(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, it)
+                        }
+                    )
                 }
             }
         }
