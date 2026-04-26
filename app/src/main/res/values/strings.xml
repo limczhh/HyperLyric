@@ -241,7 +241,6 @@
     <string name="format_padding_pair">%1$d,%2$d</string>
     <string name="title_behavior_after_pause">暂停音乐后行为</string>
     <string name="option_after_pause_default">恢复默认</string>
-    <string name="option_after_pause_destroy">销毁</string>
     <string name="option_after_pause_keep">保持不变</string>
 
     <!-- ———————————————————————— Shared ———————————————————————— -->

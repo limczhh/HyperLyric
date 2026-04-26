@@ -81,11 +81,17 @@ object HookIslandLyric {
             try {
                 val islandView = chain.thisObject as? ViewGroup
                 if (islandView != null) {
+                    val prefs = (module as HookEntry).prefs
+                    val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
+                    
+                    if (!LyriconDataBridge.isPlaying && behavior == 0) {
+                        return chain.proceed()
+                    }
+
                     val pkgName = activeIslandPkgNames[islandView]
                     val activePkg = LyriconDataBridge.activePackageName
                     
                     if (pkgName != null && pkgName == activePkg && isPackageHookEnabled(activePkg)) {
-                        val prefs = (module as HookEntry).prefs
                         applySettings(islandView)
                         val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
                         val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
@@ -123,17 +129,21 @@ object HookIslandLyric {
             }
 
             val activePkg = LyriconDataBridge.activePackageName
-            
+            val prefs = (module as HookEntry).prefs
+            val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
+
+            if (!LyriconDataBridge.isPlaying && behavior == 0) {
+                clearInjectedViews(viewGroup)
+                return result
+            }
+
             // 增加校验：包名匹配 且 在歌词白名单中开启
             if (pkgName.isEmpty() || pkgName != activePkg || !isPackageHookEnabled(activePkg)) {
-
                 return result
             }
 
             activeContentView = java.lang.ref.WeakReference(viewGroup)
 
-            val prefs = (module as HookEntry).prefs
-            
             applySettings(viewGroup)
             val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
             val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
@@ -358,6 +368,7 @@ object HookIslandLyric {
             // 设置内边距和可见性，必须在 measure/layout 之前，否则会导致一帧的位移抖动
             richView.setPadding((pL * density).toInt(), 0, (pR * density).toInt(), 0)
             richView.visibility = View.VISIBLE
+            wrapperView.visibility = View.VISIBLE
             
             richView.line = when(mode) {
                 1, 2, 3, 4, 5 -> RichLyricLine(text = singleModeText, words = emptyList())
@@ -456,6 +467,8 @@ object HookIslandLyric {
                 if (pkgName == activePkg) {
                     cv.post {
                         val prefs = (module as HookEntry).prefs
+                        cv.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW_WRAPPER")?.let { (it.parent as? ViewGroup)?.removeView(it) }
+                        cv.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW_WRAPPER")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         cv.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         cv.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         applySettings(cv)
@@ -558,6 +571,67 @@ object HookIslandLyric {
      * 播放/暂停状态变化回调
      */
     fun onPlaybackStateChanged(isPlaying: Boolean) {
-        refreshActiveIsland()
+        val prefs = (module as HookEntry).prefs
+        val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
+
+        if (isPlaying) {
+            refreshActiveIsland()
+        } else {
+            when (behavior) {
+                0 -> {
+                    // 恢复系统默认
+                    val iterator = activeIslandPkgNames.entries.iterator()
+                    while (iterator.hasNext()) {
+                        val entry = iterator.next()
+                        val cv = entry.key as? ViewGroup
+                        if (cv != null && cv.isAttachedToWindow) {
+                            cv.post {
+                                clearInjectedViews(cv)
+                                triggerSystemRelayout(cv)
+                            }
+                        } else {
+                            iterator.remove()
+                        }
+                    }
+                }
+                1 -> {
+                    // 保持现状，不做处理
+                }
+            }
+        }
+    }
+
+    private fun clearInjectedViews(rootView: ViewGroup) {
+        rootView.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW")?.visibility = View.GONE
+        rootView.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW_WRAPPER")?.visibility = View.GONE
+        rootView.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW")?.visibility = View.GONE
+        rootView.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW_WRAPPER")?.visibility = View.GONE
+        
+        // 恢复系统原有组件的可见性
+        toggleContainer(rootView, "island_container_module_image_text_1", "island_container_module_icon", true)
+        toggleContainer(rootView, "island_container_module_image_text_2", "island_container_module_icon", true)
+        
+        showOriginalTexts(rootView, "island_container_module_image_text_1")
+        showOriginalTexts(rootView, "island_container_module_image_text_2")
+    }
+
+    private fun showOriginalTexts(rootView: ViewGroup, parentName: String) {
+        val res = rootView.resources
+        val slotId = res.getIdentifier(parentName, "id", "miui.systemui.plugin")
+        if (slotId == 0) return
+        val parent = rootView.findViewById<ViewGroup>(slotId) ?: return
+        
+        val textSlotId = res.getIdentifier("island_container_module_text", "id", "miui.systemui.plugin")
+        val container = if (textSlotId != 0) parent.findViewById(textSlotId) ?: parent else parent
+
+        if (container is ViewGroup) {
+            for (i in 0 until container.childCount) {
+                val child = container.getChildAt(i)
+                val tag = child.tag as? String ?: ""
+                if (!tag.startsWith("HYPERLYRIC")) {
+                    child.visibility = View.VISIBLE
+                }
+            }
+        }
     }
 }

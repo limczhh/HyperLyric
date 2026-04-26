@@ -125,7 +125,6 @@ fun SuperIslandSettingsPage() {
 
     val afterPauseOptionResList = listOf(
         R.string.option_after_pause_default,
-        R.string.option_after_pause_destroy,
         R.string.option_after_pause_keep
     )
     val afterPauseOptions = afterPauseOptionResList.map { stringResource(id = it) }
