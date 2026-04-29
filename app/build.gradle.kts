@@ -12,9 +12,9 @@ android {
     defaultConfig {
         applicationId = "com.lidesheng.hyperlyric"
         minSdk = 33
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1927
-        versionName = "5.4"
+        versionName = "5.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

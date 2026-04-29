@@ -22,7 +22,7 @@
     <string name="toast_no_root">App does not have root access</string>
     <string name="title_basic_features">Basic Features</string>
     <string name="title_super_island_lyrics">Xiaomi HyperIsland Lyrics</string>
-    <string name="summary_super_island_lyrics">Only supports HyperOS 3 devices with LSPosed 2.0 installed</string>
+    <string name="summary_super_island_lyrics">Only supports HyperOS 3 devices with LSPosed v2.0 installed</string>
     <string name="title_super_island_config">Xiaomi HyperIsland Lyrics Custom Configuration</string>
     <string name="title_dynamic_island_lyrics">Notification Dynamic Island Lyrics</string>
     <string name="summary_dynamic_island_lyrics">Uses notifications for Dynamic Island lyric effects, suitable for non-rooted devices</string>
