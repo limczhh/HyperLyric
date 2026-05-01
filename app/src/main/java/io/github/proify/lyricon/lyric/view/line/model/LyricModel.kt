@@ -7,6 +7,7 @@
 package io.github.proify.lyricon.lyric.view.line.model
 
 import android.graphics.Paint
+import android.graphics.Rect
 import io.github.proify.lyricon.lyric.model.LyricLine
 import io.github.proify.lyricon.lyric.model.LyricMetadata
 import io.github.proify.lyricon.lyric.model.LyricWord
@@ -29,11 +30,27 @@ data class LyricModel(
     val isPlainText: Boolean = words.isEmpty()
 
     fun updateSizes(paint: Paint) {
-        width = paint.measureText(text)
+        width = getTextFullWidth(paint, text)
         var previous: WordModel? = null
         words.forEach { word ->
             word.updateSizes(previous, paint)
             previous = word
+        }
+    }
+
+    /**
+     * 获取文字绘制所需的实际宽度
+     */
+    private fun getTextFullWidth(paint: Paint, text: String): Float {
+        val measureWidth = paint.measureText(text)
+        val bounds = Rect()
+        paint.getTextBounds(text, 0, text.length, bounds)
+
+        // 如果 bounds.right 大于 measureWidth，说明文字向右侧溢出了
+        return if (bounds.right > measureWidth) {
+            bounds.right.toFloat()
+        } else {
+            measureWidth
         }
     }
 }

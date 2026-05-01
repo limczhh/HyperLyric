@@ -17,8 +17,12 @@ import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
 import io.github.proify.lyricon.lyric.model.RichLyricLine
-import io.github.proify.lyricon.lyric.view.RichLyricLineConfig
+import io.github.proify.lyricon.lyric.view.Highlight
+import io.github.proify.lyricon.lyric.view.LyricViewStyle
+import io.github.proify.lyricon.lyric.view.Marquee
 import io.github.proify.lyricon.lyric.view.RichLyricLineView
+import io.github.proify.lyricon.lyric.view.TextLook
+import io.github.proify.lyricon.lyric.view.TitleSlot
 import io.github.proify.lyricon.lyric.view.yoyo.YoYoPresets
 import io.github.proify.lyricon.lyric.view.yoyo.animateUpdate
 
@@ -400,55 +404,50 @@ object HookIslandLyric {
     // removed configureTextView
 
     private fun configureRichLyricView(view: RichLyricLineView, prefs: SharedPreferences, res: android.content.res.Resources, mode: Int) {
-        val config = RichLyricLineConfig().apply {
-            fadingEdgeLength = prefs.getInt(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, RootConstants.DEFAULT_HOOK_FADING_EDGE_LENGTH)
-            gradientProgressStyle = prefs.getBoolean(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS)
-            
-            placeholderFormat = io.github.proify.lyricon.lyric.view.PlaceholderFormat.NONE
-            
-            val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
-            val fontWeight = prefs.getInt(RootConstants.KEY_HOOK_FONT_WEIGHT, RootConstants.DEFAULT_HOOK_FONT_WEIGHT)
-            val fontItalic = prefs.getBoolean(RootConstants.KEY_HOOK_FONT_ITALIC, RootConstants.DEFAULT_HOOK_FONT_ITALIC)
-            val tf = Typeface.create(Typeface.DEFAULT, fontWeight, fontItalic)
-            
-            val textSizeRatio = prefs.getFloat(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO)
-            val primarySizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat(), res.displayMetrics)
-            
-            primary.textSize = primarySizePx
-            primary.typeface = tf
+        val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
+        val fontWeight = prefs.getInt(RootConstants.KEY_HOOK_FONT_WEIGHT, RootConstants.DEFAULT_HOOK_FONT_WEIGHT)
+        val fontItalic = prefs.getBoolean(RootConstants.KEY_HOOK_FONT_ITALIC, RootConstants.DEFAULT_HOOK_FONT_ITALIC)
+        val tf = Typeface.create(Typeface.DEFAULT, fontWeight, fontItalic)
 
-            val isMetadataDualLine = (mode == 6 || mode == 7)
-            val isTranslationVisible = LyriconDataBridge.isDisplayTranslation
-            val showSecondary = isMetadataDualLine || isTranslationVisible
-            
-            secondary.textSize = if (showSecondary) primarySizePx * textSizeRatio else 0f
-            secondary.typeface = tf
-            if (!showSecondary) {
-                secondary.textColor = intArrayOf(Color.TRANSPARENT)
-            }
-            
-            primary.enableRelativeProgress = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_RELATIVE, RootConstants.DEFAULT_HOOK_SYLLABLE_RELATIVE)
-            primary.enableRelativeProgressHighlight = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT, RootConstants.DEFAULT_HOOK_SYLLABLE_HIGHLIGHT)
-            primary.isScrollOnly = false
-            
-            syllable.enableSustainGlow = true
-            
-            val isMarqueeEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)
-            marquee.disableSyllableScroll = !isMarqueeEnabled
-            if (isMarqueeEnabled) {
-                marquee.scrollSpeed = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_SPEED).toFloat()
-                marquee.initialDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_DELAY)
-                marquee.loopDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_LOOP_DELAY)
-                val infinite = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_INFINITE)
-                marquee.repeatCount = if (infinite) -1 else 1
-                marquee.stopAtEnd = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_STOP_END, RootConstants.DEFAULT_HOOK_MARQUEE_STOP_END)
-            } else {
-                marquee.repeatCount = 0
-                marquee.scrollSpeed = 0f
-            }
-        }
-        view.setStyle(config)
-        view.updateColor(intArrayOf(Color.WHITE), intArrayOf(0x4CFFFFFF), intArrayOf(Color.WHITE))
+        val textSizeRatio = prefs.getFloat(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO)
+        val primarySizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat(), res.displayMetrics)
+
+        val isMetadataDualLine = (mode == 6 || mode == 7)
+        val isTranslationVisible = LyriconDataBridge.isDisplayTranslation
+        val showSecondary = isMetadataDualLine || isTranslationVisible
+
+        val isMarqueeEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)
+        val infinite = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_INFINITE)
+
+        val style = LyricViewStyle(
+            primary = TextLook(
+                color = intArrayOf(Color.WHITE),
+                size = primarySizePx,
+                typeface = tf,
+                relativeProgress = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_RELATIVE, RootConstants.DEFAULT_HOOK_SYLLABLE_RELATIVE),
+                relativeHighlight = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT, RootConstants.DEFAULT_HOOK_SYLLABLE_HIGHLIGHT),
+            ),
+            secondary = TextLook(
+                color = if (showSecondary) intArrayOf(Color.WHITE) else intArrayOf(Color.TRANSPARENT),
+                size = if (showSecondary) primarySizePx * textSizeRatio else 0f,
+                typeface = tf,
+            ),
+            highlight = Highlight(
+                background = intArrayOf(0x4CFFFFFF),
+                foreground = intArrayOf(Color.WHITE),
+            ),
+            marquee = Marquee(
+                speed = if (isMarqueeEnabled) prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_SPEED).toFloat() else 0f,
+                initialDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_DELAY),
+                loopDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_LOOP_DELAY),
+                repeatCount = if (!isMarqueeEnabled) 0 else if (infinite) -1 else 1,
+                stopAtEnd = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_STOP_END, RootConstants.DEFAULT_HOOK_MARQUEE_STOP_END),
+            ),
+            gradient = prefs.getBoolean(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS),
+            fadingEdge = prefs.getInt(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, RootConstants.DEFAULT_HOOK_FADING_EDGE_LENGTH),
+            placeholder = TitleSlot.NONE,
+        )
+        view.setStyle(style)
     }
 
     fun refreshActiveIsland() {
@@ -523,9 +522,7 @@ object HookIslandLyric {
                 line = targetLine
                 post {
                     if (prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)) {
-                        tryStartMarquee()
-                    } else {
-                        stopMarquee()
+                        requestStartMarquee()
                     }
                 }
             }

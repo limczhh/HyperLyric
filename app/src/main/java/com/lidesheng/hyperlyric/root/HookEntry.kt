@@ -1,13 +1,11 @@
 package com.lidesheng.hyperlyric.root
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import com.lidesheng.hyperlyric.root.utils.xLog
 import com.lidesheng.hyperlyric.root.utils.xLogError
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
+import io.github.proify.lyricon.app.bridge.AppBridgeConstants
+import io.github.proify.lyricon.app.bridge.LyriconBridge
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -115,7 +113,6 @@ class HookEntry : XposedModule() {
                 try {
                     initializeLyricon(app)
                     registerActivePlayerListener()
-                    registerRefreshReceiver(app)
                     xLog("Lyricon environment initialized in SystemUI")
                 } catch (e: Exception) {
                     xLogError("Receiver init failed", e)
@@ -128,6 +125,24 @@ class HookEntry : XposedModule() {
             ScreenStateMonitor.initialize(app)
             BridgeCentral.initialize(app)
             BridgeCentral.sendBootCompleted()
+            initBridgeRouting(app)
+        }
+
+        private fun initBridgeRouting(app: android.app.Application) {
+            LyriconBridge.routing(app) {
+                onCommand(AppBridgeConstants.REQUEST_UPDATE_LYRIC_STYLE) {
+                    xLog("Bridge: received style update request")
+                    HookIslandLyric.refreshActiveIsland()
+                }
+                onCommand("com.lidesheng.hyperlyric.REFRESH_ISLAND") {
+                    xLog("Bridge: received REFRESH_ISLAND")
+                    HookIslandLyric.refreshActiveIsland()
+                }
+                onCommand("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM") {
+                    xLog("Bridge: received UPDATE_LYRIC_ANIM")
+                    HookIslandLyric.updateLyricLine()
+                }
+            }
         }
 
         private fun registerActivePlayerListener() {
@@ -171,25 +186,5 @@ class HookEntry : XposedModule() {
             })
         }
 
-        private fun registerRefreshReceiver(app: android.app.Application) {
-            val filter = IntentFilter()
-            filter.addAction("com.lidesheng.hyperlyric.REFRESH_ISLAND")
-            filter.addAction("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM")
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    when (intent?.action) {
-                        "com.lidesheng.hyperlyric.REFRESH_ISLAND" -> {
-                            xLog("Received REFRESH_ISLAND broadcast, refreshing island...")
-                            HookIslandLyric.refreshActiveIsland()
-                        }
-                        "com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM" -> {
-                            xLog("Received UPDATE_LYRIC_ANIM broadcast, updating lyric line...")
-                            HookIslandLyric.updateLyricLine()
-                        }
-                    }
-                }
-            }
-            app.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-        }
     }
 }
