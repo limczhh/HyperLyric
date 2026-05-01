@@ -22,7 +22,7 @@
     <string name="toast_no_root">应用未获取root权限</string>
     <string name="title_basic_features">基础功能</string>
     <string name="title_super_island_lyrics">小米超级岛歌词</string>
-    <string name="summary_super_island_lyrics">仅支持已安装LSPosed v2.0的HyperOS3设备</string>
+    <string name="summary_super_island_lyrics">仅支持已安装LSPosed v2.0的HyperOS 3设备</string>
     <string name="title_super_island_config">小米超级岛歌词自定义配置</string>
     <string name="title_dynamic_island_lyrics">通知型灵动岛歌词</string>
     <string name="summary_dynamic_island_lyrics">利用通知实现灵动岛歌词效果，适用于无root设备</string>
