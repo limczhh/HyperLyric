@@ -302,6 +302,7 @@ object HookIslandLyric {
                     finalArtistName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                     finalAlbumName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""
                     albumBitmap = mMetadata.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
+                        ?: mMetadata.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
                 }
             } catch (_: Exception) {}
         }
