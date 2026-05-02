@@ -13,7 +13,12 @@ object LicenseProvider {
             LicenseItem("kotlinx.serialization", "Kotlin", "https://github.com/Kotlin/kotlinx.serialization"),
             LicenseItem("Jetpack Compose", "Google", "https://developer.android.com/jetpack/compose"),
             LicenseItem("HyperCeiler", "Sevtinge", "https://github.com/ReChronoRain/HyperCeiler"),
-            LicenseItem("HyperOShape", "xzakota", "https://github.com/xzakota/HyperOShape")
+            LicenseItem("HyperOShape", "xzakota", "https://github.com/xzakota/HyperOShape"),
+            LicenseItem("KernelSU", "tiann", "https://github.com/tiann/KernelSU"),
+            LicenseItem("AndroidAnimations", "daimajia", "https://github.com/daimajia/AndroidAnimations"),
+            LicenseItem("HiddenApiBypass", "LSPosed", "https://github.com/LSPosed/AndroidHiddenApiBypass"),
+            LicenseItem("OpenAI", "OpenAI", "https://openai.com"),
+            LicenseItem("Kotlin Coroutines", "Kotlin", "https://github.com/Kotlin/kotlinx.coroutines")
         )
     }
 }

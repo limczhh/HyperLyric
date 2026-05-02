@@ -30,9 +30,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lidesheng.hyperlyric.Quotes
+import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.ui.component.SearchBarFake
 import com.lidesheng.hyperlyric.ui.component.SearchBox
 import com.lidesheng.hyperlyric.ui.component.SearchPager
@@ -62,7 +64,8 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 @Composable
 fun PoetryPage() {
     val navigator = LocalNavigator.current
-    var searchStatus by remember { mutableStateOf(SearchStatus(label = "搜索")) }
+    val searchLabel = stringResource(R.string.search)
+    var searchStatus by remember { mutableStateOf(SearchStatus(label = searchLabel)) }
 
     val filteredQuotes = remember(searchStatus.searchText) {
         if (searchStatus.searchText.isBlank()) {
@@ -97,7 +100,7 @@ fun PoetryPage() {
                         IconButton(
                             onClick = { navigator.pop() }
                         ) {
-                            Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
+                            Icon(imageVector = MiuixIcons.Back, contentDescription = stringResource(R.string.back))
                         }
                     },
                     bottomContent = {
@@ -122,7 +125,7 @@ fun PoetryPage() {
                                     } else Modifier
                                 )
                         ) {
-                            SearchBarFake("搜索")
+                            SearchBarFake(stringResource(R.string.search))
                         }
                     },
                     modifier = Modifier.hazeEffect(hazeState) {
@@ -148,7 +151,7 @@ fun PoetryPage() {
                 ) {
                     Icon(
                         imageVector = MiuixIcons.Back,
-                        contentDescription = "回到顶部",
+                        contentDescription = stringResource(R.string.back_to_top),
                         modifier = Modifier.rotate(90f),
                         tint = Color.White
                     )

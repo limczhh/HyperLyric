@@ -175,7 +175,7 @@ fun LyricSettingsPage() {
     val hazeState = remember { HazeState() }
     val hazeStyle = HazeStyle(backgroundColor = MiuixTheme.colorScheme.surface, tint = HazeTint(MiuixTheme.colorScheme.surface.copy(0.8f)))
 
-    val tabs = listOf("基础功能", "高级功能")
+    val tabs = listOf(stringResource(R.string.tab_basic), stringResource(R.string.tab_advanced))
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
 
@@ -210,7 +210,7 @@ fun LyricSettingsPage() {
         TextInputDialog(show = showModelDialog, title = stringResource(id = R.string.label_ai_trans_model), initialValue = model, onDismiss = { showModelDialog = false }, onConfirm = { model = it; saveConfig(RootConstants.KEY_HOOK_AI_TRANS_MODEL, it) })
         TextInputDialog(show = showBaseUrlDialog, title = stringResource(id = R.string.label_ai_trans_base_url), initialValue = baseUrl, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), onDismiss = { showBaseUrlDialog = false }, onConfirm = { baseUrl = it; saveConfig(RootConstants.KEY_HOOK_AI_TRANS_BASE_URL, it) })
         TextInputDialog(show = showTargetLangDialog, title = stringResource(id = R.string.label_ai_trans_target_lang), initialValue = targetLang, onDismiss = { showTargetLangDialog = false }, onConfirm = { targetLang = it; saveConfig(RootConstants.KEY_HOOK_AI_TRANS_TARGET_LANG, it) })
-        TextInputDialog(show = showPromptDialog, title = "自定义提示词", initialValue = prompt, onDismiss = { showPromptDialog = false }, onConfirm = { prompt = it; saveConfig(RootConstants.KEY_HOOK_AI_TRANS_PROMPT, it) })
+        TextInputDialog(show = showPromptDialog, title = stringResource(R.string.title_custom_prompt), initialValue = prompt, onDismiss = { showPromptDialog = false }, onConfirm = { prompt = it; saveConfig(RootConstants.KEY_HOOK_AI_TRANS_PROMPT, it) })
 
         FloatInputDialog(show = showWordMotionCjkLiftDialog, title = stringResource(id = R.string.title_word_motion_cjk_lift), label = stringResource(id = R.string.label_word_motion_lift_range), initialValue = wordMotionCjkLift, min = 0f, max = 0.2f, onDismiss = { showWordMotionCjkLiftDialog = false }, onConfirm = { value -> wordMotionCjkLift = value; saveConfig(RootConstants.KEY_HOOK_WORD_MOTION_CJK_LIFT, value) })
         FloatInputDialog(show = showWordMotionCjkWaveDialog, title = stringResource(id = R.string.title_word_motion_cjk_wave), label = stringResource(id = R.string.label_word_motion_wave_range), initialValue = wordMotionCjkWave, min = 0f, max = 8f, onDismiss = { showWordMotionCjkWaveDialog = false }, onConfirm = { value -> wordMotionCjkWave = value; saveConfig(RootConstants.KEY_HOOK_WORD_MOTION_CJK_WAVE, value) })
@@ -514,7 +514,7 @@ fun LyricSettingsPage() {
                                                         onClick = { showBaseUrlDialog = true }
                                                     )
                                                     ArrowPreference(
-                                                        title = "自定义提示词",
+                                                        title = stringResource(R.string.title_custom_prompt),
                                                         summary = if (prompt.lines().size > 3) prompt.lines().take(2).joinToString("\n") + "..." else prompt,
                                                         onClick = { showPromptDialog = true }
                                                     )

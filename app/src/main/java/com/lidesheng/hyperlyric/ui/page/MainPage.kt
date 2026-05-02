@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -346,7 +348,7 @@ fun MainPage() {
                                         onCheckedChange = { isChecked ->
                                             if (isChecked) {
                                                 val hasPostNotification =
-                                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                                                 val hasListenerPermission = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
 
                                                 if (hasPostNotification && hasListenerPermission) {
@@ -455,7 +457,7 @@ fun MainPage() {
             IconButton(onClick = { showPermissionSheet = false }) {
                 Icon(
                     imageVector = MiuixIcons.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(R.string.close),
                     tint = MiuixTheme.colorScheme.onBackground
                 )
             }
@@ -463,7 +465,7 @@ fun MainPage() {
         endAction = {
             IconButton(onClick = {
                 val hasPostNotification =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                 val hasListenerPermission = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
                 if (hasPostNotification && hasListenerPermission) {
                     showPermissionSheet = false
@@ -477,7 +479,7 @@ fun MainPage() {
             }) {
                 Icon(
                     imageVector = MiuixIcons.Ok,
-                    contentDescription = "OK",
+                    contentDescription = stringResource(R.string.confirm),
                     tint = MiuixTheme.colorScheme.onBackground
                 )
             }
@@ -503,7 +505,7 @@ fun MainPage() {
                     title = stringResource(R.string.title_permission_listener),
                     onClick = {
                         try {
-                            val intent = Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                             context.startActivity(intent)
                         } catch (_: Exception) {
                             Toast.makeText(context, msgOpenSettingsFailed, Toast.LENGTH_SHORT).show()
@@ -519,14 +521,15 @@ fun MainPage() {
 fun AboutContent(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val navigator = LocalNavigator.current
-    val appVersion = remember {
+    val versionUnknown = stringResource(R.string.version_unknown)
+    val appVersion = remember(versionUnknown) {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
             val vName = pInfo.versionName
             val vCode = PackageInfoCompat.getLongVersionCode(pInfo)
             "v $vName-$vCode"
         } catch (_: Exception) {
-            "v Unknown"
+            versionUnknown
         }
     }
 
@@ -598,7 +601,7 @@ fun AboutContent(modifier: Modifier = Modifier) {
                 startAction = {
                     Image(
                         painter = painterResource(id = R.drawable.avatar),
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.content_description_avatar),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(40.dp)
@@ -609,7 +612,7 @@ fun AboutContent(modifier: Modifier = Modifier) {
                 endActions = {
                     Icon(
                         imageVector = MiuixIcons.Basic.ArrowRight,
-                        contentDescription = "Go",
+                        contentDescription = stringResource(R.string.content_description_go),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantActions
                     )
                 },

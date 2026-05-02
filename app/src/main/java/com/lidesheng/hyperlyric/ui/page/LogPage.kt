@@ -124,7 +124,7 @@ data class LogEntry(
         }
 }
 
-private suspend fun readXposedLogs(): List<LogEntry> = withContext(Dispatchers.IO) {
+private suspend fun readXposedLogs(context: Context): List<LogEntry> = withContext(Dispatchers.IO) {
     val entries = mutableListOf<LogEntry>()
     try {
         val findProcess = Runtime.getRuntime().exec(
@@ -137,7 +137,7 @@ private suspend fun readXposedLogs(): List<LogEntry> = withContext(Dispatchers.I
         findProcess.waitFor()
 
         if (foundDirs.isEmpty()) {
-            entries.add(LogEntry("NOW", "W", "Logger", "未找到 LSPosed 日志目录，请确认 LSPosed 已正确安装"))
+            entries.add(LogEntry("NOW", "W", context.getString(R.string.tag_logger), context.getString(R.string.lsposed_not_found)))
             return@withContext entries
         }
 
@@ -150,7 +150,7 @@ private suspend fun readXposedLogs(): List<LogEntry> = withContext(Dispatchers.I
         listProcess.waitFor()
 
         if (logFiles.isEmpty()) {
-            entries.add(LogEntry("NOW", "W", "Logger", "日志目录存在 ($dirsArg) 但未找到 .log 文件"))
+            entries.add(LogEntry("NOW", "W", context.getString(R.string.tag_logger), context.getString(R.string.format_log_files_not_found, dirsArg)))
             return@withContext entries
         }
 
@@ -171,8 +171,8 @@ private suspend fun readXposedLogs(): List<LogEntry> = withContext(Dispatchers.I
                     val firstLine = blockStr.lineSequence().firstOrNull() ?: ""
 
                     val timeMatcher = timeRegex.matcher(firstLine)
-                    val rawTime = if (timeMatcher.find()) timeMatcher.group(1) ?: "未知时间" else "未知时间"
-                    val time = if (rawTime.length >= 19) rawTime.substring(5).replace('T', ' ') else rawTime
+                    val rawTime = if (timeMatcher.find()) timeMatcher.group(1) ?: context.getString(R.string.unknown_time) else context.getString(R.string.unknown_time)
+                    val time = if (rawTime.length >= 19 && rawTime != context.getString(R.string.unknown_time)) rawTime.substring(5).replace('T', ' ') else rawTime
 
                     val levelMatcher = levelRegex.matcher(firstLine)
                     val parsedLevel = if (levelMatcher.find()) levelMatcher.group(1) ?: "I" else "I"
@@ -202,7 +202,7 @@ private suspend fun readXposedLogs(): List<LogEntry> = withContext(Dispatchers.I
                         headerMsg
                     }
 
-                    entries.add(LogEntry(time, level, "LSPosed", finalMsg.trim()))
+                    entries.add(LogEntry(time, level, context.getString(R.string.tag_lsposed), finalMsg.trim()))
                 }
             }
 
@@ -223,25 +223,24 @@ private suspend fun readXposedLogs(): List<LogEntry> = withContext(Dispatchers.I
         process.waitFor()
 
         if (entries.isEmpty()) {
-            entries.add(LogEntry("NOW", "I", "Logger",
-                "已扫描 ${logFiles.size} 个日志文件，未发现包含 HyperLyric 的记录。" +
-                "日志目录: $dirsArg"))
+            entries.add(LogEntry("NOW", "I", context.getString(R.string.tag_logger),
+                context.getString(R.string.format_logs_scanned_no_match, logFiles.size, dirsArg)))
         }
     } catch (e: Exception) {
         val msg = if (e.message?.contains("Permission denied") == true ||
                       e.message?.contains("su:") == true ||
                       e.message?.contains("not found") == true) {
-            "应用未获取root权限，无法获取lsposed日志"
+            context.getString(R.string.no_root_permission)
         } else {
-            "读取 LSPosed 日志失败: ${e.message}"
+            context.getString(R.string.format_log_read_failed, e.message)
         }
-        entries.add(LogEntry("NOW", "E", "Logger", msg))
+        entries.add(LogEntry("NOW", "E", context.getString(R.string.tag_logger), msg))
     }
     entries.sortedByDescending { it.timestamp }
 }
 
-private suspend fun collectAllLogs(): List<LogEntry> {
-    return readXposedLogs()
+private suspend fun collectAllLogs(context: Context): List<LogEntry> {
+    return readXposedLogs(context)
 }
 
 private fun formatTimestamp(raw: String): String {
@@ -279,7 +278,7 @@ fun LogPage() {
     val reloadLogs = {
         coroutineScope.launch {
             isLoading = true
-            val logs = collectAllLogs()
+            val logs = collectAllLogs(context)
             allLogs.clear()
             allLogs.addAll(logs)
             updateFilteredLogs(allLogs, searchStatus.searchText, selectedLevel, filteredLogs)

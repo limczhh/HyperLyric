@@ -48,7 +48,7 @@
     <string name="title_developer">Developer</string>
     <string name="dev_name">lidesheng</string>
     <string name="title_licenses">Licenses</string>
-    <string name="summary_licenses">感谢@FrancOS 和@于逸风 的帮助，以及一些没列出的项目</string>
+    <string name="summary_licenses">Thanks to @FrancOS and @于逸风 for their help, and some unlisted projects</string>
 
     <!-- ———————————————————————— SettingsPage ———————————————————————— -->
     <string name="toast_backup_success">Backup successful</string>
@@ -58,7 +58,6 @@
     <string name="toast_restore_invalid">Invalid file format</string>
     <string name="toast_restore_failed">Restore failed</string>
     <string name="title_settings_page">App Settings</string>
-    <string name="label_custom_font_path">Enter full path of the font file</string>
     <string name="back">Back</string>
     <string name="title_personalization">Personalization</string>
     <string name="theme_system">Follow System</string>
@@ -92,6 +91,7 @@
     <string name="title_lyric_mode">Lyric Mode</string>
     <string name="title_custom_config">Custom Configuration</string>
     <string name="title_super_island">HyperIsland</string>
+    <string name="subtitle_super_island">Takes effect after music paused or changed</string>
     <string name="title_lyrics">Lyrics</string>
     <string name="title_lyric_anim">Lyric Animation</string>
     <string name="title_lyric_provider">Lyric Provider</string>
@@ -100,20 +100,19 @@
     <!-- ———————————————————————— DynamicIslandNotificationPage ———————————————————————— -->
     <string name="dialog_cache_limit_title">Online Lyric Cache Limit</string>
     <string name="dialog_add_whitelist_title">Enter Application Package Name</string>
-    <string name="dialog_add_whitelist_hint">e.g., com.spotify.music</string>
+    <string name="dialog_add_whitelist_hint">e.g. com.spotify.music</string>
     <string name="save">Save</string>
     <string name="toast_app_exists">This app already exists</string>
     <string name="toast_pkg_empty">Package name cannot be empty</string>
     <string name="dialog_delete_whitelist_title">Are you sure you want to remove this app from the list?</string>
     <string name="option_notification_live">Live Update Notification</string>
     <string name="option_notification_focus">Xiaomi Notification Spotlight</string>
-    <string name="title_translation_only">Translation only</string>
-    <string name="title_swap_translation">Swap lyric and translation</string>
+    <string name="title_notification_type">Notification Type</string>
     <string name="title_island_settings">Dynamic Island Settings</string>
     <string name="title_island_left_icon">Left Icon</string>
     <string name="title_disable_lyric_split">Disable Lyric Splitting</string>
     <string name="option_icon_style_note">Music Note</string>
-    <string name="option_icon_style_rounded">Rounded Album Cover</string>
+    <string name="option_icon_style_rounded">Album Cover</string>
     <string name="option_icon_style_circular">Circular Album Cover</string>
     <string name="option_icon_style_none">None</string>
     <string name="title_limit_width">Limit Maximum Width</string>
@@ -126,7 +125,7 @@
     <string name="option_click_open_app">Open HyperLyric</string>
     <string name="option_click_open_media">Open Current Media App</string>
     <string name="title_show_progress">Show Progress Bar</string>
-    <string name="summary_show_progress">Do not disable on other systems! Tested on HyperOS 3 only.</string>
+    <string name="summary_show_progress">Do not disable on other systems! Only tested on HyperOS 3</string>
     <string name="title_progress_color">Progress Bar Accent Color</string>
     <string name="summary_progress_color">Takes effect after track change</string>
     <string name="title_show_album_art">Show Album Art</string>
@@ -184,7 +183,7 @@
     <string name="option_anim_zoom">Zoom</string>
 
     <!-- ———————————————————————— LyricSettingsPage ———————————————————————— -->
-    <string name="title_text">Text</string>
+    <string name="title_text">Text Style</string>
     <string name="title_size">Size</string>
     <string name="label_size_range">Range: 8 ~ 16</string>
     <string name="title_font_weight">Font Weight</string>
@@ -205,10 +204,36 @@
     <string name="title_lyric_marquee">Lyric Marquee</string>
     <string name="title_infinite_loop">Infinite Loop</string>
     <string name="title_stop_at_end">Stop at End</string>
-    <string name="title_syllable_relative">Enable Relative Progress Lyrics</string>
+    <string name="title_syllable_relative">Relative Progress Lyrics</string>
+    <string name="summary_syllable_relative">When lyrics lack word-level data, display the entire line as a word</string>
     <string name="title_syllable_highlight">Show Highlight for Relative Progress Lyrics</string>
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
+    <string name="title_translation">Translation</string>
+    <string name="label_custom_font_path">Enter full path of the font file</string>
+    <string name="title_disable_translation">Disable All Translations</string>
+    <string name="title_translation_only">Translation Only</string>
+    <string name="title_swap_translation">Swap Lyric and Translation</string>
+    <string name="title_extract_cover_color">Extract Cover Color</string>
+    <string name="title_extract_cover_gradient">Extract Cover Gradient</string>
+    <string name="title_word_motion">Word Lift Animation</string>
+    <string name="title_word_motion_cjk_lift">CJK Lift Coefficient</string>
+    <string name="title_word_motion_cjk_wave">CJK Wavelength Coefficient</string>
+    <string name="title_word_motion_latin_lift">Latin Lift Coefficient</string>
+    <string name="title_word_motion_latin_wave">Latin Wavelength Coefficient</string>
+    <string name="label_word_motion_lift_range">Range: 0 ~ 0.2</string>
+    <string name="label_word_motion_wave_range">Range: 0 ~ 8</string>
+    <string name="title_custom_font">Font</string>
+    <string name="summary_default_font">Default</string>
+    <string name="title_ai_translation">OpenAI Translation</string>
+    <string name="title_ai_trans_basic">Basic Settings</string>
+    <string name="title_ai_trans_auto_ignore_chinese">Automatically Skip Chinese Lyrics</string>
+    <string name="label_ai_trans_api_key">API Key</string>
+    <string name="label_ai_trans_model">Model Name</string>
+    <string name="label_ai_trans_base_url">API Base URL</string>
+    <string name="label_ai_trans_target_lang">Target Language</string>
+    <string name="label_ai_trans_prompt">Custom Translation Prompt</string>
+    <string name="summary_ai_trans_prompt_hint">Leave empty for default prompt</string>
 
     <!-- ———————————————————————— LyricProviderPage ———————————————————————— -->
     <string name="refresh_pull_down">Pull down to refresh</string>
@@ -256,9 +281,35 @@
     <string name="refresh">Refresh</string>
     <string name="close">Close</string>
     <string name="copy">Copy</string>
-    <string name="copied">Copied</string>
+    <string name="copied">Copied to clipboard</string>
 
-    <!-- ———————————————————————— LogPage ———————————————————————— -->
+    <!-- Help Page -->
+    <string name="title_help_usage_tips">Usage Tips</string>
+    <string name="title_help_config_steps">Configuration Steps</string>
+    <string name="title_help_warm_tips">Warm Tips</string>
+    <string name="summary_help_bug_notice">The current version has bugs. If it doesn\'t fit your model or system version, please use Notification-style Dynamic Island lyrics instead. Thank you for your understanding.</string>
+    <string name="summary_help_super_island_steps">1. Go to GitHub to download the corresponding Lyricon provider\n2. Enable HyperLyric and the provider in LSPosed\n3. Turn on the Super Island switch on the HyperLyric home page\n4. Add music app package names in the whitelist page\n5. Restart System UI and music apps</string>
+    <string name="summary_help_dynamic_island_hint">Use real-time notifications and Xiaomi focus notifications to achieve dynamic island effects, suitable for devices that support both.</string>
+    <string name="summary_help_focus_whitelist_hint">Xiaomi focus notifications have whitelist verification; you need to find a way to bypass it yourself.</string>
+    <string name="summary_help_dynamic_island_steps">1. Turn on the Notification-style Dynamic Island switch on the HyperLyric home page\n2. Add music app package names in the whitelist page\n3. Turn on the Bluetooth lyrics feature in the music app and connect a Bluetooth device</string>
+    <string name="summary_help_salt_player">Salt Player is supported, more apps coming soon...</string>
+
+    <!-- Poetry Page -->
+    <string name="back_to_top">Back to top</string>
+
+    <!-- Log Page -->
+    <string name="unknown_time">Unknown Time</string>
+
+    <!-- Lyric Settings Page -->
+    <string name="tab_basic">Basic</string>
+    <string name="tab_advanced">Advanced</string>
+    <string name="title_custom_prompt">Custom Prompt</string>
+
+    <!-- Main Page & General Content Descriptions -->
+    <string name="content_description_avatar">Avatar</string>
+    <string name="content_description_go">Go</string>
+    <string name="version_unknown">v Unknown</string>
+
     <string name="title_module_logs">Module Logs</string>
     <string name="level_debug">Debug</string>
     <string name="level_info">Info</string>

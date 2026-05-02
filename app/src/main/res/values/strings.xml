@@ -281,7 +281,34 @@
     <string name="refresh">刷新</string>
     <string name="close">关闭</string>
     <string name="copy">复制</string>
-    <string name="copied">已复制</string>
+    <string name="copied">已复制到剪贴板</string>
+
+    <!-- Help Page -->
+    <string name="title_help_usage_tips">使用提示</string>
+    <string name="title_help_config_steps">配置流程</string>
+    <string name="title_help_warm_tips">温馨提示</string>
+    <string name="summary_help_bug_notice">目前版本存在bug，如果不适配你的机型或系统版本，可用通知型灵动岛歌词代替，还请谅解</string>
+    <string name="summary_help_super_island_steps">1、前往github下载对应lyricon词幕歌词提供器\n2、在lsposed中启用HyperLyric和歌词提供器\n3、打开HyperLyric主页的小米超级岛歌词开关\n4、点击进入歌词白名单页添加音乐软件包名\n5、重启系统界面和音乐软件</string>
+    <string name="summary_help_dynamic_island_hint">利用实时通知和小米焦点通知来实现灵动岛歌词效果，适用于支持这两种通知的设备</string>
+    <string name="summary_help_focus_whitelist_hint">小米的焦点通知有白名单验证，需要你自己想办法绕过</string>
+    <string name="summary_help_dynamic_island_steps">1、打开HyperLyric主页的通知型灵动岛歌词开关\n2、点击进入歌词白名单页添加音乐软件包名\n3、在音乐软件里打开蓝牙歌词功能，并连接蓝牙设备</string>
+    <string name="summary_help_salt_player">已支持 Salt Player，更多应用等你发现...</string>
+
+    <!-- Poetry Page -->
+    <string name="back_to_top">回到顶部</string>
+
+    <!-- Log Page -->
+    <string name="unknown_time">未知时间</string>
+
+    <!-- Lyric Settings Page -->
+    <string name="tab_basic">基础功能</string>
+    <string name="tab_advanced">高级功能</string>
+    <string name="title_custom_prompt">自定义提示词</string>
+
+    <!-- Main Page & General Content Descriptions -->
+    <string name="content_description_avatar">头像</string>
+    <string name="content_description_go">前往</string>
+    <string name="version_unknown">v 未知</string>
 
     <!-- ———————————————————————— LogPage ———————————————————————— -->
     <string name="title_module_logs">模块日志</string>

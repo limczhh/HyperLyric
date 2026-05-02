@@ -52,7 +52,7 @@ fun HelpPage() {
         tint = HazeTint(MiuixTheme.colorScheme.surface.copy(0.8f))
     )
 
-    val tabs = listOf(stringResource(R.string.title_super_island_lyrics), stringResource(R.string.title_dynamic_island_lyrics))
+    val tabs = listOf(stringResource(R.string.title_super_island), stringResource(R.string.title_dynamic_island_lyrics))
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
 
@@ -70,14 +70,26 @@ fun HelpPage() {
                     title = stringResource(R.string.title_help),
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) { Icon(imageVector = MiuixIcons.Back, contentDescription = "返回") }
+                        IconButton(onClick = { navigator.pop() }) {
+                            Icon(
+                                imageVector = MiuixIcons.Back,
+                                contentDescription = stringResource(R.string.back)
+                            )
+                        }
                     }
                 )
                 TabRow(
                     tabs = tabs,
                     selectedTabIndex = pagerState.currentPage,
-                    onTabSelected = { coroutineScope.launch { pagerState.animateScrollToPage(it) } },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 8.dp),
+                    onTabSelected = { index ->
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 8.dp),
                     colors = TabRowDefaults.tabRowColors(backgroundColor = Color.Transparent)
                 )
             }
@@ -102,37 +114,34 @@ fun HelpPage() {
                     ) {
                         item {
                             SmallTitle(
-                                text = "使用提示",
+                                text = stringResource(R.string.title_help_usage_tips),
                                 insideMargin = PaddingValues(10.dp, 4.dp)
                             )
-                            Card {
+                            Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     BasicComponent(
-                                        title = "仅支持HyperOS 3、LSPosed v2.0",
-                                        summary = "目前版本存在bug，如果不适配你的机型或系统版本，可用通知型灵动岛歌词代替，还请谅解"
+                                        title = stringResource(R.string.summary_super_island_lyrics),
+                                        summary = stringResource(R.string.summary_help_bug_notice)
                                     )
                                 }
                             }
                         }
                         item {
                             SmallTitle(
-                                text = "配置流程",
+                                text = stringResource(R.string.title_help_config_steps),
                                 insideMargin = PaddingValues(10.dp, 4.dp)
                             )
-                            Card {
+                            Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     BasicComponent(
-                                        summary = "1、前往github下载对应lyricon词幕歌词提供器\n" +
-                                                "2、在lsposed中启用HyperLyric和歌词提供器\n" +
-                                                "3、打开HyperLyric主页的小米超级岛歌词开关\n" +
-                                                "4、点击进入歌词白名单页添加音乐软件包名\n" +
-                                                "5、重启系统界面和音乐软件"
+                                        summary = stringResource(R.string.summary_help_super_island_steps)
                                     )
                                 }
                             }
                         }
                     }
                 }
+
                 1 -> {
                     LazyColumn(
                         modifier = Modifier
@@ -150,42 +159,40 @@ fun HelpPage() {
                     ) {
                         item {
                             SmallTitle(
-                                text = "使用提示",
+                                text = stringResource(R.string.title_help_usage_tips),
                                 insideMargin = PaddingValues(10.dp, 4.dp)
                             )
-                            Card {
+                            Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     BasicComponent(
-                                        title = "利用实时通知和小米焦点通知来实现灵动岛歌词效果，适用于支持这两种通知的设备",
-                                        summary = "小米的焦点通知有白名单验证，需要你自己想办法绕过"
+                                        title = stringResource(R.string.summary_help_dynamic_island_hint),
+                                        summary = stringResource(R.string.summary_help_focus_whitelist_hint)
                                     )
                                 }
                             }
                         }
                         item {
                             SmallTitle(
-                                text = "配置流程",
+                                text = stringResource(R.string.title_help_config_steps),
                                 insideMargin = PaddingValues(10.dp, 4.dp)
                             )
-                            Card {
+                            Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     BasicComponent(
-                                        summary = "1、打开HyperLyric主页的通知型灵动岛歌词开关\n" +
-                                                "2、点击进入歌词白名单页添加音乐软件包名\n" +
-                                                "3、在音乐软件里打开蓝牙歌词功能，并连接蓝牙设备"
+                                        summary = stringResource(R.string.summary_help_dynamic_island_steps)
                                     )
                                 }
                             }
                         }
                         item {
                             SmallTitle(
-                                text = "温馨提示",
+                                text = stringResource(R.string.title_help_warm_tips),
                                 insideMargin = PaddingValues(10.dp, 4.dp)
                             )
-                            Card {
+                            Card(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     BasicComponent(
-                                        summary = "已支持 Salt Player，更多应用等你发现..."
+                                        summary = stringResource(R.string.summary_help_salt_player)
                                     )
                                 }
                             }
