@@ -125,6 +125,8 @@ class RichLyricLineView(
         enableRelativeProgress = style.primary.relativeProgress
         enableRelativeProgressHighlight = style.primary.relativeHighlight
 
+        setTransitionConfig(style.transitionConfig)
+
         applyLineStyle(
             main,
             style.primary,

@@ -110,6 +110,8 @@ dependencies {
 
     // --- 网络与序列化 (在线歌词) ---
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
     "onlineImplementation"(libs.retrofit2.retrofit)
     "onlineImplementation"(libs.squareup.okhttp3)
     "onlineImplementation"(libs.retrofit2.kotlinx.serialization.converter)

@@ -20,6 +20,7 @@ data class LyricViewStyle(
     val scaleMultiLine: Float = 1f,
     val animation: AnimParams = AnimParams(),
     val placeholder: TitleSlot = TitleSlot.NAME_ARTIST,
+    val transitionConfig: String = "smooth",
 )
 
 data class TextLook(

@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root
 
+import com.lidesheng.hyperlyric.root.aitrans.AITranslator
 import com.lidesheng.hyperlyric.root.utils.xLog
 import com.lidesheng.hyperlyric.root.utils.xLogError
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
@@ -125,6 +126,7 @@ class HookEntry : XposedModule() {
             ScreenStateMonitor.initialize(app)
             BridgeCentral.initialize(app)
             BridgeCentral.sendBootCompleted()
+            AITranslator.init(app)
             initBridgeRouting(app)
         }
 
@@ -140,7 +142,7 @@ class HookEntry : XposedModule() {
                 }
                 onCommand("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM") {
                     xLog("Bridge: received UPDATE_LYRIC_ANIM")
-                    HookIslandLyric.updateLyricLine()
+                    HookIslandLyric.refreshActiveIsland()
                 }
             }
         }
@@ -153,7 +155,8 @@ class HookEntry : XposedModule() {
                 }
 
                 override fun onSongChanged(song: Song?) {
-                    LyriconDataBridge.updateSong(song)
+                    val hookEntry = HookIslandLyric.module as? HookEntry
+                    LyriconDataBridge.updateSong(song, hookEntry?.prefs)
                     HookIslandLyric.refreshActiveIsland()
                 }
 

@@ -11,6 +11,12 @@ import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
+fun String.md5(): String {
+    return MessageDigest.getInstance("MD5")
+        .digest(this.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+}
+
 fun File.md5(): String {
     if (!exists() || !canRead()) return ""
     try {

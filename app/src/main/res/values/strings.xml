@@ -182,7 +182,7 @@
     <string name="option_anim_zoom">缩放</string>
 
     <!-- ———————————————————————— LyricSettingsPage ———————————————————————— -->
-    <string name="title_text">文字</string>
+    <string name="title_text">文字样式</string>
     <string name="title_size">大小</string>
     <string name="label_size_range">范围：8 ~ 16</string>
     <string name="title_font_weight">字重</string>
@@ -203,10 +203,38 @@
     <string name="title_lyric_marquee">歌词滚动</string>
     <string name="title_infinite_loop">无限循环</string>
     <string name="title_stop_at_end">结束时在末尾停止</string>
-    <string name="title_syllable_relative">启用相对进度歌词</string>
+    <string name="title_syllable_relative">相对进度歌词</string>
+    <string name="summary_syllable_relative">当歌词缺少单词数据时，将整行作为单词显示</string>
     <string name="title_syllable_highlight">显示相对进度歌词高亮进度</string>
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
+    <string name="title_translation">翻译</string>
+    <string name="title_disable_translation">禁用所有翻译</string>
+    <string name="title_translation_only">使用翻译代替歌词</string>
+    <string name="title_extract_cover_color">提取封面颜色</string>
+    <string name="title_extract_cover_gradient">提取封面渐变色</string>
+    <string name="title_word_motion">字词上浮动画</string>
+    <string name="title_word_motion_cjk_lift">中日韩上浮系数</string>
+    <string name="title_word_motion_cjk_wave">中日韩波长系数</string>
+    <string name="title_word_motion_latin_lift">拉丁文字上浮系数</string>
+    <string name="title_word_motion_latin_wave">拉丁文字波长系数</string>
+    <string name="label_word_motion_lift_range">范围：0 ~ 0.2</string>
+    <string name="label_word_motion_wave_range">范围：0 ~ 8</string>
+    <string name="title_custom_font">自定义字体</string>
+    <string name="summary_default_font">默认字体</string>
+    <string name="summary_no_font_files">未找到字体文件。请将 .ttf 或 .otf 文件放入以下目录:\n%1$s</string>
+
+    <!-- ———————————————————————— AiTranslationPage ———————————————————————— -->
+    <string name="title_ai_translation">AI 翻译</string>
+    <string name="title_ai_trans_basic">基础设置</string>
+    <string name="title_ai_trans_enable">Open AI翻译</string>
+    <string name="title_ai_trans_auto_ignore_chinese">自动跳过中文歌词</string>
+    <string name="label_ai_trans_api_key">API Key</string>
+    <string name="label_ai_trans_model">模型名称</string>
+    <string name="label_ai_trans_base_url">API 地址</string>
+    <string name="label_ai_trans_target_lang">目标语言</string>
+    <string name="label_ai_trans_prompt">自定义翻译风格提示词</string>
+    <string name="summary_ai_trans_prompt_hint">留空使用默认提示词。自定义提示词仅影响翻译风格，不会覆盖核心协议。</string>
 
     <!-- ———————————————————————— LyricProviderPage ———————————————————————— -->
     <string name="refresh_pull_down">下拉刷新</string>

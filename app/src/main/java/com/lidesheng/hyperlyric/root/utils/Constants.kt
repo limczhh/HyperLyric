@@ -50,6 +50,37 @@ object Constants {
     const val KEY_HOOK_SYLLABLE_RELATIVE = "key_hook_syllable_relative"
     const val KEY_HOOK_SYLLABLE_HIGHLIGHT = "key_hook_syllable_highlight"
 
+    // ================= TRANSLATION KEYS =================
+    const val KEY_HOOK_DISABLE_TRANSLATION = "key_hook_disable_translation"
+    const val KEY_HOOK_TRANSLATION_ONLY = "key_hook_translation_only"
+
+    // ================= COLOR KEYS =================
+    const val KEY_HOOK_EXTRACT_COVER_TEXT_COLOR = "key_hook_extract_cover_text_color"
+    const val KEY_HOOK_EXTRACT_COVER_TEXT_GRADIENT = "key_hook_extract_cover_text_gradient"
+
+    // ================= FONT KEYS =================
+    const val KEY_HOOK_CUSTOM_FONT_PATH = "key_hook_custom_font_path"
+
+    // ================= WORD MOTION KEYS =================
+    const val KEY_HOOK_WORD_MOTION_ENABLED = "key_hook_word_motion_enabled"
+    const val KEY_HOOK_WORD_MOTION_CJK_LIFT = "key_hook_word_motion_cjk_lift"
+    const val KEY_HOOK_WORD_MOTION_CJK_WAVE = "key_hook_word_motion_cjk_wave"
+    const val KEY_HOOK_WORD_MOTION_LATIN_LIFT = "key_hook_word_motion_latin_lift"
+    const val KEY_HOOK_WORD_MOTION_LATIN_WAVE = "key_hook_word_motion_latin_wave"
+
+    // ================= AI TRANSLATION KEYS =================
+    const val KEY_HOOK_AI_TRANS_ENABLE = "key_hook_ai_trans_enable"
+    const val KEY_HOOK_AI_TRANS_AUTO_IGNORE_CHINESE = "key_hook_ai_trans_auto_ignore_chinese"
+    const val KEY_HOOK_AI_TRANS_PROVIDER = "key_hook_ai_trans_provider"
+    const val KEY_HOOK_AI_TRANS_API_KEY = "key_hook_ai_trans_api_key"
+    const val KEY_HOOK_AI_TRANS_MODEL = "key_hook_ai_trans_model"
+    const val KEY_HOOK_AI_TRANS_BASE_URL = "key_hook_ai_trans_base_url"
+    const val KEY_HOOK_AI_TRANS_TARGET_LANG = "key_hook_ai_trans_target_lang"
+    const val KEY_HOOK_AI_TRANS_PROMPT = "key_hook_ai_trans_prompt"
+    const val KEY_HOOK_AI_TRANS_TEMPERATURE = "key_hook_ai_trans_temperature"
+    const val KEY_HOOK_AI_TRANS_TOP_P = "key_hook_ai_trans_top_p"
+    const val KEY_HOOK_AI_TRANS_MAX_TOKENS = "key_hook_ai_trans_max_tokens"
+
     // ================= DEFAULTS =================
     const val DEFAULT_HOOK_LYRIC_MODE = 0
     const val DEFAULT_HOOK_ENABLE_SUPER_ISLAND = false
@@ -89,4 +120,16 @@ object Constants {
 
     const val DEFAULT_HOOK_SYLLABLE_RELATIVE = true
     const val DEFAULT_HOOK_SYLLABLE_HIGHLIGHT = false
+
+    const val DEFAULT_HOOK_DISABLE_TRANSLATION = false
+    const val DEFAULT_HOOK_TRANSLATION_ONLY = false
+    const val DEFAULT_HOOK_EXTRACT_COVER_TEXT_COLOR = false
+    const val DEFAULT_HOOK_EXTRACT_COVER_TEXT_GRADIENT = false
+    const val DEFAULT_HOOK_WORD_MOTION_ENABLED = true
+    const val DEFAULT_HOOK_WORD_MOTION_CJK_LIFT = 0.05f
+    const val DEFAULT_HOOK_WORD_MOTION_CJK_WAVE = 2.8f
+    const val DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT = 0.06f
+    const val DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE = 3.6f
+    const val DEFAULT_HOOK_AI_TRANS_ENABLE = false
+    const val DEFAULT_HOOK_AI_TRANS_AUTO_IGNORE_CHINESE = false
 }

@@ -3,7 +3,6 @@ package com.lidesheng.hyperlyric.root
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.graphics.Color
-import android.graphics.Typeface
 import com.lidesheng.hyperlyric.root.utils.xLog
 import android.util.TypedValue
 import android.view.Gravity
@@ -11,7 +10,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
+import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.DynamicFinder
+import com.lidesheng.hyperlyric.root.utils.FontHelper
+import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 import com.lidesheng.hyperlyric.root.utils.xLogError
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -23,6 +25,7 @@ import io.github.proify.lyricon.lyric.view.Marquee
 import io.github.proify.lyricon.lyric.view.RichLyricLineView
 import io.github.proify.lyricon.lyric.view.TextLook
 import io.github.proify.lyricon.lyric.view.TitleSlot
+import io.github.proify.lyricon.lyric.view.WordMotion
 import io.github.proify.lyricon.lyric.view.yoyo.YoYoPresets
 import io.github.proify.lyricon.lyric.view.yoyo.animateUpdate
 
@@ -285,6 +288,7 @@ object HookIslandLyric {
         var metadataSongName = ""
         var finalArtistName = ""
         var finalAlbumName = ""
+        var albumBitmap: android.graphics.Bitmap? = null
 
         val targetPkg = LyriconDataBridge.activePackageName ?: pkgName
         if (targetPkg.isNotEmpty()) {
@@ -297,6 +301,7 @@ object HookIslandLyric {
                     metadataSongName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
                     finalArtistName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                     finalAlbumName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""
+                    albumBitmap = mMetadata.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
                 }
             } catch (_: Exception) {}
         }
@@ -367,7 +372,7 @@ object HookIslandLyric {
             } catch (_: Exception) {}
 
             val richView = targetView as RichLyricLineView
-            configureRichLyricView(richView, prefs, res, mode)
+            configureRichLyricView(richView, prefs, res, mode, albumBitmap)
             
             // 设置内边距和可见性，必须在 measure/layout 之前，否则会导致一帧的位移抖动
             richView.setPadding((pL * density).toInt(), 0, (pR * density).toInt(), 0)
@@ -381,7 +386,10 @@ object HookIslandLyric {
                     val sec = if (finalAlbumName.isEmpty()) finalArtistName else "$finalArtistName - $finalAlbumName"
                     RichLyricLine(text = lyriconSongName, words = emptyList(), secondary = sec, secondaryWords = emptyList())
                 }
-                8 -> LyriconDataBridge.currentLyricLine ?: RichLyricLine(text = lyriconSongName, words = emptyList())
+                8 -> {
+                    val rawLine = LyriconDataBridge.currentLyricLine ?: RichLyricLine(text = lyriconSongName, words = emptyList())
+                    if (TranslationHelper.isTranslationOnly(prefs)) TranslationHelper.applyTranslationOnly(rawLine) else rawLine
+                }
                 else -> null
             }
 
@@ -403,38 +411,73 @@ object HookIslandLyric {
 
     // removed configureTextView
 
-    private fun configureRichLyricView(view: RichLyricLineView, prefs: SharedPreferences, res: android.content.res.Resources, mode: Int) {
+    private fun configureRichLyricView(view: RichLyricLineView, prefs: SharedPreferences, res: android.content.res.Resources, mode: Int, albumBitmap: android.graphics.Bitmap? = null) {
         val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
-        val fontWeight = prefs.getInt(RootConstants.KEY_HOOK_FONT_WEIGHT, RootConstants.DEFAULT_HOOK_FONT_WEIGHT)
-        val fontItalic = prefs.getBoolean(RootConstants.KEY_HOOK_FONT_ITALIC, RootConstants.DEFAULT_HOOK_FONT_ITALIC)
-        val tf = Typeface.create(Typeface.DEFAULT, fontWeight, fontItalic)
+        val tf = FontHelper.loadTypeface(prefs)
 
         val textSizeRatio = prefs.getFloat(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO)
         val primarySizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat(), res.displayMetrics)
 
         val isMetadataDualLine = (mode == 6 || mode == 7)
-        val isTranslationVisible = LyriconDataBridge.isDisplayTranslation
+        val isTranslationDisabled = TranslationHelper.isTranslationDisabled(prefs)
+        val isTranslationVisible = LyriconDataBridge.isDisplayTranslation && !isTranslationDisabled
         val showSecondary = isMetadataDualLine || isTranslationVisible
 
         val isMarqueeEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)
         val infinite = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_INFINITE)
 
+        // Determine text colors: use cover colors if enabled, otherwise white
+        val useCoverColor = prefs.getBoolean(RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_COLOR, RootConstants.DEFAULT_HOOK_EXTRACT_COVER_TEXT_COLOR)
+        val useCoverGradient = prefs.getBoolean(RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_GRADIENT, RootConstants.DEFAULT_HOOK_EXTRACT_COVER_TEXT_GRADIENT)
+
+        // 三个颜色槽位：
+        // primaryColors = TextLook.color → 无逐字效果的歌词、标题
+        // bgColors = Highlight.background → 未唱到的逐字歌词
+        // hlColors = Highlight.foreground → 已唱到的逐字歌词
+        val primaryColors: IntArray
+        val bgColors: IntArray
+        val hlColors: IntArray
+        if (useCoverColor) {
+            if (albumBitmap != null) {
+                val songKey = LyriconDataBridge.currentSongName
+                val (lightColors, darkColors) = CoverColorHelper.extractColors(albumBitmap, useCoverGradient, songKey)
+                primaryColors = darkColors   // 无逐字/标题 → 封面亮色
+                bgColors = lightColors       // 未唱到 → 封面暗色
+                hlColors = darkColors        // 已唱到 → 封面亮色
+            } else {
+                val cached = CoverColorHelper.getCachedColors()
+                if (cached != null) {
+                    primaryColors = cached.second  // 无逐字/标题 → 缓存亮色
+                    bgColors = cached.first        // 未唱到 → 缓存暗色
+                    hlColors = cached.second       // 已唱到 → 缓存亮色
+                } else {
+                    primaryColors = intArrayOf(Color.WHITE)
+                    bgColors = intArrayOf(Color.GRAY)
+                    hlColors = intArrayOf(Color.WHITE)
+                }
+            }
+        } else {
+            primaryColors = intArrayOf(Color.WHITE)
+            bgColors = intArrayOf(Color.GRAY)
+            hlColors = intArrayOf(Color.WHITE)
+        }
+
         val style = LyricViewStyle(
             primary = TextLook(
-                color = intArrayOf(Color.WHITE),
+                color = primaryColors,
                 size = primarySizePx,
                 typeface = tf,
                 relativeProgress = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_RELATIVE, RootConstants.DEFAULT_HOOK_SYLLABLE_RELATIVE),
                 relativeHighlight = prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT, RootConstants.DEFAULT_HOOK_SYLLABLE_HIGHLIGHT),
             ),
             secondary = TextLook(
-                color = if (showSecondary) intArrayOf(Color.WHITE) else intArrayOf(Color.TRANSPARENT),
+                color = if (showSecondary) primaryColors else intArrayOf(Color.TRANSPARENT),
                 size = if (showSecondary) primarySizePx * textSizeRatio else 0f,
                 typeface = tf,
             ),
             highlight = Highlight(
-                background = intArrayOf(0x4CFFFFFF),
-                foreground = intArrayOf(Color.WHITE),
+                background = bgColors,
+                foreground = hlColors,
             ),
             marquee = Marquee(
                 speed = if (isMarqueeEnabled) prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_SPEED).toFloat() else 0f,
@@ -445,6 +488,13 @@ object HookIslandLyric {
             ),
             gradient = prefs.getBoolean(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS),
             fadingEdge = prefs.getInt(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, RootConstants.DEFAULT_HOOK_FADING_EDGE_LENGTH),
+            wordMotion = WordMotion(
+                enabled = prefs.getBoolean(RootConstants.KEY_HOOK_WORD_MOTION_ENABLED, RootConstants.DEFAULT_HOOK_WORD_MOTION_ENABLED),
+                cjkLiftFactor = prefs.getFloat(RootConstants.KEY_HOOK_WORD_MOTION_CJK_LIFT, RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_LIFT),
+                cjkWaveFactor = prefs.getFloat(RootConstants.KEY_HOOK_WORD_MOTION_CJK_WAVE, RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_WAVE),
+                latinLiftFactor = prefs.getFloat(RootConstants.KEY_HOOK_WORD_MOTION_LATIN_LIFT, RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT),
+                latinWaveFactor = prefs.getFloat(RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE, RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE),
+            ),
             placeholder = TitleSlot.NONE,
         )
         view.setStyle(style)
@@ -470,6 +520,7 @@ object HookIslandLyric {
                         cv.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW_WRAPPER")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         cv.findViewWithTag<View>("HYPERLYRIC_LEFT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
                         cv.findViewWithTag<View>("HYPERLYRIC_RIGHT_VIEW")?.let { (it.parent as? ViewGroup)?.removeView(it) }
+                        CoverColorHelper.clearCache()
                         applySettings(cv)
                         val leftMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT)
                         val rightMode = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_RIGHT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_RIGHT)
@@ -511,10 +562,10 @@ object HookIslandLyric {
     private fun updateLyricInSlot(cv: ViewGroup, tag: String, mode: Int, prefs: SharedPreferences) {
         if (mode != 8) return
         val view = cv.findViewWithTag<RichLyricLineView>(tag) ?: return
-        val targetLine = LyriconDataBridge.currentLyricLine
+        val rawLine = LyriconDataBridge.currentLyricLine
+        val targetLine = if (TranslationHelper.isTranslationOnly(prefs) && rawLine != null) TranslationHelper.applyTranslationOnly(rawLine) else rawLine
 
         cv.post {
-            configureRichLyricView(view, prefs, cv.resources, mode)
             val isAnimEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ANIM_ENABLE, RootConstants.DEFAULT_HOOK_ANIM_ENABLE)
             val animId = prefs.getString(RootConstants.KEY_HOOK_ANIM_ID, RootConstants.DEFAULT_HOOK_ANIM_ID)
 
