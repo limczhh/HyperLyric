@@ -13,6 +13,7 @@ import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.DynamicFinder
 import com.lidesheng.hyperlyric.root.utils.FontHelper
+import com.lidesheng.hyperlyric.root.utils.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 import com.lidesheng.hyperlyric.root.utils.xLogError
 import io.github.libxposed.api.XposedInterface.Chain
@@ -291,21 +292,12 @@ object HookIslandLyric {
         var albumBitmap: android.graphics.Bitmap? = null
 
         val targetPkg = LyriconDataBridge.activePackageName ?: pkgName
-        if (targetPkg.isNotEmpty()) {
-            try {
-                val mediaSessionManager = rootView.context.getSystemService(android.content.Context.MEDIA_SESSION_SERVICE) as android.media.session.MediaSessionManager
-                val controllers = mediaSessionManager.getActiveSessions(null)
-                val controller = controllers.find { it.packageName == targetPkg }
-                val mMetadata = controller?.metadata
-                if (mMetadata != null) {
-                    metadataSongName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
-                    finalArtistName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""
-                    finalAlbumName = mMetadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""
-                    albumBitmap = mMetadata.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
-                        ?: mMetadata.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
-                }
-            } catch (_: Exception) {}
-        }
+        val mediaInfo = MediaMetadataHelper.getMediaInfo(rootView.context, targetPkg)
+        
+        metadataSongName = mediaInfo.title
+        finalArtistName = mediaInfo.artist
+        finalAlbumName = mediaInfo.album
+        albumBitmap = mediaInfo.albumArt
 
         val singleModeText = when(mode) {
             1 -> metadataSongName
