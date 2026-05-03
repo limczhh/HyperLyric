@@ -180,14 +180,14 @@ fun ModeSelectionPage(selectedMode: Int, onModeSelected: (Int) -> Unit) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "hook模式",
+                            text = "小米超级岛歌词（hook模式）",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (selectedMode == 0) Color.White else MiuixTheme.colorScheme.onSurface
                         )
                     }
                     Text(
-                        text = "仅支持HyperOS3设备root用户",
+                        text = "仅支持LSPosed、HyperOS3设备",
                         fontSize = 14.sp,
                         color = if (selectedMode == 0) Color.White.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceSecondary,
                         modifier = Modifier.padding(top = 4.dp)
@@ -207,14 +207,14 @@ fun ModeSelectionPage(selectedMode: Int, onModeSelected: (Int) -> Unit) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "无root模式",
+                            text = "通知型灵动岛歌词（无root模式）",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (selectedMode == 1) Color.White else MiuixTheme.colorScheme.onSurface
                         )
                     }
                     Text(
-                        text = "通过发送实时通知/焦点通知上岛",
+                        text = "通过发送实时通知/焦点通知达到上岛效果",
                         fontSize = 14.sp,
                         color = if (selectedMode == 1) Color.White.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceSecondary,
                         modifier = Modifier.padding(top = 4.dp)
