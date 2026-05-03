@@ -92,7 +92,7 @@
     <string name="title_custom_config">Custom Configuration</string>
     <string name="title_super_island">HyperIsland</string>
     <string name="subtitle_super_island">Takes effect after music paused or changed</string>
-    <string name="title_lyrics">Lyrics</string>
+    <string name="title_lyrics">Media Info</string>
     <string name="title_lyric_anim">Lyric Animation</string>
     <string name="title_lyric_provider">Lyric Provider</string>
     <string name="title_lyric_whitelist">Lyric Whitelist</string>
@@ -190,8 +190,15 @@
     <string name="label_font_weight_range">Range: 100 ~ 900</string>
     <string name="title_fading_edge">Fading Edge Length</string>
     <string name="label_fading_edge_range">Range: 0 ~ 100</string>
+    <string name="title_marquee">Marquee</string>
     <string name="title_marquee_speed">Marquee Speed</string>
-    <string name="label_marquee_speed_range">Range: 10 ~ 500</string>
+    <string name="label_marquee_speed_range">Range: 5 ~ 100</string>
+    <string name="title_marquee_metadata_speed">Marquee Speed</string>
+    <string name="title_marquee_metadata_mode">Metadata Marquee</string>
+    <string name="summary_marquee_metadata_mode">Marquee scrolling for song info</string>
+    <string name="title_marquee_metadata_delay">Initial Marquee Delay</string>
+    <string name="title_marquee_metadata_loop">Loop Interval</string>
+    <string name="title_marquee_metadata_infinite">Infinite Loop</string>
     <string name="title_marquee_delay">Initial Marquee Delay</string>
     <string name="label_marquee_delay_range">ms Range: 0 ~ 5000</string>
     <string name="title_marquee_loop">Loop Interval</string>
@@ -202,6 +209,7 @@
     <string name="title_italic">Italic</string>
     <string name="title_gradient_progress">Gradient Progress Style</string>
     <string name="title_lyric_marquee">Lyric Marquee</string>
+    <string name="summary_lyric_marquee">Marquee scrolling for 没有时间轴的 lyric</string>
     <string name="title_infinite_loop">Infinite Loop</string>
     <string name="title_stop_at_end">Stop at End</string>
     <string name="title_syllable_relative">Relative Progress Lyrics</string>

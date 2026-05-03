@@ -304,6 +304,24 @@ object HookIslandLyric {
                 else -> null
             }
 
+            // mode 1~7 是歌曲信息，使用独立的跑马灯参数覆盖歌词默认值
+            if (mode in 1..7 && prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_MODE)) {
+                val mdSpeed = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_METADATA_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_SPEED).toFloat()
+                val mdDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_METADATA_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_DELAY)
+                val mdLoopDelay = prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_METADATA_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_LOOP_DELAY)
+                val mdInfinite = prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_INFINITE)
+                richView.setMetadataMarqueeConfig(
+                    speed = mdSpeed,
+                    initialDelay = mdDelay,
+                    loopDelay = mdLoopDelay,
+                    repeatCount = if (mdInfinite) -1 else 1,
+                    stopAtEnd = true  // 歌曲信息始终在尾部停顿，无限循环时自动启用双行尾部同步
+                )
+                // 设置对端行宽度，用于双行尾部同步
+                richView.main.setPeerLineWidth(richView.secondary.lineWidth)
+                richView.secondary.setPeerLineWidth(richView.main.lineWidth)
+            }
+
             // 强制隐藏原生容器中除我们 wrapperView 之外的所有原生文本视图
             for (i in 0 until container.childCount) {
                 val child = container.getChildAt(i)
@@ -318,9 +336,14 @@ object HookIslandLyric {
             wrapperView.measure(msW, msH)
             wrapperView.layout(0, 0, wrapperView.measuredWidth, wrapperView.measuredHeight)
 
-            // 如果开启了跑马灯，请求开始滚动（同步歌词滚动设置）
+            // 如果开启了跑马灯，请求开始滚动
             richView.post {
-                if (prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)) {
+                val shouldMarquee = if (mode in 1..7) {
+                    prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_MODE)
+                } else {
+                    prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_MODE)
+                }
+                if (shouldMarquee) {
                     richView.requestStartMarquee()
                 }
             }

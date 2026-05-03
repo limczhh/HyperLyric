@@ -117,6 +117,22 @@ class RichLyricLineView(
         secondary.requestScroll()
     }
 
+    /**
+     * 覆盖歌曲信息行的跑马灯参数（与歌词参数独立）
+     */
+    fun setMetadataMarqueeConfig(
+        speed: Float, initialDelay: Int, loopDelay: Int,
+        repeatCount: Int, stopAtEnd: Boolean
+    ) {
+        listOf(main, secondary).forEach {
+            it.setMarqueeSpeed(speed)
+            it.setMarqueeInitialDelay(initialDelay)
+            it.setMarqueeLoopDelay(loopDelay)
+            it.setMarqueeRepeatCount(repeatCount)
+            it.setMarqueeStopAtEnd(stopAtEnd)
+        }
+    }
+
     fun setStyle(style: LyricViewStyle) {
         assembler.updateFlags(
             displayTranslation, displayRoma,

@@ -44,6 +44,11 @@ object Constants {
     const val KEY_HOOK_MARQUEE_LOOP_DELAY = "key_hook_marquee_loop_delay"
     const val KEY_HOOK_MARQUEE_INFINITE = "key_hook_marquee_infinite"
     const val KEY_HOOK_MARQUEE_STOP_END = "key_hook_marquee_stop_end"
+    const val KEY_HOOK_MARQUEE_METADATA_SPEED = "key_hook_marquee_metadata_speed"
+    const val KEY_HOOK_MARQUEE_METADATA_MODE = "key_hook_marquee_metadata_mode"
+    const val KEY_HOOK_MARQUEE_METADATA_DELAY = "key_hook_marquee_metadata_delay"
+    const val KEY_HOOK_MARQUEE_METADATA_LOOP_DELAY = "key_hook_marquee_metadata_loop_delay"
+    const val KEY_HOOK_MARQUEE_METADATA_INFINITE = "key_hook_marquee_metadata_infinite"
 
     // ================= SYLLABLE KEYS =================
     const val KEY_HOOK_SYLLABLE_RELATIVE = "key_hook_syllable_relative"
@@ -110,12 +115,17 @@ object Constants {
 
     const val DEFAULT_HOOK_ANIM_ENABLE = false
     const val DEFAULT_HOOK_ANIM_ID = "yoyo_default"
-    const val DEFAULT_HOOK_MARQUEE_MODE = true
-    const val DEFAULT_HOOK_MARQUEE_SPEED = 100
+    const val DEFAULT_HOOK_MARQUEE_MODE = false
+    const val DEFAULT_HOOK_MARQUEE_SPEED = 30
     const val DEFAULT_HOOK_MARQUEE_DELAY = 1500
-    const val DEFAULT_HOOK_MARQUEE_LOOP_DELAY = 700
+    const val DEFAULT_HOOK_MARQUEE_LOOP_DELAY = 1000
     const val DEFAULT_HOOK_MARQUEE_INFINITE = false
     const val DEFAULT_HOOK_MARQUEE_STOP_END = true
+    const val DEFAULT_HOOK_MARQUEE_METADATA_SPEED = 25
+    const val DEFAULT_HOOK_MARQUEE_METADATA_MODE = true
+    const val DEFAULT_HOOK_MARQUEE_METADATA_DELAY = 1000
+    const val DEFAULT_HOOK_MARQUEE_METADATA_LOOP_DELAY = 0
+    const val DEFAULT_HOOK_MARQUEE_METADATA_INFINITE = true
 
     const val DEFAULT_HOOK_SYLLABLE_RELATIVE = true
     const val DEFAULT_HOOK_SYLLABLE_HIGHLIGHT = false

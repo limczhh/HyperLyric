@@ -92,9 +92,9 @@
     <string name="title_custom_config">自定义配置</string>
     <string name="title_super_island">超级岛</string>
     <string name="subtitle_super_island">暂停或切换音乐后生效</string>
-    <string name="title_lyrics">歌词</string>
+    <string name="title_lyrics">音乐信息</string>
     <string name="title_lyric_anim">歌词切换动画</string>
-    <string name="title_lyric_provider">歌词提供者</string>
+    <string name="title_lyric_provider">歌词提供服务</string>
     <string name="title_lyric_whitelist">歌词白名单</string>
 
     <!-- ———————————————————————— DynamicIslandNotificationPage ———————————————————————— -->
@@ -191,7 +191,13 @@
     <string name="title_fading_edge">羽化边缘长度</string>
     <string name="label_fading_edge_range">范围：0 ~ 100</string>
     <string name="title_marquee_speed">滚动速度</string>
-    <string name="label_marquee_speed_range">范围：10 ~ 500</string>
+    <string name="label_marquee_speed_range">范围：5 ~ 100</string>
+    <string name="title_marquee_metadata_speed">滚动速度</string>
+    <string name="title_marquee_metadata_mode">歌曲信息滚动</string>
+    <string name="summary_marquee_metadata_mode">针对歌曲信息</string>
+    <string name="title_marquee_metadata_delay">初始滚动延迟</string>
+    <string name="title_marquee_metadata_loop">循环间隔</string>
+    <string name="title_marquee_metadata_infinite">无限循环</string>
     <string name="title_marquee_delay">初始滚动延迟</string>
     <string name="label_marquee_delay_range">ms 范围：0 ~ 5000</string>
     <string name="title_marquee_loop">循环间隔</string>
@@ -202,11 +208,13 @@
     <string name="title_italic">斜体</string>
     <string name="title_gradient_progress">羽化进度样式</string>
     <string name="title_lyric_marquee">歌词滚动</string>
+    <string name="title_marquee">滚动</string>
+    <string name="summary_lyric_marquee">针对没有时间轴的歌词</string>
     <string name="title_infinite_loop">无限循环</string>
     <string name="title_stop_at_end">结束时在末尾停止</string>
     <string name="title_syllable_relative">相对进度歌词</string>
-    <string name="summary_syllable_relative">当歌词缺少单词数据时，将整行作为单词显示</string>
-    <string name="title_syllable_highlight">显示相对进度歌词高亮进度</string>
+    <string name="summary_syllable_relative">当歌词缺少字词时间轴时，将整行作为一个进度单元</string>
+    <string name="title_syllable_highlight">相对进度歌词高亮显示</string>
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
     <string name="title_translation">翻译</string>
@@ -240,7 +248,7 @@
     <string name="refresh_release">松开刷新</string>
     <string name="refreshing">正在刷新...</string>
     <string name="refresh_success">刷新成功</string>
-    <string name="title_no_provider">暂未发现歌词提供者</string>
+    <string name="title_no_provider">暂未发现歌词提供服务</string>
     <string name="summary_no_provider">请点击右上角图标前往 LyricProvider 仓库下载安装并启用插件</string>
     <string name="category_others">其他</string>
     <string name="unknown_author">未知作者</string>

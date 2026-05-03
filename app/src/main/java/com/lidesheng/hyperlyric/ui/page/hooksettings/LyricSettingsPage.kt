@@ -85,6 +85,11 @@ fun LyricSettingsPage() {
     var marqueeLoop by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_LOOP_DELAY)) }
     var marqueeInfinite by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_INFINITE)) }
     var marqueeStopEnd by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_STOP_END, RootConstants.DEFAULT_HOOK_MARQUEE_STOP_END)) }
+    var marqueeMetadataSpeed by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_METADATA_SPEED, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_SPEED)) }
+    var marqueeMetadataMode by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_MODE)) }
+    var marqueeMetadataDelay by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_METADATA_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_DELAY)) }
+    var marqueeMetadataLoopDelay by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_MARQUEE_METADATA_LOOP_DELAY, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_LOOP_DELAY)) }
+    var marqueeMetadataInfinite by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_INFINITE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_INFINITE)) }
     var syllableRelative by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_RELATIVE, RootConstants.DEFAULT_HOOK_SYLLABLE_RELATIVE)) }
     var syllableHighlight by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT, RootConstants.DEFAULT_HOOK_SYLLABLE_HIGHLIGHT)) }
     var textSizeRatio by remember { mutableFloatStateOf(prefs.getFloat(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO)) }
@@ -113,6 +118,9 @@ fun LyricSettingsPage() {
     var showFontWeightDialog by remember { mutableStateOf(false) }
     var showFadingEdgeDialog by remember { mutableStateOf(false) }
     var showMarqueeSpeedDialog by remember { mutableStateOf(false) }
+    var showMarqueeMetadataSpeedDialog by remember { mutableStateOf(false) }
+    var showMarqueeMetadataDelayDialog by remember { mutableStateOf(false) }
+    var showMarqueeMetadataLoopDialog by remember { mutableStateOf(false) }
     var showMarqueeDelayDialog by remember { mutableStateOf(false) }
     var showMarqueeLoopDialog by remember { mutableStateOf(false) }
     var showTextSizeRatioDialog by remember { mutableStateOf(false) }
@@ -152,6 +160,11 @@ fun LyricSettingsPage() {
             RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY,
             RootConstants.KEY_HOOK_MARQUEE_INFINITE,
             RootConstants.KEY_HOOK_MARQUEE_STOP_END,
+            RootConstants.KEY_HOOK_MARQUEE_METADATA_SPEED,
+            RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE,
+            RootConstants.KEY_HOOK_MARQUEE_METADATA_DELAY,
+            RootConstants.KEY_HOOK_MARQUEE_METADATA_LOOP_DELAY,
+            RootConstants.KEY_HOOK_MARQUEE_METADATA_INFINITE,
             RootConstants.KEY_HOOK_SYLLABLE_RELATIVE,
             RootConstants.KEY_HOOK_SYLLABLE_HIGHLIGHT,
             RootConstants.KEY_HOOK_DISABLE_TRANSLATION,
@@ -220,7 +233,46 @@ fun LyricSettingsPage() {
         NumberInputDialog(show = showTextSizeDialog, title = stringResource(id = R.string.title_size), label = stringResource(id = R.string.label_size_range), initialValue = textSize, min = 8, max = 16, onDismiss = { showTextSizeDialog = false }, onConfirm = { value -> textSize = value; saveConfig(RootConstants.KEY_HOOK_TEXT_SIZE, value) })
         NumberInputDialog(show = showFontWeightDialog, title = stringResource(id = R.string.title_font_weight), label = stringResource(id = R.string.label_font_weight_range), initialValue = fontWeight, min = 100, max = 900, onDismiss = { showFontWeightDialog = false }, onConfirm = { value -> fontWeight = value; saveConfig(RootConstants.KEY_HOOK_FONT_WEIGHT, value) })
         NumberInputDialog(show = showFadingEdgeDialog, title = stringResource(id = R.string.title_fading_edge), label = stringResource(id = R.string.label_fading_edge_range), initialValue = fadingEdge, min = 0, max = 100, onDismiss = { showFadingEdgeDialog = false }, onConfirm = { value -> fadingEdge = value; saveConfig(RootConstants.KEY_HOOK_FADING_EDGE_LENGTH, value) })
-        NumberInputDialog(show = showMarqueeSpeedDialog, title = stringResource(id = R.string.title_marquee_speed), label = stringResource(id = R.string.label_marquee_speed_range), initialValue = marqueeSpeed, min = 10, max = 500, onDismiss = { showMarqueeSpeedDialog = false }, onConfirm = { value -> marqueeSpeed = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_SPEED, value) })
+        NumberInputDialog(
+            show = showMarqueeSpeedDialog,
+            title = stringResource(id = R.string.title_marquee_speed),
+            label = stringResource(id = R.string.label_marquee_speed_range),
+            initialValue = marqueeSpeed,
+            min = 5,
+            max = 100,
+            onDismiss = { showMarqueeSpeedDialog = false },
+            onConfirm = { value -> marqueeSpeed = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_SPEED, value) }
+        )
+        NumberInputDialog(
+            show = showMarqueeMetadataSpeedDialog,
+            title = stringResource(id = R.string.title_marquee_metadata_speed),
+            label = stringResource(id = R.string.label_marquee_speed_range),
+            initialValue = marqueeMetadataSpeed,
+            min = 5,
+            max = 100,
+            onDismiss = { showMarqueeMetadataSpeedDialog = false },
+            onConfirm = { value -> marqueeMetadataSpeed = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_METADATA_SPEED, value) }
+        )
+        NumberInputDialog(
+            show = showMarqueeMetadataDelayDialog,
+            title = stringResource(id = R.string.title_marquee_metadata_delay),
+            label = stringResource(id = R.string.label_marquee_delay_range),
+            initialValue = marqueeMetadataDelay,
+            min = 0,
+            max = 5000,
+            onDismiss = { showMarqueeMetadataDelayDialog = false },
+            onConfirm = { value -> marqueeMetadataDelay = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_METADATA_DELAY, value) }
+        )
+        NumberInputDialog(
+            show = showMarqueeMetadataLoopDialog,
+            title = stringResource(id = R.string.title_marquee_metadata_loop),
+            label = stringResource(id = R.string.label_marquee_loop_range),
+            initialValue = marqueeMetadataLoopDelay,
+            min = 0,
+            max = 5000,
+            onDismiss = { showMarqueeMetadataLoopDialog = false },
+            onConfirm = { value -> marqueeMetadataLoopDelay = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_METADATA_LOOP_DELAY, value) }
+        )
         NumberInputDialog(show = showMarqueeDelayDialog, title = stringResource(id = R.string.title_marquee_delay), label = stringResource(id = R.string.label_marquee_delay_range), initialValue = marqueeDelay, min = 0, max = 5000, onDismiss = { showMarqueeDelayDialog = false }, onConfirm = { value -> marqueeDelay = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_DELAY, value) })
         NumberInputDialog(show = showMarqueeLoopDialog, title = stringResource(id = R.string.title_marquee_loop), label = stringResource(id = R.string.label_marquee_loop_range), initialValue = marqueeLoop, min = 0, max = 5000, onDismiss = { showMarqueeLoopDialog = false }, onConfirm = { value -> marqueeLoop = value; saveConfig(RootConstants.KEY_HOOK_MARQUEE_LOOP_DELAY, value) })
         NumberInputDialog(show = showTextSizeRatioDialog, title = stringResource(id = R.string.title_text_size_ratio), label = stringResource(id = R.string.label_text_size_ratio_range), initialValue = (textSizeRatio * 100).toInt(), min = 10, max = 100, onDismiss = { showTextSizeRatioDialog = false }, onConfirm = { value -> textSizeRatio = value.toFloat() / 100f; saveConfig(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, textSizeRatio) })
@@ -326,18 +378,55 @@ fun LyricSettingsPage() {
 
                         item {
                             Column {
-                                SmallTitle(text = stringResource(id = R.string.title_lyric_marquee), insideMargin = PaddingValues(10.dp, 4.dp))
+                                SmallTitle(text = stringResource(id = R.string.title_marquee), insideMargin = PaddingValues(10.dp, 4.dp))
                                 Card {
-                                    Column {
-                                        SwitchPreference(title = stringResource(id = R.string.title_lyric_marquee), checked = marqueeMode, onCheckedChange = { marqueeMode = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_MODE, it) })
-                                        AnimatedVisibility(visible = marqueeMode) {
-                                            Column {
-                                                ArrowPreference(title = stringResource(id = R.string.title_marquee_speed), endActions = { Text("$marqueeSpeed", fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = { showMarqueeSpeedDialog = true }, bottomAction = { Slider(value = marqueeSpeed.toFloat(), onValueChange = { marqueeSpeed = it.toInt(); saveConfig(RootConstants.KEY_HOOK_MARQUEE_SPEED, marqueeSpeed) }, valueRange = 10f..500f) })
-                                                ArrowPreference(title = stringResource(id = R.string.title_marquee_delay), endActions = { Text(stringResource(id = R.string.format_ms, marqueeDelay), fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = { showMarqueeDelayDialog = true } )
-                                                SwitchPreference(title = stringResource(id = R.string.title_infinite_loop), checked = marqueeInfinite, onCheckedChange = { marqueeInfinite = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_INFINITE, it) })
-                                                ArrowPreference(title = stringResource(id = R.string.title_marquee_loop), endActions = { Text(stringResource(id = R.string.format_ms, marqueeLoop), fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = { showMarqueeLoopDialog = true } )
-                                                SwitchPreference(title = stringResource(id = R.string.title_stop_at_end), checked = marqueeStopEnd, onCheckedChange = { marqueeStopEnd = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_STOP_END, it) })
-                                            }
+                                    SwitchPreference(
+                                        title = stringResource(id = R.string.title_lyric_marquee),
+                                        summary = stringResource(id = R.string.summary_lyric_marquee),
+                                        checked = marqueeMode,
+                                        onCheckedChange = { marqueeMode = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_MODE, it) }
+                                    )
+                                    AnimatedVisibility(visible = marqueeMode) {
+                                        Column {
+                                            ArrowPreference(
+                                                title = stringResource(id = R.string.title_marquee_speed),
+                                                endActions = { Text("$marqueeSpeed", fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) },
+                                                onClick = { showMarqueeSpeedDialog = true }
+                                            )
+                                            ArrowPreference(title = stringResource(id = R.string.title_marquee_delay), endActions = { Text(stringResource(id = R.string.format_ms, marqueeDelay), fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = { showMarqueeDelayDialog = true } )
+                                            SwitchPreference(title = stringResource(id = R.string.title_infinite_loop), checked = marqueeInfinite, onCheckedChange = { marqueeInfinite = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_INFINITE, it) })
+                                            ArrowPreference(title = stringResource(id = R.string.title_marquee_loop), endActions = { Text(stringResource(id = R.string.format_ms, marqueeLoop), fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = { showMarqueeLoopDialog = true } )
+                                            SwitchPreference(title = stringResource(id = R.string.title_stop_at_end), checked = marqueeStopEnd, onCheckedChange = { marqueeStopEnd = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_STOP_END, it) })
+                                        }
+                                    }
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    // ---- 歌曲信息独立跑马灯参数 ----
+                                    SwitchPreference(
+                                        title = stringResource(id = R.string.title_marquee_metadata_mode),
+                                        summary = stringResource(id = R.string.summary_marquee_metadata_mode),
+                                        checked = marqueeMetadataMode,
+                                        onCheckedChange = { marqueeMetadataMode = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE, it) }
+                                    )
+                                    AnimatedVisibility(visible = marqueeMetadataMode) {
+                                        Column {
+                                            ArrowPreference(
+                                                title = stringResource(id = R.string.title_marquee_metadata_speed),
+                                                endActions = { Text("$marqueeMetadataSpeed", fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) },
+                                                onClick = { showMarqueeMetadataSpeedDialog = true }
+                                            )
+                                            ArrowPreference(
+                                                title = stringResource(id = R.string.title_marquee_metadata_delay),
+                                                endActions = { Text(stringResource(id = R.string.format_ms, marqueeMetadataDelay), fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) },
+                                                onClick = { showMarqueeMetadataDelayDialog = true }
+                                            )
+                                            SwitchPreference(title = stringResource(id = R.string.title_marquee_metadata_infinite), checked = marqueeMetadataInfinite, onCheckedChange = { marqueeMetadataInfinite = it; saveConfig(RootConstants.KEY_HOOK_MARQUEE_METADATA_INFINITE, it) })
+                                            ArrowPreference(
+                                                title = stringResource(id = R.string.title_marquee_metadata_loop),
+                                                endActions = { Text(stringResource(id = R.string.format_ms, marqueeMetadataLoopDelay), fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) },
+                                                onClick = { showMarqueeMetadataLoopDialog = true }
+                                            )
                                         }
                                     }
                                 }

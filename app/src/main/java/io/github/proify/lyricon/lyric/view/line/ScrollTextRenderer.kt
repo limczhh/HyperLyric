@@ -13,6 +13,7 @@ import android.view.animation.LinearInterpolator
 import androidx.core.graphics.withTranslation
 import io.github.proify.lyricon.lyric.view.dp
 import io.github.proify.lyricon.lyric.view.line.model.LyricModel
+import kotlin.math.ceil
 
 internal class ScrollTextRenderer : LineRenderer {
 
@@ -29,6 +30,7 @@ internal class ScrollTextRenderer : LineRenderer {
     var loopDelayMs: Int = 800
     var repeatCount: Int = -1
     var stopAtEnd: Boolean = false
+    var peerLineWidth: Float = 0f
 
     override val isPlaying get() = isRunning || isPendingDelay
     override val isFinished get() = finished
@@ -42,6 +44,7 @@ internal class ScrollTextRenderer : LineRenderer {
     private var currentRepeat = 0
     private var delayRemainingNanos = 0L
     private var currentUnitOffset = 0f
+    private var _isAtTail = false
     private var lastViewWidth = 0
     private var lastLyricWidth = 0f
     private var cachedBaseline = 0f
@@ -71,8 +74,14 @@ internal class ScrollTextRenderer : LineRenderer {
             if (delayRemainingNanos <= 0) {
                 isPendingDelay = false
                 isRunning = true
+                if (_isAtTail) {
+                    // 尾部延时到期：立即 fall through 处理本帧移动，避免丢一帧
+                } else {
+                    return false
+                }
+            } else {
+                return false
             }
-            return false
         }
 
         if (!isRunning) return false
@@ -80,6 +89,24 @@ internal class ScrollTextRenderer : LineRenderer {
         val unit = model.width + ghostSpacing
         val deltaPx = scrollSpeed * (deltaNanos / 1_000_000f)
         currentUnitOffset += deltaPx
+
+        // 无限循环 + stopAtEnd + 有对端行: 在尾部暂停，等待对端行也到达尾部
+        if (stopAtEnd && repeatCount < 0 && !_isAtTail && peerLineWidth > 0) {
+            val tailOffset = model.width - vw
+            if (tailOffset > 0 && currentUnitOffset >= tailOffset) {
+                currentUnitOffset = tailOffset
+                state.scrollOffset = -tailOffset
+                _isAtTail = true
+                // 短行额外等待时间 = ceil((对端行宽度 - 本行宽度) / 速度)
+                val extraDelayMs = if (peerLineWidth > model.width && scrollSpeed > 0) {
+                    ceil((peerLineWidth - model.width).toDouble() / scrollSpeed).toLong()
+                } else {
+                    0L
+                }
+                scheduleDelay(extraDelayMs)
+                return true
+            }
+        }
 
         val isLastRepeat = repeatCount > 0 && (currentRepeat + 1) >= repeatCount
 
@@ -97,6 +124,7 @@ internal class ScrollTextRenderer : LineRenderer {
         if (currentUnitOffset >= unit) {
             currentUnitOffset -= unit
             currentRepeat++
+            _isAtTail = false  // 新循环开始，重新允许尾部检测
 
             if (repeatCount < 0 || currentRepeat < repeatCount) {
                 scheduleDelay(loopDelayMs.toLong())
@@ -200,6 +228,7 @@ internal class ScrollTextRenderer : LineRenderer {
         currentRepeat = 0
         currentUnitOffset = 0f
         delayRemainingNanos = 0L
+        _isAtTail = false
     }
 
     private fun scheduleDelay(delayMs: Long) {
