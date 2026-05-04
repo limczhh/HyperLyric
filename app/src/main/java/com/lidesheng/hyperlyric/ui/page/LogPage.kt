@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalScrollBarApi::class)
+
 package com.lidesheng.hyperlyric.ui.page
 
 import android.content.ClipData
@@ -13,12 +15,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -48,8 +51,9 @@ import com.lidesheng.hyperlyric.ui.component.SearchBox
 import com.lidesheng.hyperlyric.ui.component.SearchPager
 import com.lidesheng.hyperlyric.ui.component.SearchStatus
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
-import com.lidesheng.hyperlyric.ui.utils.BlurredBox
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import com.lidesheng.hyperlyric.ui.utils.BlurredBar
+import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
+import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -68,14 +72,15 @@ import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.basic.VerticalScrollBar
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
-import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
+import top.yukonga.miuix.kmp.basic.rememberScrollBarAdapter
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.window.WindowListPopup
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -251,12 +256,10 @@ fun LogPage() {
     val context = LocalContext.current
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
-    val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
-    val surfaceColor = MiuixTheme.colorScheme.surface
-    val backdrop = rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val backdrop = rememberBlurBackdrop()
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val allLogs = remember { mutableStateListOf<LogEntry>() }
     val filteredLogs = remember { mutableStateListOf<LogEntry>() }
     var isLoading by remember { mutableStateOf(true) }
@@ -322,12 +325,12 @@ fun LogPage() {
 
     Scaffold(
         topBar = {
-            BlurredBox(backdrop = backdrop) {
-                searchStatus.TopAppBarAnim(backgroundColor = Color.Transparent) {
+            BlurredBar(backdrop, blurActive) {
+                searchStatus.TopAppBarAnim(backgroundColor = barColor) {
                     TopAppBar(
-                        color = Color.Transparent,
+                        color = barColor,
                         title = stringResource(id = R.string.title_module_logs),
-                        scrollBehavior = scrollBehavior,
+                        scrollBehavior = topAppBarScrollBehavior,
                         navigationIcon = {
                             IconButton(
                                 onClick = { navigator.pop() }
@@ -448,14 +451,14 @@ fun LogPage() {
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().layerBackdrop(backdrop)) {
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             searchStatus.SearchBox {
                 PullToRefresh(
                     isRefreshing = isLoading,
                     onRefresh = { reloadLogs() },
                     pullToRefreshState = pullToRefreshState,
                     contentPadding = PaddingValues(top = padding.calculateTopPadding()),
-                    topAppBarScrollBehavior = scrollBehavior,
+                    topAppBarScrollBehavior = topAppBarScrollBehavior,
                     refreshTexts = listOf(
                         stringResource(id = R.string.refresh_pull_down),
                         stringResource(id = R.string.refresh_release),
@@ -464,35 +467,31 @@ fun LogPage() {
                     ),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    val lazyListState = rememberLazyListState()
+                    val top = padding.calculateTopPadding()
+                    val bottom = padding.calculateBottomPadding()
+                    val contentPadding = remember(top, bottom) {
+                        PaddingValues(top = top, bottom = bottom + 16.dp)
+                    }
+                    Box {
                         LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .scrollEndHaptic()
-                                .nestedScroll(scrollBehavior.nestedScrollConnection),
-                            contentPadding = PaddingValues(
-                                top = padding.calculateTopPadding(),
-                                bottom = padding.calculateBottomPadding() + 16.dp
-                            )
+                            state = lazyListState,
+                            modifier = Modifier.pageScrollModifiers(true, true, topAppBarScrollBehavior),
+                            contentPadding = contentPadding
                         ) {
                             if (isLoading) {
-                                item {
-                                    Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                        CircularProgressIndicator()
-                                    }
-                                }
+                                item { Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                             } else if (filteredLogs.isEmpty()) {
-                                item {
-                                    Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text(stringResource(id = R.string.no_logs_found), color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                                    }
-                                }
+                                item { Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.no_logs_found), color = MiuixTheme.colorScheme.onSurfaceSecondary) } }
                             } else {
-                                items(filteredLogs) { entry ->
-                                    LogItem(entry = entry, copiedMsg = copiedMsg)
-                                }
+                                items(filteredLogs) { entry -> LogItem(entry = entry, copiedMsg = copiedMsg) }
                             }
                         }
+                        VerticalScrollBar(
+                            adapter = rememberScrollBarAdapter(lazyListState),
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                            trackPadding = contentPadding,
+                        )
                     }
                 }
             }

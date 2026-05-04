@@ -1,42 +1,49 @@
+@file:OptIn(ExperimentalScrollBarApi::class)
+
 package com.lidesheng.hyperlyric.ui.page
 
 import android.content.Intent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.lidesheng.hyperlyric.R
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
-import com.lidesheng.hyperlyric.ui.utils.BlurredBox
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.layerBackdrop
+import com.lidesheng.hyperlyric.ui.utils.BlurredBar
+import com.lidesheng.hyperlyric.ui.utils.LicenseProvider
+import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
+import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.basic.VerticalScrollBar
+import top.yukonga.miuix.kmp.basic.rememberScrollBarAdapter
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import com.lidesheng.hyperlyric.ui.utils.LicenseProvider
 
 data class LicenseItem(
     val name: String,
@@ -46,71 +53,73 @@ data class LicenseItem(
 
 @Composable
 fun LicensesPage() {
-    val context = LocalContext.current
     val navigator = LocalNavigator.current
-    val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
-
-    val surfaceColor = MiuixTheme.colorScheme.surface
-    val backdrop = rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
-
-    val licenses = remember { LicenseProvider.getLicenses() }
-
+    val backdrop = rememberBlurBackdrop()
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
     Scaffold(
         topBar = {
-            BlurredBox(backdrop = backdrop) {
+            BlurredBar(backdrop, blurActive) {
                 TopAppBar(
-                    color = Color.Transparent,
+                    color = barColor,
                     title = stringResource(R.string.title_licenses),
-                    scrollBehavior = scrollBehavior,
+                    scrollBehavior = topAppBarScrollBehavior,
                     navigationIcon = {
-                        IconButton(
-                            onClick = { navigator.pop() }
-                        ) {
+                        IconButton(onClick = { navigator.pop() }) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = stringResource(R.string.back))
                         }
                     }
                 )
             }
         }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .scrollEndHaptic()
-                .layerBackdrop(backdrop)
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                top = padding.calculateTopPadding(),
+    ) { innerPadding ->
+        val lazyListState = rememberLazyListState()
+        val top = innerPadding.calculateTopPadding()
+        val bottom = innerPadding.calculateBottomPadding()
+        val contentPadding = remember(top, bottom) {
+            PaddingValues(
+                top = top,
                 start = 12.dp,
                 end = 12.dp,
-                bottom = padding.calculateBottomPadding() + 20.dp
+                bottom = bottom + 20.dp
             )
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
+        }
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.pageScrollModifiers(true, true, topAppBarScrollBehavior),
+                contentPadding = contentPadding,
+            ) {
+                licensesPageSections()
             }
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                ) {
-                    Column {
-                        licenses.forEach { license ->
-                            ArrowPreference(
-                                title = license.name,
-                                summary = license.author,
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, license.url.toUri())
-                                    context.startActivity(intent)
-                                }
-                            )
+            VerticalScrollBar(
+                adapter = rememberScrollBarAdapter(lazyListState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                trackPadding = contentPadding,
+            )
+        }
+    }
+}
+
+private fun LazyListScope.licensesPageSections() {
+    item(key = "licenses_top_spacer") {
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+    item(key = "licenses_card") {
+        val context = LocalContext.current
+        val licenses = remember { LicenseProvider.getLicenses() }
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Column {
+                licenses.forEach { license ->
+                    ArrowPreference(
+                        title = license.name,
+                        summary = license.author,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, license.url.toUri())
+                            context.startActivity(intent)
                         }
-                    }
+                    )
                 }
             }
         }

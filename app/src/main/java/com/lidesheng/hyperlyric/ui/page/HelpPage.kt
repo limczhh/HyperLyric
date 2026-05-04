@@ -1,25 +1,31 @@
+@file:OptIn(ExperimentalScrollBarApi::class)
+
 package com.lidesheng.hyperlyric.ui.page
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
-import com.lidesheng.hyperlyric.ui.utils.BlurredBox
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.layerBackdrop
+import com.lidesheng.hyperlyric.ui.utils.BlurredBar
+import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
+import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -31,42 +37,40 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
+import top.yukonga.miuix.kmp.basic.VerticalScrollBar
+import top.yukonga.miuix.kmp.basic.rememberScrollBarAdapter
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun HelpPage() {
     val navigator = LocalNavigator.current
-    val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
-
-    val surfaceColor = MiuixTheme.colorScheme.surface
-    val backdrop = rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
+    val backdrop = rememberBlurBackdrop()
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
 
     val tabs = listOf(stringResource(R.string.title_super_island), stringResource(R.string.title_dynamic_island_lyrics))
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
 
+    val superIslandListState = rememberLazyListState()
+    val dynamicIslandListState = rememberLazyListState()
+
     Scaffold(
         topBar = {
-            BlurredBox(backdrop = backdrop) {
+            BlurredBar(backdrop, blurActive) {
                 Column {
                     TopAppBar(
-                        color = Color.Transparent,
+                        color = barColor,
                         title = stringResource(R.string.title_help),
-                        scrollBehavior = scrollBehavior,
+                        scrollBehavior = topAppBarScrollBehavior,
                         navigationIcon = {
                             IconButton(onClick = { navigator.pop() }) {
-                                Icon(
-                                    imageVector = MiuixIcons.Back,
-                                    contentDescription = stringResource(R.string.back)
-                                )
+                                Icon(imageVector = MiuixIcons.Back, contentDescription = stringResource(R.string.back))
                             }
                         }
                     )
@@ -74,9 +78,7 @@ fun HelpPage() {
                         tabs = tabs,
                         selectedTabIndex = pagerState.currentPage,
                         onTabSelected = { index ->
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
+                            coroutineScope.launch { pagerState.animateScrollToPage(index) }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -87,112 +89,90 @@ fun HelpPage() {
                 }
             }
         }
-    ) { padding ->
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), userScrollEnabled = true) { page ->
-            when (page) {
-                0 -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .scrollEndHaptic()
-                            .layerBackdrop(backdrop)
-                            .overScrollVertical()
-                            .nestedScroll(scrollBehavior.nestedScrollConnection),
-                        contentPadding = PaddingValues(
-                            top = padding.calculateTopPadding(),
-                            start = 12.dp,
-                            end = 12.dp,
-                            bottom = padding.calculateBottomPadding() + 16.dp
-                        ),
-                    ) {
-                        item {
-                            SmallTitle(
-                                text = stringResource(R.string.title_help_usage_tips),
-                                insideMargin = PaddingValues(10.dp, 4.dp)
-                            )
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column {
-                                    BasicComponent(
-                                        title = stringResource(R.string.summary_super_island_lyrics),
-                                        summary = stringResource(R.string.summary_help_bug_notice)
-                                    )
-                                }
-                            }
-                        }
-                        item {
-                            SmallTitle(
-                                text = stringResource(R.string.title_help_config_steps),
-                                insideMargin = PaddingValues(10.dp, 4.dp)
-                            )
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column {
-                                    BasicComponent(
-                                        summary = stringResource(R.string.summary_help_super_island_steps)
-                                    )
-                                }
-                            }
-                        }
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+            HorizontalPager(state = pagerState, verticalAlignment = Alignment.Top) { page ->
+                val listState = if (page == 0) superIslandListState else dynamicIslandListState
+                val contentPadding = remember(innerPadding) {
+                    PaddingValues(
+                        top = innerPadding.calculateTopPadding(),
+                        start = 12.dp,
+                        end = 12.dp,
+                        bottom = innerPadding.calculateBottomPadding() + 16.dp
+                    )
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.pageScrollModifiers(true, true, topAppBarScrollBehavior),
+                    contentPadding = contentPadding,
+                ) {
+                    when (page) {
+                        0 -> superIslandHelpSections()
+                        1 -> dynamicIslandHelpSections()
                     }
                 }
-
-                1 -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .scrollEndHaptic()
-                            .layerBackdrop(backdrop)
-                            .overScrollVertical()
-                            .nestedScroll(scrollBehavior.nestedScrollConnection),
-                        contentPadding = PaddingValues(
-                            top = padding.calculateTopPadding(),
-                            start = 12.dp,
-                            end = 12.dp,
-                            bottom = padding.calculateBottomPadding() + 16.dp
-                        ),
-                    ) {
-                        item {
-                            SmallTitle(
-                                text = stringResource(R.string.title_help_usage_tips),
-                                insideMargin = PaddingValues(10.dp, 4.dp)
-                            )
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column {
-                                    BasicComponent(
-                                        title = stringResource(R.string.summary_help_dynamic_island_hint),
-                                        summary = stringResource(R.string.summary_help_focus_whitelist_hint)
-                                    )
-                                }
-                            }
-                        }
-                        item {
-                            SmallTitle(
-                                text = stringResource(R.string.title_help_config_steps),
-                                insideMargin = PaddingValues(10.dp, 4.dp)
-                            )
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column {
-                                    BasicComponent(
-                                        summary = stringResource(R.string.summary_help_dynamic_island_steps)
-                                    )
-                                }
-                            }
-                        }
-                        item {
-                            SmallTitle(
-                                text = stringResource(R.string.title_help_warm_tips),
-                                insideMargin = PaddingValues(10.dp, 4.dp)
-                            )
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column {
-                                    BasicComponent(
-                                        summary = stringResource(R.string.summary_help_salt_player)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                VerticalScrollBar(
+                    adapter = rememberScrollBarAdapter(listState),
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    trackPadding = contentPadding,
+                )
             }
+        }
+    }
+}
+
+private fun LazyListScope.superIslandHelpSections() {
+    item(key = "super_island_tips_title") {
+        SmallTitle(text = stringResource(R.string.title_help_usage_tips), insideMargin = PaddingValues(10.dp, 4.dp))
+    }
+    item(key = "super_island_tips_content") {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                BasicComponent(
+                    title = stringResource(R.string.summary_super_island_lyrics),
+                    summary = stringResource(R.string.summary_help_bug_notice)
+                )
+            }
+        }
+    }
+    item(key = "super_island_steps_title") {
+        SmallTitle(text = stringResource(R.string.title_help_config_steps), insideMargin = PaddingValues(10.dp, 4.dp))
+    }
+    item(key = "super_island_steps_content") {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column { BasicComponent(summary = stringResource(R.string.summary_help_super_island_steps)) }
+        }
+    }
+}
+
+private fun LazyListScope.dynamicIslandHelpSections() {
+    item(key = "dynamic_island_tips_title") {
+        SmallTitle(text = stringResource(R.string.title_help_usage_tips), insideMargin = PaddingValues(10.dp, 4.dp))
+    }
+    item(key = "dynamic_island_tips_content") {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                BasicComponent(
+                    title = stringResource(R.string.summary_help_dynamic_island_hint),
+                    summary = stringResource(R.string.summary_help_focus_whitelist_hint)
+                )
+            }
+        }
+    }
+    item(key = "dynamic_island_steps_title") {
+        SmallTitle(text = stringResource(R.string.title_help_config_steps), insideMargin = PaddingValues(10.dp, 4.dp))
+    }
+    item(key = "dynamic_island_steps_content") {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column { BasicComponent(summary = stringResource(R.string.summary_help_dynamic_island_steps)) }
+        }
+    }
+    item(key = "dynamic_island_warm_tips_title") {
+        SmallTitle(text = stringResource(R.string.title_help_warm_tips), insideMargin = PaddingValues(10.dp, 4.dp))
+    }
+    item(key = "dynamic_island_warm_tips_content") {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column { BasicComponent(summary = stringResource(R.string.summary_help_salt_player)) }
         }
     }
 }
