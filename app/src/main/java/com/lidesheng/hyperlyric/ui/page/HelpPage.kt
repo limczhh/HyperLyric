@@ -96,8 +96,8 @@ fun HelpPage() {
                 val contentPadding = remember(innerPadding) {
                     PaddingValues(
                         top = innerPadding.calculateTopPadding(),
-                        start = 12.dp,
-                        end = 12.dp,
+                        start = 0.dp,
+                        end = 0.dp,
                         bottom = innerPadding.calculateBottomPadding() + 16.dp
                     )
                 }
@@ -123,10 +123,10 @@ fun HelpPage() {
 
 private fun LazyListScope.superIslandHelpSections() {
     item(key = "super_island_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_usage_tips), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_help_usage_tips))
     }
     item(key = "super_island_tips_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 BasicComponent(
                     title = stringResource(R.string.summary_super_island_lyrics),
@@ -136,10 +136,10 @@ private fun LazyListScope.superIslandHelpSections() {
         }
     }
     item(key = "super_island_steps_title") {
-        SmallTitle(text = stringResource(R.string.title_help_config_steps), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_help_config_steps))
     }
     item(key = "super_island_steps_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column { BasicComponent(summary = stringResource(R.string.summary_help_super_island_steps)) }
         }
     }
@@ -147,10 +147,10 @@ private fun LazyListScope.superIslandHelpSections() {
 
 private fun LazyListScope.dynamicIslandHelpSections() {
     item(key = "dynamic_island_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_usage_tips), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_help_usage_tips))
     }
     item(key = "dynamic_island_tips_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 BasicComponent(
                     title = stringResource(R.string.summary_help_dynamic_island_hint),
@@ -160,18 +160,18 @@ private fun LazyListScope.dynamicIslandHelpSections() {
         }
     }
     item(key = "dynamic_island_steps_title") {
-        SmallTitle(text = stringResource(R.string.title_help_config_steps), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_help_config_steps))
     }
     item(key = "dynamic_island_steps_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column { BasicComponent(summary = stringResource(R.string.summary_help_dynamic_island_steps)) }
         }
     }
     item(key = "dynamic_island_warm_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_warm_tips), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_help_warm_tips))
     }
     item(key = "dynamic_island_warm_tips_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column { BasicComponent(summary = stringResource(R.string.summary_help_salt_player)) }
         }
     }

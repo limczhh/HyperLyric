@@ -39,7 +39,7 @@ fun LazyListScope.homePageSections(
 ) {
     item(key = "quote") {
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth(),
             onClick = onQuoteClick,
             onLongPress = onQuoteLongPress,
         ) {
@@ -55,13 +55,12 @@ fun LazyListScope.homePageSections(
 
     item(key = "basic_features_title") {
         SmallTitle(
-            text = stringResource(R.string.title_basic_features),
-            insideMargin = PaddingValues(10.dp, 4.dp)
+            text = stringResource(R.string.title_basic_features)
         )
     }
 
     item(key = "basic_features_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 SwitchPreference(
                     title = stringResource(R.string.title_super_island_lyrics),
@@ -93,13 +92,12 @@ fun LazyListScope.homePageSections(
 
     item(key = "special_features_title") {
         SmallTitle(
-            text = stringResource(R.string.title_special_features),
-            insideMargin = PaddingValues(10.dp, 4.dp)
+            text = stringResource(R.string.title_special_features)
         )
     }
 
     item(key = "special_features_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 ArrowPreference(
                     title = stringResource(R.string.title_restart_ui),
@@ -121,11 +119,11 @@ fun LazyListScope.homePageSections(
     }
 
     item(key = "bottom_spacer") {
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 
     item(key = "app_settings") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
             ArrowPreference(
                 title = stringResource(R.string.title_app_settings),
                 summary = stringResource(R.string.summary_app_settings),

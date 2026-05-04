@@ -70,13 +70,12 @@ fun LazyListScope.aboutPageSections(
 
     item(key = "system_info_title") {
         SmallTitle(
-            text = stringResource(R.string.title_system_info),
-            insideMargin = PaddingValues(10.dp, 4.dp)
+            text = stringResource(R.string.title_system_info)
         )
     }
 
     item(key = "system_info_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 BasicComponent(title = aboutDeviceModel, summary = stringResource(R.string.info_device_model))
                 BasicComponent(title = aboutOsVersion, summary = stringResource(R.string.info_os_version))
@@ -87,13 +86,12 @@ fun LazyListScope.aboutPageSections(
 
     item(key = "help_title") {
         SmallTitle(
-            text = stringResource(R.string.title_help),
-            insideMargin = PaddingValues(10.dp, 4.dp)
+            text = stringResource(R.string.title_help)
         )
     }
 
     item(key = "help_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             ArrowPreference(
                 title = stringResource(R.string.title_help),
                 onClick = onHelpClick,
@@ -103,14 +101,13 @@ fun LazyListScope.aboutPageSections(
 
     item(key = "developer_title") {
         SmallTitle(
-            text = stringResource(R.string.title_developer),
-            insideMargin = PaddingValues(10.dp, 4.dp)
+            text = stringResource(R.string.title_developer)
         )
     }
 
     item(key = "developer_content") {
         val context = LocalContext.current
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             BasicComponent(
                 title = stringResource(R.string.dev_name),
                 startAction = {

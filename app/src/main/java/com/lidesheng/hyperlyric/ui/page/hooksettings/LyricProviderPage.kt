@@ -119,7 +119,7 @@ fun LyricProviderPage() {
                 val top = innerPadding.calculateTopPadding()
                 val bottom = innerPadding.calculateBottomPadding()
                 val contentPadding = remember(top, bottom) {
-                    PaddingValues(top = top, start = 12.dp, end = 12.dp, bottom = bottom)
+                    PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
                 }
                 Box {
                     LazyColumn(
@@ -139,7 +139,7 @@ fun LyricProviderPage() {
 private fun LazyListScope.providerSections(uiState: ProviderUiState, groupedModules: List<ModuleCategory>) {
     if (!uiState.isLoading && uiState.modules.isEmpty()) {
         item(key = "no_provider") {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                 BasicComponent(title = stringResource(id = R.string.title_no_provider), summary = stringResource(id = R.string.summary_no_provider))
             }
         }
@@ -152,7 +152,7 @@ private fun LazyListScope.providerSections(uiState: ProviderUiState, groupedModu
             }
             items(category.items.size, key = { "provider_${category.items[it].label}" }) { index ->
                 val module = category.items[index]
-                Card(modifier = Modifier.fillMaxWidth(), pressFeedbackType = PressFeedbackType.Sink) {
+                Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(), pressFeedbackType = PressFeedbackType.Sink) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = module.label, style = MiuixTheme.textStyles.title4, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(4.dp))

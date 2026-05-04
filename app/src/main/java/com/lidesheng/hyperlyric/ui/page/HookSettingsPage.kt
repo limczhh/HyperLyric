@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -78,8 +79,8 @@ fun HookSettingsPage() {
         val contentPadding = remember(top, bottom) {
             PaddingValues(
                 top = top,
-                start = 12.dp,
-                end = 12.dp,
+                start = 0.dp,
+                end = 0.dp,
                 bottom = bottom + 16.dp
             )
         }
@@ -110,7 +111,7 @@ private fun LazyListScope.hookSettingsSections() {
             stringResource(R.string.lyric_mode_verbatim),
             stringResource(R.string.lyric_mode_separated)
         )
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
             OverlayDropdownPreference(
                 title = stringResource(R.string.title_lyric_mode),
                 items = lyricModeOptions,
@@ -123,11 +124,11 @@ private fun LazyListScope.hookSettingsSections() {
         }
     }
     item(key = "custom_config_title") {
-        SmallTitle(text = stringResource(R.string.title_custom_config), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_custom_config))
     }
     item(key = "custom_config_content") {
         val navigator = LocalNavigator.current
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
             Column {
                 ArrowPreference(title = stringResource(R.string.title_super_island), onClick = { navigator.navigate(Route.SuperIslandSettings) })
                 ArrowPreference(title = stringResource(R.string.title_lyrics), onClick = { navigator.navigate(Route.LyricSettings) })

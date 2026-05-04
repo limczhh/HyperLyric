@@ -80,8 +80,8 @@ fun LicensesPage() {
         val contentPadding = remember(top, bottom) {
             PaddingValues(
                 top = top,
-                start = 12.dp,
-                end = 12.dp,
+                start = 0.dp,
+                end = 0.dp,
                 bottom = bottom + 20.dp
             )
         }
@@ -109,7 +109,7 @@ private fun LazyListScope.licensesPageSections() {
     item(key = "licenses_card") {
         val context = LocalContext.current
         val licenses = remember { LicenseProvider.getLicenses() }
-        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
             Column {
                 licenses.forEach { license ->
                     ArrowPreference(

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -108,8 +109,8 @@ fun LyricAnimationPage() {
         val contentPadding = remember(top, bottom) {
             PaddingValues(
                 top = top,
-                start = 12.dp,
-                end = 12.dp,
+                start = 0.dp,
+                end = 0.dp,
                 bottom = bottom
             )
         }
@@ -148,7 +149,7 @@ private fun LazyListScope.animationPageSections() {
             ConfigSync.syncPreference(UIConstants.PREF_NAME, key, value)
             context.sendBroadcast(Intent("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM"))
         }
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
             Column {
                 RadioButtonPreference(
                     title = stringResource(id = R.string.option_anim_none),

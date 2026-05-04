@@ -66,8 +66,8 @@ fun HomePage(
             innerPadding = innerPadding,
             outerPadding = outerPadding,
             isWideScreen = false,
-            extraStart = 12.dp,
-            extraEnd = 12.dp,
+            extraStart = 0.dp,
+            extraEnd = 0.dp,
         )
 
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {

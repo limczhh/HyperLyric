@@ -59,8 +59,6 @@ fun AboutPage(
             innerPadding = innerPadding,
             outerPadding = outerPadding,
             isWideScreen = false,
-            extraStart = 12.dp,
-            extraEnd = 12.dp,
         )
 
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {

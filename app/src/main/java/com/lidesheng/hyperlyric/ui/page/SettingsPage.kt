@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -183,7 +184,7 @@ fun SettingsPage() {
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
         val contentPadding = remember(top, bottom) {
-            PaddingValues(top = top, start = 12.dp, end = 12.dp, bottom = bottom + 16.dp)
+            PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom + 16.dp)
         }
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             LazyColumn(
@@ -203,7 +204,7 @@ private fun LazyListScope.settingsSections(
     restoreLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
 ) {
     item(key = "personalization_title") {
-        SmallTitle(text = stringResource(R.string.title_personalization), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_personalization))
     }
     item(key = "personalization_content") {
         val context = LocalContext.current
@@ -211,7 +212,7 @@ private fun LazyListScope.settingsSections(
         var themeMode by remember { mutableIntStateOf(prefs.getInt(UIConstants.KEY_THEME_MODE, UIConstants.DEFAULT_THEME_MODE)) }
         val themeOptions = listOf(stringResource(R.string.theme_system), stringResource(R.string.theme_light), stringResource(R.string.theme_dark), stringResource(R.string.theme_system_monet), stringResource(R.string.theme_light_monet), stringResource(R.string.theme_dark_monet))
 
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 WindowDropdownPreference(title = stringResource(R.string.title_theme), items = themeOptions, selectedIndex = themeMode, onSelectedIndexChange = { themeMode = it; prefs.edit { putInt(UIConstants.KEY_THEME_MODE, it) } })
                 if (themeMode >= 3) {
@@ -234,10 +235,10 @@ private fun LazyListScope.settingsSections(
         }
     }
     item(key = "config_management_title") {
-        SmallTitle(text = stringResource(R.string.title_config_management), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_config_management))
     }
     item(key = "config_management_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 ArrowPreference(title = stringResource(R.string.title_backup), onClick = { val dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")); backupLauncher.launch("hyperlyric_backup_$dateTime.json") })
                 ArrowPreference(title = stringResource(R.string.title_restore), onClick = { restoreLauncher.launch(arrayOf("application/json")) })
@@ -245,11 +246,11 @@ private fun LazyListScope.settingsSections(
         }
     }
     item(key = "debug_info_title") {
-        SmallTitle(text = stringResource(R.string.title_debug_info), insideMargin = PaddingValues(10.dp, 4.dp))
+        SmallTitle(text = stringResource(R.string.title_debug_info))
     }
     item(key = "debug_info_content") {
         val navigator = LocalNavigator.current
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             ArrowPreference(title = stringResource(R.string.title_view_logs), onClick = { navigator.navigate(Route.Log) })
         }
     }

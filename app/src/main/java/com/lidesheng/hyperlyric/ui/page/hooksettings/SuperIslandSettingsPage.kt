@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -130,7 +131,7 @@ fun SuperIslandSettingsPage() {
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
         val contentPadding = remember(top, bottom) {
-            PaddingValues(top = top, start = 12.dp, end = 12.dp, bottom = bottom)
+            PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
         }
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             LazyColumn(
@@ -165,9 +166,9 @@ private fun LazyListScope.superIslandSettingsSections(
     onLeftPaddingClick: () -> Unit, onRightPaddingClick: () -> Unit,
     saveConfig: (String, Any) -> Unit
 ) {
-    item(key = "layout_title") { SmallTitle(text = stringResource(id = R.string.title_layout), insideMargin = PaddingValues(10.dp, 4.dp)) }
+    item(key = "layout_title") { SmallTitle(text = stringResource(id = R.string.title_layout)) }
     item(key = "layout_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 ArrowPreference(title = stringResource(id = R.string.title_left_content_width), endActions = { Text("$leftContentWidth", fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = onLeftContentWidthClick, bottomAction = { Slider(value = leftContentWidth.toFloat(), onValueChange = { saveConfig(RootConstants.KEY_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH, it.toInt()) }, valueRange = 0f..100f) })
                 ArrowPreference(title = stringResource(id = R.string.title_right_content_width), endActions = { Text("$rightContentWidth", fontSize = MiuixTheme.textStyles.body2.fontSize, color = MiuixTheme.colorScheme.onSurfaceVariantActions) }, onClick = onRightContentWidthClick, bottomAction = { Slider(value = rightContentWidth.toFloat(), onValueChange = { saveConfig(RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH, it.toInt()) }, valueRange = 0f..100f) })
@@ -176,9 +177,9 @@ private fun LazyListScope.superIslandSettingsSections(
             }
         }
     }
-    item(key = "content_title") { SmallTitle(text = stringResource(id = R.string.title_content), insideMargin = PaddingValues(10.dp, 4.dp)) }
+    item(key = "content_title") { SmallTitle(text = stringResource(id = R.string.title_content)) }
     item(key = "content_options") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 SwitchPreference(title = stringResource(id = R.string.title_audio_cover), checked = audioCover, onCheckedChange = { saveConfig(RootConstants.KEY_HOOK_ISLAND_LEFT_ALBUM, it) })
                 SwitchPreference(title = stringResource(id = R.string.title_audio_rhythm), checked = audioRhythm, onCheckedChange = { saveConfig(RootConstants.KEY_HOOK_ISLAND_RIGHT_ICON, it) })
@@ -187,9 +188,9 @@ private fun LazyListScope.superIslandSettingsSections(
             }
         }
     }
-    item(key = "special_features_title") { SmallTitle(text = stringResource(id = R.string.title_special_features), insideMargin = PaddingValues(10.dp, 4.dp)) }
+    item(key = "special_features_title") { SmallTitle(text = stringResource(id = R.string.title_special_features)) }
     item(key = "special_features_content") {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             OverlayDropdownPreference(title = stringResource(id = R.string.title_behavior_after_pause), items = afterPauseOptions, selectedIndex = afterPauseBehavior, onSelectedIndexChange = { saveConfig(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, it) })
         }
     }

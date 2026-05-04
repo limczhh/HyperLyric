@@ -298,7 +298,7 @@ fun LyricSettingsPage() {
         )
 
         val contentPadding = remember(padding) {
-            PaddingValues(top = padding.calculateTopPadding(), start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp)
+            PaddingValues(top = padding.calculateTopPadding(), start = 0.dp, end = 0.dp, bottom = padding.calculateBottomPadding() + 16.dp)
         }
 
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), userScrollEnabled = true) { page ->
@@ -312,8 +312,8 @@ fun LyricSettingsPage() {
                         ) {
                             item {
                                 Column {
-                                    SmallTitle(text = stringResource(id = R.string.title_text), insideMargin = PaddingValues(10.dp, 4.dp))
-                                    Card {
+                                    SmallTitle(text = stringResource(id = R.string.title_text))
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         Column {
                                             ArrowPreference(
                                                 title = stringResource(id = R.string.title_size),
@@ -392,8 +392,8 @@ fun LyricSettingsPage() {
 
                             item {
                                 Column {
-                                    SmallTitle(text = stringResource(id = R.string.title_marquee), insideMargin = PaddingValues(10.dp, 4.dp))
-                                    Card {
+                                    SmallTitle(text = stringResource(id = R.string.title_marquee))
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         SwitchPreference(
                                             title = stringResource(id = R.string.title_lyric_marquee),
                                             summary = stringResource(id = R.string.summary_lyric_marquee),
@@ -463,8 +463,8 @@ fun LyricSettingsPage() {
                         ) {
                             item {
                                 Column {
-                                    SmallTitle(text = stringResource(id = R.string.lyric_mode_verbatim), insideMargin = PaddingValues(10.dp, 4.dp))
-                                    Card {
+                                    SmallTitle(text = stringResource(id = R.string.lyric_mode_verbatim))
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         Column {
                                             SwitchPreference(title = stringResource(id = R.string.title_gradient_progress), checked = gradientStyle, onCheckedChange = { gradientStyle = it; saveConfig(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, it) })
                                             SwitchPreference(
@@ -536,8 +536,8 @@ fun LyricSettingsPage() {
                             }
                             item {
                                 Column {
-                                    SmallTitle(text = stringResource(id = R.string.title_translation), insideMargin = PaddingValues(10.dp, 4.dp))
-                                    Card {
+                                    SmallTitle(text = stringResource(id = R.string.title_translation))
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         Column {
                                             SwitchPreference(
                                                 title = stringResource(id = R.string.title_disable_translation),

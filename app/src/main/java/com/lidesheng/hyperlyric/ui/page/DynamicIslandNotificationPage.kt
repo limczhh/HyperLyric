@@ -150,7 +150,7 @@ fun DynamicIslandNotificationPage() {
         }
     ) { padding ->
         val contentPadding = remember(padding) {
-            PaddingValues(top = padding.calculateTopPadding(), start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding())
+            PaddingValues(top = padding.calculateTopPadding(), start = 0.dp, end = 0.dp, bottom = padding.calculateBottomPadding())
         }
 
 
@@ -216,7 +216,7 @@ fun DynamicIslandNotificationPage() {
                                     val notificationTypeOptions = listOf(stringResource(R.string.option_notification_live), stringResource(R.string.option_notification_focus))
                                     val initialIconStyleKey = if (notificationType == 1) ServiceConstants.KEY_ISLAND_LEFT_ICON_FOCUS else ServiceConstants.KEY_ISLAND_LEFT_ICON_NORMAL
                                     var islandLeftIconStyle by remember { mutableIntStateOf(prefs.getInt(initialIconStyleKey, ServiceConstants.DEFAULT_ISLAND_LEFT_ICON)) }
-                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         OverlayDropdownPreference(title = stringResource(R.string.title_notification_type), items = notificationTypeOptions, selectedIndex = notificationType, onSelectedIndexChange = { index ->
                                             val oldTypeKey = if (notificationType == 1) ServiceConstants.KEY_ISLAND_LEFT_ICON_FOCUS else ServiceConstants.KEY_ISLAND_LEFT_ICON_NORMAL
                                             prefs.edit { putInt(oldTypeKey, islandLeftIconStyle) }
@@ -228,9 +228,9 @@ fun DynamicIslandNotificationPage() {
                                         })
                                     }
 
-                                    SmallTitle(text = stringResource(R.string.title_island_settings), insideMargin = PaddingValues(10.dp, 4.dp))
+                                    SmallTitle(text = stringResource(R.string.title_island_settings))
                                     var disableLyricSplitEnabled by remember { mutableStateOf(prefs.getBoolean(ServiceConstants.KEY_NOTIFICATION_ISLAND_DISABLE_LYRIC_SPLIT, ServiceConstants.DEFAULT_NOTIFICATION_ISLAND_DISABLE_LYRIC_SPLIT)) }
-                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         Column {
                                             val iconStyleOptions = if (notificationType == 1) {
                                                 listOf(
@@ -291,8 +291,8 @@ fun DynamicIslandNotificationPage() {
                                         }
                                     }
 
-                                    SmallTitle(text = stringResource(R.string.title_notification_settings), insideMargin = PaddingValues(10.dp, 4.dp))
-                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                    SmallTitle(text = stringResource(R.string.title_notification_settings))
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         var notificationClickAction by remember { mutableIntStateOf(prefs.getInt(ServiceConstants.KEY_NOTIFICATION_CLICK_ACTION, ServiceConstants.DEFAULT_NOTIFICATION_CLICK_ACTION)) }
                                         val clickOptions = listOf(stringResource(R.string.option_click_pause), stringResource(R.string.option_click_open_app), stringResource(R.string.option_click_open_media))
                                         WindowDropdownPreference(title = stringResource(R.string.title_notification_click), items = clickOptions, selectedIndex = notificationClickAction, onSelectedIndexChange = { notificationClickAction = it; prefs.edit { putInt(ServiceConstants.KEY_NOTIFICATION_CLICK_ACTION, it) } })
@@ -327,8 +327,8 @@ fun DynamicIslandNotificationPage() {
                                         WindowDropdownPreference(title = stringResource(R.string.title_song_info), items = normalTitleOptions, selectedIndex = normalNotificationTitleStyle, onSelectedIndexChange = { normalNotificationTitleStyle = it; prefs.edit { putInt(ServiceConstants.KEY_NOTIFICATION_TITLE_STYLE, it) } })
                                     }
 
-                                    SmallTitle(text = stringResource(R.string.title_advanced_features), insideMargin = PaddingValues(10.dp, 4.dp))
-                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                    SmallTitle(text = stringResource(R.string.title_advanced_features))
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         Column {
                                             ArrowPreference(title = stringResource(R.string.title_autostart), onClick = {
                                                 try {
@@ -381,14 +381,14 @@ fun DynamicIslandNotificationPage() {
                             contentPadding = contentPadding
                         ) {
                             item {
-                                Card(modifier = Modifier.fillMaxWidth()) {
+                                Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                     ArrowPreference(title = stringResource(R.string.title_add_whitelist), onClick = { tempWhitelistInput = ""; showAddWhitelistDialog = true }, holdDownState = showAddWhitelistDialog)
                                 }
                             }
-                            item { SmallTitle(text = stringResource(R.string.title_added_apps), insideMargin = PaddingValues(10.dp, 4.dp)) }
+                            item { SmallTitle(text = stringResource(R.string.title_added_apps)) }
                             item {
                                 if (whitelist.isNotEmpty()) {
-                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         Column {
                                             whitelist.forEachIndexed { _, packageName ->
                                                 val appName = commonMusicApps[packageName]
@@ -405,7 +405,7 @@ fun DynamicIslandNotificationPage() {
                                         }
                                     }
                                 } else {
-                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                    Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                                         BasicComponent(
                                             title = stringResource(R.string.title_no_whitelist),
                                         )

@@ -365,7 +365,6 @@ fun MainPage() {
                         Modifier
                     },
                     color = floatingBarColor,
-                    shadowElevation = 3.dp,
                     mode = FloatingNavigationBarDisplayMode.IconOnly
                 ) {
                     navItems.forEachIndexed { index, item ->
