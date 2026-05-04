@@ -53,7 +53,7 @@ fun HelpPage() {
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
 
-    val tabs = listOf(stringResource(R.string.title_super_island), stringResource(R.string.title_dynamic_island_lyrics))
+    val tabs = listOf(stringResource(R.string.title_super_island_lyrics), stringResource(R.string.title_dynamic_island_lyrics))
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
 
