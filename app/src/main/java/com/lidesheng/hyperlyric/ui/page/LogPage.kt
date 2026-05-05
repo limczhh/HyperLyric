@@ -397,10 +397,7 @@ fun LogPage() {
                                     .alpha(if (searchStatus.isCollapsed()) 1f else 0f)
                                     .onGloballyPositioned { coordinates ->
                                         with(density) {
-                                            val newOffsetY = coordinates.positionInWindow().y.toDp()
-                                            if (searchStatus.offsetY != newOffsetY) {
-                                                searchStatus = searchStatus.copy(offsetY = newOffsetY)
-                                            }
+                                            searchStatus = searchStatus.copy(offsetY = coordinates.positionInWindow().y.toDp())
                                         }
                                     }
                                     .then(
@@ -423,30 +420,28 @@ fun LogPage() {
         popupHost = {
             searchStatus.SearchPager(
                 onSearchStatusChange = { searchStatus = it },
+                offsetY = searchStatus.offsetY,
+                defaultResult = {},
             ) {
                 if (searchStatus.searchText.isNotBlank()) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        if (isLoading) {
-                            item {
-                                Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator()
-                                }
-                            }
-                        } else if (filteredLogs.isEmpty()) {
-                            item {
-                                Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(stringResource(id = R.string.no_logs_found), color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                                }
-                            }
-                        } else {
-                            items(filteredLogs) { entry ->
-                                LogItem(entry = entry, copiedMsg = copiedMsg)
+                    if (isLoading) {
+                        item {
+                            Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
                             }
                         }
+                    } else if (filteredLogs.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(stringResource(id = R.string.no_logs_found), color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                            }
+                        }
+                    } else {
+                        items(count = filteredLogs.size, key = { it }) { index ->
+                            LogItem(entry = filteredLogs[index], copiedMsg = copiedMsg)
+                        }
                     }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
             }
         }

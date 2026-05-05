@@ -25,143 +25,156 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.basic.SearchCleanup
-import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 
-@Composable
-fun SearchStatus.SearchBox(
-    content: @Composable () -> Unit
-) {
-    if (shouldCollapsed()) content()
-}
-
+// Search Pager Composable
 @Composable
 fun SearchStatus.SearchPager(
     onSearchStatusChange: (SearchStatus) -> Unit,
-    searchBarTopPadding: Dp = 4.dp,
-    result: @Composable () -> Unit
+    offsetY: Dp,
+    defaultResult: @Composable () -> Unit,
+    expandBar: @Composable (SearchStatus, (SearchStatus) -> Unit) -> Unit = { searchStatus, onStatusChange ->
+        SearchBar(searchStatus, onStatusChange)
+    },
+    result: LazyListScope.() -> Unit,
 ) {
     val searchStatus = this
+    val onSearchStatusChangeUpdated = rememberUpdatedState(onSearchStatusChange)
+    val searchStatusUpdated = rememberUpdatedState(searchStatus)
+    val onCancelSearch = remember {
+        {
+            onSearchStatusChangeUpdated.value(
+                searchStatusUpdated.value.copy(
+                    searchText = "",
+                    current = SearchStatus.Status.COLLAPSING,
+                ),
+            )
+        }
+    }
     val systemBarsPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
     val topPadding by animateDpAsState(
         targetValue = if (searchStatus.shouldExpand()) {
-            systemBarsPadding + 5.dp
+            systemBarsPadding + 12.dp
         } else {
-            max(searchStatus.offsetY, 0.dp)
+            max(offsetY, 0.dp)
         },
         animationSpec = tween(300, easing = LinearOutSlowInEasing),
-        label = "SearchPagerTopPadding"
+        label = "SearchPagerTopPadding",
     ) {
         onSearchStatusChange(searchStatus.onAnimationComplete())
     }
     val surfaceAlpha by animateFloatAsState(
         if (searchStatus.shouldExpand()) 1f else 0f,
         animationSpec = tween(200, easing = FastOutSlowInEasing),
-        label = "SearchPagerSurfaceAlpha"
+        label = "SearchPagerSurfaceAlpha",
     )
-    val surfaceColor = colorScheme.surface
 
-    BackHandler(enabled = searchStatus.shouldExpand()) {
-        onSearchStatusChange(
-            searchStatus.copy(searchText = "", current = SearchStatus.Status.COLLAPSING)
-        )
-    }
-
-    if (!searchStatus.isCollapsed()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawBehind { drawRect(surfaceColor.copy(alpha = surfaceAlpha)) }
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(5f)
+            .drawBehind { drawRect(surfaceColor.copy(alpha = surfaceAlpha)) }
+            .semantics { onClick { false } }
+            .then(
+                if (!searchStatus.isCollapsed()) Modifier.pointerInput(Unit) { } else Modifier,
+            ),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = topPadding)
+                .then(
+                    if (!searchStatus.isCollapsed()) {
+                        Modifier.background(MiuixTheme.colorScheme.surface)
+                    } else {
+                        Modifier
+                    },
+                ),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = topPadding)
-                    .background(colorScheme.surface),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            if (!searchStatus.isCollapsed()) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .background(colorScheme.surface)
+                        .background(MiuixTheme.colorScheme.surface),
                 ) {
-                    SearchBar(searchStatus, onSearchStatusChange, searchBarTopPadding)
-                }
-                AnimatedVisibility(
-                    visible = searchStatus.isExpand() || searchStatus.isAnimatingExpand(),
-                    enter = expandHorizontally() + slideInHorizontally(initialOffsetX = { it }),
-                    exit = shrinkHorizontally() + slideOutHorizontally(targetOffsetX = { it })
-                ) {
-                    Text(
-                        text = stringResource(android.R.string.cancel),
-                        fontWeight = FontWeight.Bold,
-                        color = colorScheme.primary,
-                        modifier = Modifier
-                            .padding(start = 4.dp, end = 16.dp, top = searchBarTopPadding, bottom = 6.dp)
-                            .clickable(
-                                interactionSource = null,
-                                indication = null
-                            ) {
-                                onSearchStatusChange(
-                                    searchStatus.copy(
-                                        searchText = "",
-                                        current = SearchStatus.Status.COLLAPSING
-                                    )
-                                )
-                            }
-                    )
+                    expandBar(searchStatus, onSearchStatusChange)
                 }
             }
             AnimatedVisibility(
-                visible = searchStatus.isExpand(),
-                modifier = Modifier.fillMaxSize(),
-                enter = fadeIn(),
-                exit = fadeOut()
+                visible = searchStatus.isExpand() || searchStatus.isAnimatingExpand(),
+                enter = expandHorizontally() + slideInHorizontally(initialOffsetX = { it }),
+                exit = shrinkHorizontally() + slideOutHorizontally(targetOffsetX = { it }),
+            ) {
+                Text(
+                    text = stringResource(android.R.string.cancel),
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(end = 16.dp, bottom = 6.dp)
+                        .clickable(
+                            interactionSource = null,
+                            enabled = searchStatus.isExpand(),
+                            indication = null,
+                            onClick = onCancelSearch,
+                        ),
+                )
+                BackHandler(enabled = searchStatus.isExpand()) {
+                    onSearchStatusChange(
+                        searchStatus.copy(searchText = "", current = SearchStatus.Status.COLLAPSING)
+                    )
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = searchStatus.isExpand(),
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1f),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            LazyColumn(
+                Modifier
+                    .fillMaxSize()
+                    .overScrollVertical(),
             ) {
                 result()
             }
@@ -170,85 +183,72 @@ fun SearchStatus.SearchPager(
 }
 
 @Composable
-private fun SearchBar(
+fun SearchBar(
     searchStatus: SearchStatus,
     onSearchStatusChange: (SearchStatus) -> Unit,
-    searchBarTopPadding: Dp = 4.dp,
 ) {
     val focusRequester = remember { FocusRequester() }
-    var textFieldValue by remember { mutableStateOf(TextFieldValue(searchStatus.searchText)) }
-
-    LaunchedEffect(searchStatus.searchText) {
-        if (textFieldValue.text != searchStatus.searchText) {
-            textFieldValue = TextFieldValue(searchStatus.searchText)
-        }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val onSearchStatusChangeUpdated = rememberUpdatedState(onSearchStatusChange)
+    val searchStatusUpdated = rememberUpdatedState(searchStatus)
+    val onClearSearch = remember {
+        { onSearchStatusChangeUpdated.value(searchStatusUpdated.value.copy(searchText = "")) }
     }
 
-    BasicTextField(
-        value = textFieldValue,
-        onValueChange = {
-            textFieldValue = it
-            onSearchStatusChange(searchStatus.copy(searchText = it.text))
+    InputField(
+        query = searchStatus.searchText,
+        onQueryChange = { onSearchStatusChange(searchStatus.copy(searchText = it)) },
+        label = searchStatus.label,
+        leadingIcon = {
+            Icon(
+                imageVector = MiuixIcons.Basic.Search,
+                contentDescription = "search",
+                modifier = Modifier
+                    .size(44.dp)
+                    .padding(start = 16.dp, end = 8.dp),
+                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh,
+            )
         },
-        singleLine = true,
-        textStyle = TextStyle(
-            fontWeight = FontWeight.Medium,
-            fontSize = 17.sp,
-            color = colorScheme.onSurface
-        ),
-        cursorBrush = SolidColor(colorScheme.primary),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        trailingIcon = {
+            AnimatedVisibility(
+                searchStatus.searchText.isNotEmpty(),
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Basic.SearchCleanup,
+                    tint = MiuixTheme.colorScheme.onSurface,
+                    contentDescription = "Clean",
+                    modifier = Modifier
+                        .size(44.dp)
+                        .padding(start = 8.dp, end = 16.dp)
+                        .clickable(
+                            interactionSource = null,
+                            indication = null,
+                            onClick = onClearSearch,
+                        ),
+                )
+            }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(top = searchBarTopPadding, bottom = 6.dp)
-            .heightIn(min = 45.dp)
-            .background(colorScheme.surfaceContainerHigh, CircleShape)
+            .padding(bottom = 6.dp)
             .focusRequester(focusRequester),
-        decorationBox = { innerTextField ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = MiuixIcons.Basic.Search,
-                    contentDescription = "search",
-                    modifier = Modifier
-                        .size(44.dp)
-                        .padding(start = 16.dp, end = 8.dp),
-                    tint = colorScheme.onSurfaceContainerHigh,
-                )
-                Box(modifier = Modifier.weight(1f)) {
-                    innerTextField()
-                }
-                AnimatedVisibility(
-                    searchStatus.searchText.isNotEmpty(),
-                    enter = fadeIn() + scaleIn(),
-                    exit = fadeOut() + scaleOut(),
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Basic.SearchCleanup,
-                        tint = colorScheme.onSurface,
-                        contentDescription = "Clean",
-                        modifier = Modifier
-                            .size(44.dp)
-                            .padding(start = 8.dp, end = 16.dp)
-                            .clickable(
-                                interactionSource = null,
-                                indication = null
-                            ) {
-                                textFieldValue = TextFieldValue("")
-                                onSearchStatusChange(searchStatus.copy(searchText = ""))
-                            },
-                    )
-                }
-            }
-        }
+        onSearch = {},
+        expanded = searchStatus.shouldExpand(),
+        onExpandedChange = {
+            onSearchStatusChange(
+                searchStatus.copy(
+                    current = if (it) SearchStatus.Status.EXPANDED else SearchStatus.Status.COLLAPSED,
+                ),
+            )
+        },
     )
-
     LaunchedEffect(Unit) {
-        if (searchStatus.isAnimatingExpand()) {
+        if (!expanded && searchStatus.shouldExpand()) {
             focusRequester.requestFocus()
+            expanded = true
         }
     }
 }
@@ -256,7 +256,6 @@ private fun SearchBar(
 @Composable
 fun SearchBarFake(
     label: String,
-    searchBarTopPadding: Dp = 4.dp,
 ) {
     InputField(
         query = "",
@@ -265,20 +264,33 @@ fun SearchBarFake(
         leadingIcon = {
             Icon(
                 imageVector = MiuixIcons.Basic.Search,
-                contentDescription = "search",
+                contentDescription = "Search",
                 modifier = Modifier
                     .size(44.dp)
                     .padding(start = 16.dp, end = 8.dp),
-                tint = colorScheme.onSurfaceContainerHigh,
+                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh,
             )
         },
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(top = searchBarTopPadding, bottom = 6.dp),
+            .padding(bottom = 6.dp),
         onSearch = { },
         enabled = false,
         expanded = false,
-        onExpandedChange = { }
+        onExpandedChange = { },
     )
+}
+
+@Composable
+fun SearchStatus.SearchBox(
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier.graphicsLayer {
+            alpha = if (this@SearchBox.shouldCollapsed()) 1f else 0f
+        }
+    ) {
+        content()
+    }
 }

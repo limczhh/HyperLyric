@@ -118,10 +118,6 @@ fun LazyListScope.homePageSections(
         }
     }
 
-    item(key = "bottom_spacer") {
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-
     item(key = "app_settings") {
         Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
             ArrowPreference(

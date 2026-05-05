@@ -86,7 +86,7 @@
     <string name="title_view_logs">查看模块日志</string>
 
     <!-- ———————————————————————— HookSettingsPage ———————————————————————— -->
-    <string name="lyric_mode_verbatim">逐字歌词</string>
+    <string name="lyric_mode_verbatim">lyricon逐字歌词</string>
     <string name="lyric_mode_separated">分离歌词</string>
     <string name="title_lyric_mode">歌词模式</string>
     <string name="title_custom_config">自定义配置</string>

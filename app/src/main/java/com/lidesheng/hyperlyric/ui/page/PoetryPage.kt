@@ -10,8 +10,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -100,9 +102,7 @@ fun PoetryPage() {
                                     .alpha(if (searchStatus.isCollapsed()) 1f else 0f)
                                     .onGloballyPositioned { coordinates ->
                                         with(density) {
-                                            val newOffsetY = coordinates.positionInWindow().y.toDp()
-                                            if (searchStatus.offsetY != newOffsetY)
-                                                searchStatus = searchStatus.copy(offsetY = newOffsetY)
+                                            searchStatus = searchStatus.copy(offsetY = coordinates.positionInWindow().y.toDp())
                                         }
                                     }
                                     .then(
@@ -124,15 +124,18 @@ fun PoetryPage() {
             }
         },
         popupHost = {
-            searchStatus.SearchPager(onSearchStatusChange = { searchStatus = it }) {
+            searchStatus.SearchPager(
+                onSearchStatusChange = { searchStatus = it },
+                offsetY = searchStatus.offsetY,
+                defaultResult = {},
+            ) {
                 if (searchStatus.searchText.isNotBlank()) {
-                    LazyColumn(modifier = Modifier.fillMaxSize().overScrollVertical(), contentPadding = PaddingValues(bottom = 16.dp)) {
-                        items(filteredQuotes) { quote ->
-                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                                Text(text = quote, fontSize = 14.sp, lineHeight = 20.sp, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
-                            }
+                    items(filteredQuotes, key = { it }) { quote ->
+                        Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth()) {
+                            Text(text = quote, fontSize = 14.sp, lineHeight = 20.sp, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
                         }
                     }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
             }
         }

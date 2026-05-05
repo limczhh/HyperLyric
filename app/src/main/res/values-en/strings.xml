@@ -86,7 +86,7 @@
     <string name="title_view_logs">View Module Logs</string>
 
     <!-- ———————————————————————— HookSettingsPage ———————————————————————— -->
-    <string name="lyric_mode_verbatim">Verbatim Lyrics</string>
+    <string name="lyric_mode_verbatim">Lyricon Verbatim Lyrics</string>
     <string name="lyric_mode_separated">Separated Lyrics</string>
     <string name="title_lyric_mode">Lyric Mode</string>
     <string name="title_custom_config">Custom Configuration</string>
