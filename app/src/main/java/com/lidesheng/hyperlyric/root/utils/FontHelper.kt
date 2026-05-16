@@ -18,12 +18,12 @@ object FontHelper {
                 val file = File(customFontPath)
                 if (file.exists() && file.canRead()) {
                     baseTf = Typeface.createFromFile(file)
-                    xLog("Successfully loaded custom font from: $customFontPath")
+                    xLog("自定义字体加载成功：$customFontPath")
                 } else {
-                    xLog("Custom font file not found or not readable: $customFontPath (exists: ${file.exists()}, canRead: ${file.canRead()})")
+                    xLog("自定义字体文件不存在或无法读取：$customFontPath (存在: ${file.exists()}, 可读: ${file.canRead()})")
                 }
             } catch (e: Exception) {
-                xLog("Failed to create Typeface from file: $customFontPath, error: ${e.message}")
+                xLog("无法从文件创建字体：$customFontPath，原因: ${e.message}")
             }
         }
 

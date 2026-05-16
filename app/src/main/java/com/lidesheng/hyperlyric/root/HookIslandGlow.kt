@@ -50,13 +50,13 @@ object HookIslandGlow {
                     injectHighlightColor(chain)
                     result
                 }
-                xLog("ModuleInit : IslandGlow -> DynamicIslandBaseContentView.updateTemplate hooked")
+                xLog("ModuleInit : 超级岛外圈光效注入成功")
             } else {
-                xLogWarn("ModuleInit : IslandGlow -> DynamicIslandBaseContentView.updateTemplate not found")
+                xLogWarn("ModuleInit : 未找到超级岛外圈光效注入位置")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : IslandGlow -> ERROR: Initialization failed", e)
+                xLogError("ModuleInit : 超级岛外圈光效初始化失败", e)
             }
         }
 
@@ -103,7 +103,7 @@ object HookIslandGlow {
                 }
             }
         }.onFailure { e ->
-            xLogError("ModuleInit : IslandGlow -> ERROR: Highlight color injection failed", e)
+            xLogError("ModuleInit : 超级岛外圈光效颜色提取失败", e)
         }
     }
 

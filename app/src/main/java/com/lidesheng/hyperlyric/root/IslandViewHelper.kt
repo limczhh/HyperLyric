@@ -119,7 +119,7 @@ object IslandViewHelper {
                 viewClass.methods.find { it.name == "calculateBigIslandWidth" }?.invoke(islandView)
             }
         }.onFailure { e ->
-            xLogError("IslandHelper: Failed to trigger system relayout", e)
+            xLogError("超级岛布局刷新失败", e)
         }
     }
 

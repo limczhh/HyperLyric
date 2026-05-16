@@ -38,7 +38,7 @@ object MediaMetadataHelper {
                 )
             } ?: MediaInfo()
         } catch (e: Exception) {
-            xLogError("Failed to get media info for $packageName", e)
+            xLogError("获取媒体信息失败 ($packageName)", e)
             MediaInfo()
         }
     }

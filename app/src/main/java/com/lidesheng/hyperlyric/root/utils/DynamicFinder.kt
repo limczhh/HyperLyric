@@ -59,7 +59,7 @@ object DynamicFinder {
                 }
             }
         } catch (e: Exception) {
-            xLogError("Finder: Error scanning Dex for constant string: $targetString", e)
+            xLogError("扫描 Dex 寻找特征字符串时出错: $targetString", e)
         }
         return null
     }

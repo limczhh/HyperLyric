@@ -59,7 +59,7 @@ object HookIslandLyric {
                     module.deoptimize(method)
                     module.hook(method).intercept(UpdateBigIslandHooker())
                     hookedMethods.add("updateBigIslandView")
-                    xLog("ModuleInit : SuperIsland -> Hooked: $method")
+                    xLog("ModuleInit : 已注入超级岛: $method")
                 }
             }
 
@@ -69,7 +69,7 @@ object HookIslandLyric {
                     module.deoptimize(method)
                     module.hook(method).intercept(PreInjectHooker())
                     hookedMethods.add("calculateBigIslandWidth")
-                    xLog("ModuleInit : SuperIsland -> Hooked: $method")
+                    xLog("ModuleInit : 已注入超级岛: $method")
                 }
             }
 
@@ -79,11 +79,11 @@ object HookIslandLyric {
             if (hookedMethods.isNotEmpty()) {
                 isHookedSuccess = true
                 val methodsSummary = hookedMethods.distinct().joinToString(", ")
-                xLog("ModuleInit : SuperIsland -> Initialization complete. Hooked methods: [$methodsSummary] in $cl")
+                xLog("ModuleInit : 初始化完成。已注入超级岛: [$methodsSummary]")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : SuperIsland -> ERROR: Hook processing failed", e)
+                xLogError("ModuleInit : 注入超级岛失败", e)
             }
         }
     }
@@ -111,7 +111,7 @@ object HookIslandLyric {
                     injectToSlot(islandView, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
                 }
             }.onFailure { e ->
-                xLogError("ModuleInit : SuperIsland -> ERROR: Pre-injection failed", e)
+                xLogError("ModuleInit : 预注入超级岛失败", e)
             }
             return chain.proceed()
         }
@@ -165,7 +165,7 @@ object HookIslandLyric {
                 // 注入光效 Bundle 标记 + 主动触发 BigIslandView 的 startGlowEffect
                 HookIslandGlow.injectAndTriggerGlow(viewGroup, islandData, prefs)
             }.onFailure { e ->
-                xLogError("ModuleInit : SuperIsland -> ERROR: updateBigIslandView hook logic failed", e)
+                xLogError("ModuleInit : 更新超级岛视图失败", e)
             }
 
             return result
