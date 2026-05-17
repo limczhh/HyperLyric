@@ -30,7 +30,7 @@ object UnlockIslandWhitelist {
             if (method != null) {
                 module.deoptimize(method)
                 module.hook(method).intercept(ReturnTrueHooker())
-                xLog("ModuleInit : 成功移除超级岛下拉小窗白名单 ($TARGET_METHOD)")
+                xLog("ModuleInit : 成功注入超级岛下拉小窗白名单 ($TARGET_METHOD)")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {

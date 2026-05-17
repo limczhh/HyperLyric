@@ -39,6 +39,11 @@ class HookEntry : XposedModule() {
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
+        val processName = runCatching { android.app.Application.getProcessName() }.getOrNull() ?: ""
+        
+        // 仅在主进程注入
+        if (processName.contains(":")) return
+        
         val packageName = param.packageName
         
         if (packageName == "com.android.systemui") {

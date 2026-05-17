@@ -60,7 +60,7 @@ object UnlockFocusWhitelist {
                     module.deoptimize(method)
                     module.hook(method).intercept(ReturnTrueHooker())
                 }
-                xLog("ModuleInit : 成功移除焦点通知白名单 (${methods.joinToString { it.name }})")
+                xLog("ModuleInit : 成功注入焦点通知白名单 (${methods.joinToString { it.name }})")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
@@ -76,11 +76,11 @@ object UnlockFocusWhitelist {
             if (method != null) {
                 module.deoptimize(method)
                 module.hook(method).intercept(AuthResultHooker())
-                xLog("ModuleInit : 焦点白名单授权回调注入成功")
+                xLog("ModuleInit : 焦点通知白名单授权回调注入成功")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : 焦点白名单授权注入失败 ($cl)", e)
+                xLogError("ModuleInit : 焦点通知白名单授权注入失败 ($cl)", e)
             }
         }
     }
