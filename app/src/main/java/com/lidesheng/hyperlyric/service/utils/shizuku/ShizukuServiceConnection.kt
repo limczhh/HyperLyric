@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration.Companion.milliseconds
 
 object ShizukuServiceConnection {
 
@@ -56,13 +57,13 @@ object ShizukuServiceConnection {
                             Log.d(TAG, "Service 缓存有效 (ping 成功)")
                             return cached
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         Log.w(TAG, "Service ping 失败, 正在重新绑定: ${e.message}")
                     }
                     lastPingAttempt = now
                     cachedService = null
                 } else {
-                    Log.v(TAG, "正在使用缓存的 Service (距离上次 ping 已过 ${now - lastPingAttempt}ms)")
+                    Log.v(TAG, "正在使用缓存 of Service (距离上次 ping 已过 ${now - lastPingAttempt}ms)")
                     return cached
                 }
             }
@@ -86,13 +87,13 @@ object ShizukuServiceConnection {
                 service.setLogCallback(null)
                 Log.d(TAG, "Log 回调已从特权 Service 取消注册 (开关切换)")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "切换 Log 回调失败: ${e.message}")
         }
     }
 
     private suspend fun establishServiceConnection(): IPrivilegedService {
-        return withTimeoutOrNull(BIND_TIMEOUT_MS) {
+        return withTimeoutOrNull(BIND_TIMEOUT_MS.milliseconds) {
             suspendCancellableCoroutine { continuation ->
                 val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -135,7 +136,7 @@ object ShizukuServiceConnection {
                 try {
                     Log.d(TAG, "正在调用 Shizuku.bindUserService()...")
                     Shizuku.bindUserService(args, connection)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     Log.e(TAG, "bindUserService 抛出异常: ${e.message}", e)
                     continuation.resumeWithException(e)
                 }
@@ -144,7 +145,7 @@ object ShizukuServiceConnection {
                     Log.d(TAG, "Service 绑定已取消, 正在执行 unbind...")
                     try {
                         Shizuku.unbindUserService(args, connection, true)
-                    } catch (ignored: Exception) {
+                    } catch (ignored: Throwable) {
                         Log.w(TAG, "执行 unbind 期间发生错误: ${ignored.message}")
                     }
                 }
@@ -158,7 +159,7 @@ object ShizukuServiceConnection {
             action(getPrivilegedService()).also {
                 Log.d(TAG, "executeWithService 执行成功")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "executeWithService 执行失败: ${e.message}", e)
             throw e
         }

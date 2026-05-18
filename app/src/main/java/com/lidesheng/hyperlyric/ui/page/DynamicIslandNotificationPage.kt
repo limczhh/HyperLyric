@@ -158,6 +158,21 @@ fun DynamicIslandNotificationPage() {
         )
     }
 
+    androidx.compose.runtime.DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+            if (key == ServiceConstants.KEY_BYPASS_FOCUS_NOTIFICATION_LIMIT) {
+                bypassFocusLimitEnabled = sharedPreferences.getBoolean(
+                    ServiceConstants.KEY_BYPASS_FOCUS_NOTIFICATION_LIMIT,
+                    ServiceConstants.DEFAULT_BYPASS_FOCUS_NOTIFICATION_LIMIT
+                )
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
     var disableLyricSplitEnabled by remember {
         mutableStateOf(
             prefs.getBoolean(

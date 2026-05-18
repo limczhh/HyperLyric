@@ -18,12 +18,17 @@ import rikka.shizuku.SystemServiceHelper
 import rikka.sui.Sui
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.ConcurrentHashMap
+import androidx.core.content.edit
 
 class ShizukuContext(base: Context) : ContextWrapper(base) {
     override fun getOpPackageName(): String = "com.android.shell"
 
     override fun getAttributionSource(): AttributionSource {
-        val shellUid = Shizuku.getUid()
+        val shellUid = try {
+            Shizuku.getUid()
+        } catch (_: Throwable) {
+            2000
+        }
         val builder = AttributionSource.Builder(shellUid)
             .setPackageName("com.android.shell")
         if (Build.VERSION.SDK_INT >= 34) {
@@ -54,15 +59,15 @@ object ShizukuManager {
     )
 
     private val serviceBackends = listOf(
-        ServiceBackend("Connectivity", "android.net.IConnectivityManager\$Stub", Context.CONNECTIVITY_SERVICE),
-        ServiceBackend("NetworkManagement", "android.os.INetworkManagementService\$Stub", "network_management")
+        ServiceBackend("Connectivity", $$"android.net.IConnectivityManager$Stub", Context.CONNECTIVITY_SERVICE),
+        ServiceBackend("NetworkManagement", $$"android.os.INetworkManagementService$Stub", "network_management")
     )
 
     suspend fun checkShizukuPermission(): Boolean {
-        if (!isShizukuServiceRunning()) return false
-        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return true
-
         return try {
+            if (!isShizukuServiceRunning()) return false
+            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return true
+
             callbackFlow {
                 val listener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
                     trySend(grantResult == PackageManager.PERMISSION_GRANTED)
@@ -71,7 +76,8 @@ object ShizukuManager {
                 Shizuku.requestPermission(1001)
                 awaitClose { Shizuku.removeRequestPermissionResultListener(listener) }
             }.catch { emit(false) }.first()
-        } catch (_: Exception) {
+        } catch (e: Throwable) {
+            Log.e(TAG, "Shizuku 权限检查异常: ${e.message}", e)
             false
         }
     }
@@ -80,20 +86,43 @@ object ShizukuManager {
         return try {
             Sui.init(BuildConfig.APPLICATION_ID)
             Shizuku.pingBinder()
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             false
         }
     }
 
+    private fun disableBypassFocusLimit(context: Context) {
+        try {
+            val prefs = context.getSharedPreferences("com.lidesheng.hyperlyric_preferences", Context.MODE_PRIVATE)
+            if (prefs.getBoolean("key_bypass_focus_notification_limit", false)) {
+                Log.i(TAG, "检测到 Shizuku 服务离线，已自动回退关闭 [key_bypass_focus_notification_limit] 选项")
+                prefs.edit { putBoolean("key_bypass_focus_notification_limit", false) }
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "自动关闭绕过选项失败: ${e.message}")
+        }
+    }
+
     suspend fun setXmsfNetworkingEnabled(context: Context, enabled: Boolean): Boolean {
-        if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED || !Shizuku.pingBinder()) {
+        try {
+            if (!isShizukuServiceRunning()) {
+                disableBypassFocusLimit(context)
+                return false
+            }
+            if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                disableBypassFocusLimit(context)
+                return false
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "Shizuku 检查异常 (服务可能未启动或 binder 未接收): ${e.message}", e)
+            disableBypassFocusLimit(context)
             return false
         }
 
         val pm = context.packageManager
         val uid = try {
             pm.getPackageUid(XMSF_PACKAGE, 0)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Log.w(TAG, "未找到 XMSF 包名 (UID 查询失败)")
             return false
         }
@@ -188,11 +217,11 @@ object ShizukuManager {
                 val finalArgs = Array(args.size) { i ->
                     val paramType = targetMethod.parameterTypes[i]
                     val arg = args[i]
-                    when {
-                        paramType == Int::class.javaPrimitiveType && arg is Int -> arg
-                        paramType == Boolean::class.javaPrimitiveType && arg is Boolean -> arg
-                        paramType == Boolean::class.javaPrimitiveType && arg is Number -> arg.toInt() != 0
-                        paramType == Int::class.javaPrimitiveType && arg is Boolean -> if (arg) 1 else 0
+                    when (paramType) {
+                        Int::class.javaPrimitiveType if arg is Int -> arg
+                        Boolean::class.javaPrimitiveType if arg is Boolean -> arg
+                        Boolean::class.javaPrimitiveType if arg is Number -> arg.toInt() != 0
+                        Int::class.javaPrimitiveType if arg is Boolean -> if (arg) 1 else 0
                         else -> arg
                     }
                 }

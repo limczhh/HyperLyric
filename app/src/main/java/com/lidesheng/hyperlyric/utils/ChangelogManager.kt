@@ -10,6 +10,11 @@ object ChangelogManager {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "5.10-1929",
+                title = "",
+                summary = "- 修复shizuku异常关闭引起的错误"
+            ),
+            ChangelogItem(
                 version = "5.9-1929",
                 title = "以后更新节奏放缓",
                 summary = "- 新增shizuku绕过焦点通知限制\n" +
