@@ -24,6 +24,7 @@ jobs:
         id: gate
         run: |
           V_NAME=$(grep "versionName =" app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          V_CODE=$(grep "versionCode =" app/build.gradle.kts | sed 's/[^0-9]//g')
           echo "name=$V_NAME" >> $GITHUB_OUTPUT
 
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
@@ -37,13 +38,14 @@ jobs:
             exit 0
           fi
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            PREV=$(git show HEAD~1:app/build.gradle.kts | grep "versionName =" | sed 's/.*"\(.*\)".*/\1/')
-            if [ "$V_NAME" != "$PREV" ]; then
+            PREV_NAME=$(git show HEAD~1:app/build.gradle.kts | grep "versionName =" | sed 's/.*"\(.*\)".*/\1/')
+            PREV_CODE=$(git show HEAD~1:app/build.gradle.kts | grep "versionCode =" | sed 's/[^0-9]//g')
+            if [ "$V_NAME" != "$PREV_NAME" ] || [ "$V_CODE" != "$PREV_CODE" ]; then
               echo "skip=false" >> $GITHUB_OUTPUT
-              echo "version $V_NAME != $PREV, proceeding"
+              echo "version changed (Name: $PREV_NAME -> $V_NAME, Code: $PREV_CODE -> $V_CODE), proceeding"
             else
               echo "skip=true" >> $GITHUB_OUTPUT
-              echo "version unchanged ($V_NAME), skipping build"
+              echo "version unchanged (Name: $V_NAME, Code: $V_CODE), skipping build"
             fi
           else
             echo "skip=false" >> $GITHUB_OUTPUT
