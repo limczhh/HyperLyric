@@ -12,7 +12,8 @@ object ChangelogManager {
             ChangelogItem(
                 version = "6.0-1929",
                 title = "测试内容",
-                summary = "- 新增小米超级岛“分离歌词”歌词模式，选择“分离歌词”后重启系统界面，不允许自定义容器内容"
+                summary = "- 新增小米超级岛“分离歌词”歌词模式，选择“分离歌词”后重启系统界面，不允许自定义容器内容\n" +
+                        "- 修复AI翻译自动跳过中文歌曲不生效的错误"
             ),
             ChangelogItem(
                 version = "5.10-1929",

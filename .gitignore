@@ -10,6 +10,7 @@ local.properties
 .idea
 .agent/
 .claude/
+.codegraph
 .kotlin/
 .vscode/
 docs/

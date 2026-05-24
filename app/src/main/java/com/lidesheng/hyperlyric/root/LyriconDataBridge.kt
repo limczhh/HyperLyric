@@ -99,8 +99,18 @@ object LyriconDataBridge {
 
     private fun startAiTranslation(song: Song, prefs: SharedPreferences, version: Int) {
         val configs = buildAiTranslationConfigs(prefs)
+        val autoIgnoreChinese = prefs.getBoolean(
+            RootConstants.KEY_HOOK_AI_TRANS_AUTO_IGNORE_CHINESE,
+            RootConstants.DEFAULT_HOOK_AI_TRANS_AUTO_IGNORE_CHINESE
+        )
         activeAiTranslationJob = aiTransScope.launch {
             try {
+                val ratio = song.calculateChineseRatio()
+                if (autoIgnoreChinese && ratio > 0.7f) {
+                    val percentage = String.format(java.util.Locale.US, "%.1f%%", ratio * 100)
+                    com.lidesheng.hyperlyric.root.utils.xLog("AITranslation : 歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
+                    return@launch
+                }
                 val translatedSong = AITranslator.translateSongSync(song, configs)
                 
                 // 核心校验：如果当前运行的翻译版本号不是最新的全局版本号，说明已被切歌，直接废弃结果
@@ -193,5 +203,26 @@ object LyriconDataBridge {
         versionCounter.incrementAndGet()
         activeAiTranslationJob?.cancel()
         activeAiTranslationJob = null
+    }
+
+    private fun Song.calculateChineseRatio(): Float {
+        val totalChars = lyrics?.flatMap { it.text.orEmpty().toList() }
+            ?.filterNot { it.isWhitespace() || it.isPunctuation() } ?: return 1.0f
+        if (totalChars.isEmpty()) return 1.0f
+        
+        val chineseHanCount = totalChars.count { it.isChineseHan() }
+        return chineseHanCount.toFloat() / totalChars.size
+    }
+
+    private fun Char.isChineseHan(): Boolean {
+        val ub = Character.UnicodeBlock.of(this)
+        return ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+                ub == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+                ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
+                ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
+    }
+
+    private fun Char.isPunctuation(): Boolean {
+        return !isLetterOrDigit() && !isWhitespace()
     }
 }
