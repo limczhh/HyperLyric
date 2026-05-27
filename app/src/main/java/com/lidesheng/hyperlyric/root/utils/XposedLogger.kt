@@ -7,6 +7,16 @@ private const val TAG = "HyperLyric"
 
 var globalXposedModule: XposedModule? = null
 
+/** DEBUG 级别日志，同时输出到 Logcat 和 LSPosed 管理器 */
+fun xLogDebug(msg: String) {
+    val module = globalXposedModule ?: return
+    val prefs = try { module.getRemotePreferences("com.lidesheng.hyperlyric_preferences") } catch (_: Exception) { null }
+    val level = prefs?.getInt("key_log_level", 0) ?: 0
+    if (level < 1) return
+    Log.d(TAG, msg)
+    module.log(Log.DEBUG, TAG, msg)
+}
+
 /** INFO 级别日志，同时输出到 Logcat 和 LSPosed 管理器 */
 fun xLog(msg: String) {
     Log.i(TAG, msg)

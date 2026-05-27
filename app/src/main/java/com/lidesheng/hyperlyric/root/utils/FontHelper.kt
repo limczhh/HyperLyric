@@ -6,6 +6,8 @@ import java.io.File
 
 object FontHelper {
 
+    private val loggedFontFailures = mutableSetOf<String>()
+
     fun loadTypeface(prefs: SharedPreferences): Typeface {
         val fontWeight = prefs.getInt(Constants.KEY_HOOK_FONT_WEIGHT, Constants.DEFAULT_HOOK_FONT_WEIGHT)
         val fontItalic = prefs.getBoolean(Constants.KEY_HOOK_FONT_ITALIC, Constants.DEFAULT_HOOK_FONT_ITALIC)
@@ -18,12 +20,16 @@ object FontHelper {
                 val file = File(customFontPath)
                 if (file.exists() && file.canRead()) {
                     baseTf = Typeface.createFromFile(file)
-                    xLog("自定义字体加载成功：$customFontPath")
+                    xLogDebug("FontHelper : 自定义字体加载成功：$customFontPath")
                 } else {
-                    xLog("自定义字体文件不存在或无法读取：$customFontPath (存在: ${file.exists()}, 可读: ${file.canRead()})")
+                    if (loggedFontFailures.add(customFontPath)) {
+                        xLogWarn("FontHelper : 自定义字体文件不存在或无法读取：$customFontPath (存在: ${file.exists()}, 可读: ${file.canRead()})")
+                    }
                 }
             } catch (e: Exception) {
-                xLog("无法从文件创建字体：$customFontPath，原因: ${e.message}")
+                if (loggedFontFailures.add(customFontPath)) {
+                    xLogWarn("FontHelper : 无法从文件创建字体：$customFontPath，原因: ${e.message}")
+                }
             }
         }
 

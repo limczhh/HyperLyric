@@ -3,6 +3,7 @@
 import android.app.Application
 import android.content.Context
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
+import com.lidesheng.hyperlyric.utils.LogManager
 import io.github.libxposed.service.XposedService
 import io.github.libxposed.service.XposedServiceHelper
 
@@ -10,7 +11,8 @@ class ConfigSync : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
+        LogManager.init(this)
+
         XposedServiceHelper.registerListener(object : XposedServiceHelper.OnServiceListener {
             override fun onServiceBind(service: XposedService) {
                 xposedService = service

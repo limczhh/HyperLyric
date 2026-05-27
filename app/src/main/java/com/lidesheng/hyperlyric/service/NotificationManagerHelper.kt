@@ -1,5 +1,6 @@
-package com.lidesheng.hyperlyric.service
+﻿package com.lidesheng.hyperlyric.service
 
+import com.lidesheng.hyperlyric.utils.LogManager
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import com.lidesheng.hyperlyric.service.Constants as ServiceConstants
 import com.lidesheng.hyperlyric.R
@@ -225,7 +226,7 @@ object NotificationManagerHelper {
         try {
             notificationManager.cancel(FOCUS_NOTIFICATION_ID)
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e("NotificationManagerHelper", "取消焦点通知失败", e)
         }
     }
 
@@ -233,7 +234,7 @@ object NotificationManagerHelper {
         try {
             notificationManager.cancel(NORMAL_NOTIFICATION_ID)
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e("NotificationManagerHelper", "取消普通通知失败", e)
         }
     }
 

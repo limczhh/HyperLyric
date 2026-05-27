@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright 2026 Proify, Tomakino
  * Licensed under the Apache License, Version 2.0
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -8,6 +8,7 @@
 
 package io.github.proify.lyricon.app.bridge
 
+import com.lidesheng.hyperlyric.utils.LogManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -65,7 +66,7 @@ object LyriconBridge {
                 } catch (e: Exception) {
                     // 发生异常时回传空 Bundle 确保客户端 await 能够结束
                     callback.onReply(Bundle.EMPTY)
-                    e.printStackTrace()
+                    LogManager.e("LyriconBridge", "IPC 调用处理异常", e)
                 }
             }
         }

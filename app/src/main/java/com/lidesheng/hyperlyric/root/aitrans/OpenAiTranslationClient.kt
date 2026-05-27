@@ -1,7 +1,7 @@
 package com.lidesheng.hyperlyric.root.aitrans
 
 import android.util.Log
-import com.lidesheng.hyperlyric.root.utils.xLog
+import com.lidesheng.hyperlyric.root.utils.xLogDebug
 import com.lidesheng.hyperlyric.root.utils.xLogError
 import com.lidesheng.hyperlyric.root.utils.xLogWarn
 import io.github.proify.android.extensions.json
@@ -63,7 +63,7 @@ internal object OpenAiTranslationClient {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(apiUrl)
-            xLog("AITranslation : API 请求：使用模型 ${configs.model}，地址 $apiUrl")
+            xLogDebug("AITranslation : API 请求：使用模型 ${configs.model}，地址 $apiUrl")
 
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -86,7 +86,7 @@ internal object OpenAiTranslationClient {
                     xLogError("AITranslation : API 错误：AI 返回的内容为空")
                     return@withContext null
                 }
-                xLog("AITranslation : API 成功：已接收到 AI 返回的数据")
+                xLogDebug("AITranslation : API 成功：已接收到 AI 返回的数据")
                 AITranslationResponseParser.parse(content, requestIndices)
             } else {
                 val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "无错误信息"

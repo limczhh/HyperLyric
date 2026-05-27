@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright 2026 Proify, Tomakino
  * Licensed under the Apache License, Version 2.0
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -7,6 +7,7 @@
 
 package io.github.proify.android.extensions
 
+import com.lidesheng.hyperlyric.utils.LogManager
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
@@ -30,7 +31,7 @@ fun File.md5(): String {
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     } catch (e: Exception) {
-        e.printStackTrace()
+        LogManager.e("FileExtensions", "文件哈希计算失败", e)
         return ""
     }
 }

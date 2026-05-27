@@ -1,8 +1,8 @@
-package com.lidesheng.hyperlyric.online.source.ne
+﻿package com.lidesheng.hyperlyric.online.source.ne
 
 import android.content.Context
 import android.util.Base64
-import android.util.Log
+import com.lidesheng.hyperlyric.utils.LogManager
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.online.model.LyricsResult
 import com.lidesheng.hyperlyric.online.model.SearchSource
@@ -30,6 +30,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 class NeSource(
@@ -40,7 +41,7 @@ class NeSource(
     override val sourceType = Source.NE
 
 
-    private val cookieMap = mutableMapOf<String, String>()
+    private val cookieMap = ConcurrentHashMap<String, String>()
     private val DEVICEID_XOR_KEY = "3go8&$8*3*3h0k(2)2"
 
 
@@ -116,11 +117,11 @@ class NeSource(
 
             if (loadSession()) {
                 isInitialized = true
-                Log.d("NeSource", "从缓存恢复会话成功, uid: $userId")
+                LogManager.d("NeSource", "从缓存恢复会话成功, uid: $userId")
                 return@withLock
             }
 
-            Log.d("NeSource", "开始执行匿名登录流程...")
+            LogManager.d("NeSource", "开始执行匿名登录流程...")
 
             val modes = listOf(
                 "MS-iCraft B760M WIFI", "ASUS ROG STRIX Z790", "MSI MAG B550 TOMAHAWK",
@@ -186,16 +187,16 @@ class NeSource(
                             saveSession(userId, cookieMap)
 
                             isInitialized = true
-                            Log.d("NeSource", "匿名登录成功: userId=$userId, 缓存已更新")
+                            LogManager.d("NeSource", "匿名登录成功: userId=$userId, 缓存已更新")
                         } else {
-                            Log.e("NeSource", "登录失败, 服务器返回: ${jsonRes["code"]}")
+                            LogManager.e("NeSource", "登录失败, 服务器返回: ${jsonRes["code"]}")
                         }
                     }
                 } else {
-                    Log.e("NeSource", "HTTP 请求失败: ${response.code()}")
+                    LogManager.e("NeSource", "HTTP 请求失败: ${response.code()}")
                 }
             } catch (e: Exception) {
-                Log.e("NeSource", "初始化过程中发生异常", e)
+                LogManager.e("NeSource", "初始化过程中发生异常", e)
             }
         }
     }
@@ -275,7 +276,7 @@ class NeSource(
             val decrypted = NeCryptoUtils.aesDecrypt(responseBytes)
 
             if (decrypted.contains("\"code\":301") || decrypted.contains("\"code\":401")) {
-                Log.w("NeSource", "Session invalid (code 301/401), clearing cache...")
+                LogManager.w("NeSource", "Session invalid (code 301/401), clearing cache...")
                 isInitialized = false
             }
 
@@ -302,12 +303,12 @@ class NeSource(
 
         try {
             val rawJson = doRequest(path, params)
-            Log.d("NeSource", "Search raw: $rawJson")
+            LogManager.d("NeSource", "Search raw: $rawJson")
 
             val resp = json.decodeFromString<NeSearchResponse>(rawJson)
 
             if (resp.code != 200) return@withContext emptyList()
-            Log.d("NeSource", "Search result: $resp")
+            LogManager.d("NeSource", "Search result: $resp")
             return@withContext resp.data?.resources?.map { res ->
                 val song = res.baseInfo.simpleSongData
                 SongSearchResult(
@@ -324,7 +325,7 @@ class NeSource(
             } ?: emptyList()
 
         } catch (e: Exception) {
-            Log.e("NeSource", "Search exception", e)
+            LogManager.e("NeSource", "Search exception", e)
             return@withContext emptyList()
         }
     }
@@ -343,10 +344,10 @@ class NeSource(
         val resp = try {
             json.decodeFromString<NeLyricResponse>(rawJson)
         } catch (_: Exception) { return@withContext null }
-        Log.d("NeSource", "Lyric lrc result: ${resp.lrc}")
-        Log.d("NeSource", "Lyric yrc result: ${resp.yrc}")
-        Log.d("NeSource", "Lyric translation result: ${resp.tlyric}")
-        Log.d("NeSource", "Lyric romanization result: ${resp.romalrc}")
+        LogManager.d("NeSource", "Lyric lrc result: ${resp.lrc}")
+        LogManager.d("NeSource", "Lyric yrc result: ${resp.yrc}")
+        LogManager.d("NeSource", "Lyric translation result: ${resp.tlyric}")
+        LogManager.d("NeSource", "Lyric romanization result: ${resp.romalrc}")
         return@withContext YrcParser.parse(
             yrc = resp.yrc?.lyric,
             lrc = resp.lrc?.lyric,

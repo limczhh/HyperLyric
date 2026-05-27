@@ -1,9 +1,9 @@
-package com.lidesheng.hyperlyric.service.utils.shizuku
+﻿package com.lidesheng.hyperlyric.service.utils.shizuku
 
 import android.content.ComponentName
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.util.Log
+import com.lidesheng.hyperlyric.utils.LogManager
 import com.lidesheng.hyperlyric.BuildConfig
 import com.lidesheng.hyperlyric.IPrivilegedService
 import com.lidesheng.hyperlyric.IPrivilegedLogCallback
@@ -33,11 +33,11 @@ object ShizukuServiceConnection {
             val safeTag = tag ?: "PrivilegedService"
             val safeMsg = message ?: ""
             when (level) {
-                0 -> Log.d(safeTag, safeMsg)
-                1 -> Log.i(safeTag, safeMsg)
-                2 -> Log.w(safeTag, safeMsg)
-                3 -> Log.e(safeTag, safeMsg)
-                else -> Log.d(safeTag, safeMsg)
+                0 -> LogManager.d(safeTag, safeMsg)
+                1 -> LogManager.i(safeTag, safeMsg)
+                2 -> LogManager.w(safeTag, safeMsg)
+                3 -> LogManager.e(safeTag, safeMsg)
+                else -> LogManager.d(safeTag, safeMsg)
             }
         }
     }
@@ -54,24 +54,24 @@ object ShizukuServiceConnection {
                     try {
                         if (cached.asBinder().pingBinder()) {
                             lastPingAttempt = now
-                            Log.d(TAG, "Service 缓存有效 (ping 成功)")
+                            LogManager.d(TAG, "Service 缓存有效 (ping 成功)")
                             return cached
                         }
                     } catch (e: Throwable) {
-                        Log.w(TAG, "Service ping 失败, 正在重新绑定: ${e.message}")
+                        LogManager.w(TAG, "Service ping 失败, 正在重新绑定: ${e.message}", e)
                     }
                     lastPingAttempt = now
                     cachedService = null
                 } else {
-                    Log.v(TAG, "正在使用缓存 of Service (距离上次 ping 已过 ${now - lastPingAttempt}ms)")
+                    LogManager.d(TAG, "正在使用缓存 of Service (距离上次 ping 已过 ${now - lastPingAttempt}ms)")
                     return cached
                 }
             }
 
-            Log.d(TAG, "正在建立新的 Service 连接...")
+            LogManager.d(TAG, "正在建立新的 Service 连接...")
             return establishServiceConnection().also {
                 lastPingAttempt = System.currentTimeMillis()
-                Log.d(TAG, "Service 连接建立成功")
+                LogManager.d(TAG, "Service 连接建立成功")
             }
         }
     }
@@ -82,13 +82,13 @@ object ShizukuServiceConnection {
         try {
             if (enabled) {
                 service.setLogCallback(logCallback)
-                Log.d(TAG, "Log 回调已注册到特权 Service (开关切换)")
+                LogManager.d(TAG, "Log 回调已注册到特权 Service (开关切换)")
             } else {
                 service.setLogCallback(null)
-                Log.d(TAG, "Log 回调已从特权 Service 取消注册 (开关切换)")
+                LogManager.d(TAG, "Log 回调已从特权 Service 取消注册 (开关切换)")
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "切换 Log 回调失败: ${e.message}")
+            LogManager.w(TAG, "切换 Log 回调失败: ${e.message}", e)
         }
     }
 
@@ -97,28 +97,28 @@ object ShizukuServiceConnection {
             suspendCancellableCoroutine { continuation ->
                 val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                        Log.d(TAG, "onServiceConnected 被调用, service=$service")
+                        LogManager.d(TAG, "onServiceConnected 被调用, service=$service")
                         if (service != null) {
                             val privileged = IPrivilegedService.Stub.asInterface(service)
                             if (logCallbackEnabled) {
                                 try {
                                     privileged.setLogCallback(logCallback)
-                                    Log.d(TAG, "Log 回调已注册到特权 Service")
+                                    LogManager.d(TAG, "Log 回调已注册到特权 Service")
                                 } catch (e: Exception) {
-                                    Log.w(TAG, "注册 Log 回调失败: ${e.message}")
+                                    LogManager.w(TAG, "注册 Log 回调失败: ${e.message}", e)
                                 }
                             }
                             cachedService = privileged
                             serviceConnection = this
                             continuation.resume(privileged)
                         } else {
-                            Log.e(TAG, "onServiceConnected 但 binder 为 null!")
+                            LogManager.e(TAG, "onServiceConnected 但 binder 为 null!")
                             continuation.resumeWithException(Exception("Shizuku UserService 已绑定但返回了空的 binder"))
                         }
                     }
 
                     override fun onServiceDisconnected(name: ComponentName?) {
-                        Log.w(TAG, "Service 异常断开连接")
+                        LogManager.w(TAG, "Service 异常断开连接")
                         cachedService = null
                     }
                 }
@@ -134,19 +134,19 @@ object ShizukuServiceConnection {
                 serviceArgs = args
 
                 try {
-                    Log.d(TAG, "正在调用 Shizuku.bindUserService()...")
+                    LogManager.d(TAG, "正在调用 Shizuku.bindUserService()...")
                     Shizuku.bindUserService(args, connection)
                 } catch (e: Throwable) {
-                    Log.e(TAG, "bindUserService 抛出异常: ${e.message}", e)
+                    LogManager.e(TAG, "bindUserService 抛出异常: ${e.message}", e)
                     continuation.resumeWithException(e)
                 }
 
                 continuation.invokeOnCancellation {
-                    Log.d(TAG, "Service 绑定已取消, 正在执行 unbind...")
+                    LogManager.d(TAG, "Service 绑定已取消, 正在执行 unbind...")
                     try {
                         Shizuku.unbindUserService(args, connection, true)
                     } catch (ignored: Throwable) {
-                        Log.w(TAG, "执行 unbind 期间发生错误: ${ignored.message}")
+                        LogManager.w(TAG, "执行 unbind 期间发生错误: ${ignored.message}", ignored)
                     }
                 }
             }
@@ -154,13 +154,13 @@ object ShizukuServiceConnection {
     }
 
     suspend fun <T> executeWithService(action: suspend (IPrivilegedService) -> T): T {
-        Log.d(TAG, "executeWithService 被调用")
+        LogManager.d(TAG, "executeWithService 被调用")
         return try {
             action(getPrivilegedService()).also {
-                Log.d(TAG, "executeWithService 执行成功")
+                LogManager.d(TAG, "executeWithService 执行成功")
             }
         } catch (e: Throwable) {
-            Log.e(TAG, "executeWithService 执行失败: ${e.message}", e)
+            LogManager.e(TAG, "executeWithService 执行失败: ${e.message}", e)
             throw e
         }
     }

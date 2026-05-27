@@ -1,7 +1,7 @@
-package com.lidesheng.hyperlyric.online.utils
+﻿package com.lidesheng.hyperlyric.online.utils
 
 import android.annotation.SuppressLint
-import android.util.Log
+import com.lidesheng.hyperlyric.utils.LogManager
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.zip.Inflater
@@ -33,7 +33,7 @@ object NeCryptoUtils {
             cipher.init(Cipher.DECRYPT_MODE, secretKey)
             String(cipher.doFinal(data))
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e("CryptoUtils", "AES 解密失败", e)
             ""
         }
     }
@@ -62,7 +62,7 @@ object QmCryptoUtils {
 
             val encryptedBytes = hexStringToByteArray(hexString)
             if (encryptedBytes.size % 8 != 0) {
-                Log.e(TAG, "Encrypted bytes size not multiple of 8")
+                LogManager.e(TAG, "Encrypted bytes size not multiple of 8")
                 return ""
             }
 
@@ -73,13 +73,13 @@ object QmCryptoUtils {
             val decryptedBytes = TripleDesCustom.tripleDesCrypt(encryptedBytes, schedules)
 
             if (decryptedBytes.isNotEmpty()) {
-                Log.d(TAG, "Decrypted Header: %02X %02X".format(decryptedBytes[0], decryptedBytes[1]))
+                LogManager.d(TAG, "Decrypted Header: %02X %02X".format(decryptedBytes[0], decryptedBytes[1]))
             }
 
             return decompress(decryptedBytes)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Decrypt Error", e)
+            LogManager.e(TAG, "Decrypt Error", e)
             return ""
         }
     }
@@ -113,7 +113,7 @@ object QmCryptoUtils {
                 outputStream.write(buffer, 0, count)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Zlib Decompress failed: ${e.message}")
+            LogManager.e(TAG, "Zlib Decompress failed: ${e.message}")
             return ""
         } finally {
             outputStream.close()

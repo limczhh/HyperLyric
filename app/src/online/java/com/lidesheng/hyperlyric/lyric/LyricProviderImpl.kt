@@ -3,38 +3,45 @@ package com.lidesheng.hyperlyric.lyric
 import android.content.Context
 import com.lidesheng.hyperlyric.online.LrcCacheManager
 import com.lidesheng.hyperlyric.online.OnlineLyricTargeter
+import com.lidesheng.hyperlyric.utils.LogManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class LyricProviderImpl(private val context: Context) : ILyricProvider {
-    
+
     override suspend fun fetchLyrics(params: LyricSearchParams): List<LrcLine>? {
         return withContext(Dispatchers.IO) {
+            LogManager.d("LyricProvider", "正在获取歌词: 标题=${params.title}, 艺术家=${params.artist}, 专辑=${params.album}, pkg=${params.packageName}, 时长=${params.duration}ms")
+
             // 1. 尝试从缓存获取
-            var lines = LrcCacheManager.getLyricFromCache(context, params.title, params.artist)?.let { 
-                parseLrc(it) 
+            var lines = LrcCacheManager.getLyricFromCache(context, params.title, params.artist)?.let {
+                parseLrc(it)
             }
-            
-            // 2. 缓存没有，则在线搜索
-            if (lines.isNullOrEmpty()) {
+
+            if (!lines.isNullOrEmpty()) {
+                LogManager.d("LyricProvider", "缓存命中: 行数=${lines.size}")
+            } else {
+                // 2. 缓存没有，则在线搜索
+                LogManager.d("LyricProvider", "缓存未命中，正在在线搜索")
                 lines = OnlineLyricTargeter.fetchBestLyric(
-                    context, 
-                    params.packageName, 
-                    params.title, 
-                    params.artist, 
+                    context,
+                    params.packageName,
+                    params.title,
+                    params.artist,
                     params.duration
                 )
-                
+
                 // 3. 搜索成功，存入缓存
                 if (!lines.isNullOrEmpty()) {
                     LrcCacheManager.saveLyricToCache(
-                        context, 
-                        params.title, 
-                        params.artist, 
+                        context,
+                        params.title,
+                        params.artist,
                         buildLrcString(lines)
                     )
                 }
             }
+            LogManager.d("LyricProvider", "歌词获取完成: 行数=${lines?.size ?: 0}")
             lines
         }
     }

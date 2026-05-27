@@ -1,7 +1,8 @@
-package com.lidesheng.hyperlyric.service
+﻿package com.lidesheng.hyperlyric.service
 
 import android.app.Notification
 import android.app.NotificationManager
+import com.lidesheng.hyperlyric.utils.LogManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -78,7 +79,9 @@ class NotificationPresenter(
     fun unregister() {
         try {
             context.unregisterReceiver(playbackToggleReceiver)
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            LogManager.w("NotificationPresenter", "注销播放控制接收器失败", e)
+        }
         pauseDebounceJob?.cancel()
     }
 
@@ -135,12 +138,19 @@ class NotificationPresenter(
         val showProgressSetting = sp.getBoolean(ServiceConstants.KEY_NOTIFICATION_SHOW_PROGRESS, ServiceConstants.DEFAULT_NOTIFICATION_SHOW_PROGRESS)
 
         if (!force && lastUiState != null) {
-            if (currentUiState == lastUiState) return
+            if (currentUiState == lastUiState) {
+                LogManager.d("NotificationPresenter", "updateState 跳过: 状态未变化")
+                return
+            }
             val progressOnly = currentUiState.isProgressOnlyChange(lastUiState!!)
             if (progressOnly) {
                 // 如果当前关闭了进度条显示，或者屏幕处于关闭状态，则不因进度变化触发通知
-                if (!showProgressSetting || !isScreenOn) return
+                if (!showProgressSetting || !isScreenOn) {
+                    LogManager.d("NotificationPresenter", "updateState 跳过: 仅进度变化, 进度条开关=$showProgressSetting, 屏幕=$isScreenOn")
+                    return
+                }
             }
+            LogManager.d("NotificationPresenter", "updateState: 强制=$force, 仅进度变化=$progressOnly, 播放中=${currentUiState.isPlaying}")
         }
 
         if (currentUiState.isPlaying) {
@@ -180,6 +190,7 @@ class NotificationPresenter(
         val sp = context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE)
         val showProgressSetting = sp.getBoolean(ServiceConstants.KEY_NOTIFICATION_SHOW_PROGRESS, ServiceConstants.DEFAULT_NOTIFICATION_SHOW_PROGRESS)
         val actualShowProgress = isScreenOn && showProgressSetting
+        LogManager.d("NotificationPresenter", "正在发送通知: 类型=${if (notificationType == 1) "焦点" else "普通"}, bypass=$isBypassFocusLimitEnabled, 进度=$actualShowProgress")
 
         when (notificationType) {
             0 -> {
@@ -232,7 +243,7 @@ class NotificationPresenter(
         try {
             notificationManager.notify(id, notification)
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e("NotificationPresenter", "通知发送失败 id=$id", e)
         }
     }
 

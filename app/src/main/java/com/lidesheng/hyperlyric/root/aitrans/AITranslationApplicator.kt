@@ -1,7 +1,7 @@
 package com.lidesheng.hyperlyric.root.aitrans
 
 import android.util.Log
-import com.lidesheng.hyperlyric.root.utils.xLog
+import com.lidesheng.hyperlyric.root.utils.xLogDebug
 import io.github.proify.lyricon.lyric.model.Song
 
 /** Applies validated translation items back to lyric lines. */
@@ -24,7 +24,7 @@ internal object AITranslationApplicator {
                 line
             }
         }
-        xLog("AITranslation : Result: Applied $appliedCount lines to ${song.name}")
+        xLogDebug("AITranslation : Result: Applied $appliedCount lines to ${song.name}")
         return song.copy(lyrics = newLyrics)
     }
 }

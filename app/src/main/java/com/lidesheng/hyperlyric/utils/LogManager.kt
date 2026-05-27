@@ -1,16 +1,148 @@
 package com.lidesheng.hyperlyric.utils
 
 import android.content.Context
+import android.util.Log
 import com.lidesheng.hyperlyric.R
-import com.lidesheng.hyperlyric.ui.page.LogEntry
+import com.lidesheng.hyperlyric.ui.page.log.LogEntry
+import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.regex.Pattern
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 object LogManager {
-    suspend fun readXposedLogs(context: Context): List<LogEntry> = withContext(Dispatchers.IO) {
+    private const val LOG_FILE_NAME = "app_logs.log"
+    private const val MAX_LOG_SIZE = 2 * 1024 * 1024L // 2MB
+
+    // 日志等级：0=一般(I+W+E), 1=调试(D+I+W+E)
+    private const val LEVEL_NORMAL = 0
+    private const val LEVEL_DEBUG = 1
+
+    private val lock = ReentrantReadWriteLock()
+    private val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.getDefault())
+    private var logFile: File? = null
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        val dir = File(context.filesDir, "logs")
+        if (!dir.exists()) dir.mkdirs()
+        logFile = File(dir, LOG_FILE_NAME)
+    }
+
+    // ========================= 写入 =========================
+
+    fun d(tag: String, message: String) {
+        Log.d(tag, message)
+        if (shouldWrite("D")) writeLog("D", tag, message)
+    }
+
+    fun i(tag: String, message: String) {
+        Log.i(tag, message)
+        writeLog("I", tag, message)
+    }
+
+    fun w(tag: String, message: String, e: Throwable? = null) {
+        val fullMsg = if (e != null) "$message: ${e.message}" else message
+        Log.w(tag, fullMsg, e)
+        writeLog("W", tag, fullMsg)
+    }
+
+    fun e(tag: String, message: String, e: Throwable? = null) {
+        val fullMsg = if (e != null) "$message: ${e.message}" else message
+        Log.e(tag, fullMsg, e)
+        writeLog("E", tag, fullMsg)
+    }
+
+    fun clearLogs() {
+        val file = logFile ?: return
+        lock.write {
+            try {
+                if (file.exists()) file.writeText("")
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun shouldWrite(level: String): Boolean {
+        val prefs = appContext?.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) ?: return true
+        val logLevel = prefs.getInt(UIConstants.KEY_LOG_LEVEL, UIConstants.DEFAULT_LOG_LEVEL)
+        if (logLevel == LEVEL_DEBUG) return true
+        return level == "I" || level == "W" || level == "E" || level == "C"
+    }
+
+    private fun writeLog(level: String, tag: String, message: String) {
+        val file = logFile ?: return
+        lock.write {
+            try {
+                if (file.exists() && file.length() > MAX_LOG_SIZE) {
+                    trimLogFile(file)
+                }
+                val timestamp = dateFormat.format(Date())
+                val line = "$timestamp $level/$tag: $message\n"
+                file.appendText(line)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun trimLogFile(file: File) {
+        try {
+            val lines = file.readLines()
+            val keepCount = lines.size / 2
+            if (keepCount > 0) {
+                file.writeText(lines.subList(lines.size - keepCount, lines.size).joinToString("\n") + "\n")
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    // ========================= 读取 =========================
+
+    suspend fun readAppLogs(): List<LogEntry> = withContext(Dispatchers.IO) {
+        val file = logFile ?: return@withContext emptyList()
+        if (!file.exists()) return@withContext emptyList()
+
+        val entries = mutableListOf<LogEntry>()
+        val regex = Regex("""^(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) ([DIWEC])/(\S+): (.+)$""")
+
+        lock.read {
+            try {
+                file.forEachLine { line ->
+                    val match = regex.find(line)
+                    if (match != null) {
+                        val (time, level, tag, msg) = match.destructured
+                        entries.add(
+                            LogEntry(
+                                timestamp = time,
+                                level = level,
+                                tag = tag,
+                                message = msg,
+                                source = "HyperLyric",
+                                rawLog = line
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        entries.reversed()
+    }
+
+    suspend fun readModuleLogs(context: Context): List<LogEntry> {
+        return readXposedLogs(context)
+    }
+
+    private suspend fun readXposedLogs(context: Context): List<LogEntry> = withContext(Dispatchers.IO) {
         val entries = mutableListOf<LogEntry>()
         try {
             val findProcess = Runtime.getRuntime().exec(
@@ -60,7 +192,7 @@ object LogManager {
                     val isHyperLyric = blockStr.contains("hyperlyric", ignoreCase = true) || blockStr.contains("HyperLyric")
                     val isSystemUi = blockStr.contains("systemui", ignoreCase = true) || blockStr.contains("SystemUI")
                     val isLyricon = blockStr.contains("io.github.proify.lyricon", ignoreCase = true)
-                    val isSystemUiCrash = isSystemUi && 
+                    val isSystemUiCrash = isSystemUi &&
                                           (blockStr.contains("crash", ignoreCase = true) || blockStr.contains("fatal exception", ignoreCase = true))
 
                     if (isHyperLyric || isSystemUi || isLyricon) {
@@ -148,13 +280,8 @@ object LogManager {
             entries.add(LogEntry("NOW", "E", context.getString(R.string.tag_logger), msg, rawLog = msg))
         }
         val sortedList = entries.sortedByDescending { it.timestamp }
-        sortedList.forEachIndexed { index, entry ->
-            entry.id = "log_${index}_${entry.timestamp}"
+        sortedList.mapIndexed { index, entry ->
+            entry.copy(id = "log_${index}_${entry.timestamp}")
         }
-        sortedList
-    }
-
-    suspend fun collectAllLogs(context: Context): List<LogEntry> {
-        return readXposedLogs(context)
     }
 }

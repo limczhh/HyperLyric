@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.service
+﻿package com.lidesheng.hyperlyric.service
 
 import android.content.ComponentName
 import android.content.Context
@@ -11,6 +11,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
+import com.lidesheng.hyperlyric.utils.LogManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.toColorInt
 import com.lidesheng.hyperlyric.lyric.DynamicLyricData
@@ -132,13 +133,15 @@ class LiveLyricService : NotificationListenerService() {
             }, componentName)
 
             updateCurrentController(mediaSessionManager.getActiveSessions(componentName))
+            LogManager.d("LiveLyricService", "媒体会话监听注册成功")
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e("LiveLyricService", "媒体会话监听注册失败", e)
         }
     }
 
     private fun updateCurrentController(controllers: List<MediaController>?) {
         if (controllers.isNullOrEmpty()) {
+            LogManager.d("LiveLyricService", "控制器列表为空，正在清除歌词状态")
             unregisterAllControllers()
             clearLyricState()
             return
@@ -147,6 +150,7 @@ class LiveLyricService : NotificationListenerService() {
         val playingController = controllers.find {
             it.playbackState?.state == PlaybackState.STATE_PLAYING
         }
+        LogManager.d("LiveLyricService", "控制器更新: 数量=${controllers.size}, 播放中=${playingController?.packageName}")
 
         if (playingController != null) {
             val alreadyTracking = currentControllers.singleOrNull()?.sessionToken == playingController.sessionToken
@@ -174,7 +178,9 @@ class LiveLyricService : NotificationListenerService() {
         for (controller in currentControllers) {
             try {
                 controller.unregisterCallback(mediaCallback)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                LogManager.w("LiveLyricService", "注销媒体回调失败", e)
+            }
         }
         currentControllers.clear()
     }
@@ -206,16 +212,27 @@ class LiveLyricService : NotificationListenerService() {
             try {
                 val componentName = ComponentName(this@LiveLyricService, LiveLyricService::class.java)
                 updateCurrentController(mediaSessionManager.getActiveSessions(componentName))
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                LogManager.w("LiveLyricService", "会话销毁处理失败", e)
+            }
         }
     }
 
 
     private fun syncToGlobalData(controller: MediaController?) {
-        controller ?: return
+        controller ?: run {
+            LogManager.d("LiveLyricService", "syncToGlobalData 跳过: controller 为 null")
+            return
+        }
 
-        val metadata = controller.metadata ?: return
-        val playbackState = controller.playbackState ?: return
+        val metadata = controller.metadata ?: run {
+            LogManager.d("LiveLyricService", "syncToGlobalData 跳过: metadata 为 null, pkg=${controller.packageName}")
+            return
+        }
+        val playbackState = controller.playbackState ?: run {
+            LogManager.d("LiveLyricService", "syncToGlobalData 跳过: playbackState 为 null, pkg=${controller.packageName}")
+            return
+        }
         val currentPackageName = controller.packageName ?: ""
 
         val rawTitle = (metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
@@ -231,6 +248,7 @@ class LiveLyricService : NotificationListenerService() {
 
         val newIdentifier = "$currentPackageName-$artist-$album-$duration"
         val isNewSong = (newIdentifier != currentSongIdentifier) || DynamicLyricData.currentState.albumBitmap == null
+        LogManager.d("LiveLyricService", "同步元数据: pkg=$currentPackageName, 标题=$rawTitle, 艺术家=$artist, 专辑=$album, 时长=${duration}ms, 新歌=$isNewSong")
         
         if (isNewSong) {
             currentSongIdentifier = newIdentifier
@@ -273,6 +291,7 @@ class LiveLyricService : NotificationListenerService() {
         }
 
         if (isNewSong && albumBitmap == null) {
+            LogManager.d("LiveLyricService", "封面为空，正在启动重试")
             scheduleBitmapRetry(controller)
         } else if (isNewSong) {
             cancelBitmapRetry()
@@ -295,17 +314,23 @@ class LiveLyricService : NotificationListenerService() {
             while (bitmapRetryCount < maxBitmapRetries) {
                 delay(bitmapRetryDelayMs.milliseconds)
                 bitmapRetryCount++
+                LogManager.d("LiveLyricService", "封面重试: 第${bitmapRetryCount}次/${maxBitmapRetries}次")
                 val metadata = controller.metadata ?: continue
                 val bitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                     ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
                 if (bitmap != null) {
                     if (controller.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != currentSyncData?.dynamicTitle) {
+                        LogManager.d("LiveLyricService", "封面重试中止: 标题已变更")
                         break
                     }
+                    LogManager.d("LiveLyricService", "封面重试成功: 第${bitmapRetryCount}次")
                     DynamicLyricData.updateLoadingAlbumArt(false)
                     syncToGlobalData(controller)
                     break
                 }
+            }
+            if (bitmapRetryCount >= maxBitmapRetries) {
+                LogManager.w("LiveLyricService", "封面重试超时: 已达最大次数 $maxBitmapRetries")
             }
             DynamicLyricData.updateLoadingAlbumArt(false)
         }
@@ -321,6 +346,7 @@ class LiveLyricService : NotificationListenerService() {
         val enableDynamicIsland = sp.getBoolean(RootConstants.KEY_HOOK_ENABLE_DYNAMIC_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_DYNAMIC_ISLAND)
         val pauseListening = !enableDynamicIsland
         val isWhitelisted = DynamicLyricData.whitelistState.value.contains(data.currentPackageName)
+        LogManager.d("LiveLyricService", "processSyncData: 超级岛开关=$enableDynamicIsland, 白名单通过=$isWhitelisted, pkg=${data.currentPackageName}")
 
         if (pauseListening || !isWhitelisted) {
             isCurrentlyPlaying = false
@@ -342,7 +368,10 @@ class LiveLyricService : NotificationListenerService() {
             cachedNotificationEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
             lastPermissionCheckTime = now
         }
-        if (!cachedNotificationEnabled) return
+        if (!cachedNotificationEnabled) {
+            LogManager.w("LiveLyricService", "通知权限未授予，跳过处理")
+            return
+        }
 
         DynamicLyricData.updateAnchor(data.position, data.isPlaying)
 
@@ -360,6 +389,7 @@ class LiveLyricService : NotificationListenerService() {
                 val default = "#E0E0E0".toColorInt()
                 AlbumImageProcessor.ExtractedColors(default, default)
             }
+            LogManager.d("LiveLyricService", "正在提取封面取色: 主色=${String.format("#%06X", 0xFFFFFF and colors.main)}, 次色=${String.format("#%06X", 0xFFFFFF and colors.secondary)}")
             DynamicLyricData.updateColor(colors.main, colors.secondary)
         }
 
@@ -382,6 +412,7 @@ class LiveLyricService : NotificationListenerService() {
                     )
                 )
                 DynamicLyricData.updateFetchingLyrics(false)
+                LogManager.d("LiveLyricService", "在线歌词获取完成: 行数=${lines?.size ?: 0}, 身份守卫=${currentSongIdentifier == data.identifier}")
 
                 if (!lines.isNullOrEmpty()) {
                     if (currentSongIdentifier == data.identifier) {
@@ -409,6 +440,7 @@ class LiveLyricService : NotificationListenerService() {
     private fun launchLyricScheduler() {
         tickerJob?.cancel()
         val lines = currentLyricLines ?: return
+        LogManager.d("LiveLyricService", "启动歌词调度器: 行数=${lines.size}")
         
         tickerJob = serviceScope.launch {
             while (true) {
@@ -432,7 +464,9 @@ class LiveLyricService : NotificationListenerService() {
     private fun launchProgressScheduler() {
         progressJob?.cancel()
         val sp = getSharedPreferences(UIConstants.PREF_NAME, MODE_PRIVATE)
-        if (!sp.getBoolean(ServiceConstants.KEY_NOTIFICATION_SHOW_PROGRESS, ServiceConstants.DEFAULT_NOTIFICATION_SHOW_PROGRESS)) return
+        val showProgress = sp.getBoolean(ServiceConstants.KEY_NOTIFICATION_SHOW_PROGRESS, ServiceConstants.DEFAULT_NOTIFICATION_SHOW_PROGRESS)
+        if (!showProgress) return
+        LogManager.d("LiveLyricService", "启动进度调度器")
         
         progressJob = serviceScope.launch {
             var lastPercent = -1
@@ -498,6 +532,7 @@ class LiveLyricService : NotificationListenerService() {
             6 -> "${data.identityArtist} - ${data.identityAlbum}"
             else -> ""
         }
+        LogManager.d("LiveLyricService", "分发歌词: islandLeft=$finalIslandLeft, islandRight=$finalIslandRight, songInfo=$songInfo")
 
         val shouldUpdateBitmap = data.isNewSong ||
                                 finalIslandLeft != lastDispatchedIslandLeft || 
@@ -519,6 +554,7 @@ class LiveLyricService : NotificationListenerService() {
 
     
     override fun onDestroy() {
+        LogManager.d("LiveLyricService", "LiveLyricService 销毁")
         super.onDestroy()
         notificationPresenter.unregister()
         notificationPresenter.clearNotifications()
@@ -535,13 +571,16 @@ class LiveLyricService : NotificationListenerService() {
          * 用于解决杀后台后监听器假死的问题。
          */
         fun ensureListenerBound(context: Context) {
+            LogManager.d("LiveLyricService", "正在尝试静默重连 NotificationListenerService")
             try {
                 val pm = context.packageManager
                 val cn = ComponentName(context, LiveLyricService::class.java)
                 pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, android.content.pm.PackageManager.DONT_KILL_APP)
                 pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP)
                 requestRebind(cn)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                LogManager.e("LiveLyricService", "静默重连失败", e)
+            }
         }
     }
 }

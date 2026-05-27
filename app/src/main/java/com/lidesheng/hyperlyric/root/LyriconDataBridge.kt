@@ -65,6 +65,7 @@ object LyriconDataBridge {
     private var interludeTracker = InterludeTracker(8_000L)
 
     fun updateSong(song: Song?, prefs: SharedPreferences? = null) {
+        com.lidesheng.hyperlyric.root.utils.xLogDebug("LyriconDataBridge : 歌曲变更: ${song?.name}")
         isTextMode = false
         currentSong = song
         currentSongName = song?.name
@@ -108,10 +109,10 @@ object LyriconDataBridge {
                 val ratio = song.calculateChineseRatio()
                 val percentage = String.format(java.util.Locale.US, "%.1f%%", ratio * 100)
                 if (autoIgnoreChinese) {
-                    com.lidesheng.hyperlyric.root.utils.xLog("AITranslation : 歌曲 ${song.name}（中文占比 $percentage)")
+                    com.lidesheng.hyperlyric.root.utils.xLogDebug("AITranslation : 歌曲 ${song.name}（中文占比 $percentage)")
                 }
                 if (autoIgnoreChinese && ratio > 0.5f) {
-                    com.lidesheng.hyperlyric.root.utils.xLog("AITranslation : 歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
+                    com.lidesheng.hyperlyric.root.utils.xLogDebug("AITranslation : 歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
                     return@launch
                 }
                 val translatedSong = AITranslator.translateSongSync(song, configs)
@@ -131,6 +132,8 @@ object LyriconDataBridge {
                     aiSetDisplayTranslation = true
                     HookIslandLyric.refreshActiveIsland()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (_: Exception) {
             }
         }
@@ -171,6 +174,7 @@ object LyriconDataBridge {
         val newText = foundLine?.text ?: currentLyric ?: ""
 
         if (newText != currentLyric) {
+            com.lidesheng.hyperlyric.root.utils.xLogDebug("LyriconDataBridge : 歌词行切换: ${newText.take(30)}")
             currentLyric = newText
             return true
         }

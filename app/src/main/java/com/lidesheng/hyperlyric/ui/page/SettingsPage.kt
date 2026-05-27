@@ -153,8 +153,15 @@ private fun LazyListScope.settingsSections(
     }
     item(key = "debug_info_content") {
         val navigator = LocalNavigator.current
+        val context = LocalContext.current
+        val prefs = remember { context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) }
+        var logLevel by remember { mutableIntStateOf(prefs.getInt(UIConstants.KEY_LOG_LEVEL, UIConstants.DEFAULT_LOG_LEVEL)) }
+        val logLevelOptions = listOf(stringResource(R.string.log_level_normal), stringResource(R.string.log_level_verbose))
         Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
-            ArrowPreference(title = stringResource(R.string.title_view_logs), onClick = { navigator.navigate(Route.Log) })
+            Column {
+                WindowDropdownPreference(title = stringResource(R.string.title_log_level), items = logLevelOptions, selectedIndex = logLevel, onSelectedIndexChange = { logLevel = it; prefs.edit { putInt(UIConstants.KEY_LOG_LEVEL, it) } })
+                ArrowPreference(title = stringResource(R.string.title_view_logs), onClick = { navigator.navigate(Route.Log) })
+            }
         }
     }
 }

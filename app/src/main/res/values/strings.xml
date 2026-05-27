@@ -84,7 +84,7 @@
     <string name="title_backup">备份</string>
     <string name="title_restore">恢复</string>
     <string name="title_debug_info">调试信息</string>
-    <string name="title_view_logs">查看模块日志</string>
+    <string name="title_view_logs">查看日志</string>
 
     <!-- ———————————————————————— HookSettingsPage ———————————————————————— -->
     <string name="lyric_mode_verbatim">Lyricon逐字歌词</string>
@@ -331,6 +331,13 @@
 
     <!-- ———————————————————————— LogPage ———————————————————————— -->
     <string name="title_module_logs">模块日志</string>
+    <string name="title_app_logs">应用日志</string>
+    <string name="title_log_viewer">日志查看</string>
+    <string name="title_log_level">日志输出等级</string>
+    <string name="log_level_normal">一般日志</string>
+    <string name="log_level_verbose">调试日志</string>
+    <string name="clear_logs">清空日志</string>
+    <string name="clear_logs_confirm">确定要清空应用日志吗？\n此操作不会清除模块日志。</string>
     <string name="level_debug">Debug</string>
     <string name="level_info">Info</string>
     <string name="level_warn">Warn</string>
@@ -338,7 +345,7 @@
     <string name="level_crash">Crash</string>
     <string name="export_all">导出日志</string>
     <string name="module_logs_level">日志等级</string>
-    <string name="no_logs_found">未找到相关日志</string>
+    <string name="no_logs_found">暂无日志</string>
     <string name="no_root_permission">应用未获取root权限，无法获取lsposed日志</string>
     <string name="title_log_detail">日志详情</string>
     <string name="export_success">导出成功</string>

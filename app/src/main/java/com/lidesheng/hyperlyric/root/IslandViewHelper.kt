@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root
 import android.annotation.SuppressLint
 import android.view.View
 import android.view.ViewGroup
+import com.lidesheng.hyperlyric.root.utils.xLogDebug
 import com.lidesheng.hyperlyric.root.utils.xLogError
 
 /**
@@ -30,7 +31,9 @@ object IslandViewHelper {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            xLogError("toggleContainer : 切换容器可见性失败 ($containerName)", e)
+        }
     }
 
     /**
@@ -58,7 +61,9 @@ object IslandViewHelper {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            xLogError("clearTextContainerMargin : 清除边距失败 ($parentName)", e)
+        }
     }
 
     /**
@@ -101,13 +106,16 @@ object IslandViewHelper {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            xLogError("showOriginalTexts : 恢复原生文本失败 ($parentName)", e)
+        }
     }
 
     /**
      * 触发灵动岛系统的布局刷新
      */
     fun triggerSystemRelayout(islandView: ViewGroup) {
+        xLogDebug("IslandViewHelper : 正在触发布局刷新")
         runCatching {
             val viewClass = islandView.javaClass
             // 优先尝试 updateBigIslandViewWidth

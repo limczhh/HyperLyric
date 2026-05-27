@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.service.utils.shizuku
+﻿package com.lidesheng.hyperlyric.service.utils.shizuku
 
 import android.content.AttributionSource
 import android.content.Context
@@ -6,7 +6,8 @@ import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
+import android.util.Log.e
+import com.lidesheng.hyperlyric.utils.LogManager
 import com.lidesheng.hyperlyric.BuildConfig
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
@@ -77,7 +78,7 @@ object ShizukuManager {
                 awaitClose { Shizuku.removeRequestPermissionResultListener(listener) }
             }.catch { emit(false) }.first()
         } catch (e: Throwable) {
-            Log.e(TAG, "Shizuku 权限检查异常: ${e.message}", e)
+            LogManager.e(TAG, "Shizuku 权限检查异常: ${e.message}", e)
             false
         }
     }
@@ -95,11 +96,11 @@ object ShizukuManager {
         try {
             val prefs = context.getSharedPreferences("com.lidesheng.hyperlyric_preferences", Context.MODE_PRIVATE)
             if (prefs.getBoolean("key_bypass_focus_notification_limit", false)) {
-                Log.i(TAG, "检测到 Shizuku 服务离线，已自动回退关闭 [key_bypass_focus_notification_limit] 选项")
+                LogManager.i(TAG, "检测到 Shizuku 服务离线，已自动回退关闭 [key_bypass_focus_notification_limit] 选项")
                 prefs.edit { putBoolean("key_bypass_focus_notification_limit", false) }
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "自动关闭绕过选项失败: ${e.message}")
+            LogManager.w(TAG, "自动关闭绕过选项失败: ${e.message}", e)
         }
     }
 
@@ -114,7 +115,7 @@ object ShizukuManager {
                 return false
             }
         } catch (e: Throwable) {
-            Log.e(TAG, "Shizuku 检查异常 (服务可能未启动或 binder 未接收): ${e.message}", e)
+            LogManager.e(TAG, "Shizuku 检查异常 (服务可能未启动或 binder 未接收): ${e.message}", e)
             disableBypassFocusLimit(context)
             return false
         }
@@ -123,26 +124,26 @@ object ShizukuManager {
         val uid = try {
             pm.getPackageUid(XMSF_PACKAGE, 0)
         } catch (_: Exception) {
-            Log.w(TAG, "未找到 XMSF 包名 (UID 查询失败)")
+            LogManager.w(TAG, "未找到 XMSF 包名 (UID 查询失败)")
             return false
         }
 
-        Log.v(TAG, "setXmsfNetworkingEnabled 被调用: enabled=$enabled, UID=$uid")
+        LogManager.d(TAG, "setXmsfNetworkingEnabled 被调用: enabled=$enabled, UID=$uid")
 
         // 1. 优先尝试使用具有高权限的 Shizuku User Service 进行跨进程调用以完美绕过系统对于 callingUid 的强校验
         try {
-            Log.v(TAG, "正在尝试使用 Shizuku UserService...")
+            LogManager.d(TAG, "正在尝试使用 Shizuku UserService...")
             val service = ShizukuServiceConnection.getPrivilegedService()
-            Log.v(TAG, "成功获取特权 Service, 正在调用 setPackageNetworkingEnabled...")
+            LogManager.d(TAG, "成功获取特权 Service, 正在调用 setPackageNetworkingEnabled...")
             val success = service.setPackageNetworkingEnabled(uid, enabled)
             if (success) {
-                Log.d(TAG, "通过特权 Service 成功设置 XMSF 网络状态为 $enabled")
+                LogManager.d(TAG, "通过特权 Service 成功设置 XMSF 网络状态为 $enabled")
                 return true
             } else {
-                Log.w(TAG, "特权 Service 返回失败, UID=$uid, 正在退回到本地 Hook 模式")
+                LogManager.w(TAG, "特权 Service 返回失败, UID=$uid, 正在退回到本地 Hook 模式")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "特权 Service 调用失败: ${e.message}, 正在退回到本地 Hook 模式")
+            LogManager.w(TAG, "特权 Service 调用失败: ${e.message}, 正在退回到本地 Hook 模式", e)
         }
 
         // 2. 本地 Hook 备用方案（当 User Service 无法正常工作或尚未就绪时的降级路径）
@@ -152,7 +153,7 @@ object ShizukuManager {
         for (backend in serviceBackends) {
             try {
                 val service = getHookedService(backend)
-                Log.d(TAG, "正在尝试 ${backend.label} 后端: UID=$uid, enabled=$enabled (本地 Hook)")
+                LogManager.d(TAG, "正在尝试 ${backend.label} 后端: UID=$uid, enabled=$enabled (本地 Hook)")
 
                 if (!enabled) {
                     callMethodResilient(
@@ -161,7 +162,7 @@ object ShizukuManager {
                         OEM_DENY_CHAIN,
                         true
                     )
-                    Log.d(TAG, "在拦截 UID=$uid 之前, 已通过 ${backend.label} 启用防火墙链 $OEM_DENY_CHAIN (本地 Hook)")
+                    LogManager.d(TAG, "在拦截 UID=$uid 之前, 已通过 ${backend.label} 启用防火墙链 $OEM_DENY_CHAIN (本地 Hook)")
                 }
 
                 val methodUsed = callMethodResilient(
@@ -171,7 +172,7 @@ object ShizukuManager {
                     uid,
                     rule
                 )
-                Log.d(
+                LogManager.d(
                     TAG,
                     "已通过 ${backend.label}.$methodUsed 成功${if (enabled) "恢复" else "拦截"} UID=$uid 的网络连接 (本地 Hook)"
                 )
@@ -179,11 +180,11 @@ object ShizukuManager {
             } catch (t: Throwable) {
                 val detail = "${backend.label} 失败: ${t.message}"
                 failures += detail
-                Log.w(TAG, detail, t)
+                LogManager.w(TAG, detail, t)
             }
         }
 
-        Log.e(TAG, "所有防火墙后端均失败: ${failures.joinToString(" || ")}")
+        LogManager.e(TAG, "所有防火墙后端均失败: ${failures.joinToString(" || ")}")
         return false
     }
 

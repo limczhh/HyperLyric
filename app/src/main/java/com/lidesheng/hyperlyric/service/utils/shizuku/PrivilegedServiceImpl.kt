@@ -1,11 +1,10 @@
-package com.lidesheng.hyperlyric.service.utils.shizuku
+﻿package com.lidesheng.hyperlyric.service.utils.shizuku
 
 import androidx.annotation.Keep
 import com.lidesheng.hyperlyric.IPrivilegedService
 import com.lidesheng.hyperlyric.IPrivilegedLogCallback
-import android.util.Log
+import com.lidesheng.hyperlyric.utils.LogManager
 import android.os.IBinder
-import android.os.IInterface
 import java.lang.reflect.InvocationTargetException
 import android.os.Handler
 import android.os.HandlerThread
@@ -26,7 +25,7 @@ class PrivilegedServiceImpl : IPrivilegedService.Stub() {
         
         init {
             try {
-                Log.d(TAG, "PrivilegedServiceImpl 类已加载")
+                LogManager.d(TAG, "PrivilegedServiceImpl 类已加载")
             } catch (ignored: Exception) {}
         }
     }
@@ -89,7 +88,6 @@ class PrivilegedServiceImpl : IPrivilegedService.Stub() {
                 e?.cause?.let { cause ->
                     logE("异常根源: ${cause.javaClass.name}: ${cause.message}")
                 }
-                e?.printStackTrace()
                 return false
             }
             
@@ -150,17 +148,17 @@ class PrivilegedServiceImpl : IPrivilegedService.Stub() {
     }
 
     private fun logD(message: String) {
-        Log.d(TAG, message)
+        LogManager.d(TAG, message)
         logCallback?.let { runCatching { it.log(0, TAG, message) } }
     }
 
     private fun logW(message: String) {
-        Log.w(TAG, message)
+        LogManager.w(TAG, message)
         logCallback?.let { runCatching { it.log(2, TAG, message) } }
     }
 
     private fun logE(message: String) {
-        Log.e(TAG, message)
+        LogManager.e(TAG, message)
         logCallback?.let { runCatching { it.log(3, TAG, message) } }
     }
 }

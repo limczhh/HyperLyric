@@ -103,7 +103,7 @@ object HookIslandGlow {
                 }
             }
         }.onFailure { e ->
-            xLogError("ModuleInit : 超级岛外圈光效颜色提取失败", e)
+            xLogError("HookIslandGlow : 颜色提取失败", e)
         }
     }
 

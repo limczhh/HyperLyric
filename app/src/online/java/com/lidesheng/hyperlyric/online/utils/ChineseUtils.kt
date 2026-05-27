@@ -1,6 +1,7 @@
-package com.lidesheng.hyperlyric.online.utils
+﻿package com.lidesheng.hyperlyric.online.utils
 
 import android.content.Context
+import com.lidesheng.hyperlyric.utils.LogManager
 
 /**
  * 极轻量级繁简转换工具（仅支持 繁体 -> 简体）
@@ -49,7 +50,7 @@ object ChineseUtils {
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogManager.e("ChineseUtils", "字典加载失败", e)
             }
             
             initialized = true

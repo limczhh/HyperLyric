@@ -9,6 +9,7 @@ import android.graphics.RectF
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import androidx.core.graphics.toColorInt
+import com.lidesheng.hyperlyric.utils.LogManager
 
 /**
  * 专辑图片与色彩处理中心。
@@ -99,11 +100,14 @@ object AlbumImageProcessor {
             if (targetBitmap != bitmap && !targetBitmap.isRecycled) targetBitmap.recycle()
 
             // 统一取 onBlackBackground (高亮度) 的结果
-            ExtractedColors(
+            val result = ExtractedColors(
                 main = palette.onBlackBackground.getOrNull(0) ?: defaultColor,
                 secondary = palette.onBlackBackground.getOrNull(1) ?: (palette.onBlackBackground.getOrNull(0) ?: defaultColor)
             )
-        } catch (_: Exception) {
+            LogManager.d("AlbumProcessor", "正在提取取色: ${bitmap.width}x${bitmap.height}, 主色=${String.format("#%06X", 0xFFFFFF and result.main)}, 次色=${String.format("#%06X", 0xFFFFFF and result.secondary)}")
+            result
+        } catch (e: Exception) {
+            LogManager.e("AlbumProcessor", "取色失败: ${bitmap.width}x${bitmap.height}", e)
             fallback
         }
     }
@@ -115,7 +119,8 @@ object AlbumImageProcessor {
         if (bitmap == null || bitmap.isRecycled) return null
         return try {
             bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            LogManager.w("AlbumProcessor", "Bitmap 拷贝失败: ${bitmap.width}x${bitmap.height}", e)
             null
         }
     }

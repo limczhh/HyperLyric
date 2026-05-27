@@ -4,6 +4,7 @@ import android.content.Context
 import com.lidesheng.hyperlyric.lyric.LrcLine
 import com.lidesheng.hyperlyric.online.model.SongSearchResult
 import com.lidesheng.hyperlyric.online.utils.ChineseUtils
+import com.lidesheng.hyperlyric.utils.LogManager
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
@@ -28,38 +29,50 @@ object OnlineLyricTargeter {
         }
 
         val keyword = "$title $artist"
-        
+        LogManager.d("OnlineTargeter", "正在搜索: 关键词=\"$keyword\", 源顺序=${sources.joinToString { it.javaClass.simpleName }}")
+
         val cleanLocalTitle = cleanString(context, title)
         val localArtists = artist.split("&", ",", "，", "、").map { cleanString(context, it) }
         val featureKeywords = listOf("live", "remastered", "翻唱", "cover")
         val localFeatures = featureKeywords.filter { title.lowercase().contains(it) }
         
+        var bestScore = -1
+
         for (source in sources) {
             val results = withTimeoutOrNull(TIMEOUT_MS) {
                 try {
                     source.search(keyword, 1, "/", 20)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    LogManager.w("OnlineTargeter", "搜索异常: 源=${source.javaClass.simpleName}, ${e.message}")
                     null
                 }
             }
-            if (results.isNullOrEmpty()) continue
+            if (results.isNullOrEmpty()) {
+                LogManager.d("OnlineTargeter", "搜索结果为空: 源=${source.javaClass.simpleName}")
+                continue
+            }
+            LogManager.d("OnlineTargeter", "搜索结果: 源=${source.javaClass.simpleName}, 数量=${results.size}")
 
-            var bestScore = -1
+            var localBestScore = -1
             var bestSong: SongSearchResult? = null
 
             for (song in results) {
                 val score = calculateScore(context, song, cleanLocalTitle, localArtists, localFeatures, durationMs)
-                if (score > bestScore) {
-                    bestScore = score
+                if (score > localBestScore) {
+                    localBestScore = score
                     bestSong = song
                 }
             }
+
+            if (localBestScore > bestScore) bestScore = localBestScore
+            LogManager.d("OnlineTargeter", "评分: \"${bestSong?.title}\" - \"${bestSong?.artist}\", 得分=$localBestScore, 阈值=$PASS_SCORE, 通过=${localBestScore >= PASS_SCORE}")
 
             if (bestScore >= PASS_SCORE && bestSong != null) {
                 val lyricsResult = withTimeoutOrNull(TIMEOUT_MS) {
                     try {
                         source.getLyrics(bestSong)
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        LogManager.w("OnlineTargeter", "获取歌词异常: 源=${source.javaClass.simpleName}, ${e.message}")
                         null
                     }
                 }
@@ -75,10 +88,14 @@ object OnlineLyricTargeter {
                             list.add(LrcLine(line.start, content))
                         }
                     }
-                    if (list.isNotEmpty()) return list
+                    if (list.isNotEmpty()) {
+                        LogManager.d("OnlineTargeter", "歌词命中: 源=${source.javaClass.simpleName}, 得分=$bestScore, 行数=${list.size}")
+                        return list
+                    }
                 }
             }
         }
+        LogManager.d("OnlineTargeter", "歌词未命中: 最佳得分=$bestScore < 阈值 $PASS_SCORE")
         return null
     }
 

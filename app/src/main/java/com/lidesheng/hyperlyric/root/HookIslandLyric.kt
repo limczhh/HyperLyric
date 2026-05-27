@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.root.utils.xLog
+import com.lidesheng.hyperlyric.root.utils.xLogDebug
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -15,6 +16,7 @@ import com.lidesheng.hyperlyric.root.utils.LyricStyleHelper
 import com.lidesheng.hyperlyric.root.utils.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 import com.lidesheng.hyperlyric.root.utils.xLogError
+import com.lidesheng.hyperlyric.root.utils.xLogWarn
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -111,7 +113,7 @@ object HookIslandLyric {
                     injectToSlot(islandView, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
                 }
             }.onFailure { e ->
-                xLogError("ModuleInit : 预注入超级岛失败", e)
+                xLogError("HookIslandLyric : 预注入超级岛失败", e)
             }
             return chain.proceed()
         }
@@ -165,7 +167,7 @@ object HookIslandLyric {
                 // 注入光效 Bundle 标记 + 主动触发 BigIslandView 的 startGlowEffect
                 HookIslandGlow.injectAndTriggerGlow(viewGroup, islandData, prefs)
             }.onFailure { e ->
-                xLogError("ModuleInit : 更新超级岛视图失败", e)
+                xLogError("HookIslandLyric : 更新超级岛视图失败", e)
             }
 
             return result
@@ -300,7 +302,9 @@ object HookIslandLyric {
                 val maxField = wrapperView.javaClass.getDeclaredField("maxWidthPx")
                 maxField.isAccessible = true
                 maxField.setInt(wrapperView, (maxWidthDp * density).toInt())
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                xLogWarn("HookIslandLyric : 设置 maxWidthPx 失败: ${e.message}")
+            }
 
             val richView = targetView ?: return
             configureRichLyricView(richView, prefs, res, mode, albumBitmap)
@@ -329,6 +333,7 @@ object HookIslandLyric {
                 9 -> RichLyricLine(text = metadataSongName, words = emptyList(), secondary = finalArtistName, secondaryWords = emptyList())
                 else -> null
             }
+            xLogDebug("HookIslandLyric : 注入完成: mode=$mode, 标题=${singleModeText.take(20)}, 歌词=${(LyriconDataBridge.currentLyric ?: "").take(20)}")
 
             // mode 1~7 是歌曲信息，使用独立的跑马灯参数覆盖歌词默认值
             if ((mode in 1..7 || mode == 9) && prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_MODE)) {
@@ -388,6 +393,7 @@ object HookIslandLyric {
     }
 
     fun refreshActiveIsland() {
+        xLogDebug("HookIslandLyric : 正在刷新超级岛")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
         
@@ -425,9 +431,10 @@ object HookIslandLyric {
     }
 
     fun updateLyricLine() {
+        xLogDebug("HookIslandLyric : 正在更新歌词行")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
-        
+
         // 增加白名单校验
         if (!isPackageHookEnabled(activePkg)) return
 
@@ -522,6 +529,7 @@ object HookIslandLyric {
      * 播放/暂停状态变化回调
      */
     fun onPlaybackStateChanged(isPlaying: Boolean) {
+        xLogDebug("HookIslandLyric : 播放状态变更: isPlaying=$isPlaying")
         val prefs = (module as HookEntry).prefs
         val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
 

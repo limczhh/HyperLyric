@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root
 
 import com.lidesheng.hyperlyric.root.aitrans.AITranslator
 import com.lidesheng.hyperlyric.root.utils.xLog
+import com.lidesheng.hyperlyric.root.utils.xLogDebug
 import com.lidesheng.hyperlyric.root.utils.xLogError
 import com.lidesheng.hyperlyric.root.utils.xLogWarn
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
@@ -178,15 +179,15 @@ class HookEntry : XposedModule() {
         private fun initBridgeRouting(app: android.app.Application) {
             LyriconBridge.routing(app) {
                 onCommand(AppBridgeConstants.REQUEST_UPDATE_LYRIC_STYLE) {
-                    xLog("Bridge : 接收到样式更新请求")
+                    xLogDebug("Bridge : 接收到样式更新请求")
                     if (activeMode == 1) HookIslandSpaceGateLyric.refreshActiveIsland() else HookIslandLyric.refreshActiveIsland()
                 }
                 onCommand("com.lidesheng.hyperlyric.REFRESH_ISLAND") {
-                    xLog("Bridge : 接收到超级岛刷新请求")
+                    xLogDebug("Bridge : 接收到超级岛刷新请求")
                     if (activeMode == 1) HookIslandSpaceGateLyric.refreshActiveIsland() else HookIslandLyric.refreshActiveIsland()
                 }
                 onCommand("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM") {
-                    xLog("Bridge : 接收到歌词动画刷新请求")
+                    xLogDebug("Bridge : 接收到歌词动画刷新请求")
                     if (activeMode == 1) HookIslandSpaceGateLyric.refreshActiveIsland() else HookIslandLyric.refreshActiveIsland()
                 }
             }

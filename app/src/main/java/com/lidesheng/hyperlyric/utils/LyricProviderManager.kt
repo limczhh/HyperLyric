@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.utils
+﻿package com.lidesheng.hyperlyric.utils
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -108,7 +108,7 @@ object LyricProviderManager {
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogManager.e("LyricProviderManager", "加载歌词模块失败", e)
                 stateFlow.update { it.copy(isLoading = false) }
             }
         }

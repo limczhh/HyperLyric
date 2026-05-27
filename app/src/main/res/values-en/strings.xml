@@ -329,6 +329,13 @@
     <string name="version_unknown">v Unknown</string>
 
     <string name="title_module_logs">Module Logs</string>
+    <string name="title_app_logs">App Logs</string>
+    <string name="title_log_viewer">Log Viewer</string>
+    <string name="title_log_level">Log Level</string>
+    <string name="log_level_normal">Normal</string>
+    <string name="log_level_verbose">Debug</string>
+    <string name="clear_logs">Clear Logs</string>
+    <string name="clear_logs_confirm">Clear app logs?\nModule logs will not be affected.</string>
     <string name="level_debug">Debug</string>
     <string name="level_info">Info</string>
     <string name="level_warn">Warn</string>

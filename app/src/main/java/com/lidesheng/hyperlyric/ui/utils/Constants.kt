@@ -11,6 +11,7 @@ object Constants {
     const val KEY_PREDICTIVE_BACK_GESTURE = "key_predictive_back_gesture"
     const val KEY_FLOATING_NAV_BAR = "key_floating_nav_bar"
     const val KEY_EXCLUDE_FROM_RECENTS = "key_exclude_from_recents"
+    const val KEY_LOG_LEVEL = "key_log_level"
 
     // ================= DEFAULTS =================
     const val DEFAULT_WORK_MODE = 0
@@ -20,4 +21,5 @@ object Constants {
     const val DEFAULT_PREDICTIVE_BACK_GESTURE = false
     const val DEFAULT_FLOATING_NAV_BAR = false
     const val DEFAULT_EXCLUDE_FROM_RECENTS = false
+    const val DEFAULT_LOG_LEVEL = 0 // 0=一般日志(I+W+E), 1=调试日志(D+I+W+E)
 }
