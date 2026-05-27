@@ -95,26 +95,6 @@ fun HookSettingsPage() {
 }
 
 private fun LazyListScope.hookSettingsSections() {
-    item(key = "log_level") {
-        val context = LocalContext.current
-        val prefs = remember { context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) }
-        var logLevel by remember { mutableIntStateOf(prefs.getInt(UIConstants.KEY_LOG_LEVEL, UIConstants.DEFAULT_LOG_LEVEL)) }
-        val logLevelOptions = listOf(
-            stringResource(R.string.log_level_normal),
-            stringResource(R.string.log_level_verbose)
-        )
-        Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
-            OverlayDropdownPreference(
-                title = stringResource(R.string.title_log_level),
-                items = logLevelOptions,
-                selectedIndex = logLevel,
-                onSelectedIndexChange = { index ->
-                    logLevel = index
-                    prefs.edit { putInt(UIConstants.KEY_LOG_LEVEL, index) }
-                }
-            )
-        }
-    }
     item(key = "lyric_mode") {
         val context = LocalContext.current
         val navigator = LocalNavigator.current

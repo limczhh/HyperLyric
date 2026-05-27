@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.root.utils.ConfigSync
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route
@@ -159,8 +160,22 @@ private fun LazyListScope.settingsSections(
         val logLevelOptions = listOf(stringResource(R.string.log_level_normal), stringResource(R.string.log_level_verbose))
         Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
-                WindowDropdownPreference(title = stringResource(R.string.title_log_level), items = logLevelOptions, selectedIndex = logLevel, onSelectedIndexChange = { logLevel = it; prefs.edit { putInt(UIConstants.KEY_LOG_LEVEL, it) } })
-                ArrowPreference(title = stringResource(R.string.title_view_logs), onClick = { navigator.navigate(Route.Log) })
+                WindowDropdownPreference(
+                    title = stringResource(R.string.title_log_level), 
+                    items = logLevelOptions, 
+                    selectedIndex = logLevel, 
+                    onSelectedIndexChange = { 
+                        logLevel = it; 
+                        prefs.edit { putInt(UIConstants.KEY_LOG_LEVEL, it) }; 
+                        ConfigSync.syncPreference(UIConstants.PREF_NAME, UIConstants.KEY_LOG_LEVEL, it) 
+                        }
+                )
+                ArrowPreference(
+                    title = stringResource(R.string.title_view_logs), 
+                    onClick = { 
+                        navigator.navigate(Route.Log) 
+                    }
+                )
             }
         }
     }
