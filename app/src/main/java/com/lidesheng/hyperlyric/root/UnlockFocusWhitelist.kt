@@ -2,9 +2,7 @@ package com.lidesheng.hyperlyric.root
 
 import android.content.Context
 import android.os.Bundle
-import com.lidesheng.hyperlyric.root.utils.xLog
-import com.lidesheng.hyperlyric.root.utils.xLogWarn
-import com.lidesheng.hyperlyric.root.utils.xLogError
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -29,15 +27,15 @@ object UnlockFocusWhitelist {
             if (method != null) {
                 module.deoptimize(method)
                 module.hook(method).intercept(PluginLoadHooker())
-                xLog("ModuleInit : 插件拦截器已就绪 (PluginInstance)")
+                HookLogger.i("UnlockFocusWhitelist","ModuleInit : 插件拦截器已就绪 (PluginInstance)")
             } else {
-                xLogWarn("ModuleInit : 未找到 PluginInstance.loadPlugin")
+                HookLogger.w("UnlockFocusWhitelist","ModuleInit : 未找到 PluginInstance.loadPlugin")
             }
         }.onFailure { e ->
             if (e is ClassNotFoundException) {
-                xLogWarn("ModuleInit : $PLUGIN_INSTANCE_CLASS 未找到")
+                HookLogger.w("UnlockFocusWhitelist","ModuleInit : $PLUGIN_INSTANCE_CLASS 未找到")
             } else {
-                xLogError("ModuleInit : 拦截 PluginInstance 时发生错误", e)
+                HookLogger.e("UnlockFocusWhitelist", "ModuleInit : 拦截 PluginInstance 时发生错误", e)
             }
         }
 
@@ -60,11 +58,11 @@ object UnlockFocusWhitelist {
                     module.deoptimize(method)
                     module.hook(method).intercept(ReturnTrueHooker())
                 }
-                xLog("ModuleInit : 成功注入焦点通知白名单 (${methods.joinToString { it.name }})")
+                HookLogger.i("UnlockFocusWhitelist","ModuleInit : 成功注入焦点通知白名单 (${methods.joinToString { it.name }})")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : 焦点通知白名单注入失败 ($cl)", e)
+                HookLogger.e("UnlockFocusWhitelist", "ModuleInit : 焦点通知白名单注入失败 ($cl)", e)
             }
         }
 
@@ -76,11 +74,11 @@ object UnlockFocusWhitelist {
             if (method != null) {
                 module.deoptimize(method)
                 module.hook(method).intercept(AuthResultHooker())
-                xLog("ModuleInit : 焦点通知白名单授权回调注入成功")
+                HookLogger.i("UnlockFocusWhitelist","ModuleInit : 焦点通知白名单授权回调注入成功")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : 焦点通知白名单授权注入失败 ($cl)", e)
+                HookLogger.e("UnlockFocusWhitelist", "ModuleInit : 焦点通知白名单授权注入失败 ($cl)", e)
             }
         }
     }

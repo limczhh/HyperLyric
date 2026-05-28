@@ -1,7 +1,6 @@
 package com.lidesheng.hyperlyric.root
 
-import com.lidesheng.hyperlyric.root.utils.xLog
-import com.lidesheng.hyperlyric.root.utils.xLogError
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -30,11 +29,11 @@ object UnlockIslandWhitelist {
             if (method != null) {
                 module.deoptimize(method)
                 module.hook(method).intercept(ReturnTrueHooker())
-                xLog("ModuleInit : 成功注入超级岛下拉小窗白名单 ($TARGET_METHOD)")
+                HookLogger.i("UnlockIslandWhitelist","ModuleInit : 成功注入超级岛下拉小窗白名单 ($TARGET_METHOD)")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : 超级岛下拉小窗白名单注入失败", e)
+                HookLogger.e("UnlockIslandWhitelist", "ModuleInit : 超级岛下拉小窗白名单注入失败", e)
             }
         }
     }

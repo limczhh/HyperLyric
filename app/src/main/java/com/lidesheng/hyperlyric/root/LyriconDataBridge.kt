@@ -12,6 +12,7 @@ import io.github.proify.lyricon.lyric.style.AiTranslationProvider
 import io.github.proify.lyricon.lyric.view.InterludeTracker
 import io.github.proify.lyricon.lyric.view.SongPreprocessor
 import io.github.proify.lyricon.lyric.view.TimedLine
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.proify.lyricon.lyric.view.TitleSlot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +66,7 @@ object LyriconDataBridge {
     private var interludeTracker = InterludeTracker(8_000L)
 
     fun updateSong(song: Song?, prefs: SharedPreferences? = null) {
-        com.lidesheng.hyperlyric.root.utils.xLogDebug("LyriconDataBridge : 歌曲变更: ${song?.name}")
+        HookLogger.d("LyriconDataBridge", "歌曲变更: ${song?.name}")
         isTextMode = false
         currentSong = song
         currentSongName = song?.name
@@ -109,10 +110,10 @@ object LyriconDataBridge {
                 val ratio = song.calculateChineseRatio()
                 val percentage = String.format(java.util.Locale.US, "%.1f%%", ratio * 100)
                 if (autoIgnoreChinese) {
-                    com.lidesheng.hyperlyric.root.utils.xLogDebug("AITranslation : 歌曲 ${song.name}（中文占比 $percentage)")
+                    HookLogger.d("LyriconDataBridge", "AITranslation : 歌曲 ${song.name}（中文占比 $percentage)")
                 }
                 if (autoIgnoreChinese && ratio > 0.5f) {
-                    com.lidesheng.hyperlyric.root.utils.xLogDebug("AITranslation : 歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
+                    HookLogger.d("LyriconDataBridge", "AITranslation : 歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
                     return@launch
                 }
                 val translatedSong = AITranslator.translateSongSync(song, configs)
@@ -174,7 +175,7 @@ object LyriconDataBridge {
         val newText = foundLine?.text ?: currentLyric ?: ""
 
         if (newText != currentLyric) {
-            com.lidesheng.hyperlyric.root.utils.xLogDebug("LyriconDataBridge : 歌词行切换: ${newText.take(30)}")
+            HookLogger.d("LyriconDataBridge", "歌词行切换: ${newText.take(30)}")
             currentLyric = newText
             return true
         }

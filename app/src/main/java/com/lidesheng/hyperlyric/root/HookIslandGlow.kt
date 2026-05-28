@@ -5,10 +5,8 @@ import android.graphics.Bitmap
 import android.content.SharedPreferences
 import android.view.View
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
-import com.lidesheng.hyperlyric.root.utils.xLog
-import com.lidesheng.hyperlyric.root.utils.xLogWarn
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
-import com.lidesheng.hyperlyric.root.utils.xLogError
 import io.github.libxposed.api.XposedModule
 
 /**
@@ -50,13 +48,13 @@ object HookIslandGlow {
                     injectHighlightColor(chain)
                     result
                 }
-                xLog("ModuleInit : 超级岛外圈光效注入成功")
+                HookLogger.i("HookIslandGlow","ModuleInit : 超级岛外圈光效注入成功")
             } else {
-                xLogWarn("ModuleInit : 未找到超级岛外圈光效注入位置")
+                HookLogger.w("HookIslandGlow","ModuleInit : 未找到超级岛外圈光效注入位置")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : 超级岛外圈光效初始化失败", e)
+                HookLogger.e("HookIslandGlow", "ModuleInit : 超级岛外圈光效初始化失败", e)
             }
         }
 
@@ -103,7 +101,7 @@ object HookIslandGlow {
                 }
             }
         }.onFailure { e ->
-            xLogError("HookIslandGlow : 颜色提取失败", e)
+            HookLogger.e("HookIslandGlow", "HookIslandGlow : 颜色提取失败", e)
         }
     }
 

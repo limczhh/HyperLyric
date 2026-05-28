@@ -8,7 +8,7 @@ package io.github.proify.lyricon.central.provider
 
 import android.os.IBinder
 import android.util.Log
-import com.lidesheng.hyperlyric.root.utils.xLogError
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.proify.lyricon.central.provider.player.ActivePlayerDispatcher
 import io.github.proify.lyricon.provider.IProviderBinder
 import io.github.proify.lyricon.provider.ProviderInfo
@@ -50,13 +50,13 @@ internal class RemoteProvider(
         deathRecipient?.runCatching {
             binder?.asBinder()?.unlinkToDeath(this, 0)
         }?.onFailure {
-            xLogError("Provider: unlink to Death failed", it)
+            HookLogger.e("RemoteProvider", "Provider: unlink to Death failed", it)
         }
 
         newDeathRecipient?.runCatching {
             binder?.asBinder()?.linkToDeath(this, 0)
         }?.onFailure {
-            xLogError("Provider: link to Death failed", it)
+            HookLogger.e("RemoteProvider", "Provider: link to Death failed", it)
         }
 
         deathRecipient = newDeathRecipient

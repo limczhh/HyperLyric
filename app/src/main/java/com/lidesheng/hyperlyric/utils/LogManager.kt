@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.utils
 import android.content.Context
 import android.util.Log
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.common.HyperLogger
 import com.lidesheng.hyperlyric.ui.page.log.LogEntry
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +19,7 @@ import java.util.regex.Pattern
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-object LogManager {
+object LogManager : HyperLogger {
     private const val LOG_FILE_NAME = "app_logs.log"
     private const val MAX_LOG_SIZE = 2 * 1024 * 1024L // 2MB
 
@@ -40,24 +41,24 @@ object LogManager {
 
     // ========================= 写入 =========================
 
-    fun d(tag: String, message: String) {
-        Log.d(tag, message)
-        if (shouldWrite("D")) writeLog("D", tag, message)
+    override fun d(tag: String, msg: String) {
+        Log.d(tag, msg)
+        if (shouldWrite("D")) writeLog("D", tag, msg)
     }
 
-    fun i(tag: String, message: String) {
-        Log.i(tag, message)
-        writeLog("I", tag, message)
+    override fun i(tag: String, msg: String) {
+        Log.i(tag, msg)
+        writeLog("I", tag, msg)
     }
 
-    fun w(tag: String, message: String, e: Throwable? = null) {
-        val fullMsg = if (e != null) "$message: ${e.message}" else message
+    override fun w(tag: String, msg: String, e: Throwable?) {
+        val fullMsg = if (e != null) "$msg: ${e.message}" else msg
         Log.w(tag, fullMsg, e)
         writeLog("W", tag, fullMsg)
     }
 
-    fun e(tag: String, message: String, e: Throwable? = null) {
-        val fullMsg = if (e != null) "$message: ${e.message}" else message
+    override fun e(tag: String, msg: String, e: Throwable?) {
+        val fullMsg = if (e != null) "$msg: ${e.message}" else msg
         Log.e(tag, fullMsg, e)
         writeLog("E", tag, fullMsg)
     }

@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaSessionManager
-import com.lidesheng.hyperlyric.root.utils.xLogError
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /**
  * 媒体元数据辅助类。
@@ -39,7 +39,7 @@ object MediaMetadataHelper {
                 )
             } ?: MediaInfo()
         } catch (e: Exception) {
-            xLogError("获取媒体信息失败 ($packageName)", e)
+            HookLogger.e("MediaMetadataHelper", "获取媒体信息失败 ($packageName)", e)
             MediaInfo()
         }
     }

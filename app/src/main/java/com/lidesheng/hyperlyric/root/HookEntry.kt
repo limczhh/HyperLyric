@@ -1,10 +1,7 @@
 package com.lidesheng.hyperlyric.root
 
 import com.lidesheng.hyperlyric.root.aitrans.AITranslator
-import com.lidesheng.hyperlyric.root.utils.xLog
-import com.lidesheng.hyperlyric.root.utils.xLogDebug
-import com.lidesheng.hyperlyric.root.utils.xLogError
-import com.lidesheng.hyperlyric.root.utils.xLogWarn
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.ui.utils.Constants as UIConstants
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
 import io.github.proify.lyricon.app.bridge.AppBridgeConstants
@@ -39,8 +36,8 @@ class HookEntry : XposedModule() {
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         super.onModuleLoaded(param)
-        com.lidesheng.hyperlyric.root.utils.globalXposedModule = this
-        xLog("ModuleInit : 模块已加载")
+        com.lidesheng.hyperlyric.root.utils.HookLogger.module = this
+        HookLogger.i("HookEntry","ModuleInit : 模块已加载")
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
@@ -56,30 +53,30 @@ class HookEntry : XposedModule() {
                 UnlockIslandWhitelist.hook(this, param.defaultClassLoader)
             } catch (e: Exception) {
                  if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                     xLogWarn("ModuleInit : 此系统版本不支持超级岛下拉小窗白名单")
+                     HookLogger.w("HookEntry","ModuleInit : 此系统版本不支持超级岛下拉小窗白名单")
                  } else {
-                     xLogError("ModuleInit : 超级岛下拉小窗白名单注入失败", e)
+                     HookLogger.e("HookEntry", "ModuleInit : 超级岛下拉小窗白名单注入失败", e)
                  }
             }
             try {
                 UnlockFocusWhitelist.hook(this, param.defaultClassLoader)
             } catch (e: Exception) {
                  if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                     xLogWarn("ModuleInit : 此系统版本不支持解锁焦点通知白名单")
+                     HookLogger.w("HookEntry","ModuleInit : 此系统版本不支持解锁焦点通知白名单")
                  } else {
-                     xLogError("ModuleInit : 焦点通知白名单注入失败", e)
+                     HookLogger.e("HookEntry", "ModuleInit : 焦点通知白名单注入失败", e)
                  }
             }
 
             val isSuperIslandEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)
             
             if (!isSuperIslandEnabled) {
-                xLog("ModuleInit : 已在设置中禁用超级岛歌词功能")
+                HookLogger.i("HookEntry","ModuleInit : 已在设置中禁用超级岛歌词功能")
                 return
             }
 
             activeMode = prefs.getInt(RootConstants.KEY_HOOK_LYRIC_MODE, RootConstants.DEFAULT_HOOK_LYRIC_MODE)
-            xLog("ModuleInit : 超级岛激活模式 = $activeMode")
+            HookLogger.i("HookEntry","ModuleInit : 超级岛激活模式 = $activeMode")
 
             // 劫持 Application.onCreate 以初始化 Lyricon Receiver 所需的环境
             try {
@@ -87,12 +84,12 @@ class HookEntry : XposedModule() {
                 val onCreateMethod = appClass.getDeclaredMethod("onCreate")
                 deoptimize(onCreateMethod)
                 hook(onCreateMethod).intercept(AppCreateHooker())
-                xLog("ModuleInit : 系统环境注入成功 (Application.onCreate)")
+                HookLogger.i("HookEntry","ModuleInit : 系统环境注入成功 (Application.onCreate)")
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    xLogWarn("ModuleInit : 未找到 Application.onCreate，无法注入环境")
+                    HookLogger.w("HookEntry","ModuleInit : 未找到 Application.onCreate，无法注入环境")
                 } else {
-                    xLogError("ModuleInit : 注入 Application.onCreate 时发生错误", e)
+                    HookLogger.e("HookEntry", "ModuleInit : 注入 Application.onCreate 时发生错误", e)
                 }
             }
 
@@ -103,12 +100,12 @@ class HookEntry : XposedModule() {
                     deoptimize(constructor)
                     hook(constructor).intercept(ClassLoaderHooker())
                 }
-                xLog("ModuleInit : 插件拦截器已就绪 (ClassLoader)")
+                HookLogger.i("HookEntry","ModuleInit : 插件拦截器已就绪 (ClassLoader)")
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    xLogWarn("ModuleInit : 未找到 ClassLoader 构造方法")
+                    HookLogger.w("HookEntry","ModuleInit : 未找到 ClassLoader 构造方法")
                 } else {
-                    xLogError("ModuleInit : 拦截 ClassLoader 时发生错误", e)
+                    HookLogger.e("HookEntry", "ModuleInit : 拦截 ClassLoader 时发生错误", e)
                 }
             }
 
@@ -141,9 +138,9 @@ class HookEntry : XposedModule() {
                 }
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    // xLogWarn("ModuleInit : 插件中未找到超级岛相关类")
+                    // HookLogger.w("HookEntry","ModuleInit : 插件中未找到超级岛相关类")
                 } else {
-                    xLogError("ModuleInit : 动态注入超级岛插件失败", e)
+                    HookLogger.e("HookEntry", "ModuleInit : 动态注入超级岛插件失败", e)
                 }
             }
             return result
@@ -160,9 +157,9 @@ class HookEntry : XposedModule() {
                 try {
                     initializeLyricon(app)
                     registerActivePlayerListener()
-                    xLog("ModuleInit : 系统环境初始化完成")
+                    HookLogger.i("HookEntry","ModuleInit : 系统环境初始化完成")
                 } catch (e: Exception) {
-                    xLogError("ModuleInit : 系统环境初始化失败", e)
+                    HookLogger.e("HookEntry", "ModuleInit : 系统环境初始化失败", e)
                 }
             }
             return chain.proceed()
@@ -179,15 +176,15 @@ class HookEntry : XposedModule() {
         private fun initBridgeRouting(app: android.app.Application) {
             LyriconBridge.routing(app) {
                 onCommand(AppBridgeConstants.REQUEST_UPDATE_LYRIC_STYLE) {
-                    xLogDebug("Bridge : 接收到样式更新请求")
+                    HookLogger.d("HookEntry","Bridge : 接收到样式更新请求")
                     if (activeMode == 1) HookIslandSpaceGateLyric.refreshActiveIsland() else HookIslandLyric.refreshActiveIsland()
                 }
                 onCommand("com.lidesheng.hyperlyric.REFRESH_ISLAND") {
-                    xLogDebug("Bridge : 接收到超级岛刷新请求")
+                    HookLogger.d("HookEntry","Bridge : 接收到超级岛刷新请求")
                     if (activeMode == 1) HookIslandSpaceGateLyric.refreshActiveIsland() else HookIslandLyric.refreshActiveIsland()
                 }
                 onCommand("com.lidesheng.hyperlyric.UPDATE_LYRIC_ANIM") {
-                    xLogDebug("Bridge : 接收到歌词动画刷新请求")
+                    HookLogger.d("HookEntry","Bridge : 接收到歌词动画刷新请求")
                     if (activeMode == 1) HookIslandSpaceGateLyric.refreshActiveIsland() else HookIslandLyric.refreshActiveIsland()
                 }
             }

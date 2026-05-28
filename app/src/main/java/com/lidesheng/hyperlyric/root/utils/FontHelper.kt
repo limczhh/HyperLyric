@@ -1,10 +1,7 @@
-package com.lidesheng.hyperlyric.common.font
+package com.lidesheng.hyperlyric.root.utils
 
 import android.content.SharedPreferences
 import android.graphics.Typeface
-import com.lidesheng.hyperlyric.root.utils.Constants
-import com.lidesheng.hyperlyric.root.utils.xLogDebug
-import com.lidesheng.hyperlyric.root.utils.xLogWarn
 import java.io.File
 
 object FontHelper {
@@ -23,15 +20,15 @@ object FontHelper {
                 val file = File(customFontPath)
                 if (file.exists() && file.canRead()) {
                     baseTf = Typeface.createFromFile(file)
-                    xLogDebug("FontHelper : 自定义字体加载成功：$customFontPath")
+                    HookLogger.d("FontHelper", "自定义字体加载成功：$customFontPath")
                 } else {
                     if (loggedFontFailures.add(customFontPath)) {
-                        xLogWarn("FontHelper : 自定义字体文件不存在或无法读取：$customFontPath (存在: ${file.exists()}, 可读: ${file.canRead()})")
+                        HookLogger.w("FontHelper", "自定义字体文件不存在或无法读取：$customFontPath (存在: ${file.exists()}, 可读: ${file.canRead()})")
                     }
                 }
             } catch (e: Exception) {
                 if (loggedFontFailures.add(customFontPath)) {
-                    xLogWarn("FontHelper : 无法从文件创建字体：$customFontPath，原因: ${e.message}")
+                    HookLogger.w("FontHelper", "无法从文件创建字体：$customFontPath，原因: ${e.message}")
                 }
             }
         }
@@ -39,10 +36,8 @@ object FontHelper {
         val finalBaseTf = baseTf ?: Typeface.DEFAULT
 
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            // API 28+ supports weight and italic separately
             Typeface.create(finalBaseTf, fontWeight.coerceIn(1, 1000), fontItalic)
         } else {
-            // Fallback for older APIs
             val style = when {
                 fontWeight >= 600 && fontItalic -> Typeface.BOLD_ITALIC
                 fontWeight >= 600 -> Typeface.BOLD

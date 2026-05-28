@@ -2,8 +2,7 @@ package com.lidesheng.hyperlyric.root
 
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
-import com.lidesheng.hyperlyric.root.utils.xLog
-import com.lidesheng.hyperlyric.root.utils.xLogDebug
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -15,8 +14,6 @@ import com.lidesheng.hyperlyric.root.utils.DynamicFinder
 import com.lidesheng.hyperlyric.root.utils.LyricStyleHelper
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.utils.TranslationHelper
-import com.lidesheng.hyperlyric.root.utils.xLogError
-import com.lidesheng.hyperlyric.root.utils.xLogWarn
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -63,7 +60,7 @@ object HookIslandSpaceGateLyric {
                     module.deoptimize(method)
                     module.hook(method).intercept(UpdateBigIslandHooker())
                     hookedMethods.add("updateBigIslandView")
-                    xLog("ModuleInit : 已注入超级岛(SpaceGate): $method")
+                    HookLogger.i("HookIslandSpaceGateLyric","ModuleInit : 已注入超级岛(SpaceGate): $method")
                 }
             }
 
@@ -73,7 +70,7 @@ object HookIslandSpaceGateLyric {
                     module.deoptimize(method)
                     module.hook(method).intercept(PreInjectHooker())
                     hookedMethods.add("calculateBigIslandWidth")
-                    xLog("ModuleInit : 已注入超级岛(SpaceGate): $method")
+                    HookLogger.i("HookIslandSpaceGateLyric","ModuleInit : 已注入超级岛(SpaceGate): $method")
                 }
             }
 
@@ -83,11 +80,11 @@ object HookIslandSpaceGateLyric {
             if (hookedMethods.isNotEmpty()) {
                 isHookedSuccess = true
                 val methodsSummary = hookedMethods.distinct().joinToString(", ")
-                xLog("ModuleInit : SpaceGate 初始化完成。已注入超级岛: [$methodsSummary]")
+                HookLogger.i("HookIslandSpaceGateLyric","ModuleInit : SpaceGate 初始化完成。已注入超级岛: [$methodsSummary]")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                xLogError("ModuleInit : SpaceGate 注入超级岛失败", e)
+                HookLogger.e("HookIslandSpaceGateLyric", "ModuleInit : SpaceGate 注入超级岛失败", e)
             }
         }
     }
@@ -115,7 +112,7 @@ object HookIslandSpaceGateLyric {
                     linkViews(islandView)
                 }
             }.onFailure { e ->
-                xLogError("HookIslandSpaceGate : 预注入超级岛失败", e)
+                HookLogger.e("HookIslandSpaceGateLyric", "HookIslandSpaceGate : 预注入超级岛失败", e)
             }
             return chain.proceed()
         }
@@ -166,7 +163,7 @@ object HookIslandSpaceGateLyric {
 
                 HookIslandGlow.injectAndTriggerGlow(viewGroup, islandData, prefs)
             }.onFailure { e ->
-                xLogError("HookIslandSpaceGate : 更新超级岛视图失败", e)
+                HookLogger.e("HookIslandSpaceGateLyric", "HookIslandSpaceGate : 更新超级岛视图失败", e)
             }
 
             return result
@@ -217,9 +214,9 @@ object HookIslandSpaceGateLyric {
             if (cutoutView != null) {
                 val cutoutLoc = IntArray(2)
                 cutoutView.getLocationOnScreen(cutoutLoc)
-                xLogDebug("SpaceGate : 成功定位摄像头容器(area_cutout), 宽度 = ${cutoutView.width}px, 绝对X = ${cutoutLoc[0]}")
+                HookLogger.d("HookIslandSpaceGateLyric","SpaceGate : 成功定位摄像头容器(area_cutout), 宽度 = ${cutoutView.width}px, 绝对X = ${cutoutLoc[0]}")
             } else {
-                xLogDebug("SpaceGate : 未找到系统 area_cutout 容器，将使用几何居中fallback。")
+                HookLogger.d("HookIslandSpaceGateLyric","SpaceGate : 未找到系统 area_cutout 容器，将使用几何居中fallback。")
             }
             loggedCutoutInfo = true
         }
@@ -296,7 +293,7 @@ object HookIslandSpaceGateLyric {
             maxField.isAccessible = true
             maxField.setInt(wrapperView, (maxWidthDp * density).toInt())
         } catch (e: Exception) {
-            xLogWarn("HookIslandSpaceGate : 设置 maxWidthPx 失败: ${e.message}")
+            HookLogger.w("HookIslandSpaceGateLyric","HookIslandSpaceGate : 设置 maxWidthPx 失败: ${e.message}")
         }
 
         val richView = targetView ?: return
@@ -346,7 +343,7 @@ object HookIslandSpaceGateLyric {
     }
 
     fun refreshActiveIsland() {
-        xLogDebug("HookIslandSpaceGate : 正在刷新超级岛")
+        HookLogger.d("HookIslandSpaceGateLyric","HookIslandSpaceGate : 正在刷新超级岛")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
         
@@ -382,7 +379,7 @@ object HookIslandSpaceGateLyric {
     }
 
     fun updateLyricLine() {
-        xLogDebug("HookIslandSpaceGate : 正在更新歌词行")
+        HookLogger.d("HookIslandSpaceGateLyric","HookIslandSpaceGate : 正在更新歌词行")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
         
@@ -471,7 +468,7 @@ object HookIslandSpaceGateLyric {
     }
 
     fun onPlaybackStateChanged(isPlaying: Boolean) {
-        xLogDebug("HookIslandSpaceGate : 播放状态变更: isPlaying=$isPlaying")
+        HookLogger.d("HookIslandSpaceGateLyric","HookIslandSpaceGate : 播放状态变更: isPlaying=$isPlaying")
         val prefs = (module as HookEntry).prefs
         val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
 

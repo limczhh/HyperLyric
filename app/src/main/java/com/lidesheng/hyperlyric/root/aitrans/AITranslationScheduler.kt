@@ -1,9 +1,7 @@
 package com.lidesheng.hyperlyric.root.aitrans
 
 import android.util.Log
-import com.lidesheng.hyperlyric.root.utils.xLogDebug
-import com.lidesheng.hyperlyric.root.utils.xLogError
-import com.lidesheng.hyperlyric.root.utils.xLogWarn
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.proify.lyricon.lyric.model.Song
 import io.github.proify.lyricon.lyric.style.AiTranslationConfigs
 import kotlinx.coroutines.CancellationException
@@ -56,7 +54,7 @@ internal class AITranslationScheduler(
             )
             jobs[key] = job
             pending.addLast(job)
-            xLogDebug("AITranslation : 已添加 ${job.songName} 到翻译队列（等待中=${pending.size}，运行中=$running）")
+            HookLogger.d("AITranslationScheduler", "AITranslation : 已添加 ${job.songName} 到翻译队列（等待中=${pending.size}，运行中=$running）")
             trimPendingLocked()
             dispatchNextLocked()
             return job.deferred
@@ -83,7 +81,7 @@ internal class AITranslationScheduler(
             dropped.state = TranslationJobState.CANCELLED
             jobs.remove(dropped.key, dropped)
             dropped.deferred.complete(null)
-            xLogWarn("AITranslation : 由于队列已满，取消了 ${dropped.songName} 的翻译请求")
+            HookLogger.w("AITranslationScheduler", "AITranslation : 由于队列已满，取消了 ${dropped.songName} 的翻译请求")
         }
     }
 
@@ -94,7 +92,7 @@ internal class AITranslationScheduler(
 
             job.state = TranslationJobState.RUNNING
             running++
-            xLogDebug("AITranslation : 开始翻译 ${job.songName}（等待中=${pending.size}，运行中=$running）")
+            HookLogger.d("AITranslationScheduler", "AITranslation : 开始翻译 ${job.songName}（等待中=${pending.size}，运行中=$running）")
             scope.launch { runJob(job) }
         }
     }
@@ -104,7 +102,7 @@ internal class AITranslationScheduler(
             val apiResults =
                 OpenAiTranslationClient.request(job.configs, job.song, job.originalLines)
             if (!apiResults.isNullOrEmpty() && job.generation == generation.get()) {
-                xLogDebug("AITranslation :  ${job.songName}翻译成功（翻译已缓存）")
+                HookLogger.d("AITranslationScheduler", "AITranslation :  ${job.songName}翻译成功（翻译已缓存）")
                 cache.putMemory(job.key, apiResults)
                 cache.saveToDb(job.key, apiResults)
             }
@@ -116,7 +114,7 @@ internal class AITranslationScheduler(
             throw e
         } catch (e: Exception) {
             job.state = TranslationJobState.COMPLETED
-            xLogError("AITranslation : 翻译[${job.songName}] 出错", e)
+            HookLogger.e("AITranslationScheduler", "AITranslation : 翻译[${job.songName}] 出错", e)
             job.deferred.complete(null)
         } finally {
             synchronized(lock) {

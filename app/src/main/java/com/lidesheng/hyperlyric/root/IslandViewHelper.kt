@@ -3,8 +3,7 @@ package com.lidesheng.hyperlyric.root
 import android.annotation.SuppressLint
 import android.view.View
 import android.view.ViewGroup
-import com.lidesheng.hyperlyric.root.utils.xLogDebug
-import com.lidesheng.hyperlyric.root.utils.xLogError
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /**
  * MIUI 灵动岛视图管理助手
@@ -32,7 +31,7 @@ object IslandViewHelper {
                 }
             }
         } catch (e: Exception) {
-            xLogError("toggleContainer : 切换容器可见性失败 ($containerName)", e)
+            HookLogger.e("IslandViewHelper", "toggleContainer : 切换容器可见性失败 ($containerName)", e)
         }
     }
 
@@ -62,7 +61,7 @@ object IslandViewHelper {
                 }
             }
         } catch (e: Exception) {
-            xLogError("clearTextContainerMargin : 清除边距失败 ($parentName)", e)
+            HookLogger.e("IslandViewHelper", "clearTextContainerMargin : 清除边距失败 ($parentName)", e)
         }
     }
 
@@ -107,7 +106,7 @@ object IslandViewHelper {
                 }
             }
         } catch (e: Exception) {
-            xLogError("showOriginalTexts : 恢复原生文本失败 ($parentName)", e)
+            HookLogger.e("IslandViewHelper", "showOriginalTexts : 恢复原生文本失败 ($parentName)", e)
         }
     }
 
@@ -115,7 +114,7 @@ object IslandViewHelper {
      * 触发灵动岛系统的布局刷新
      */
     fun triggerSystemRelayout(islandView: ViewGroup) {
-        xLogDebug("IslandViewHelper : 正在触发布局刷新")
+        HookLogger.d("IslandViewHelper","IslandViewHelper : 正在触发布局刷新")
         runCatching {
             val viewClass = islandView.javaClass
             // 优先尝试 updateBigIslandViewWidth
@@ -127,7 +126,7 @@ object IslandViewHelper {
                 viewClass.methods.find { it.name == "calculateBigIslandWidth" }?.invoke(islandView)
             }
         }.onFailure { e ->
-            xLogError("超级岛布局刷新失败", e)
+            HookLogger.e("IslandViewHelper", "超级岛布局刷新失败", e)
         }
     }
 
