@@ -18,7 +18,7 @@ import com.lidesheng.hyperlyric.lyric.DynamicLyricData
 import com.lidesheng.hyperlyric.lyric.LrcLine
 import com.lidesheng.hyperlyric.lyric.LyricProviderFactory
 import com.lidesheng.hyperlyric.lyric.LyricSearchParams
-import com.lidesheng.hyperlyric.service.utils.LyricSplitter
+import com.lidesheng.hyperlyric.common.lyric.LyricSplitter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

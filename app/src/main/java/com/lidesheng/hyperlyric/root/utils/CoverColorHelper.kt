@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.root.utils
 
 import android.graphics.Bitmap
+import com.lidesheng.hyperlyric.common.color.ColorExtractor
 
 object CoverColorHelper {
 
@@ -16,7 +17,7 @@ object CoverColorHelper {
             return Pair(cachedLightColors!!, cachedDarkColors!!)
         }
 
-        val result = ColorExtractorImpl.extractThemePalette(bitmap, if (useGradient) 4 else 1)
+        val result = ColorExtractor.extractThemePalette(bitmap, if (useGradient) 4 else 1)
         val lightColors = result.onWhiteBackground.toIntArray()
         val darkColors = result.onBlackBackground.toIntArray()
 

@@ -5,6 +5,7 @@ import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.util.TypedValue
+import com.lidesheng.hyperlyric.common.font.FontHelper
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.utils.Constants as RootConstants
 import io.github.proify.lyricon.lyric.view.Highlight

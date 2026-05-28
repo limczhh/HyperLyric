@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.service.utils
+package com.lidesheng.hyperlyric.common.lyric
 
 import android.graphics.Paint
 import android.util.DisplayMetrics
@@ -94,7 +94,7 @@ class LyricSplitter(
             }
         }
 
-        // 处理“禁止分割”设置
+        // 处理"禁止分割"设置
         if (config.disableLyricSplit) {
             islandRight = if (config.limitMaxWidth) {
                 // 如果开启了宽度限制，即便不分割，右侧单侧也需截断至最大宽度的一半（保持右侧物理边界一致）

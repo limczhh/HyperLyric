@@ -9,6 +9,7 @@ import android.graphics.RectF
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import androidx.core.graphics.toColorInt
+import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.utils.LogManager
 
 /**
@@ -82,7 +83,7 @@ object AlbumImageProcessor {
     }
 
     /**
-     * 使用 ColorExtractorImpl 从专辑封面提取主色和次色。
+     * 使用 ColorExtractor 从专辑封面提取主色和次色。
      * 统一返回适配深色背景的高亮度颜色（即使在浅色背景下也使用鲜艳色）。
      */
     fun extractColors(bitmap: Bitmap?): ExtractedColors {
@@ -94,8 +95,8 @@ object AlbumImageProcessor {
                 bitmap.scale(100, 100, false)
             } else bitmap
 
-            // 使用 ColorExtractorImpl 提取调色板
-            val palette = com.lidesheng.hyperlyric.root.utils.ColorExtractorImpl.extractThemePalette(targetBitmap, 2)
+            // 使用 ColorExtractor 提取调色板
+            val palette = ColorExtractor.extractThemePalette(targetBitmap, 2)
             
             if (targetBitmap != bitmap && !targetBitmap.isRecycled) targetBitmap.recycle()
 

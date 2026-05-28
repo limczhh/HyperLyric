@@ -1,7 +1,10 @@
-package com.lidesheng.hyperlyric.root.utils
+package com.lidesheng.hyperlyric.common.font
 
 import android.content.SharedPreferences
 import android.graphics.Typeface
+import com.lidesheng.hyperlyric.root.utils.Constants
+import com.lidesheng.hyperlyric.root.utils.xLogDebug
+import com.lidesheng.hyperlyric.root.utils.xLogWarn
 import java.io.File
 
 object FontHelper {

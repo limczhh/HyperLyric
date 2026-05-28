@@ -6,7 +6,6 @@ import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
-import android.util.Log.e
 import com.lidesheng.hyperlyric.utils.LogManager
 import com.lidesheng.hyperlyric.BuildConfig
 import kotlinx.coroutines.channels.awaitClose

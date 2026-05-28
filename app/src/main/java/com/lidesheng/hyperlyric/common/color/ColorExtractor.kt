@@ -4,7 +4,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 
-package com.lidesheng.hyperlyric.root.utils
+package com.lidesheng.hyperlyric.common.color
 
 import android.graphics.Bitmap
 import androidx.core.graphics.ColorUtils
@@ -18,7 +18,7 @@ import kotlin.random.Random
  * 主色主导级颜色提取器（Theme-Adaptive Edition）。
  * 优化点：支持弹性颜色数量返回，自动生成适配深/浅背景的两套方案。
  */
-object ColorExtractorImpl {
+object ColorExtractor {
 
     private const val DEFAULT_MAX_COLORS = 4
     private const val MAX_SAMPLE_PIXELS = 100 * 100
