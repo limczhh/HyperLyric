@@ -225,7 +225,7 @@ object HookIslandLyric : IslandRenderer {
 
         val lyriconSongName = LyriconDataBridge.currentSongName
         val targetPkg = LyriconDataBridge.activePackageName ?: pkgName
-        val mediaInfo = MediaMetadataHelper.getMediaInfo(rootView.context, targetPkg)
+        val mediaInfo = MediaMetadataHelper.getMediaInfo(rootView.context, targetPkg, HookLogger)
         
         val metadataSongName = mediaInfo.title
         val finalArtistName = mediaInfo.artist
@@ -416,7 +416,7 @@ object HookIslandLyric : IslandRenderer {
                         injectToSlot(cv, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
                         
                         // 刷新时同步更新光效
-                        val mediaInfo = MediaMetadataHelper.getMediaInfo(cv.context, pkgName)
+                        val mediaInfo = MediaMetadataHelper.getMediaInfo(cv.context, pkgName, HookLogger)
                         HookIslandGlow.updateMusicGlow(mediaInfo.albumArt, prefs)
 
                         triggerSystemRelayout(cv)

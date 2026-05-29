@@ -367,7 +367,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
                         injectToSlot(cv, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", prefs, pkgName)
                         linkViews(cv)
                         
-                        val mediaInfo = MediaMetadataHelper.getMediaInfo(cv.context, pkgName)
+                        val mediaInfo = MediaMetadataHelper.getMediaInfo(cv.context, pkgName, HookLogger)
                         HookIslandGlow.updateMusicGlow(mediaInfo.albumArt, prefs)
 
                         triggerSystemRelayout(cv)

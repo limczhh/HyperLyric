@@ -1,7 +1,7 @@
 package com.lidesheng.hyperlyric.lyric.source
 
 import android.content.SharedPreferences
-import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.common.HyperLogger
 
 class SourceManager(
     private val sources: List<LyricSource>,
@@ -9,7 +9,8 @@ class SourceManager(
     private val sink: LyricSink,
     private val prefKey: String,
     private val defaultSourceId: String,
-    private val stateResetter: StateResetter
+    private val stateResetter: StateResetter,
+    private val logger: HyperLogger
 ) {
     private var activeSource: LyricSource? = null
 
@@ -19,12 +20,12 @@ class SourceManager(
             ?: sources.firstOrNull { it.isAvailable() }
 
         if (source == null) {
-            HookLogger.w("SourceManager", "没有可用的歌词源")
+            logger.w("SourceManager", "没有可用的歌词源")
             return
         }
 
         activeSource = source
-        HookLogger.i("SourceManager", "启动歌词源: ${source.displayName}")
+        logger.i("SourceManager", "启动歌词源: ${source.displayName}")
         source.start(sink)
     }
 
@@ -37,12 +38,12 @@ class SourceManager(
 
         val source = sources.find { it.id == sourceId && it.isAvailable() }
         if (source == null) {
-            HookLogger.w("SourceManager", "歌词源不可用: $sourceId")
+            logger.w("SourceManager", "歌词源不可用: $sourceId")
             return
         }
 
         activeSource = source
-        HookLogger.i("SourceManager", "切换歌词源: ${source.displayName}")
+        logger.i("SourceManager", "切换歌词源: ${source.displayName}")
         source.start(sink)
     }
 

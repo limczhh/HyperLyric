@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaSessionManager
-import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.common.HyperLogger
 
 /**
  * 媒体元数据辅助类。
@@ -22,7 +22,7 @@ object MediaMetadataHelper {
     /**
      * 获取指定包名的当前媒体信息
      */
-    fun getMediaInfo(context: Context, packageName: String): MediaInfo {
+    fun getMediaInfo(context: Context, packageName: String, logger: HyperLogger? = null): MediaInfo {
         if (packageName.isEmpty()) return MediaInfo()
 
         return try {
@@ -39,7 +39,7 @@ object MediaMetadataHelper {
                 )
             } ?: MediaInfo()
         } catch (e: Exception) {
-            HookLogger.e("MediaMetadataHelper", "获取媒体信息失败 ($packageName)", e)
+            logger?.e("MediaMetadataHelper", "获取媒体信息失败 ($packageName)", e)
             MediaInfo()
         }
     }
