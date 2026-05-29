@@ -9,7 +9,6 @@ import com.lidesheng.hyperlyric.root.HookIslandSpaceGateLyric
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.aitrans.AITranslator
 import com.lidesheng.hyperlyric.root.utils.HookLogger
-import com.lidesheng.hyperlyric.root.bridge.IpcRouter
 import io.github.proify.lyricon.lyric.model.Song
 import io.github.proify.lyricon.subscriber.ActivePlayerListener
 import io.github.proify.lyricon.subscriber.ConnectionListener
@@ -92,7 +91,6 @@ class LyriconSource : LyricSource {
 
     private fun initializeSubscriber(app: Application) {
         AITranslator.init(app)
-        IpcRouter.initialize(app, getRenderer())
 
         val sub = LyriconFactory.createSubscriber(app)
         subscriber = sub

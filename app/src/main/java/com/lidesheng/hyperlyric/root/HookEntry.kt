@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.root
 
 import com.lidesheng.hyperlyric.lyric.source.SourceManager
+import com.lidesheng.hyperlyric.root.bridge.IpcRouter
 import com.lidesheng.hyperlyric.root.source.LyriconSource
 import com.lidesheng.hyperlyric.root.source.RootLyricSink
 import com.lidesheng.hyperlyric.root.source.SuperLyricSource
@@ -162,6 +163,8 @@ class HookEntry : XposedModule() {
                     val renderer = if (activeMode == 1) HookIslandSpaceGateLyric else HookIslandLyric
                     val entry = instance!!
                     val sink = RootLyricSink(renderer, entry.prefs)
+
+                    IpcRouter.initialize(app, renderer)
 
                     lyriconSource.initialize(app, entry.prefs, activeMode)
                     superLyricSource.initialize(app)
