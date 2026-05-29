@@ -23,6 +23,7 @@ daimajia-easing = "2.4"
 hiddenapibypass = "4.3"
 shizuku = "13.1.5"
 superlyricapi = "3.4"
+lyricon-subscriber = "0.1.70"
 
 
 [libraries]
@@ -74,6 +75,9 @@ libxposed-service = { group = "io.github.libxposed", name = "service", version.r
 
 # --- SuperLyric ---
 superlyricapi = { group = "com.github.HChenX", name = "SuperLyricApi", version.ref = "superlyricapi" }
+
+# --- Lyricon Subscriber ---
+lyricon-subscriber = { group = "io.github.proify.lyricon", name = "subscriber", version.ref = "lyricon-subscriber" }
 
 # --- 动画库 (YoYo) ---
 daimajia-animations = { group = "com.daimajia.androidanimations", name = "library", version.ref = "daimajia-animations" }

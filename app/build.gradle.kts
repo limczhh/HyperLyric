@@ -87,6 +87,9 @@ dependencies {
     // SuperLyric API
     implementation(libs.superlyricapi)
 
+    // Lyricon Subscriber SDK
+    implementation(libs.lyricon.subscriber)
+
     // --- 布局兼容 ---
     implementation(libs.androidx.constraintlayout)
 
