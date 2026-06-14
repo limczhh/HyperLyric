@@ -24,7 +24,7 @@ internal object OpenAiTranslationClient {
         texts: List<String>
     ): List<TranslationItem>? = withContext(Dispatchers.IO) {
         if (configs.apiKey.isNullOrBlank()) {
-            HookLogger.e("OpenAiTranslationClient", "AITranslation : API: 无法启动：未检测到 API Key，请在设置中配置")
+            HookLogger.e("OpenAiTranslationClient", "API: 无法启动：未检测到 API Key，请在设置中配置")
             return@withContext null
         }
 
@@ -61,7 +61,7 @@ internal object OpenAiTranslationClient {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(apiUrl)
-            HookLogger.d("OpenAiTranslationClient", "AITranslation : API 请求：使用模型 ${configs.model}，地址 $apiUrl")
+            HookLogger.d("OpenAiTranslationClient", "API 请求：使用模型 ${configs.model}，地址 $apiUrl")
 
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -81,23 +81,23 @@ internal object OpenAiTranslationClient {
                 val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
                 val responseObj = json.decodeFromString<OpenAiChatResponse>(responseBody)
                 val content = responseObj.choices.firstOrNull()?.message?.content ?: run {
-                    HookLogger.e("OpenAiTranslationClient", "AITranslation : API 错误：AI 返回的内容为空")
+                    HookLogger.e("OpenAiTranslationClient", "API 错误：AI 返回的内容为空")
                     return@withContext null
                 }
-                HookLogger.d("OpenAiTranslationClient", "AITranslation : API 成功：已接收到 AI 返回的数据")
+                HookLogger.d("OpenAiTranslationClient", "API 成功：已接收到 AI 返回的数据")
                 AITranslationResponseParser.parse(content, requestIndices)
             } else {
                 val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "无错误信息"
-                HookLogger.e("OpenAiTranslationClient", "AITranslation : API 错误 (代码 $responseCode)：请检查网络状态或 Key 余额")
+                HookLogger.e("OpenAiTranslationClient", "API 错误 (代码 $responseCode)：请检查网络状态或 Key 余额")
                 null
             }
         } catch (e: CancellationException) {
             throw e
         } catch (_: EOFException) {
-            HookLogger.w("OpenAiTranslationClient", "AITranslation : API 异常：连接被意外关闭 (EOF)")
+            HookLogger.w("OpenAiTranslationClient", "API 异常：连接被意外关闭 (EOF)")
             null
         } catch (e: Exception) {
-            HookLogger.e("OpenAiTranslationClient", "AITranslation : 系统异常：网络请求出错 (${e.javaClass.simpleName})", e)
+            HookLogger.e("OpenAiTranslationClient", "系统异常：网络请求出错 (${e.javaClass.simpleName})", e)
             null
         } finally {
             connection?.disconnect()

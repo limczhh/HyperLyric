@@ -37,7 +37,7 @@ internal object AITranslationResponseParser {
             }
         }
 
-        HookLogger.e("AITranslationResponseParser", "AITranslation : API: No JSON payload found in response: ${trimForLog(trimmed)}")
+        HookLogger.e("AITranslationResponseParser", "API: No JSON payload found in response: ${trimForLog(trimmed)}")
         return null
     }
 

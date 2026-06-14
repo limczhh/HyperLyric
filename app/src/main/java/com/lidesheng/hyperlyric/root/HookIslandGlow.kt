@@ -48,13 +48,13 @@ object HookIslandGlow {
                     injectHighlightColor(chain)
                     result
                 }
-                HookLogger.i("HookIslandGlow","ModuleInit : 超级岛外圈光效注入成功")
+                HookLogger.i("HookIslandGlow","超级岛外圈光效注入成功")
             } else {
-                HookLogger.w("HookIslandGlow","ModuleInit : 未找到超级岛外圈光效注入位置")
+                HookLogger.w("HookIslandGlow","未找到超级岛外圈光效注入位置")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                HookLogger.e("HookIslandGlow", "ModuleInit : 超级岛外圈光效初始化失败", e)
+                HookLogger.e("HookIslandGlow", "超级岛外圈光效初始化失败", e)
             }
         }
 
@@ -100,7 +100,7 @@ object HookIslandGlow {
                 }
             }
         }.onFailure { e ->
-            HookLogger.e("HookIslandGlow", "HookIslandGlow : 颜色提取失败", e)
+            HookLogger.e("HookIslandGlow", "颜色提取失败", e)
         }
     }
 

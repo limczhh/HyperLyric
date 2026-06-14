@@ -42,7 +42,7 @@ class HookEntry : XposedModule() {
         super.onModuleLoaded(param)
         instance = this
         HookLogger.module = this
-        HookLogger.i("HookEntry","ModuleInit : 模块已加载")
+        HookLogger.i("HookEntry","模块已加载")
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
@@ -58,30 +58,30 @@ class HookEntry : XposedModule() {
                 UnlockIslandWhitelist.hook(this, param.defaultClassLoader)
             } catch (e: Exception) {
                  if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                     HookLogger.w("HookEntry","ModuleInit : 此系统版本不支持超级岛下拉小窗白名单")
+                     HookLogger.w("HookEntry","此系统版本不支持超级岛下拉小窗白名单")
                  } else {
-                     HookLogger.e("HookEntry", "ModuleInit : 超级岛下拉小窗白名单注入失败", e)
+                     HookLogger.e("HookEntry", "超级岛下拉小窗白名单注入失败", e)
                  }
             }
             try {
                 UnlockFocusWhitelist.hook(this, param.defaultClassLoader)
             } catch (e: Exception) {
                  if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                     HookLogger.w("HookEntry","ModuleInit : 此系统版本不支持解锁焦点通知白名单")
+                     HookLogger.w("HookEntry","此系统版本不支持解锁焦点通知白名单")
                  } else {
-                     HookLogger.e("HookEntry", "ModuleInit : 焦点通知白名单注入失败", e)
+                     HookLogger.e("HookEntry", "焦点通知白名单注入失败", e)
                  }
             }
 
             val isSuperIslandEnabled = prefs.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)
             
             if (!isSuperIslandEnabled) {
-                HookLogger.i("HookEntry","ModuleInit : 已在设置中禁用超级岛歌词功能")
+                HookLogger.i("HookEntry","已在设置中禁用超级岛歌词功能")
                 return
             }
 
             activeMode = prefs.getInt(RootConstants.KEY_HOOK_LYRIC_MODE, RootConstants.DEFAULT_HOOK_LYRIC_MODE)
-            HookLogger.i("HookEntry","ModuleInit : 超级岛激活模式 = $activeMode")
+            HookLogger.i("HookEntry","超级岛激活模式 = $activeMode")
 
             // 劫持 Application.onCreate 以初始化 Lyricon Receiver 所需的环境
             try {
@@ -89,12 +89,12 @@ class HookEntry : XposedModule() {
                 val onCreateMethod = appClass.getDeclaredMethod("onCreate")
                 deoptimize(onCreateMethod)
                 hook(onCreateMethod).intercept(AppCreateHooker())
-                HookLogger.i("HookEntry","ModuleInit : 系统环境注入成功 (Application.onCreate)")
+                HookLogger.i("HookEntry","系统环境注入成功 (Application.onCreate)")
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    HookLogger.w("HookEntry","ModuleInit : 未找到 Application.onCreate，无法注入环境")
+                    HookLogger.w("HookEntry","未找到 Application.onCreate，无法注入环境")
                 } else {
-                    HookLogger.e("HookEntry", "ModuleInit : 注入 Application.onCreate 时发生错误", e)
+                    HookLogger.e("HookEntry", "注入 Application.onCreate 时发生错误", e)
                 }
             }
 
@@ -105,12 +105,12 @@ class HookEntry : XposedModule() {
                     deoptimize(constructor)
                     hook(constructor).intercept(ClassLoaderHooker())
                 }
-                HookLogger.i("HookEntry","ModuleInit : 插件拦截器已就绪 (ClassLoader)")
+                HookLogger.i("HookEntry","插件拦截器已就绪 (ClassLoader)")
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    HookLogger.w("HookEntry","ModuleInit : 未找到 ClassLoader 构造方法")
+                    HookLogger.w("HookEntry","未找到 ClassLoader 构造方法")
                 } else {
-                    HookLogger.e("HookEntry", "ModuleInit : 拦截 ClassLoader 时发生错误", e)
+                    HookLogger.e("HookEntry", "拦截 ClassLoader 时发生错误", e)
                 }
             }
 
@@ -143,9 +143,9 @@ class HookEntry : XposedModule() {
                 }
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    // HookLogger.w("HookEntry","ModuleInit : 插件中未找到超级岛相关类")
+                    // HookLogger.w("HookEntry","插件中未找到超级岛相关类")
                 } else {
-                    HookLogger.e("HookEntry", "ModuleInit : 动态注入超级岛插件失败", e)
+                    HookLogger.e("HookEntry", "动态注入超级岛插件失败", e)
                 }
             }
             return result
@@ -180,10 +180,10 @@ class HookEntry : XposedModule() {
                     )
                     sourceManager?.start()
 
-                    HookLogger.i("HookEntry", "ModuleInit : 歌词源 = ${sourceManager?.getActiveSource()?.displayName}")
-                    HookLogger.i("HookEntry", "ModuleInit : 系统环境初始化完成")
+                    HookLogger.i("HookEntry", "歌词源 = ${sourceManager?.getActiveSource()?.displayName}")
+                    HookLogger.i("HookEntry", "系统环境初始化完成")
                 } catch (e: Exception) {
-                    HookLogger.e("HookEntry", "ModuleInit : 系统环境初始化失败", e)
+                    HookLogger.e("HookEntry", "系统环境初始化失败", e)
                 }
             }
             return chain.proceed()

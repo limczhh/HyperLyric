@@ -95,10 +95,10 @@ class RootLyricSink(
                 val ratio = song.calculateChineseRatio()
                 val percentage = String.format(java.util.Locale.US, "%.1f%%", ratio * 100)
                 if (autoIgnoreChinese) {
-                    HookLogger.d("RootLyricSink", "AITranslation : 歌曲 ${song.name}（中文占比 $percentage)")
+                    HookLogger.d("RootLyricSink", "歌曲 ${song.name}（中文占比 $percentage)")
                 }
                 if (autoIgnoreChinese && ratio > 0.5f) {
-                    HookLogger.d("RootLyricSink", "AITranslation : 歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
+                    HookLogger.d("RootLyricSink", "歌曲 ${song.name}（中文占比 $percentage），已自动跳过AI翻译")
                     return@launch
                 }
                 val skipExisting = prefs.getBoolean(
@@ -108,7 +108,7 @@ class RootLyricSink(
                 if (skipExisting) {
                     val hasTranslation = song.lyrics?.any { !it.translation.isNullOrBlank() } == true
                     if (hasTranslation) {
-                        HookLogger.d("RootLyricSink", "AITranslation : 歌曲 ${song.name} 已有翻译，跳过AI翻译")
+                        HookLogger.d("RootLyricSink", "歌曲 ${song.name} 已有翻译，跳过AI翻译")
                         return@launch
                     }
                 }

@@ -31,7 +31,7 @@ object IslandViewHelper {
                 }
             }
         } catch (e: Exception) {
-            HookLogger.e("IslandViewHelper", "toggleContainer : 切换容器可见性失败 ($containerName)", e)
+            HookLogger.e("IslandViewHelper", "切换容器可见性失败 ($containerName)", e)
         }
     }
 
@@ -61,7 +61,7 @@ object IslandViewHelper {
                 }
             }
         } catch (e: Exception) {
-            HookLogger.e("IslandViewHelper", "clearTextContainerMargin : 清除边距失败 ($parentName)", e)
+            HookLogger.e("IslandViewHelper", "清除边距失败 ($parentName)", e)
         }
     }
 
@@ -106,7 +106,7 @@ object IslandViewHelper {
                 }
             }
         } catch (e: Exception) {
-            HookLogger.e("IslandViewHelper", "showOriginalTexts : 恢复原生文本失败 ($parentName)", e)
+            HookLogger.e("IslandViewHelper", "恢复原生文本失败 ($parentName)", e)
         }
     }
 
@@ -114,7 +114,7 @@ object IslandViewHelper {
      * 触发灵动岛系统的布局刷新
      */
     fun triggerSystemRelayout(islandView: ViewGroup) {
-        HookLogger.d("IslandViewHelper","IslandViewHelper : 正在触发布局刷新")
+        HookLogger.d("IslandViewHelper","正在触发布局刷新")
         runCatching {
             val viewClass = islandView.javaClass
             // 优先尝试 updateBigIslandViewWidth

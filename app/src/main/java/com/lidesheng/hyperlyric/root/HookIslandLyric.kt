@@ -59,7 +59,7 @@ object HookIslandLyric : IslandRenderer {
                     module.deoptimize(method)
                     module.hook(method).intercept(UpdateBigIslandHooker())
                     hookedMethods.add("updateBigIslandView")
-                    HookLogger.i("HookIslandLyric","ModuleInit : 已注入超级岛: $method")
+                    HookLogger.i("HookIslandLyric","已注入超级岛: $method")
                 }
             }
 
@@ -69,7 +69,7 @@ object HookIslandLyric : IslandRenderer {
                     module.deoptimize(method)
                     module.hook(method).intercept(PreInjectHooker())
                     hookedMethods.add("calculateBigIslandWidth")
-                    HookLogger.i("HookIslandLyric","ModuleInit : 已注入超级岛: $method")
+                    HookLogger.i("HookIslandLyric","已注入超级岛: $method")
                 }
             }
 
@@ -79,7 +79,7 @@ object HookIslandLyric : IslandRenderer {
             if (hookedMethods.isNotEmpty()) {
                 isHookedSuccess = true
                 val methodsSummary = hookedMethods.distinct().joinToString(", ")
-                HookLogger.i("HookIslandLyric","ModuleInit : 初始化完成。已注入超级岛: [$methodsSummary]")
+                HookLogger.i("HookIslandLyric","初始化完成。已注入超级岛: [$methodsSummary]")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
@@ -110,7 +110,7 @@ object HookIslandLyric : IslandRenderer {
                     injectToSlot(islandView, "island_container_module_image_text_2", "HYPERLYRIC_RIGHT_VIEW", rightMode, prefs, pkgName)
                 }
             }.onFailure { e ->
-                HookLogger.e("HookIslandLyric", "HookIslandLyric : 预注入超级岛失败", e)
+                HookLogger.e("HookIslandLyric", "预注入超级岛失败", e)
             }
             return chain.proceed()
         }
@@ -163,7 +163,7 @@ object HookIslandLyric : IslandRenderer {
                 // 注入光效 Bundle 标记 + 主动触发 BigIslandView 的 startGlowEffect
                 HookIslandGlow.injectAndTriggerGlow(viewGroup, islandData, prefs)
             }.onFailure { e ->
-                HookLogger.e("HookIslandLyric", "HookIslandLyric : 更新超级岛视图失败", e)
+                HookLogger.e("HookIslandLyric", "更新超级岛视图失败", e)
             }
 
             return result
@@ -285,7 +285,7 @@ object HookIslandLyric : IslandRenderer {
                 maxField.isAccessible = true
                 maxField.setInt(wrapperView, (maxWidthDp * density).toInt())
             } catch (e: Exception) {
-                HookLogger.w("HookIslandLyric","HookIslandLyric : 设置 maxWidthPx 失败: ${e.message}")
+                HookLogger.w("HookIslandLyric","设置 maxWidthPx 失败: ${e.message}")
             }
 
             val richView = targetView ?: return
@@ -314,7 +314,7 @@ object HookIslandLyric : IslandRenderer {
                 }
                 else -> null
             }
-            HookLogger.d("HookIslandLyric","HookIslandLyric : 注入完成: mode=$mode, 标题=${singleModeText.take(20)}, 歌词=${(LyriconDataBridge.currentLyric ?: "").take(20)}")
+            HookLogger.d("HookIslandLyric","注入完成: mode=$mode, 标题=${singleModeText.take(20)}, 歌词=${(LyriconDataBridge.currentLyric ?: "").take(20)}")
 
             // mode 1~6 是歌曲信息，使用独立的跑马灯参数覆盖歌词默认值
             if (mode in 1..6 && prefs.getBoolean(RootConstants.KEY_HOOK_MARQUEE_METADATA_MODE, RootConstants.DEFAULT_HOOK_MARQUEE_METADATA_MODE)) {
@@ -374,7 +374,7 @@ object HookIslandLyric : IslandRenderer {
     }
 
     override fun refreshActiveIsland() {
-        HookLogger.d("HookIslandLyric","HookIslandLyric : 正在刷新超级岛")
+        HookLogger.d("HookIslandLyric","正在刷新超级岛")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
         
@@ -409,7 +409,7 @@ object HookIslandLyric : IslandRenderer {
     }
 
     override fun updateLyricLine() {
-        HookLogger.d("HookIslandLyric","HookIslandLyric : 正在更新歌词行")
+        HookLogger.d("HookIslandLyric","正在更新歌词行")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
 
@@ -501,7 +501,7 @@ object HookIslandLyric : IslandRenderer {
      * 播放/暂停状态变化回调
      */
     override fun onPlaybackStateChanged(isPlaying: Boolean) {
-        HookLogger.d("HookIslandLyric","HookIslandLyric : 播放状态变更: isPlaying=$isPlaying")
+        HookLogger.d("HookIslandLyric","播放状态变更: isPlaying=$isPlaying")
         val prefs = (module as HookEntry).prefs
         val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
 

@@ -47,15 +47,15 @@ object UnlockFocusWhitelist {
             if (method != null) {
                 module.deoptimize(method)
                 module.hook(method).intercept(PluginLoadHooker())
-                HookLogger.i("UnlockFocusWhitelist", "ModuleInit : 插件拦截器已就绪 (PluginInstance)")
+                HookLogger.i("UnlockFocusWhitelist", "插件拦截器已就绪 (PluginInstance)")
             } else {
-                HookLogger.w("UnlockFocusWhitelist", "ModuleInit : 未找到 PluginInstance.loadPlugin")
+                HookLogger.w("UnlockFocusWhitelist", "未找到 PluginInstance.loadPlugin")
             }
         }.onFailure { e ->
             if (e is ClassNotFoundException) {
-                HookLogger.w("UnlockFocusWhitelist", "ModuleInit : $PLUGIN_INSTANCE_CLASS 未找到")
+                HookLogger.w("UnlockFocusWhitelist", "$PLUGIN_INSTANCE_CLASS 未找到")
             } else {
-                HookLogger.e("UnlockFocusWhitelist", "ModuleInit : 拦截 PluginInstance 时发生错误", e)
+                HookLogger.e("UnlockFocusWhitelist", "拦截 PluginInstance 时发生错误", e)
             }
         }
 

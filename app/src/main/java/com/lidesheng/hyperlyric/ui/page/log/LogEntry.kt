@@ -17,8 +17,6 @@ data class LogEntry(
     val displaySource: String
         get() = when {
             source == "com.lidesheng.hyperlyric" || source == "HyperLyric" -> "HyperLyric"
-            source.contains("systemui", ignoreCase = true) -> "SystemUI"
-            source.startsWith("io.github.proify.lyricon.") -> source.substringAfterLast('.')
             else -> source
         }
     val displayLevel: String

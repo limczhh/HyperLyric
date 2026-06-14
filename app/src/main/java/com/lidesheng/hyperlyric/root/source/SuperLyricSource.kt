@@ -50,11 +50,11 @@ class SuperLyricSource : LyricSource {
         val available = try {
             SuperLyricHelper.isAvailable()
         } catch (e: Exception) {
-            HookLogger.e(TAG, "start : SuperLyric 服务不可用（未安装 SuperLyric 模块？）", e)
+            HookLogger.e(TAG, "SuperLyric 服务不可用（未安装 SuperLyric 模块？）", e)
             false
         }
         if (!available) {
-            HookLogger.e(TAG, "start : SuperLyric 服务未就绪，接收端注册跳过")
+            HookLogger.e(TAG, "SuperLyric 服务未就绪，接收端注册跳过")
             return
         }
 
@@ -64,12 +64,12 @@ class SuperLyricSource : LyricSource {
                 try {
                     handleLyric(publisher, data)
                 } catch (e: Exception) {
-                    HookLogger.w(TAG, "onLyric : 处理歌词数据失败", e)
+                    HookLogger.w(TAG, "处理歌词数据失败", e)
                 }
             }
 
             override fun onStop(publisher: String, data: SuperLyricData) {
-                HookLogger.d(TAG, "onStop : 收到停止事件, publisher=$publisher")
+                HookLogger.d(TAG, "收到停止事件, publisher=$publisher")
                 sink?.onPlaybackStateChanged(false)
                 stopPositionPolling()
             }
@@ -79,9 +79,9 @@ class SuperLyricSource : LyricSource {
         try {
             SuperLyricHelper.registerReceiver(stub)
             val registered = SuperLyricHelper.isReceiverRegistered(stub)
-            HookLogger.i(TAG, "start : 接收端注册${if (registered) "成功" else "失败"}")
+            HookLogger.i(TAG, "接收端注册${if (registered) "成功" else "失败"}")
         } catch (e: Exception) {
-            HookLogger.e(TAG, "start : 接收端注册异常", e)
+            HookLogger.e(TAG, "接收端注册异常", e)
         }
     }
 
@@ -91,12 +91,12 @@ class SuperLyricSource : LyricSource {
             try {
                 SuperLyricHelper.unregisterReceiver(it)
             } catch (e: Exception) {
-                HookLogger.w(TAG, "stop : 注销接收端失败", e)
+                HookLogger.w(TAG, "注销接收端失败", e)
             }
         }
         receiver = null
         sink = null
-        HookLogger.i(TAG, "stop : 数据源已停止")
+        HookLogger.i(TAG, "数据源已停止")
     }
 
     private fun handleLyric(publisher: String, data: SuperLyricData) {

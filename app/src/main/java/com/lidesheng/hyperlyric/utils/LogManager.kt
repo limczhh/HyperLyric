@@ -180,74 +180,45 @@ object LogManager : HyperLogger {
                 arrayOf("su", "-c", "cat $catCmd 2>/dev/null")
             )
 
-            val timeRegex = Pattern.compile("^(?:\\[\\s*)?(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}|\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}\\.\\d{3}|\\d+\\.\\d{6})")
+            val timeRegex = Pattern.compile("^(?:\\[\\s*)?(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3})")
             val levelRegex = Pattern.compile("\\s+([VDIWEC])/")
-            val lsposedRegex = Pattern.compile("\\(([^)]+)\\)\\[([^,\\]]+)")
-            val processRegex = Pattern.compile("\\(([^)]+)\\)")
+            val moduleTagRegex = Pattern.compile("com\\.lidesheng\\.hyperlyric[^\\]]*\\][ \\t]*\\[([^\\]]+)]")
 
             BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
                 val currentBlock = java.lang.StringBuilder()
 
                 fun processCurrentBlock() {
                     val blockStr = currentBlock.toString()
-                    val isHyperLyric = blockStr.contains("hyperlyric", ignoreCase = true) || blockStr.contains("HyperLyric")
-                    val isSystemUi = blockStr.contains("systemui", ignoreCase = true) || blockStr.contains("SystemUI")
-                    val isLyricon = blockStr.contains("io.github.proify.lyricon", ignoreCase = true)
-                    val isSystemUiCrash = isSystemUi &&
-                                          (blockStr.contains("crash", ignoreCase = true) || blockStr.contains("fatal exception", ignoreCase = true))
+                    if (!blockStr.contains("hyperlyric", ignoreCase = true)) return
 
-                    if (isHyperLyric || isSystemUi || isLyricon) {
-                        val firstLine = blockStr.lineSequence().firstOrNull() ?: ""
+                    val firstLine = blockStr.lineSequence().firstOrNull() ?: ""
 
-                        val timeMatcher = timeRegex.matcher(firstLine)
-                        val rawTime = if (timeMatcher.find()) timeMatcher.group(1) ?: context.getString(R.string.unknown_time) else context.getString(R.string.unknown_time)
-                        val time = if (rawTime.length >= 19 && rawTime != context.getString(R.string.unknown_time)) rawTime.substring(5).replace('T', ' ') else rawTime
+                    val timeMatcher = timeRegex.matcher(firstLine)
+                    val rawTime = if (timeMatcher.find()) timeMatcher.group(1) ?: context.getString(R.string.unknown_time) else context.getString(R.string.unknown_time)
+                    val time = if (rawTime.length >= 19 && rawTime != context.getString(R.string.unknown_time)) rawTime.substring(5).replace('T', ' ') else rawTime
 
-                        val levelMatcher = levelRegex.matcher(firstLine)
-                        val parsedLevel = if (levelMatcher.find()) levelMatcher.group(1) ?: "I" else "I"
-                        val level = when {
-                            isSystemUiCrash -> "C"
-                            blockStr.contains(" E/", ignoreCase = true) || blockStr.contains("[E]", ignoreCase = true) || blockStr.contains("error", ignoreCase = true) || blockStr.contains("fail", ignoreCase = true) || blockStr.contains("exception", ignoreCase = true) -> "E"
-                            blockStr.contains(" W/", ignoreCase = true) || blockStr.contains("[W]", ignoreCase = true) || blockStr.contains("warn", ignoreCase = true) -> "W"
-                            blockStr.contains(" D/", ignoreCase = true) || blockStr.contains("[D]", ignoreCase = true) || blockStr.contains("debug", ignoreCase = true) -> "D"
-                            else -> parsedLevel
-                        }
+                    val levelMatcher = levelRegex.matcher(firstLine)
+                    val level = if (levelMatcher.find()) levelMatcher.group(1) ?: "I" else "I"
+                    if (level == "V") return
 
-                        if (level == "V") return
-
-                        val tagStart = firstLine.indexOf("[HyperLyric]")
-                        val headerMsg = if (tagStart != -1) {
-                            firstLine.substring(tagStart + "[HyperLyric]".length).trim().ifEmpty { firstLine }
-                        } else {
-                            val lastBracket = firstLine.lastIndexOf(']')
-                            if (lastBracket != -1 && lastBracket < firstLine.length - 1) {
-                                firstLine.substring(lastBracket + 1).trim()
-                            } else firstLine
-                        }
-
-                        val remainingLines = if (blockStr.contains('\n')) blockStr.substringAfter('\n') else ""
-                        val finalMsg = if (remainingLines.isNotBlank()) {
-                            if (headerMsg.isNotEmpty() && headerMsg != firstLine) "$headerMsg\n$remainingLines" else "$headerMsg\n$remainingLines"
-                        } else {
-                            headerMsg
-                        }
-
-                        val lsposedMatcher = lsposedRegex.matcher(firstLine)
-                        val source = if (lsposedMatcher.find()) {
-                            lsposedMatcher.group(2) ?: "com.lidesheng.hyperlyric"
-                        } else {
-                            val processMatcher = processRegex.matcher(firstLine)
-                            if (processMatcher.find()) {
-                                processMatcher.group(1) ?: "com.lidesheng.hyperlyric"
-                            } else if (isSystemUi) {
-                                "com.android.systemui"
-                            } else {
-                                "com.lidesheng.hyperlyric"
-                            }
-                        }
-                        val tag = if (isSystemUi && !isHyperLyric && !isLyricon) context.getString(R.string.tag_logger) else context.getString(R.string.tag_lsposed)
-                        entries.add(LogEntry(time, level, tag, finalMsg.trim(), source = source, rawLog = blockStr))
+                    // 提取模块标签作为 source，用 matcher.end() 定位消息起始
+                    val moduleTagMatcher = moduleTagRegex.matcher(firstLine)
+                    val source: String
+                    val messageStart: Int
+                    if (moduleTagMatcher.find()) {
+                        source = moduleTagMatcher.group(1) ?: "HyperLyric"
+                        messageStart = moduleTagMatcher.end()
+                    } else {
+                        source = "HyperLyric"
+                        val lastBracket = firstLine.lastIndexOf(']')
+                        messageStart = if (lastBracket != -1) lastBracket + 1 else 0
                     }
+
+                    val headerMsg = firstLine.substring(messageStart).trim()
+                    val remainingLines = if (blockStr.contains('\n')) blockStr.substringAfter('\n') else ""
+                    val message = if (remainingLines.isNotBlank()) "$headerMsg\n$remainingLines" else headerMsg
+
+                    entries.add(LogEntry(time, level, context.getString(R.string.tag_lsposed), message.trim(), source = source, rawLog = blockStr))
                 }
 
                 reader.lineSequence().forEach { line ->

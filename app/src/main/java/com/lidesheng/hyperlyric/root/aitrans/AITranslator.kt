@@ -51,18 +51,18 @@ object AITranslator {
         configs: AiTranslationConfigs,
     ): Song {
         if (!configs.isUsable) {
-            HookLogger.w("AITranslator", "AITranslation : 跳过翻译：配置不完整，API Key 或其他配置为空")
+            HookLogger.w("AITranslator", "跳过翻译：配置不完整，API Key 或其他配置为空")
             return song
         }
         if (song.lyrics.isNullOrEmpty()) return song
 
-        HookLogger.d("AITranslator", "AITranslation : 正在翻译：${song.name}（共 ${song.lyrics?.size ?: 0} 行）")
+        HookLogger.d("AITranslator", "正在翻译：${song.name}（共 ${song.lyrics?.size ?: 0} 行）")
         return try {
             translateSong(song, configs)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            HookLogger.e("AITranslator", "AITranslation : 翻译过程发生错误", e)
+            HookLogger.e("AITranslator", "翻译过程发生错误", e)
             song
         }
     }
@@ -74,7 +74,7 @@ object AITranslator {
     ): List<TranslationItem>? = OpenAiTranslationClient.request(configs, song, texts)
 
     fun clearCache(callback: () -> Unit) {
-        HookLogger.d("AITranslator", "AITranslation : 清理记录：正在清空所有本地翻译记录（内存+数据库）")
+        HookLogger.d("AITranslator", "清理记录：正在清空所有本地翻译记录（内存+数据库）")
         scheduler.cancelPending()
         cache.clear(callback)
     }
@@ -85,20 +85,20 @@ object AITranslator {
         val songContentId = AITranslationKey.calculate(configs, song, originalLines)
 
         cache.getFromMemory(songContentId)?.let {
-            HookLogger.d("AITranslator", "AITranslation : 缓存命中：从内存加载了 ${song.name} 的翻译")
+            HookLogger.d("AITranslator", "缓存命中：从内存加载了 ${song.name} 的翻译")
             return AITranslationApplicator.apply(song, it)
         }
 
         cache.getFromDb(songContentId)?.let {
-            HookLogger.d("AITranslator", "AITranslation : 记录命中：从本地存储加载了 ${song.name} 的翻译")
+            HookLogger.d("AITranslator", "记录命中：从本地存储加载了 ${song.name} 的翻译")
             cache.putMemory(songContentId, it)
             return AITranslationApplicator.apply(song, it)
         }
 
-        HookLogger.d("AITranslator", "AITranslation : 正在请求 AI：本地无记录，准备发起在线翻译")
+        HookLogger.d("AITranslator", "正在请求 AI：本地无记录，准备发起在线翻译")
         val apiResults = scheduler.getOrEnqueue(songContentId, configs, song, originalLines).await()
         if (apiResults.isNullOrEmpty()) {
-            HookLogger.w("AITranslator", "AITranslation : 翻译失败：未能获取到 ${song.name} 的 AI 翻译")
+            HookLogger.w("AITranslator", "翻译失败：未能获取到 ${song.name} 的 AI 翻译")
             return song
         }
         return AITranslationApplicator.apply(song, apiResults)

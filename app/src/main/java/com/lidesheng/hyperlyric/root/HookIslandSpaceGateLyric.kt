@@ -61,7 +61,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
                     module.deoptimize(method)
                     module.hook(method).intercept(UpdateBigIslandHooker())
                     hookedMethods.add("updateBigIslandView")
-                    HookLogger.i("HookIslandSpaceGateLyric","ModuleInit : 已注入超级岛(SpaceGate): $method")
+                    HookLogger.i("HookIslandSpaceGateLyric","已注入超级岛(SpaceGate): $method")
                 }
             }
 
@@ -71,7 +71,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
                     module.deoptimize(method)
                     module.hook(method).intercept(PreInjectHooker())
                     hookedMethods.add("calculateBigIslandWidth")
-                    HookLogger.i("HookIslandSpaceGateLyric","ModuleInit : 已注入超级岛(SpaceGate): $method")
+                    HookLogger.i("HookIslandSpaceGateLyric","已注入超级岛(SpaceGate): $method")
                 }
             }
 
@@ -81,11 +81,11 @@ object HookIslandSpaceGateLyric : IslandRenderer {
             if (hookedMethods.isNotEmpty()) {
                 isHookedSuccess = true
                 val methodsSummary = hookedMethods.distinct().joinToString(", ")
-                HookLogger.i("HookIslandSpaceGateLyric","ModuleInit : SpaceGate 初始化完成。已注入超级岛: [$methodsSummary]")
+                HookLogger.i("HookIslandSpaceGateLyric","SpaceGate 初始化完成。已注入超级岛: [$methodsSummary]")
             }
         }.onFailure { e ->
             if (e !is ClassNotFoundException) {
-                HookLogger.e("HookIslandSpaceGateLyric", "ModuleInit : SpaceGate 注入超级岛失败", e)
+                HookLogger.e("HookIslandSpaceGateLyric", "SpaceGate 注入超级岛失败", e)
             }
         }
     }
@@ -112,7 +112,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
                     linkViews(islandView)
                 }
             }.onFailure { e ->
-                HookLogger.e("HookIslandSpaceGateLyric", "HookIslandSpaceGate : 预注入超级岛失败", e)
+                HookLogger.e("HookIslandSpaceGateLyric", "预注入超级岛失败", e)
             }
             return chain.proceed()
         }
@@ -163,7 +163,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
 
                 HookIslandGlow.injectAndTriggerGlow(viewGroup, islandData, prefs)
             }.onFailure { e ->
-                HookLogger.e("HookIslandSpaceGateLyric", "HookIslandSpaceGate : 更新超级岛视图失败", e)
+                HookLogger.e("HookIslandSpaceGateLyric", "更新超级岛视图失败", e)
             }
 
             return result
@@ -205,9 +205,9 @@ object HookIslandSpaceGateLyric : IslandRenderer {
             if (cutoutView != null) {
                 val cutoutLoc = IntArray(2)
                 cutoutView.getLocationOnScreen(cutoutLoc)
-                HookLogger.d("HookIslandSpaceGateLyric","SpaceGate : 成功定位摄像头容器(area_cutout), 宽度 = ${cutoutView.width}px, 绝对X = ${cutoutLoc[0]}")
+                HookLogger.d("HookIslandSpaceGateLyric","成功定位摄像头容器(area_cutout), 宽度 = ${cutoutView.width}px, 绝对X = ${cutoutLoc[0]}")
             } else {
-                HookLogger.d("HookIslandSpaceGateLyric","SpaceGate : 未找到系统 area_cutout 容器，将使用几何居中fallback。")
+                HookLogger.d("HookIslandSpaceGateLyric","未找到系统 area_cutout 容器，将使用几何居中fallback。")
             }
             loggedCutoutInfo = true
         }
@@ -284,7 +284,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
             maxField.isAccessible = true
             maxField.setInt(wrapperView, (maxWidthDp * density).toInt())
         } catch (e: Exception) {
-            HookLogger.w("HookIslandSpaceGateLyric","HookIslandSpaceGate : 设置 maxWidthPx 失败: ${e.message}")
+            HookLogger.w("HookIslandSpaceGateLyric","设置 maxWidthPx 失败: ${e.message}")
         }
 
         val richView = targetView ?: return
@@ -334,7 +334,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
     }
 
     override fun refreshActiveIsland() {
-        HookLogger.d("HookIslandSpaceGateLyric","HookIslandSpaceGate : 正在刷新超级岛")
+        HookLogger.d("HookIslandSpaceGateLyric","正在刷新超级岛")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
 
@@ -368,7 +368,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
     }
 
     override fun updateLyricLine() {
-        HookLogger.d("HookIslandSpaceGateLyric","HookIslandSpaceGate : 正在更新歌词行")
+        HookLogger.d("HookIslandSpaceGateLyric","正在更新歌词行")
         val iterator = activeIslandPkgNames.entries.iterator()
         val activePkg = LyriconDataBridge.activePackageName ?: return
 
@@ -453,7 +453,7 @@ object HookIslandSpaceGateLyric : IslandRenderer {
     }
 
     override fun onPlaybackStateChanged(isPlaying: Boolean) {
-        HookLogger.d("HookIslandSpaceGateLyric","HookIslandSpaceGate : 播放状态变更: isPlaying=$isPlaying")
+        HookLogger.d("HookIslandSpaceGateLyric","播放状态变更: isPlaying=$isPlaying")
         val prefs = (module as HookEntry).prefs
         val behavior = prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)
 

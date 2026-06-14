@@ -24,7 +24,7 @@ internal object AITranslationApplicator {
                 line
             }
         }
-        HookLogger.d("AITranslationApplicator", "AITranslation : Result: Applied $appliedCount lines to ${song.name}")
+        HookLogger.d("AITranslationApplicator", "Result: Applied $appliedCount lines to ${song.name}")
         return song.copy(lyrics = newLyrics)
     }
 }
