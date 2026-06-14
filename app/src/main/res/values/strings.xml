@@ -98,7 +98,7 @@
     <string name="subtitle_super_island">暂停或切换音乐后生效</string>
     <string name="title_lyrics">音乐信息</string>
     <string name="title_lyric_anim">歌词切换动画</string>
-    <string name="title_lyric_provider">歌词提供服务</string>
+    <string name="title_lyric_provider">lyricon歌词提供器</string>
     <string name="title_lyric_whitelist">歌词白名单</string>
 
     <!-- ———————————————————————— DynamicIslandNotificationPage ———————————————————————— -->
@@ -258,8 +258,8 @@
     <string name="refresh_release">松开刷新</string>
     <string name="refreshing">正在刷新...</string>
     <string name="refresh_success">刷新成功</string>
-    <string name="title_no_provider">暂未发现歌词提供器</string>
-    <string name="summary_no_provider">请点击右上角图标前往 LyricProvider 仓库下载安装并启用插件</string>
+    <string name="title_no_provider">暂未发现lyricon歌词提供器</string>
+    <string name="summary_no_provider">请给予本应用获取应用列表权限或点击右上角图标前往 LyricProvider 仓库下载安装并启用插件</string>
     <string name="category_others">其他</string>
     <string name="unknown_author">未知作者</string>
     <string name="format_version_author">%1$s | %2$s</string>
@@ -309,7 +309,7 @@
     <string name="title_help_config_steps">配置流程</string>
     <string name="title_help_warm_tips">温馨提示</string>
     <string name="summary_help_bug_notice">目前版本存在bug，如果不适配你的机型或系统版本，可用通知型灵动岛歌词代替，还请谅解</string>
-    <string name="summary_help_super_island_steps">1、前往github下载对应lyricon词幕歌词提供器\n2、在lsposed中启用HyperLyric和歌词提供器\n3、打开HyperLyric主页的小米超级岛歌词开关\n4、重启系统界面和音乐软件\n5、点击进入歌词提供服务页手动切换一次开关状态</string>
+    <string name="summary_help_super_island_steps">1、前往 github 下载对应 lyricon 歌词提供器\n2、在 lsposed 中启用 HyperLyric 和歌词提供器\n3、打开 HyperLyric 主页的小米超级岛歌词开关\n4、重启系统界面和音乐软件</string>
     <string name="summary_help_dynamic_island_hint">利用实时通知和小米焦点通知来实现灵动岛歌词效果，适用于支持这两种通知的设备</string>
     <string name="summary_help_focus_whitelist_hint">小米的焦点通知有白名单验证，需要你自己想办法绕过</string>
     <string name="summary_help_dynamic_island_steps">1、打开HyperLyric主页的通知型灵动岛歌词开关\n2、点击进入歌词白名单页添加音乐软件包名\n3、在音乐软件里打开蓝牙歌词功能，并连接蓝牙设备</string>

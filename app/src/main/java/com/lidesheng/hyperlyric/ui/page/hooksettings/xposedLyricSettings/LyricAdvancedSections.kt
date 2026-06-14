@@ -18,6 +18,7 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.advancedSections(
+    lyricSource: String,
     gradientStyle: Boolean,
     onGradientStyleChange: (Boolean) -> Unit,
     syllableRelative: Boolean,
@@ -152,71 +153,74 @@ fun LazyListScope.advancedSections(
                         onCheckedChange = onSwapTranslationChange
                     )
                 }
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                Column {
-                    SwitchPreference(
-                        title = stringResource(id = R.string.title_ai_translation),
-                        checked = aiTransEnabled,
-                        onCheckedChange = onAiTransEnabledChange
+
+                AnimatedVisibility(visible = lyricSource != "superlyric") {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
-                    AnimatedVisibility(visible = aiTransEnabled) {
-                        Column {
-                            SwitchPreference(
-                                title = stringResource(id = R.string.title_ai_trans_auto_ignore_chinese),
-                                checked = autoIgnoreChinese,
-                                onCheckedChange = onAutoIgnoreChineseChange
-                            )
-                            SwitchPreference(
-                                title = stringResource(id = R.string.title_ai_trans_skip_existing),
-                                checked = skipExistingTranslation,
-                                onCheckedChange = onSkipExistingTranslationChange
-                            )
+                    Column {
+                        SwitchPreference(
+                            title = stringResource(id = R.string.title_ai_translation),
+                            checked = aiTransEnabled,
+                            onCheckedChange = onAiTransEnabledChange
+                        )
+                        AnimatedVisibility(visible = aiTransEnabled) {
                             Column {
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.label_ai_trans_target_lang),
-                                    endActions = {
-                                        Text(
-                                            targetLang,
-                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                        )
-                                    },
-                                    onClick = onTargetLangClick
+                                SwitchPreference(
+                                    title = stringResource(id = R.string.title_ai_trans_auto_ignore_chinese),
+                                    checked = autoIgnoreChinese,
+                                    onCheckedChange = onAutoIgnoreChineseChange
                                 )
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.label_ai_trans_api_key),
-                                    endActions = {
-                                        Text(
-                                            if (apiKey.isNotEmpty()) "***************" else "未配置",
-                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                        )
-                                    },
-                                    onClick = onApiKeyClick
+                                SwitchPreference(
+                                    title = stringResource(id = R.string.title_ai_trans_skip_existing),
+                                    checked = skipExistingTranslation,
+                                    onCheckedChange = onSkipExistingTranslationChange
                                 )
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.label_ai_trans_model),
-                                    endActions = {
-                                        Text(
-                                            model,
-                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                        )
-                                    },
-                                    onClick = onModelClick
-                                )
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.label_ai_trans_base_url),
-                                    summary = baseUrl,
-                                    onClick = onBaseUrlClick
-                                )
-                                ArrowPreference(
-                                    title = stringResource(R.string.title_custom_prompt),
-                                    summary = if (prompt.lines().size > 3) prompt.lines().take(2).joinToString("\n") + "..." else prompt,
-                                    onClick = onPromptClick
-                                )
+                                Column {
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.label_ai_trans_target_lang),
+                                        endActions = {
+                                            Text(
+                                                targetLang,
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = onTargetLangClick
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.label_ai_trans_api_key),
+                                        endActions = {
+                                            Text(
+                                                if (apiKey.isNotEmpty()) "***************" else "未配置",
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = onApiKeyClick
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.label_ai_trans_model),
+                                        endActions = {
+                                            Text(
+                                                model,
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = onModelClick
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.label_ai_trans_base_url),
+                                        summary = baseUrl,
+                                        onClick = onBaseUrlClick
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(R.string.title_custom_prompt),
+                                        summary = if (prompt.lines().size > 3) prompt.lines().take(2).joinToString("\n") + "..." else prompt,
+                                        onClick = onPromptClick
+                                    )
+                                }
                             }
                         }
                     }
