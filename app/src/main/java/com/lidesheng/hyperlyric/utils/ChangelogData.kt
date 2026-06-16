@@ -12,7 +12,8 @@ object ChangelogData {
             ChangelogItem(
                 version = "6.0-1929",
                 title = "comming soon",
-                summary = "- 新增 SuperLyric 和 MediaSession 歌词源\n" +
+                summary = "- 新增应用图标\n" +
+                        "- 新增 SuperLyric 和 MediaSession 歌词源\n" +
                         "- 新增“分离歌词”歌词模式，选择“分离歌词”后需要重启系统界面\n" +
                         "- 新增应用日志，优化、调整、新增更多日志内容和日志显示\n" +
                         "- 新增ai翻译“自动跳过已有翻译歌曲”\n" +

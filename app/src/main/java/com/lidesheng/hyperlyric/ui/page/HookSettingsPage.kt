@@ -119,18 +119,16 @@ private fun LazyListScope.hookSettingsSections(
         )
         val sourceIds = listOf("lyricon", "superlyric", "mediasession")
         Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
-            AnimatedVisibility(visible = lyricSource == "lyricon") {
-                OverlayDropdownPreference(
-                    title = stringResource(R.string.title_lyric_mode),
-                    items = lyricModeOptions,
-                    selectedIndex = lyricMode,
+            OverlayDropdownPreference(
+                title = stringResource(R.string.title_lyric_mode),
+                items = lyricModeOptions,
+                selectedIndex = lyricMode,
                     onSelectedIndexChange = { index ->
-                        lyricMode = index
-                        prefs.edit { putInt(RootConstants.KEY_HOOK_LYRIC_MODE, index) }
-                        PrefsBridge.putInt(RootConstants.KEY_HOOK_LYRIC_MODE, index)
-                    }
-                )
-            }
+                    lyricMode = index
+                    prefs.edit { putInt(RootConstants.KEY_HOOK_LYRIC_MODE, index) }
+                    PrefsBridge.putInt(RootConstants.KEY_HOOK_LYRIC_MODE, index)
+                }
+            )
             OverlayDropdownPreference(
                 title = stringResource(R.string.title_lyric_source),
                 items = sourceOptions,

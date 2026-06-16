@@ -29,6 +29,8 @@ class SuperLyricSource : LyricSource {
     private var receiver: ISuperLyricReceiver? = null
     private var positionJob: Job? = null
     private val positionScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    @Volatile
+    private var lastKnownPosition: Long = -1L
 
     fun initialize(app: android.app.Application) {
         this.app = app
@@ -60,7 +62,7 @@ class SuperLyricSource : LyricSource {
 
         val stub = object : ISuperLyricReceiver.Stub() {
             override fun onLyric(publisher: String, data: SuperLyricData) {
-                android.util.Log.d("SuperLyricSource", "★ onLyric RAW: publisher=$publisher hasLyric=${data.hasLyric()}")
+                HookLogger.d(TAG, "onLyric: publisher=$publisher hasLyric=${data.hasLyric()}")
                 try {
                     handleLyric(publisher, data)
                 } catch (e: Exception) {
@@ -107,22 +109,54 @@ class SuperLyricSource : LyricSource {
         if (!hasContent) return
 
         currentSink.onPlaybackStateChanged(true)
-
-        if (data.hasTitle() || data.hasArtist() || data.hasAlbum()) {
-            currentSink.onMetadata(
-                if (data.hasTitle()) data.title else null,
-                if (data.hasArtist()) data.artist else null,
-                if (data.hasAlbum()) data.album else null,
-                publisher
-            )
-        }
+        currentSink.onMetadata(
+            if (data.hasTitle()) data.title else null,
+            if (data.hasArtist()) data.artist else null,
+            if (data.hasAlbum()) data.album else null,
+            publisher
+        )
+        startPositionPolling(publisher)
 
         if (data.hasLyric()) {
             val lyric = data.lyric
             if (lyric != null) {
-                val richLine = convertToRichLyricLine(lyric, data)
-                currentSink.onLyricLine(richLine)
-                startPositionPolling(publisher)
+                val st = lyric.startTime
+                val et = lyric.endTime
+                val dl = lyric.delay
+                val words = lyric.words
+                HookLogger.d(TAG, "歌词: text=${lyric.text}, start=$st, end=$et, delay=$dl, " +
+                    "words=${words?.size ?: 0}, pos=$lastKnownPosition, pub=$publisher")
+
+                if (st == 0L && et == 0L) {
+                    val pos = lastKnownPosition.takeIf { it >= 0 }
+                        ?: app?.let { MediaMetadataHelper.getPlaybackPosition(it, publisher) }
+                            ?.takeIf { it >= 0 }
+                            ?.also { lastKnownPosition = it }
+                    if (dl > 0 && pos != null) {
+                        val richLine = convertToRichLyricLine(lyric, data).copy(
+                            begin = pos,
+                            end = pos + dl,
+                            duration = dl
+                        )
+                        HookLogger.d(TAG, "→ onLyricLine (推算时间): begin=${richLine.begin}, end=${richLine.end}")
+                        currentSink.onLyricLine(richLine)
+                        startPositionPolling(publisher)
+                    } else {
+                        val text = buildString {
+                            append(lyric.text)
+                            if (data.hasTranslation()) {
+                                data.translation?.text?.let { append("\n").append(it) }
+                            }
+                        }
+                        HookLogger.d(TAG, "→ onPlainText: $text")
+                        currentSink.onPlainText(text)
+                    }
+                } else {
+                    val richLine = convertToRichLyricLine(lyric, data)
+                    HookLogger.d(TAG, "→ onLyricLine (原始时间): begin=$st, end=$et")
+                    currentSink.onLyricLine(richLine)
+                    startPositionPolling(publisher)
+                }
             }
         }
     }
@@ -176,7 +210,10 @@ class SuperLyricSource : LyricSource {
         positionJob = positionScope.launch {
             while (isActive) {
                 val pos = MediaMetadataHelper.getPlaybackPosition(context, publisher)
-                if (pos >= 0) sink?.onPositionChanged(pos)
+                if (pos >= 0) {
+                    lastKnownPosition = pos
+                    sink?.onPositionChanged(pos)
+                }
                 delay(50)
             }
         }
@@ -185,6 +222,7 @@ class SuperLyricSource : LyricSource {
     private fun stopPositionPolling() {
         positionJob?.cancel()
         positionJob = null
+        lastKnownPosition = -1L
     }
 
     companion object {

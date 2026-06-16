@@ -423,7 +423,11 @@ object HookIslandLyric : IslandRenderer {
         if ((module as? HookEntry)?.prefs?.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND) != true) return
         HookLogger.d("HookIslandLyric","正在更新歌词行")
         val iterator = activeIslandPkgNames.entries.iterator()
-        val activePkg = LyriconDataBridge.activePackageName ?: return
+        val activePkg = LyriconDataBridge.activePackageName
+        val islandCount = activeIslandPkgNames.size
+        val lineText = LyriconDataBridge.currentLyricLine?.text
+        HookLogger.d("HookIslandLyric", "activePkg=$activePkg, islands=$islandCount, lineText=$lineText")
+        if (activePkg.isNullOrEmpty()) return
 
         while (iterator.hasNext()) {
             val entry = iterator.next()
@@ -431,6 +435,7 @@ object HookIslandLyric : IslandRenderer {
             val pkgName = entry.value
 
             if (cv != null && cv.isAttachedToWindow) {
+                HookLogger.d("HookIslandLyric", "岛: pkg=$pkgName, match=${pkgName == activePkg}")
                 if (pkgName == activePkg) {
                     val prefs = (module as HookEntry).prefs
                     updateLyricInSlot(cv, "HYPERLYRIC_LEFT_VIEW", prefs.getInt(RootConstants.KEY_HOOK_ISLAND_CONTENT_LEFT, RootConstants.DEFAULT_HOOK_ISLAND_CONTENT_LEFT), prefs)
@@ -443,8 +448,15 @@ object HookIslandLyric : IslandRenderer {
     }
 
     private fun updateLyricInSlot(cv: ViewGroup, tag: String, mode: Int, prefs: SharedPreferences) {
-        if (mode != 7) return
-        val view = cv.findViewWithTag<RichLyricLineView>(tag) ?: return
+        if (mode != 7) {
+            HookLogger.d("HookIslandLyric", "slot=$tag mode=$mode != 7, 跳过")
+            return
+        }
+        val view = cv.findViewWithTag<RichLyricLineView>(tag)
+        if (view == null) {
+            HookLogger.d("HookIslandLyric", "slot=$tag view=null, 跳过")
+            return
+        }
         val rawLine = LyriconDataBridge.currentLyricLine
         val targetLine = if (rawLine != null) {
             if (TranslationHelper.isTranslationOnly(prefs)) {

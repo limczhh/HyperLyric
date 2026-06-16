@@ -45,6 +45,7 @@ class RootLyricSink(
 
     override fun onLyricLine(line: Any?) {
         if (line is IRichLyricLine) {
+            HookLogger.d("RootLyricSink", "onLyricLine: text=${line.text}, begin=${line.begin}, end=${line.end}")
             LyriconDataBridge.updateLyricLine(line)
             renderer.updateLyricLine()
         }
