@@ -93,7 +93,7 @@
     <string name="title_lyric_source">Lyric Source</string>
     <string name="lyric_source_lyricon">Lyricon</string>
     <string name="lyric_source_superlyric">SuperLyric</string>
-    <string name="lyric_source_mediasession">MediaSession</string>
+    <string name="lyric_source_lyricinfo">LyricInfo</string>
     <string name="title_custom_config">Custom Configuration</string>
     <string name="title_super_island">HyperIsland</string>
     <string name="subtitle_super_island">Takes effect after music paused or changed</string>
@@ -394,5 +394,5 @@
     <string name="setup_no_dependency_summary">MediaSession mode works out of the box, no extra components needed</string>
     <string name="setup_completion_lyricon">Please enable HyperLyric, Lyric Core Service and LyricProvider modules in LSPosed, then restart SystemUI and your music app</string>
     <string name="setup_completion_superlyric">Please enable the SuperLyric module in LSPosed, then restart your phone</string>
-    <string name="setup_completion_mediasession">After restarting SystemUI, enable the car Bluetooth lyrics feature in your music app</string>
+    <string name="setup_completion_lyricinfo">Install the LyricInfo module, enable it in LSPosed and select your music app, then restart SystemUI</string>
 </resources>

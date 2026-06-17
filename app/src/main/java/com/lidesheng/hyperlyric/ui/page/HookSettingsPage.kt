@@ -115,9 +115,9 @@ private fun LazyListScope.hookSettingsSections(
         val sourceOptions = listOf(
             stringResource(R.string.lyric_source_lyricon),
             stringResource(R.string.lyric_source_superlyric),
-            stringResource(R.string.lyric_source_mediasession)
+            stringResource(R.string.lyric_source_lyricinfo)
         )
-        val sourceIds = listOf("lyricon", "superlyric", "mediasession")
+        val sourceIds = listOf("lyricon", "superlyric", "lyricinfo")
         Card(modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) {
             OverlayDropdownPreference(
                 title = stringResource(R.string.title_lyric_mode),

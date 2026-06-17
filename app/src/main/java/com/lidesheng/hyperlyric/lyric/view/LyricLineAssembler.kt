@@ -31,12 +31,13 @@ internal class LyricLineAssembler(
     fun buildMain(source: IRichLyricLine?): MainResult {
         if (source == null) return MainResult(LyricLine(), false)
 
+        val hasOriginalWords = !source.words.isNullOrEmpty()
         val shouldGen = enableRelativeProgress && source.isTitleLine().not()
         val words = if (shouldGen) {
             wordBuilder.build(source, source.text, source.words)
         } else source.words
 
-        val generated = words !== source.words
+        val generated = !hasOriginalWords && words !== source.words
         val line = LyricLine(
             begin = source.begin, end = source.end, duration = source.duration,
             isAlignedRight = source.isAlignedRight, metadata = source.metadata,

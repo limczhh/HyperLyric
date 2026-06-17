@@ -4,7 +4,7 @@ import com.lidesheng.hyperlyric.lyric.source.SourceManager
 import com.lidesheng.hyperlyric.root.bridge.IpcRouter
 import com.lidesheng.hyperlyric.root.source.IslandRenderer
 import com.lidesheng.hyperlyric.root.source.LyriconSource
-import com.lidesheng.hyperlyric.root.source.MediaSessionSource
+import com.lidesheng.hyperlyric.root.source.LyricInfoSource
 import com.lidesheng.hyperlyric.root.source.RootLyricSink
 import com.lidesheng.hyperlyric.root.source.SuperLyricSource
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -23,7 +23,7 @@ class HookEntry : XposedModule() {
         var activeMode = 0
         val lyriconSource = LyriconSource()
         val superLyricSource = SuperLyricSource()
-        var mediaSessionSource: MediaSessionSource? = null
+        var lyricInfoSource: LyricInfoSource? = null
         var sourceManager: SourceManager? = null
             private set
 
@@ -168,10 +168,10 @@ class HookEntry : XposedModule() {
 
                     lyriconSource.initialize(app, entry.prefs, activeMode)
                     superLyricSource.initialize(app)
-                    mediaSessionSource = MediaSessionSource(app)
+                    lyricInfoSource = LyricInfoSource(app)
 
                     sourceManager = SourceManager(
-                        sources = listOf(lyriconSource, superLyricSource, mediaSessionSource!!),
+                        sources = listOf(lyriconSource, superLyricSource, lyricInfoSource!!),
                         prefs = entry.prefs,
                         sink = sink,
                         prefKey = RootConstants.KEY_HOOK_LYRIC_SOURCE,

@@ -381,9 +381,9 @@ fun LyricSourceSelectionPage(selectedSource: String, onSourceSelected: (String) 
     val sourceOptions = listOf(
         stringResource(R.string.lyric_source_lyricon),
         stringResource(R.string.lyric_source_superlyric),
-        stringResource(R.string.lyric_source_mediasession)
+        stringResource(R.string.lyric_source_lyricinfo)
     )
-    val sourceIds = listOf("lyricon", "superlyric", "mediasession")
+    val sourceIds = listOf("lyricon", "superlyric", "lyricinfo")
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -447,7 +447,7 @@ fun LyricSourceSelectionPage(selectedSource: String, onSourceSelected: (String) 
                         )
                     }
                 }
-                "mediasession" -> {
+                "lyricinfo" -> {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         BasicComponent(
                             title = stringResource(R.string.setup_no_dependency),
@@ -465,7 +465,7 @@ fun CompletionPage(workMode: Int, selectedSource: String = "lyricon") {
     val completionText = if (workMode == 0) {
         when (selectedSource) {
             "superlyric" -> stringResource(R.string.setup_completion_superlyric)
-            "mediasession" -> stringResource(R.string.setup_completion_mediasession)
+            "lyricinfo" -> stringResource(R.string.setup_completion_lyricinfo)
             else -> stringResource(R.string.setup_completion_lyricon)
         }
     } else {

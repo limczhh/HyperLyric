@@ -93,7 +93,7 @@
     <string name="title_lyric_source">歌词源</string>
     <string name="lyric_source_lyricon">Lyricon</string>
     <string name="lyric_source_superlyric">SuperLyric</string>
-    <string name="lyric_source_mediasession">MediaSession</string>
+    <string name="lyric_source_lyricinfo">LyricInfo</string>
     <string name="title_custom_config">自定义配置</string>
     <string name="title_super_island">超级岛</string>
     <string name="subtitle_super_island">暂停或切换音乐后生效</string>
@@ -396,5 +396,5 @@
     <string name="setup_no_dependency_summary">无需下载额外组件，功能受限，不接受bug反馈</string>
     <string name="setup_completion_lyricon">请前往 LSPosed 启用 HyperLyric 、词幕服务和歌词提供器模块，重启系统界面和音乐软件后即可使用</string>
     <string name="setup_completion_superlyric">请前往 LSPosed 启用 SuperLyric 模块，重启手机后即可使用</string>
-    <string name="setup_completion_mediasession">重启系统界面后，打开音乐软件的车载蓝牙歌词功能即可使用</string>
+    <string name="setup_completion_lyricinfo">安装歌词获取模块后，在 LSPosed 中启用并勾选音乐软件，重启系统界面即可使用</string>
 </resources>
