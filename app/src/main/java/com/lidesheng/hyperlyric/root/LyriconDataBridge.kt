@@ -92,7 +92,6 @@ object LyriconDataBridge : StateResetter {
         val newText = foundLine?.text ?: currentLyric ?: ""
 
         if (newText != currentLyric) {
-            HookLogger.d("LyriconDataBridge", "歌词行切换: ${newText.take(30)}")
             currentLyric = newText
             return true
         }
