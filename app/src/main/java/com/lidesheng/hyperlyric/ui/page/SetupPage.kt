@@ -56,6 +56,9 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarDuration
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -73,6 +76,8 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 4 })
     val prefs = remember { context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val msgXposedNotActive = stringResource(R.string.toast_xposed_module_not_active)
 
     var workMode by remember {
         val initialMode = prefs.getInt(UIConstants.KEY_WORK_MODE, UIConstants.DEFAULT_WORK_MODE)
@@ -89,6 +94,7 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
             TopAppBar(title = stringResource(R.string.title_setup))
         },
@@ -121,6 +127,13 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
                     onClick = {
                         if (isLastPage) {
                             onFinish()
+                        } else if (pagerState.currentPage == 0 && workMode == 0 && RootApplication.xposedService == null) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = msgXposedNotActive,
+                                    duration = SnackbarDuration.Custom(2000L)
+                                )
+                            }
                         } else {
                             scope.launch {
                                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
@@ -182,14 +195,10 @@ fun ModeSelectionPage(selectedMode: Int, onModeSelected: (Int) -> Unit) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = if (isModuleActive) ({ onModeSelected(0) }) else null,
+                onClick = { onModeSelected(0) },
                 pressFeedbackType = PressFeedbackType.Tilt,
                 colors = CardDefaults.defaultColors(
-                    color = when {
-                        selectedMode == 0 -> MiuixTheme.colorScheme.primary
-                        !isModuleActive -> MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f)
-                        else -> MiuixTheme.colorScheme.surfaceContainer
-                    }
+                    color = if (selectedMode == 0) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -197,30 +206,14 @@ fun ModeSelectionPage(selectedMode: Int, onModeSelected: (Int) -> Unit) {
                         text = stringResource(R.string.title_super_island_lyrics),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = when {
-                            selectedMode == 0 -> Color.White
-                            !isModuleActive -> MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            else -> MiuixTheme.colorScheme.onSurface
-                        }
+                        color = if (selectedMode == 0) Color.White else MiuixTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(R.string.summary_super_island_lyrics),
                         fontSize = 14.sp,
-                        color = when {
-                            selectedMode == 0 -> Color.White.copy(alpha = 0.8f)
-                            !isModuleActive -> MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f)
-                            else -> MiuixTheme.colorScheme.onSurfaceSecondary
-                        },
+                        color = if (selectedMode == 0) Color.White.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceSecondary,
                         modifier = Modifier.padding(top = 4.dp)
                     )
-                    if (!isModuleActive) {
-                        Text(
-                            text = stringResource(R.string.toast_xposed_module_not_active),
-                            fontSize = 12.sp,
-                            color = Color(0xFFFF6B6B),
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
                 }
             }
         }

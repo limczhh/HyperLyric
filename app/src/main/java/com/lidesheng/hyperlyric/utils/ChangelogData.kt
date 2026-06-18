@@ -10,19 +10,24 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
-                version = "6.0-1929",
+                version = "6.0-1931",
                 title = "comming soon",
                 summary = "- 新增应用图标\n" +
-                        "- 新增 SuperLyric 和 LyricInfo 歌词源，支持实时切换\n" +
+                        "- 新增 SuperLyric 和 LyricInfo 歌词源，支持实时切换。SuperLyric 不支持 ai 翻译功能\n" +
                         "- 新增“分离歌词”歌词模式，支持实时切换\n" +
                         "- 新增应用日志，优化、调整、新增更多日志内容和日志显示\n" +
                         "- 新增ai翻译“自动跳过已有翻译歌曲”\n" +
+                        "- 新增版本更新提示弹窗\n" +
                         "- 大幅重构项目\n" +
                         "- 优化小米超级岛歌曲信息组合内容和数据获取\n" +
-                        "- 优化引导页面\n" +
+                        "- 优化引导页面和使用帮助页面\n" +
+                        "- 移除 Lyricon central\n" +
                         "- 移除hook模式白名单绑定和判断，暂停注入控制移至主页“小米超级岛歌词”开关，优化使用体验\n" +
                         "- 修复AI翻译自动跳过中文歌曲不生效的错误\n" +
+                        "- 修复边缘光效颜色不独立生效的问题\n" +
                         "- 修复个别在线歌词会误删空格的错误\n" +
+                        "- 修复 LyricParsers 会误删空格的错误\n" +
+                        "- 修复不少想不起来的错误\n" +
                         "- 更改在线歌词缓存至外部存储"
             ),
             ChangelogItem(

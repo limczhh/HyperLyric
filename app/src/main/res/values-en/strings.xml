@@ -315,6 +315,21 @@
     <string name="summary_help_dynamic_island_steps">1. Turn on the Notification-style Dynamic Island switch on the HyperLyric home page\n2. Add music app package names in the whitelist page\n3. Turn on the Bluetooth lyrics feature in the music app and connect a Bluetooth device</string>
     <string name="summary_help_salt_player">Salt Player is supported, more apps coming soon…</string>
 
+    <!-- Super Island Help -->
+    <string name="summary_help_supported_devices">Only supports HyperOS 3 devices with LSPosed v2.0+ installed</string>
+    <string name="summary_help_prerequisites">① Enable HyperLyric in LSPosed and turn on the \"Super Island Lyrics\" switch on the home page\n② Select a lyric source and download the corresponding provider\n③ Restart System UI or reboot your device as required by the lyric source</string>
+    <string name="title_help_lyric_sources">Lyric Sources</string>
+    <string name="summary_help_source_lyricon">Restart System UI</string>
+    <string name="summary_help_source_superlyric">Reboot device</string>
+    <string name="summary_help_source_lyricinfo">Restart System UI</string>
+    <string name="tag_download_lyricon">Download Lyricon Api</string>
+    <string name="tag_download_providers">Download LyricProvider</string>
+    <string name="tag_download_superlyric">Download SuperLyric</string>
+    <string name="tag_download_lyricinfo">Download LyricInfo</string>
+
+    <!-- Migration Dialog -->
+    <string name="migration_dialog_title">Update Notice</string>
+
     <!-- Poetry Page -->
     <string name="back_to_top">Back to top</string>
 

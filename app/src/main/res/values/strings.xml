@@ -316,6 +316,21 @@
     <string name="summary_help_dynamic_island_steps">1、打开HyperLyric主页的通知型灵动岛歌词开关\n2、点击进入歌词白名单页添加音乐软件包名\n3、在音乐软件里打开蓝牙歌词功能，并连接蓝牙设备</string>
     <string name="summary_help_salt_player">已支持 Salt Player，更多应用等你发现...</string>
 
+    <!-- Super Island Help -->
+    <string name="summary_help_supported_devices">仅支持已安装 LSPosed v2.0+ 的 HyperOS 3 设备</string>
+    <string name="summary_help_prerequisites">① 在 LSPosed 中启用 HyperLyric，并打开主页的“小米超级岛歌词”开关\n② 选择适应的歌词源，并下载启用对应的歌词提供器\n③ 根据歌词源需要，重启系统界面或重启手机</string>
+    <string name="title_help_lyric_sources">歌词源</string>
+    <string name="summary_help_source_lyricon">重启系统界面</string>
+    <string name="summary_help_source_superlyric">重启手机</string>
+    <string name="summary_help_source_lyricinfo">重启系统界面</string>
+    <string name="tag_download_lyricon">下载 Lyricon central</string>
+    <string name="tag_download_providers">下载 LyricProvider</string>
+    <string name="tag_download_superlyric">下载 SuperLyric</string>
+    <string name="tag_download_lyricinfo">下载 LyricInfo</string>
+
+    <!-- Migration Dialog -->
+    <string name="migration_dialog_title">版本更新提醒</string>
+
     <!-- Poetry Page -->
     <string name="back_to_top">回到顶部</string>
 

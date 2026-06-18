@@ -1,9 +1,12 @@
 package com.lidesheng.hyperlyric.ui.page
 
+import android.content.Intent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,9 +21,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.ui.component.TagComponent
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
@@ -118,26 +124,94 @@ fun HelpPage() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 private fun LazyListScope.superIslandHelpSections() {
-    item(key = "super_island_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_usage_tips))
+    // 1. 配置流程
+    item(key = "config_steps_title") {
+        SmallTitle(text = stringResource(R.string.title_help_config_steps))
     }
-    item(key = "super_island_tips_content") {
+    item(key = "config_steps_content") {
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
+            Column { BasicComponent(
+                title = stringResource(R.string.summary_help_supported_devices),
+                summary = stringResource(R.string.summary_help_prerequisites)) }
+        }
+    }
+
+    // 2. 歌词源
+    item(key = "lyric_sources_title") {
+        SmallTitle(text = stringResource(R.string.title_help_lyric_sources))
+    }
+    item(key = "source_lyricon") {
+        val context = LocalContext.current
         Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 BasicComponent(
-                    title = stringResource(R.string.summary_super_island_lyrics),
-                    summary = stringResource(R.string.summary_help_bug_notice)
+                    title = "Lyricon",
+                    summary = stringResource(R.string.summary_help_source_lyricon)
                 )
+                FlowRow(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TagComponent(
+                        text = stringResource(R.string.tag_download_lyricon),
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/tomakino/lyricon/releases/tag/core".toUri()))
+                        }
+                    )
+                    TagComponent(
+                        text = stringResource(R.string.tag_download_providers),
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/proify/LyricProvider/releases".toUri()))
+                        }
+                    )
+                }
             }
         }
     }
-    item(key = "super_island_steps_title") {
-        SmallTitle(text = stringResource(R.string.title_help_config_steps))
-    }
-    item(key = "super_island_steps_content") {
+    item(key = "source_superlyric") {
+        val context = LocalContext.current
         Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
-            Column { BasicComponent(summary = stringResource(R.string.summary_help_super_island_steps)) }
+            Column {
+                BasicComponent(
+                    title = "SuperLyric",
+                    summary = stringResource(R.string.summary_help_source_superlyric)
+                )
+                FlowRow(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TagComponent(
+                        text = stringResource(R.string.tag_download_superlyric),
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/HChenX/SuperLyric".toUri()))
+                        }
+                    )
+                }
+            }
+        }
+    }
+    item(key = "source_lyricinfo") {
+        val context = LocalContext.current
+        Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
+            Column {
+                BasicComponent(
+                    title = "LyricInfo",
+                    summary = stringResource(R.string.summary_help_source_lyricinfo)
+                )
+                FlowRow(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TagComponent(
+                        text = stringResource(R.string.tag_download_lyricinfo),
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/limczhh/LyricInfo".toUri()))
+                        }
+                    )
+                }
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.lidesheng.hyperlyric.ui.component.SimpleDialog
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -61,6 +62,7 @@ import com.lidesheng.hyperlyric.ui.utils.QuotesData
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.root.RootApplication
+import com.lidesheng.hyperlyric.utils.MigrationData
 import com.lidesheng.hyperlyric.root.utils.ShellUtils
 import com.lidesheng.hyperlyric.service.LiveLyricService
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
@@ -70,6 +72,8 @@ import com.lidesheng.hyperlyric.ui.page.main.AboutPage
 import com.lidesheng.hyperlyric.ui.page.main.HomePage
 import com.lidesheng.hyperlyric.ui.page.main.rememberMainPagerState
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
 import top.yukonga.miuix.kmp.basic.FloatingToolbarDefaults
@@ -80,6 +84,7 @@ import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
@@ -94,6 +99,8 @@ import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.window.WindowDialog
+import androidx.core.net.toUri
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -294,6 +301,23 @@ fun MainPage() {
         }
     } }
 
+    // --- migration check ---
+    var migrationNotes by remember { mutableStateOf<List<com.lidesheng.hyperlyric.utils.MigrationNote>>(emptyList()) }
+    val migrationTitle = stringResource(R.string.migration_dialog_title)
+    LaunchedEffect(Unit) {
+        try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            val currentVersion = PackageInfoCompat.getLongVersionCode(pInfo)
+            val lastSeen = prefs.getLong(UIConstants.KEY_LAST_SEEN_VERSION, 0)
+            if (currentVersion != lastSeen) {
+                val matched = MigrationData.notes.filter { it.versionCode.toLong() == currentVersion }
+                if (matched.isNotEmpty()) {
+                    migrationNotes = matched
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     // --- about page data ---
     val aboutAppVersion: String? = remember {
         try {
@@ -341,6 +365,46 @@ fun MainPage() {
             }
         }
     )
+
+    // --- migration dialog ---
+    if (migrationNotes.isNotEmpty()) {
+        WindowDialog(
+            title = migrationTitle,
+            show = migrationNotes.isNotEmpty(),
+            onDismissRequest = {}
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        migrationNotes.flatMap { it.items }.forEach { item ->
+                            if (item.url != null) {
+                                BasicComponent(
+                                    title = item.text,
+                                    summary = item.summary,
+                                    onClick = {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, item.url.toUri()))
+                                    }
+                                )
+                            } else {
+                                BasicComponent(title = item.text, summary = item.summary)
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    text = stringResource(R.string.confirm),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                        val currentVersion = PackageInfoCompat.getLongVersionCode(pInfo)
+                        prefs.edit { putLong(UIConstants.KEY_LAST_SEEN_VERSION, currentVersion) }
+                        migrationNotes = emptyList()
+                    }
+                )
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },

@@ -12,6 +12,7 @@ object UIConstants {
     const val KEY_FLOATING_NAV_BAR = "key_floating_nav_bar"
     const val KEY_EXCLUDE_FROM_RECENTS = "key_exclude_from_recents"
     const val KEY_LOG_LEVEL = "key_log_level"
+    const val KEY_LAST_SEEN_VERSION = "key_last_seen_version"
 
     // ================= DEFAULTS =================
     const val DEFAULT_WORK_MODE = 0
