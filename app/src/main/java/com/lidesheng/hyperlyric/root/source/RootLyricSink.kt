@@ -31,6 +31,7 @@ class RootLyricSink(
     private var aiSetDisplayTranslation: Boolean = false
 
     override fun onSongChanged(song: Any?) {
+
         activeAiTranslationJob?.cancel()
         activeAiTranslationJob = null
 
@@ -50,13 +51,14 @@ class RootLyricSink(
 
     override fun onLyricLine(line: Any?) {
         if (line is IRichLyricLine) {
-            HookLogger.d("RootLyricSink", "onLyricLine: text=${line.text}, begin=${line.begin}, end=${line.end}")
+    
             LyriconDataBridge.updateLyricLine(line)
             renderer.updateLyricLine()
         }
     }
 
     override fun onPlainText(text: String?) {
+
         LyriconDataBridge.updateLyric(text)
         renderer.updateLyricLine()
     }

@@ -4,58 +4,180 @@ import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
 import org.json.JSONObject
+import java.util.regex.Pattern
 
-/**
- * lyricInfo JSON 解析工具。
- *
- * JSON 格式：
- * {
- *   "songName": "歌曲名",
- *   "artist": "歌手",
- *   "songId": "歌曲ID",
- *   "lyric": "[mm:ss.xx]歌词 / 翻译",
- *   "lyricWord": "[beginMs,durMs](offset,dur)字...",
- *   "translation": "[mm:ss.xx]翻译"
- * }
- */
 object LyricInfoParser {
 
-    /**
-     * 解析 lyricInfo JSON 为 Song 对象。
-     * 优先使用 lyricWord（逐字），回退到 lyric（逐行）。
-     * translation 合并到每行的 translation 字段。
-     */
+    private val LRC_TIME_RE = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]")
+
     fun parse(json: String, songName: String, artist: String): Song? {
         return try {
             val obj = JSONObject(json)
-            val lyricWordRaw = obj.optString("lyricWord", "").trim()
             val lyricRaw = obj.optString("lyric", "").trim()
-            val translationRaw = obj.optString("translation", "").trim()
+            val format = obj.optString("format", "").trim()
+            val translationFormat = obj.optString("translation", "").trim()
+            if (lyricRaw.isBlank()) return null
 
-            val lines = when {
-                lyricWordRaw.isNotBlank() -> parseYrc(lyricWordRaw)
-                lyricRaw.isNotBlank() -> parseLrc(lyricRaw)
-                else -> return null
+            val hasTranslation = translationFormat.isNotBlank()
+            val allLines = lyricRaw.lines().filter { it.isNotBlank() }
+
+            // 提取每行的时间戳和文本
+            val parsedLines = allLines.map { line ->
+                val timeMs = extractTimeMs(line)
+                ParsedLine(timeMs, line)
             }
-            if (lines.isEmpty()) return null
 
-            val withTranslation = if (translationRaw.isNotBlank()) {
-                val transLines = parseLrc(translationRaw)
-                lines.mapIndexed { i, line ->
-                    val trans = transLines.getOrNull(i)?.text
-                    if (!trans.isNullOrBlank()) line.copy(translation = trans) else line
+            // 按时间戳分组，相同时间戳的第二行为翻译
+            val resultLines = mutableListOf<RichLyricLine>()
+            var i = 0
+            while (i < parsedLines.size) {
+                val current = parsedLines[i]
+                val next = parsedLines.getOrNull(i + 1)
+
+                // 判断下一行是否是翻译（时间戳相同且有翻译格式标识）
+                val isNextTranslation = hasTranslation
+                        && next != null
+                        && next.timeMs == current.timeMs
+                        && current.timeMs >= 0
+
+                val mainLine = parseLine(current.raw, format)
+                if (mainLine != null) {
+                    if (isNextTranslation && next != null) {
+                        val transText = extractText(next.raw, translationFormat)
+                        if (!transText.isNullOrBlank()) {
+                            resultLines.add(mainLine.copy(translation = transText))
+                        } else {
+                            resultLines.add(mainLine)
+                        }
+                        i += 2 // 跳过翻译行
+                    } else {
+                        resultLines.add(mainLine)
+                        i += 1
+                    }
+                } else {
+                    i += 1
                 }
-            } else lines
+            }
 
-            Song(name = songName, artist = artist, lyrics = withTranslation)
+            // 补全 end/duration，修正最后一个词的时间
+            for (idx in resultLines.indices) {
+                val cur = resultLines[idx]
+                val nextBegin = resultLines.getOrNull(idx + 1)?.begin
+                if (cur.end <= cur.begin) {
+                    cur.end = nextBegin ?: (cur.begin + 5000)
+                    cur.duration = cur.end - cur.begin
+                }
+                // 修正最后一个词的 end 为行级 end
+                cur.words?.lastOrNull()?.let { lastWord ->
+                    if (lastWord.end < cur.end) {
+                        lastWord.end = cur.end
+                        lastWord.duration = lastWord.end - lastWord.begin
+                    }
+                }
+            }
+
+            if (resultLines.isEmpty()) return null
+            Song(name = songName, artist = artist, lyrics = resultLines)
         } catch (_: Exception) {
             null
         }
     }
 
     /**
-     * 提取字段信息用于诊断日志。
+     * 解析单行为 RichLyricLine（ELRC 或 LRC）。
      */
+    private fun parseLine(raw: String, format: String): RichLyricLine? {
+        return when (format) {
+            "elrc" -> parseElrcLine(raw)
+            else -> parseLrcLine(raw)
+        }
+    }
+
+    /**
+     * 提取行文本（去掉时间戳和词级标签）。
+     */
+    private fun extractText(raw: String, format: String): String? {
+        return when (format) {
+            "elrc" -> {
+                val lineRe = Pattern.compile("\\[\\d{2}:\\d{2}\\.\\d{2,3}]\\s*(.*)")
+                val lm = lineRe.matcher(raw.trim())
+                if (!lm.matches()) return null
+                val wordPart = lm.group(1) ?: ""
+                val wordRe = Pattern.compile("<\\d{2}:\\d{2}\\.\\d{2,3}>")
+                wordRe.matcher(wordPart).replaceAll("").trim().takeIf { it.isNotBlank() }
+            }
+            else -> parseLrcLine(raw)?.text
+        }
+    }
+
+    /**
+     * 提取行首时间戳（毫秒），用于翻译匹配。
+     * 取 [mm:ss.ms] 行首标签，不取词级标签。
+     */
+    private fun extractTimeMs(raw: String): Long {
+        val m = LRC_TIME_RE.matcher(raw)
+        if (!m.find()) return -1
+        return m.group(1)!!.toLong() * 60000 +
+                m.group(2)!!.toLong() * 1000 +
+                (if (m.group(3)!!.length == 2) m.group(3)!!.toLong() * 10 else m.group(3)!!.toLong())
+    }
+
+    /**
+     * 解析 ELRC 单行：[mm:ss.ms] <mm:ss.ms>word <mm:ss.ms>word...
+     */
+    private fun parseElrcLine(raw: String): RichLyricLine? {
+        val lineRe = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]\\s*(.*)")
+        val wordRe = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>([^<]*)")
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return null
+
+        val lm = lineRe.matcher(trimmed)
+        if (!lm.matches()) return null
+
+        val wordPart = lm.group(4) ?: ""
+
+        val wm = wordRe.matcher(wordPart)
+        val words = mutableListOf<LyricWord>()
+        while (wm.find()) {
+            val wordBegin = wm.group(1)!!.toLong() * 60000 +
+                    wm.group(2)!!.toLong() * 1000 +
+                    (if (wm.group(3)!!.length == 2) wm.group(3)!!.toLong() * 10 else wm.group(3)!!.toLong())
+            val wordText = wm.group(4) ?: ""
+            if (wordText.isBlank()) continue
+            words.add(LyricWord(begin = wordBegin, end = wordBegin + 500, duration = 500, text = wordText))
+        }
+
+        if (words.isEmpty()) return null
+
+        // 修正每个词的 end 为下一个词的 begin
+        for (i in 0 until words.size - 1) {
+            words[i].end = words[i + 1].begin
+            words[i].duration = words[i].end - words[i].begin
+        }
+        words.last().end = words.last().begin + 500
+        words.last().duration = 500
+
+        // 行级时间以第一个词的 begin 为准（行首时间戳可能与词级时间不一致）
+        val lineBegin = words.first().begin
+        val lineEnd = words.last().end
+        val lineText = words.joinToString("") { it.text.orEmpty() }
+        return RichLyricLine(begin = lineBegin, end = lineEnd, duration = lineEnd - lineBegin, text = lineText, words = words)
+    }
+
+    /**
+     * 解析 LRC 单行：[mm:ss.xx]文本
+     */
+    private fun parseLrcLine(raw: String): RichLyricLine? {
+        val re = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
+        val m = re.matcher(raw.trim())
+        if (!m.matches()) return null
+        val ms = m.group(1)!!.toLong() * 60000 + m.group(2)!!.toLong() * 1000 +
+                (if (m.group(3)!!.length == 2) m.group(3)!!.toLong() * 10 else m.group(3)!!.toLong())
+        val text = m.group(4)!!.trim()
+        if (text.isBlank()) return null
+        return RichLyricLine(begin = ms, text = text)
+    }
+
     fun diagnose(json: String): LyricInfoDiagnosis? {
         return try {
             val obj = JSONObject(json)
@@ -63,72 +185,25 @@ object LyricInfoParser {
                 songName = obj.optString("songName", ""),
                 artist = obj.optString("artist", ""),
                 songId = obj.optString("songId", ""),
+                format = obj.optString("format", ""),
+                translationFormat = obj.optString("translation", ""),
                 lyricLength = obj.optString("lyric", "").length,
-                lyricWordLength = obj.optString("lyricWord", "").length,
-                translationLength = obj.optString("translation", "").length,
-                lyricPreview = obj.optString("lyric", "").lines().filter { it.isNotBlank() }.drop(3).take(3),
-                lyricWordPreview = obj.optString("lyricWord", "").lines().filter { it.isNotBlank() }.drop(3).take(3),
-                translationPreview = obj.optString("translation", "").lines().filter { it.isNotBlank() }.drop(3).take(3)
+                lyricPreview = obj.optString("lyric", "").lines().filter { it.isNotBlank() }.drop(3).take(10)
             )
         } catch (_: Exception) {
             null
         }
     }
-
-    /**
-     * 解析 LRC 格式：[mm:ss.xx]文本
-     */
-    private fun parseLrc(lrc: String): List<RichLyricLine> {
-        val re = Regex("""\[(\d{2}):(\d{2})\.(\d{2,3})](.*)""")
-        val lines = lrc.lines().mapNotNull { l ->
-            val m = re.matchEntire(l.trim()) ?: return@mapNotNull null
-            val ms = m.groupValues[1].toLong() * 60000 + m.groupValues[2].toLong() * 1000 +
-                    (if (m.groupValues[3].length == 2) m.groupValues[3].toLong() * 10 else m.groupValues[3].toLong())
-            val text = m.groupValues[4].trim()
-            if (text.isBlank()) null else RichLyricLine(begin = ms, text = text)
-        }.sortedBy { it.begin }
-        for (i in lines.indices) {
-            val next = if (i + 1 < lines.size) lines[i + 1].begin else lines[i].begin + 5000
-            lines[i].end = next; lines[i].duration = next - lines[i].begin
-        }
-        return lines
-    }
-
-    /**
-     * 解析 YRC 逐字格式：[beginMs,durMs](offset,dur)文本...
-     */
-    private fun parseYrc(yrc: String): List<RichLyricLine> {
-        val lineRe = Regex("""\[(\d+),(\d+)](.*)""")
-        val wordRe = Regex("""\((\d+),(\d+)(?:,\d+)?\)""")
-        return yrc.lines().mapNotNull { l ->
-            val lm = lineRe.matchEntire(l.trim()) ?: return@mapNotNull null
-            val lineBegin = lm.groupValues[1].toLong()
-            val lineDur = lm.groupValues[2].toLong()
-            val wordPart = lm.groupValues[3]
-            val wordMatches = wordRe.findAll(wordPart).toList()
-            val words = wordMatches.mapIndexed { i, wm ->
-                // YRC 格式：word 的第一个数字是绝对时间戳，不是相对偏移
-                val wordBegin = wm.groupValues[1].toLong()
-                val wDur = wm.groupValues[2].toLong()
-                val textStart = wm.range.last + 1
-                val textEnd = if (i + 1 < wordMatches.size) wordMatches[i + 1].range.first else wordPart.length
-                LyricWord(begin = wordBegin, end = wordBegin + wDur, duration = wDur, text = wordPart.substring(textStart, textEnd))
-            }.filter { !it.text.isNullOrBlank() }
-            val text = words.joinToString("") { it.text.orEmpty() }
-            if (text.isBlank()) null
-            else RichLyricLine(begin = lineBegin, end = lineBegin + lineDur, duration = lineDur, text = text, words = words.ifEmpty { null })
-        }.sortedBy { it.begin }
-    }
 }
+
+private data class ParsedLine(val timeMs: Long, val raw: String)
 
 data class LyricInfoDiagnosis(
     val songName: String,
     val artist: String,
     val songId: String,
+    val format: String,
+    val translationFormat: String,
     val lyricLength: Int,
-    val lyricWordLength: Int,
-    val translationLength: Int,
-    val lyricPreview: List<String>,
-    val lyricWordPreview: List<String>,
-    val translationPreview: List<String>
+    val lyricPreview: List<String>
 )

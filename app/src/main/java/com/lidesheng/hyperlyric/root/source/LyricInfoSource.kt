@@ -28,18 +28,13 @@ class LyricInfoSource(private val context: Context) : LyricSource {
     private val trackedControllers = java.util.concurrent.ConcurrentHashMap<MediaController, MediaController.Callback>()
     private var sink: LyricSink? = null
 
-    private var currentSongKey: String? = null
-    private var currentPkg: String? = null
-    private var currentTitle: String = ""
-    private var currentArtist: String = ""
-    private var currentAlbum: String = ""
-    private var metadataSent: Boolean = false  // 是否已向 sink 发送过 metadata
-
-    private val songCache = java.util.concurrent.ConcurrentHashMap<String, Song>()
+    private var lastLyricHash: Int = 0
     private var hasLyrics: Boolean = false
+    private var activePkg: String? = null
 
     private var positionJob: Job? = null
-    private val positionScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val positionJob_supervisor = SupervisorJob()
+    private val positionScope = CoroutineScope(Dispatchers.Main + positionJob_supervisor)
 
     private val sessionListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         onActiveSessionsChanged(controllers)
@@ -61,19 +56,20 @@ class LyricInfoSource(private val context: Context) : LyricSource {
 
     override fun stop() {
         positionJob?.cancel()
+        positionJob_supervisor.cancel()
         try { manager.removeOnActiveSessionsChangedListener(sessionListener) } catch (_: Exception) {}
         trackedControllers.forEach { (ctrl, cb) ->
             try { ctrl.unregisterCallback(cb) } catch (_: Exception) {}
         }
         trackedControllers.clear()
-        resetState()
+        clearLyrics()
         sink?.onStop(); sink = null
     }
 
-    private fun resetState() {
-        currentSongKey = null; currentPkg = null
-        currentTitle = ""; currentArtist = ""; currentAlbum = ""
-        hasLyrics = false; metadataSent = false
+    private fun clearLyrics() {
+        hasLyrics = false
+        lastLyricHash = 0
+        activePkg = null
         positionJob?.cancel()
     }
 
@@ -89,7 +85,6 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                     override fun onMetadataChanged(metadata: MediaMetadata?) = onMetadataUpdate(ctrl)
                     override fun onPlaybackStateChanged(state: PlaybackState?) {
                         sink?.onPlaybackStateChanged(state?.state == PlaybackState.STATE_PLAYING)
-                        onMetadataUpdate(ctrl)
                     }
                     override fun onSessionDestroyed() = onActiveSessionsChanged(manager.getActiveSessions(null))
                 }
@@ -98,66 +93,48 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         }
     }
 
+    /**
+     * 纯靠 lyricInfo 判断：有就注入，没有就清理。
+     */
+    /**
+     * 纯靠 lyricInfo 判断：有就注入，没有就清理。
+     * 只处理有歌词的包，不同包的 MediaSession 互不干扰。
+     */
     private fun onMetadataUpdate(controller: MediaController) {
-        val pkg = controller.packageName ?: return
         val metadata = controller.metadata ?: return
-        val fullTitle = metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
-            ?.lines()?.firstOrNull { it.isNotBlank() }?.trim() ?: return
-        val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
-        val album = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
-        val duration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
-        val songKey = "$pkg-$fullTitle-$artist-$album-$duration"
+        val pkg = controller.packageName ?: return
 
-        // 切歌：只记录信息，不通知 sink（等 lyricInfo 就绪后再通知）
-        if (songKey != currentSongKey) {
-            if (hasLyrics) {
-                sink?.onStop()
-                LyriconDataBridge.clearState()
-            }
-            resetState()
-            currentSongKey = songKey
-            currentPkg = pkg
-            currentTitle = if (artist.contains(" - ")) artist.substringAfterLast(" - ").trim() else fullTitle
-            currentArtist = if (artist.contains(" - ")) artist.substringBeforeLast(" - ").trim() else artist
-            currentAlbum = album
-            // 仅设置活跃包名，不发送 metadata（避免超级岛提前出现）
-            LyriconDataBridge.activePackageName = pkg
-            HookLogger.d("LyricInfoSource", "切歌: $currentTitle - $currentArtist")
-        }
-
-        // 尝试读取 lyricInfo
         val lyricInfoRaw = try { metadata.getString("lyricInfo") } catch (_: Exception) { null }
+        val currentHash = lyricInfoRaw?.hashCode() ?: 0
 
-        if (!lyricInfoRaw.isNullOrBlank()) {
-            val cachedSong = songCache[songKey]
-            if (cachedSong != null) {
-                // 已缓存 → 直接复用
-                if (!hasLyrics) {
-                    hasLyrics = true
-                    LyriconDataBridge.updateSong(cachedSong)
-                    sink?.onSongChanged(cachedSong)
-                    sink?.onMetadata(title = currentTitle, artist = currentArtist, album = currentAlbum, publisher = pkg)
-                    startPositionPolling(pkg)
-                    HookLogger.d("LyricInfoSource", "歌词恢复: $currentTitle, ${cachedSong.lyrics?.size}行")
-                }
-            } else {
-                // 首次 → 解析
-                logDiagnosis(lyricInfoRaw)
-                val song = LyricInfoParser.parse(lyricInfoRaw, currentTitle, currentArtist)
-                if (song != null && !song.lyrics.isNullOrEmpty()) {
-                    songCache[songKey] = song
-                    hasLyrics = true
-                    LyriconDataBridge.updateSong(song)
-                    sink?.onSongChanged(song)
-                    sink?.onMetadata(title = currentTitle, artist = currentArtist, album = currentAlbum, publisher = pkg)
-                    startPositionPolling(pkg)
-                    HookLogger.d("LyricInfoSource", "歌词就绪: $currentTitle, ${song.lyrics?.size}行")
-                } else {
-                    HookLogger.d("LyricInfoSource", "lyricInfo 解析为空: $currentTitle")
-                }
+        if (!lyricInfoRaw.isNullOrBlank() && currentHash != 0) {
+            // 有 lyricInfo → 注入（不同包的歌词互相覆盖，以最后更新的为准）
+            if (currentHash == lastLyricHash && pkg == activePkg) return
+
+            val songName = metadata.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+            val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+
+            logDiagnosis(lyricInfoRaw)
+            val song = LyricInfoParser.parse(lyricInfoRaw, songName, artist)
+            if (song != null && !song.lyrics.isNullOrEmpty()) {
+                lastLyricHash = currentHash
+                hasLyrics = true
+                activePkg = pkg
+                LyriconDataBridge.activePackageName = pkg
+                sink?.onPlaybackStateChanged(true)
+                LyriconDataBridge.updateSong(song)
+                sink?.onSongChanged(song)
+                sink?.onMetadata(title = songName, artist = artist, album = "", publisher = pkg)
+                startPositionPolling(pkg)
+                HookLogger.d("LyricInfoSource", "歌词就绪: $songName | ${song.lyrics!!.size}行")
             }
+        } else if (hasLyrics && pkg == activePkg) {
+            // 只清理当前有歌词的包，不影响其他包
+            sink?.onStop()
+            LyriconDataBridge.clearState()
+            clearLyrics()
+            HookLogger.d("LyricInfoSource", "歌词消失: $pkg")
         }
-        // 无 lyricInfo → 不调用 sink，超级岛不出现
     }
 
     private fun logDiagnosis(json: String) {
@@ -166,9 +143,9 @@ class LyricInfoSource(private val context: Context) : LyricSource {
             append("  songName   : ${d.songName}\n")
             append("  artist     : ${d.artist}\n")
             append("  songId     : ${d.songId}\n")
-            append("  lyric      : ${d.lyricLength}chars | ${d.lyricPreview.joinToString(" | ")}\n")
-            append("  lyricWord  : ${d.lyricWordLength}chars | ${d.lyricWordPreview.joinToString(" | ")}\n")
-            append("  translation: ${d.translationLength}chars | ${d.translationPreview.joinToString(" | ")}")
+            append("  format     : ${d.format}\n")
+            append("  translation: ${d.translationFormat}\n")
+            append("  lyric      : ${d.lyricLength}chars | ${d.lyricPreview.joinToString(" | ")}")
         })
     }
 
