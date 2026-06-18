@@ -74,6 +74,7 @@ class SuperLyricSource : LyricSource {
                 HookLogger.d(TAG, "收到停止事件, publisher=$publisher")
                 @Suppress("UNNECESSARY_SAFE_CALL")
                 sink?.onPlaybackStateChanged(false)
+                @Suppress("UNNECESSARY_SAFE_CALL")
                 sink?.onStop()
                 stopPositionPolling()
             }

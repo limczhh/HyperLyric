@@ -42,7 +42,7 @@ object LyricInfoParser {
 
                 val mainLine = parseLine(current.raw, format)
                 if (mainLine != null) {
-                    if (isNextTranslation && next != null) {
+                    if (isNextTranslation) {
                         val transText = extractText(next.raw, translationFormat)
                         if (!transText.isNullOrBlank()) {
                             resultLines.add(mainLine.copy(translation = transText))
