@@ -8,6 +8,17 @@
 - 移除小米焦点通知白名单
 - 基于安卓实时通知/小米焦点通知，实现歌词上岛效果
 
+## 🎵 歌词源介绍
+
+HyperLyric 支持三种歌词源，用于获取音乐播放器的实时歌词数据，各歌词源支持的音乐软件请前往对应项目介绍中查看：
+
+| 歌词源 | 说明 | 额外依赖 |
+|--------|------|----------|
+| **Lyricon** | 基于 Xposed 框架的 Android 状态栏歌词增强工具 | [Lyricon central](https://github.com/tomakino/lyricon/releases/tag/core) + [LyricProvider](https://github.com/proify/LyricProvider/releases)|
+| **SuperLyric** | 基于 Binder 数据传递的音乐软件歌词获取与发布模块 | [SuperLyric](https://github.com/HChenX/SuperLyric) |
+| **LyricInfo** | 读取 MediaMetadata lyricInfo 数据 | [LyricInfo](https://github.com/limczhh/LyricInfo) (可选) |
+
+
 ## 📱 适配说明
 
 > 适配覆盖范围有限，开发者能力有限，Bug不能及时修复
