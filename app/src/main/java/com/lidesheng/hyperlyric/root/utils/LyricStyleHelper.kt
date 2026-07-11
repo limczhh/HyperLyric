@@ -5,7 +5,6 @@ import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.util.TypedValue
-import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.lyric.view.Highlight
 import com.lidesheng.hyperlyric.lyric.view.LyricViewStyle
@@ -27,7 +26,8 @@ object LyricStyleHelper {
         prefs: SharedPreferences,
         res: Resources,
         mode: Int,
-        albumBitmap: Bitmap? = null
+        albumBitmap: Bitmap? = null,
+        mediaColorKey: String? = CoverColorHelper.currentMediaKey()
     ): LyricViewStyle {
         val fontSize = prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
         val tf = FontHelper.loadTypeface(prefs)
@@ -80,16 +80,15 @@ object LyricStyleHelper {
         val bgColors: IntArray
         val hlColors: IntArray
 
-        val songKey = LyriconDataBridge.currentSongName
         if (useCoverColor) {
             if (albumBitmap != null) {
-                val (_, darkColors) = CoverColorHelper.extractColors(albumBitmap, useCoverGradient, songKey)
+                val (_, darkColors) = CoverColorHelper.extractColors(albumBitmap, useCoverGradient, mediaColorKey)
                 val translucentDarkColors = darkColors.map { Color.argb(191, Color.red(it), Color.green(it), Color.blue(it)) }.toIntArray()
                 primaryColors = darkColors   // 无逐字/标题 -> 封面颜色
                 bgColors = translucentDarkColors // 未唱到 -> 封面颜色(75%透明度)
                 hlColors = darkColors        // 已唱到 -> 封面颜色
             } else {
-                val cached = CoverColorHelper.getCachedColors(useCoverGradient, songKey)
+                val cached = CoverColorHelper.getCachedColors(useCoverGradient, mediaColorKey)
                 if (cached != null) {
                     val darkColors = cached.second
                     val translucentDarkColors = darkColors.map { Color.argb(191, Color.red(it), Color.green(it), Color.blue(it)) }.toIntArray()

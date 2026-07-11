@@ -10,6 +10,8 @@ import com.lidesheng.hyperlyric.lyric.model.LyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
 
+internal const val METADATA_NEXT_LINE_PREVIEW = "nextLinePreview"
+
 internal class LyricLineAssembler(
     private var displayTranslation: Boolean = true,
     private var displayRoma: Boolean = true,
@@ -46,12 +48,18 @@ internal class LyricLineAssembler(
         return MainResult(line, generated && !enableRelativeHighlight)
     }
 
-    data class SecondaryResult(val line: LyricLine, val alwaysShow: Boolean, val isScrollOnly: Boolean)
+    data class SecondaryResult(
+        val line: LyricLine,
+        val alwaysShow: Boolean,
+        val isScrollOnly: Boolean,
+        val isNextLinePreview: Boolean
+    )
 
     fun buildSecondary(source: IRichLyricLine?): SecondaryResult {
-        if (source == null) return SecondaryResult(LyricLine(), false, false)
+        if (source == null) return SecondaryResult(LyricLine(), false, false, false)
 
         var generated = false
+        val isNextLinePreview = source.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
         val line = LyricLine().apply {
             begin = source.begin; end = source.end; duration = source.duration
             isAlignedRight = source.isAlignedRight
@@ -59,8 +67,14 @@ internal class LyricLineAssembler(
             when {
                 !source.secondary.isNullOrBlank() || !source.secondaryWords.isNullOrEmpty() -> {
                     text = source.secondary
-                    words = wordBuilder.build(source, source.secondary, source.secondaryWords)
-                    generated = words !== source.secondaryWords
+                    if (isNextLinePreview) {
+                        // 下一句只是预览文本，不能继承当前行时间轴或生成相对时间轴。
+                        words = emptyList()
+                        metadata = lyricMetadataOf(METADATA_NEXT_LINE_PREVIEW to "true")
+                    } else {
+                        words = wordBuilder.build(source, source.secondary, source.secondaryWords)
+                        generated = words !== source.secondaryWords
+                    }
                 }
                 displayTranslation && (!source.translation.isNullOrBlank()
                         || !source.translationWords.isNullOrEmpty()) -> {
@@ -86,7 +100,7 @@ internal class LyricLineAssembler(
                         || line.words?.firstOrNull()?.begin?.let { (it - source.begin) < 500 } == true
                 )
 
-        return SecondaryResult(line, alwaysShow, generated && !enableRelativeHighlight)
+        return SecondaryResult(line, alwaysShow, generated && !enableRelativeHighlight, isNextLinePreview)
     }
 }
 

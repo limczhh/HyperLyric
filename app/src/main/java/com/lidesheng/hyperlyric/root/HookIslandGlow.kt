@@ -85,8 +85,17 @@ object HookIslandGlow {
             val context = view?.context ?: return@runCatching null
             val mediaInfo = MediaMetadataHelper.getMediaInfo(context, pkgName, HookLogger)
             val albumArt = mediaInfo.albumArt ?: return@runCatching null
-            val songKey = "$pkgName:${mediaInfo.title}:${mediaInfo.artist}"
-            val color = CoverColorHelper.extractColors(albumArt, useGradient = false, songKey = songKey)
+            val mediaColorKey = CoverColorHelper.updateMediaSession(
+                packageName = pkgName,
+                title = mediaInfo.title,
+                artist = mediaInfo.artist,
+                album = mediaInfo.album
+            )
+            val useGradient = sharedPrefs.getBoolean(
+                RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_GRADIENT,
+                RootConstants.DEFAULT_HOOK_EXTRACT_COVER_TEXT_GRADIENT
+            )
+            val color = CoverColorHelper.extractColors(albumArt, useGradient, mediaColorKey)
                 .second
                 .firstOrNull()
                 ?: return@runCatching null

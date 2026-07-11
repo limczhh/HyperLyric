@@ -19,6 +19,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.advancedSections(
     lyricSource: String,
+    lyricMode: Int,
     gradientStyle: Boolean,
     onGradientStyleChange: (Boolean) -> Unit,
     syllableRelative: Boolean,
@@ -41,6 +42,8 @@ fun LazyListScope.advancedSections(
     onTranslationOnlyChange: (Boolean) -> Unit,
     swapTranslation: Boolean,
     onSwapTranslationChange: (Boolean) -> Unit,
+    nextLyricLine: Boolean,
+    onNextLyricLineChange: (Boolean) -> Unit,
     aiTransEnabled: Boolean,
     onAiTransEnabledChange: (Boolean) -> Unit,
     autoIgnoreChinese: Boolean,
@@ -133,48 +136,69 @@ fun LazyListScope.advancedSections(
     }
 
     item {
+        val supportsNextLyricLine = (lyricSource == "lyricon" || lyricSource == "lyricinfo") && lyricMode == 0
+        val translationControlsEnabled = !supportsNextLyricLine || !nextLyricLine
+        val translationActionColor = if (translationControlsEnabled) {
+            MiuixTheme.colorScheme.onSurfaceVariantActions
+        } else {
+            MiuixTheme.colorScheme.disabledOnSecondaryVariant
+        }
         Column {
             SmallTitle(text = stringResource(id = R.string.title_translation))
             Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                 Column {
+                    AnimatedVisibility(visible = supportsNextLyricLine) {
+                        SwitchPreference(
+                            title = stringResource(id = R.string.title_next_lyric_line),
+                            summary = stringResource(id = R.string.summary_next_lyric_line),
+                            checked = nextLyricLine,
+                            onCheckedChange = onNextLyricLineChange
+                        )
+                    }
                     SwitchPreference(
                         title = stringResource(id = R.string.title_disable_translation),
                         checked = disableTranslation,
-                        onCheckedChange = onDisableTranslationChange
+                        onCheckedChange = onDisableTranslationChange,
+                        enabled = translationControlsEnabled
                     )
                     SwitchPreference(
                         title = stringResource(id = R.string.title_translation_only),
                         checked = translationOnly,
-                        onCheckedChange = onTranslationOnlyChange
+                        onCheckedChange = onTranslationOnlyChange,
+                        enabled = translationControlsEnabled
                     )
                     SwitchPreference(
                         title = stringResource(id = R.string.title_swap_translation),
                         checked = swapTranslation,
-                        onCheckedChange = onSwapTranslationChange
+                        onCheckedChange = onSwapTranslationChange,
+                        enabled = translationControlsEnabled
                     )
                 }
 
                 AnimatedVisibility(visible = lyricSource == "lyricon" || lyricSource == "lyricinfo") {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
                     Column {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                         SwitchPreference(
                             title = stringResource(id = R.string.title_ai_translation),
                             checked = aiTransEnabled,
-                            onCheckedChange = onAiTransEnabledChange
+                            onCheckedChange = onAiTransEnabledChange,
+                            enabled = translationControlsEnabled
                         )
                         AnimatedVisibility(visible = aiTransEnabled) {
                             Column {
                                 SwitchPreference(
                                     title = stringResource(id = R.string.title_ai_trans_auto_ignore_chinese),
                                     checked = autoIgnoreChinese,
-                                    onCheckedChange = onAutoIgnoreChineseChange
+                                    onCheckedChange = onAutoIgnoreChineseChange,
+                                    enabled = translationControlsEnabled
                                 )
                                 SwitchPreference(
                                     title = stringResource(id = R.string.title_ai_trans_skip_existing),
                                     checked = skipExistingTranslation,
-                                    onCheckedChange = onSkipExistingTranslationChange
+                                    onCheckedChange = onSkipExistingTranslationChange,
+                                    enabled = translationControlsEnabled
                                 )
                                 Column {
                                     ArrowPreference(
@@ -183,10 +207,11 @@ fun LazyListScope.advancedSections(
                                             Text(
                                                 targetLang,
                                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                                color = translationActionColor
                                             )
                                         },
-                                        onClick = onTargetLangClick
+                                        onClick = onTargetLangClick,
+                                        enabled = translationControlsEnabled
                                     )
                                     ArrowPreference(
                                         title = stringResource(id = R.string.label_ai_trans_api_key),
@@ -194,10 +219,11 @@ fun LazyListScope.advancedSections(
                                             Text(
                                                 if (apiKey.isNotEmpty()) "***************" else "未配置",
                                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                                color = translationActionColor
                                             )
                                         },
-                                        onClick = onApiKeyClick
+                                        onClick = onApiKeyClick,
+                                        enabled = translationControlsEnabled
                                     )
                                     ArrowPreference(
                                         title = stringResource(id = R.string.label_ai_trans_model),
@@ -205,20 +231,23 @@ fun LazyListScope.advancedSections(
                                             Text(
                                                 model,
                                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                                color = translationActionColor
                                             )
                                         },
-                                        onClick = onModelClick
+                                        onClick = onModelClick,
+                                        enabled = translationControlsEnabled
                                     )
                                     ArrowPreference(
                                         title = stringResource(id = R.string.label_ai_trans_base_url),
                                         summary = baseUrl,
-                                        onClick = onBaseUrlClick
+                                        onClick = onBaseUrlClick,
+                                        enabled = translationControlsEnabled
                                     )
                                     ArrowPreference(
                                         title = stringResource(R.string.title_custom_prompt),
                                         summary = if (prompt.lines().size > 3) prompt.lines().take(2).joinToString("\n") + "..." else prompt,
-                                        onClick = onPromptClick
+                                        onClick = onPromptClick,
+                                        enabled = translationControlsEnabled
                                     )
                                 }
                             }

@@ -8,13 +8,16 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.RichLyricLineSplitter
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
+import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
+import com.lidesheng.hyperlyric.lyric.view.METADATA_NEXT_LINE_PREVIEW
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoPresets
 import com.lidesheng.hyperlyric.lyric.view.yoyo.animateUpdate
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.LyricStyleHelper
 import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 import java.util.WeakHashMap
@@ -41,7 +44,8 @@ internal object IslandSlotContentAssembler {
         mediaInfo: MediaMetadataHelper.MediaInfo = currentMediaInfo(view.context),
         force: Boolean = false
     ) {
-        val disableAll = TranslationHelper.isTranslationDisabled(prefs)
+        val nextLinePreview = isNextLinePreviewEnabled(prefs, config)
+        val disableAll = TranslationHelper.isTranslationDisabled(prefs) || nextLinePreview
         val translationOnly = TranslationHelper.isTranslationOnly(prefs)
         val signature = listOf(
             config.styleSignature,
@@ -55,7 +59,23 @@ internal object IslandSlotContentAssembler {
         ).joinToString("|")
 
         if (!force && lastStyleSignatures[view] == signature) return
-        val style = LyricStyleHelper.buildStyle(prefs, view.resources, mode, mediaInfo.albumArt)
+        val mediaColorKey = if (mediaInfo.albumArt != null || CoverColorHelper.currentMediaKey() == null) {
+            CoverColorHelper.updateMediaSession(
+                packageName = LyriconDataBridge.currentLyricPackageName.orEmpty(),
+                title = mediaInfo.title,
+                artist = mediaInfo.artist,
+                album = mediaInfo.album
+            )
+        } else {
+            CoverColorHelper.currentMediaKey()
+        }
+        val style = LyricStyleHelper.buildStyle(
+            prefs = prefs,
+            res = view.resources,
+            mode = mode,
+            albumBitmap = mediaInfo.albumArt,
+            mediaColorKey = mediaColorKey
+        )
         when (view) {
             is RichLyricLineView -> {
                 view.displayTranslation = LyriconDataBridge.isDisplayTranslation && !disableAll
@@ -90,13 +110,29 @@ internal object IslandSlotContentAssembler {
         }
     }
 
+    fun applyLyricLineContent(
+        view: View,
+        prefs: SharedPreferences,
+        config: IslandSlotRuntimeConfig,
+        lineOverride: IRichLyricLine?,
+        playbackActive: Boolean = true
+    ): Boolean = applyLyricContent(
+        view = view,
+        prefs = prefs,
+        config = config,
+        lineOverride = lineOverride,
+        force = false,
+        playbackActive = playbackActive,
+        suppressAnimation = false
+    )
+
     fun buildSlotLyricLine(
         view: View,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         isLeft: Boolean
     ): IRichLyricLine? {
-        val rawLine = processedRawLine(prefs)
+        val rawLine = processedRawLine(prefs, config)
         if (!config.isSplitMode || rawLine == null) return rawLine
         if (rawLine.text.isNullOrEmpty()) return rawLine
 
@@ -121,10 +157,14 @@ internal object IslandSlotContentAssembler {
         return if (isLeft) splitResult.left else splitResult.right
     }
 
-    fun processedRawLine(prefs: SharedPreferences): IRichLyricLine? {
+    fun processedRawLine(prefs: SharedPreferences, config: IslandSlotRuntimeConfig? = null): IRichLyricLine? {
         val songName = LyriconDataBridge.currentSongName?.takeIf { it.isNotEmpty() } ?: ""
         var rawLine = LyriconDataBridge.currentLyricLine
             ?: RichLyricLine(text = songName, words = emptyList())
+
+        if (config != null && isNextLinePreviewEnabled(prefs, config)) {
+            return rawLine.withNextLinePreview(LyriconDataBridge.currentNextLyricLine)
+        }
 
         if (TranslationHelper.isTranslationOnly(prefs)) {
             rawLine = TranslationHelper.applyTranslationOnly(rawLine)
@@ -170,7 +210,8 @@ internal object IslandSlotContentAssembler {
             }
         }
 
-        if (config.lyricAnimationEnabled && !suppressAnimation) {
+        val suppressContentAnimation = suppressAnimation || isNextLinePreviewEnabled(prefs, config)
+        if (config.lyricAnimationEnabled && !suppressContentAnimation) {
             val preset = YoYoPresets.getById(config.lyricAnimationId) ?: YoYoPresets.Default
             when (view) {
                 is RichLyricLineView -> view.animateUpdate(preset) { applyLine(this) }
@@ -295,5 +336,35 @@ internal object IslandSlotContentAssembler {
             line.roma,
             line.isAlignedRight
         ).hashCode()
+    }
+
+    private fun isNextLinePreviewEnabled(
+        prefs: SharedPreferences,
+        config: IslandSlotRuntimeConfig
+    ): Boolean {
+        if (!config.nextLyricLine || config.isSplitMode) return false
+        val source = prefs.getString(RootConstants.KEY_HOOK_LYRIC_SOURCE, RootConstants.DEFAULT_HOOK_LYRIC_SOURCE)
+        return source == "lyricon" || source == "lyricinfo"
+    }
+
+    private fun IRichLyricLine.withNextLinePreview(nextLine: IRichLyricLine?): IRichLyricLine {
+        val nextText = nextLine?.text?.takeIf { it.isNotBlank() }
+        return RichLyricLine(
+            begin = begin,
+            end = end,
+            duration = duration,
+            isAlignedRight = isAlignedRight,
+            metadata = lyricMetadataOf(
+                *(metadata?.entries?.map { it.key to it.value } ?: emptyList()).toTypedArray(),
+                METADATA_NEXT_LINE_PREVIEW to "true"
+            ),
+            text = text,
+            words = words,
+            secondary = nextText,
+            secondaryWords = emptyList(),
+            translation = null,
+            translationWords = null,
+            roma = null
+        )
     }
 }

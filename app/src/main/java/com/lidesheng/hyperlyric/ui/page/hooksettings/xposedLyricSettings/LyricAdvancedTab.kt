@@ -14,6 +14,7 @@ fun LyricAdvancedTab(
     topAppBarScrollBehavior: ScrollBehavior,
     contentPadding: PaddingValues,
     lyricSource: String,
+    lyricMode: Int,
     gradientStyle: Boolean,
     onGradientStyleChange: (Boolean) -> Unit,
     syllableRelative: Boolean,
@@ -36,6 +37,8 @@ fun LyricAdvancedTab(
     onTranslationOnlyChange: (Boolean) -> Unit,
     swapTranslation: Boolean,
     onSwapTranslationChange: (Boolean) -> Unit,
+    nextLyricLine: Boolean,
+    onNextLyricLineChange: (Boolean) -> Unit,
     aiTransEnabled: Boolean,
     onAiTransEnabledChange: (Boolean) -> Unit,
     autoIgnoreChinese: Boolean,
@@ -64,6 +67,7 @@ fun LyricAdvancedTab(
     ) {
         advancedSections(
             lyricSource = lyricSource,
+            lyricMode = lyricMode,
             gradientStyle = gradientStyle,
             onGradientStyleChange = onGradientStyleChange,
             syllableRelative = syllableRelative,
@@ -86,6 +90,8 @@ fun LyricAdvancedTab(
             onTranslationOnlyChange = onTranslationOnlyChange,
             swapTranslation = swapTranslation,
             onSwapTranslationChange = onSwapTranslationChange,
+            nextLyricLine = nextLyricLine,
+            onNextLyricLineChange = onNextLyricLineChange,
             aiTransEnabled = aiTransEnabled,
             onAiTransEnabledChange = onAiTransEnabledChange,
             autoIgnoreChinese = autoIgnoreChinese,

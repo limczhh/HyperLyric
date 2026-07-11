@@ -7,6 +7,8 @@
 package com.lidesheng.hyperlyric.lyric.view
 
 import android.annotation.SuppressLint
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.content.Context
 import android.graphics.Canvas
 import android.view.Gravity
@@ -45,6 +47,10 @@ class RichLyricLineView(
     private var lastPosition: Long = Long.MIN_VALUE
 
     var rawLine: IRichLyricLine? = null
+    private var currentMainText: String? = null
+    private var secondaryIsNextLinePreview = false
+    private var nextLineTransitionRunning = false
+    private var nextLineTransitionGeneration = 0
 
     var line: IRichLyricLine?
         get() = rawLine
@@ -68,17 +74,21 @@ class RichLyricLineView(
     }
 
     fun reset() {
+        cancelNextLinePromotion()
         line = null
         renderScale = 1.0f
         animationTransition = false
         pendingLine = null
         pendingPosition = null
         lastPosition = Long.MIN_VALUE
+        currentMainText = null
+        secondaryIsNextLinePreview = false
         alwaysShowSecondary = false
         refreshLines()
     }
 
     fun beginAnimationTransition() {
+        cancelNextLinePromotion()
         animationTransition = true
     }
 
@@ -124,7 +134,7 @@ class RichLyricLineView(
     fun requestStartMarquee() {
         requestMarquee = true
         main.requestScroll()
-        secondary.requestScroll()
+        if (!secondaryIsNextLinePreview) secondary.requestScroll()
     }
 
     /**
@@ -223,19 +233,34 @@ class RichLyricLineView(
 
     private var oldLine: IRichLyricLine? = null
 
-    private fun refreshLines() {
-        if (oldLine === line && line.isTitleLine()) return
+    private fun refreshLines(allowNextLinePromotion: Boolean = true, bypassIdentityCheck: Boolean = false) {
+        if (nextLineTransitionRunning) return
+        if (!bypassIdentityCheck && oldLine === line && line.isTitleLine()) return
         oldLine = line
 
         val mainResult = assembler.buildMain(line)
+        val secResult = assembler.buildSecondary(line)
+
+        val shouldPromote = allowNextLinePromotion &&
+                secondaryIsNextLinePreview && secResult.isNextLinePreview &&
+                currentMainText != null && currentMainText != mainResult.line.text &&
+                secondary.model.text == mainResult.line.text &&
+                isAttachedToWindow && main.height > 0 && secondary.height > 0
+        if (shouldPromote) {
+            animateNextLinePromotion()
+            return
+        }
+
         main.setLyric(mainResult.line)
         main.isScrollOnly = mainResult.isScrollOnly
+        currentMainText = mainResult.line.text
 
-        val secResult = assembler.buildSecondary(line)
         alwaysShowSecondary = secResult.alwaysShow
+        secondaryIsNextLinePreview = secResult.isNextLinePreview
         secondary.visibleIfChanged = secResult.alwaysShow
+        secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.setLyric(secResult.line)
-        secondary.isScrollOnly = secResult.isScrollOnly
+        secondary.isScrollOnly = if (secResult.isNextLinePreview) false else secResult.isScrollOnly
 
         if (requestMarquee) requestStartMarquee()
     }
@@ -251,6 +276,79 @@ class RichLyricLineView(
 
     private fun updateLayoutTransitionX(config: String? = LayoutTransitionX.TRANSITION_CONFIG_SMOOTH) {
         layoutTransition = LayoutTransitionX(config).apply { setAnimateParentHierarchy(true) }
+    }
+
+    private fun animateNextLinePromotion() {
+        val generation = ++nextLineTransitionGeneration
+        nextLineTransitionRunning = true
+        val targetTranslationY = (main.top - secondary.top).toFloat()
+        val targetTranslationX = (main.left - secondary.left).toFloat()
+        val targetScale = (main.textSize / secondary.textSize).coerceIn(0.5f, 2f)
+
+        main.animate().cancel()
+        secondary.animate().cancel()
+        secondary.pivotX = 0f
+        secondary.pivotY = 0f
+        main.animate()
+            .alpha(0f)
+            .translationY(-main.height * 0.65f)
+            .setDuration(NEXT_LINE_PROMOTION_DURATION)
+            .withLayer()
+            .start()
+        secondary.animate()
+            .translationX(targetTranslationX)
+            .translationY(targetTranslationY)
+            .scaleX(targetScale)
+            .scaleY(targetScale)
+            .setDuration(NEXT_LINE_PROMOTION_DURATION)
+            .withLayer()
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (generation != nextLineTransitionGeneration) return
+                    finishNextLinePromotion()
+                }
+            })
+            .start()
+    }
+
+    private fun finishNextLinePromotion() {
+        clearNextLineTransitionState()
+        nextLineTransitionRunning = false
+        refreshLines(allowNextLinePromotion = false, bypassIdentityCheck = true)
+        if (secondaryIsNextLinePreview) {
+            secondary.alpha = 0f
+            secondary.animate()
+                .alpha(1f)
+                .setDuration(NEXT_LINE_PREVIEW_FADE_DURATION)
+                .withLayer()
+                .setListener(null)
+                .start()
+        }
+    }
+
+    private fun cancelNextLinePromotion() {
+        nextLineTransitionGeneration++
+        main.animate().setListener(null)
+        secondary.animate().setListener(null)
+        main.animate().cancel()
+        secondary.animate().cancel()
+        nextLineTransitionRunning = false
+        clearNextLineTransitionState()
+    }
+
+    private fun clearNextLineTransitionState() {
+        main.alpha = 1f
+        main.translationY = 0f
+        secondary.alpha = 1f
+        secondary.translationX = 0f
+        secondary.translationY = 0f
+        secondary.scaleX = 1f
+        secondary.scaleY = 1f
+    }
+
+    private companion object {
+        const val NEXT_LINE_PROMOTION_DURATION = 220L
+        const val NEXT_LINE_PREVIEW_FADE_DURATION = 140L
     }
 }
 

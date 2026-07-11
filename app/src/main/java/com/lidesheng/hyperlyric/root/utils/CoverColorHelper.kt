@@ -6,28 +6,44 @@ import com.lidesheng.hyperlyric.common.color.ColorExtractor
 object CoverColorHelper {
 
     private data class CacheEntry(
-        val bitmapGenerationId: Int,
         val colors: Pair<IntArray, IntArray>
     )
 
+    private var activeMediaKey: String? = null
     private var cachedKey: String? = null
-    private var cachedBitmap: Bitmap? = null
     private var cachedLightColors: IntArray? = null
     private var cachedDarkColors: IntArray? = null
     private val keyedCache = LinkedHashMap<String, CacheEntry>()
 
+    fun updateMediaSession(
+        packageName: String,
+        title: String,
+        artist: String,
+        album: String
+    ): String {
+        val mediaKey = listOf(packageName, title, artist, album)
+            .joinToString("\u001F") { it.trim() }
+        if (activeMediaKey != mediaKey) {
+            activeMediaKey = mediaKey
+            cachedKey = null
+            cachedLightColors = null
+            cachedDarkColors = null
+        }
+        return mediaKey
+    }
+
+    fun currentMediaKey(): String? = activeMediaKey
+
     fun extractColors(bitmap: Bitmap, useGradient: Boolean, songKey: String? = null): Pair<IntArray, IntArray> {
         val key = buildKey(useGradient, songKey)
 
-        if (key == cachedKey && bitmap === cachedBitmap && cachedLightColors != null && cachedDarkColors != null) {
+        if (key == cachedKey && cachedLightColors != null && cachedDarkColors != null) {
             return Pair(cachedLightColors!!, cachedDarkColors!!)
         }
         keyedCache[key]
-            ?.takeIf { it.bitmapGenerationId == bitmap.generationId }
             ?.colors
             ?.let { colors ->
                 cachedKey = key
-                cachedBitmap = bitmap
                 cachedLightColors = colors.first
                 cachedDarkColors = colors.second
                 return colors
@@ -38,11 +54,10 @@ object CoverColorHelper {
         val darkColors = result.onBlackBackground.toIntArray()
 
         cachedKey = key
-        cachedBitmap = bitmap
         cachedLightColors = lightColors
         cachedDarkColors = darkColors
         val pair = Pair(lightColors, darkColors)
-        keyedCache[key] = CacheEntry(bitmap.generationId, pair)
+        keyedCache[key] = CacheEntry(pair)
         trimCache()
         return pair
     }
@@ -58,8 +73,8 @@ object CoverColorHelper {
     }
 
     fun clearCache() {
+        activeMediaKey = null
         cachedKey = null
-        cachedBitmap = null
         cachedLightColors = null
         cachedDarkColors = null
         keyedCache.clear()

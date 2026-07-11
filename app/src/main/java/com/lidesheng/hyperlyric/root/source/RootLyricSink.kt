@@ -9,7 +9,6 @@ import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.IslandSlotContentAssembler
 import com.lidesheng.hyperlyric.root.island.renderer.IslandRenderer
 import com.lidesheng.hyperlyric.root.aitrans.AITranslator
-import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.lyric.model.Song
@@ -87,7 +86,6 @@ class RootLyricSink(
         if (!publisher.isNullOrEmpty()) {
             LyriconDataBridge.updateLyricPackage(publisher)
         }
-        CoverColorHelper.clearCache()
         IslandSlotContentAssembler.invalidate()
         renderer.refreshActiveIsland()
     }

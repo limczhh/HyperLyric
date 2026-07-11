@@ -28,6 +28,9 @@ object LyriconDataBridge : StateResetter {
     var currentLyricLine: IRichLyricLine? = null
 
     @Volatile
+    var currentNextLyricLine: IRichLyricLine? = null
+
+    @Volatile
     var currentPosition: Long = 0L
 
     @Volatile
@@ -65,6 +68,8 @@ object LyriconDataBridge : StateResetter {
         currentSong = song
         currentSongName = song?.name
         currentLyric = null
+        currentLyricLine = null
+        currentNextLyricLine = null
 
         versionCounter.incrementAndGet()
 
@@ -94,12 +99,13 @@ object LyriconDataBridge : StateResetter {
         if (lyrics.isNullOrEmpty()) return false
 
         // 使用 TimingNavigator 高效定位当前歌词行
-        var foundLine: IRichLyricLine? = null
+        var foundLine: TimedLine? = null
         timingNavigator.forEachAtOrPrevious(position) { timedLine ->
             foundLine = timedLine
         }
 
         currentLyricLine = foundLine
+        currentNextLyricLine = foundLine?.next
         // 间奏时保持最后一行歌词，不回退到歌名
         val newText = foundLine?.text ?: currentLyric ?: ""
 
@@ -122,11 +128,13 @@ object LyriconDataBridge : StateResetter {
         } else {
             null
         }
+        currentNextLyricLine = null
     }
 
     fun updateLyricLine(line: IRichLyricLine) {
         isTextMode = false
         currentLyricLine = line
+        currentNextLyricLine = null
         currentLyric = line.text
     }
 
@@ -135,6 +143,7 @@ object LyriconDataBridge : StateResetter {
         currentSongName = null
         currentLyric = null
         currentLyricLine = null
+        currentNextLyricLine = null
         currentPosition = 0L
         activePackageName = null
         currentLyricPackageName = null

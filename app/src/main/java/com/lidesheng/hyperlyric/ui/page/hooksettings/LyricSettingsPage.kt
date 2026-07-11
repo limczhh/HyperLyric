@@ -78,6 +78,7 @@ fun LyricSettingsPage() {
     var disableTranslation by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_DISABLE_TRANSLATION, RootConstants.DEFAULT_HOOK_DISABLE_TRANSLATION)) }
     var translationOnly by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_TRANSLATION_ONLY, RootConstants.DEFAULT_HOOK_TRANSLATION_ONLY)) }
     var swapTranslation by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_SWAP_TRANSLATION, RootConstants.DEFAULT_HOOK_SWAP_TRANSLATION)) }
+    var nextLyricLine by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_NEXT_LYRIC_LINE, RootConstants.DEFAULT_HOOK_NEXT_LYRIC_LINE)) }
     var extractCoverColor by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_COLOR, RootConstants.DEFAULT_HOOK_EXTRACT_COVER_TEXT_COLOR)) }
     var extractCoverGradient by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_GRADIENT, RootConstants.DEFAULT_HOOK_EXTRACT_COVER_TEXT_GRADIENT)) }
     var customFontPath by remember { mutableStateOf(prefs.getString(RootConstants.KEY_HOOK_CUSTOM_FONT_PATH, null) ?: "") }
@@ -311,6 +312,7 @@ fun LyricSettingsPage() {
                             topAppBarScrollBehavior = topAppBarScrollBehavior,
                             contentPadding = contentPadding,
                             lyricSource = lyricSource,
+                            lyricMode = lyricMode,
                             gradientStyle = gradientStyle,
                             onGradientStyleChange = { gradientStyle = it; saveConfig(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, it) },
                             syllableRelative = syllableRelative,
@@ -347,6 +349,8 @@ fun LyricSettingsPage() {
                                     saveConfig(RootConstants.KEY_HOOK_TRANSLATION_ONLY, false)
                                 }
                             },
+                            nextLyricLine = nextLyricLine,
+                            onNextLyricLineChange = { nextLyricLine = it; saveConfig(RootConstants.KEY_HOOK_NEXT_LYRIC_LINE, it) },
                             aiTransEnabled = aiTransEnabled,
                             onAiTransEnabledChange = { aiTransEnabled = it; saveConfig(RootConstants.KEY_HOOK_AI_TRANS_ENABLE, it) },
                             autoIgnoreChinese = autoIgnoreChinese,

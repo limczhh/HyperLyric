@@ -57,6 +57,7 @@ object RootConstants {
     const val KEY_HOOK_DISABLE_TRANSLATION = "key_hook_disable_translation"
     const val KEY_HOOK_TRANSLATION_ONLY = "key_hook_translation_only"
     const val KEY_HOOK_SWAP_TRANSLATION = "key_hook_swap_translation"
+    const val KEY_HOOK_NEXT_LYRIC_LINE = "key_hook_next_lyric_line"
 
     // ================= COLOR KEYS =================
     const val KEY_HOOK_EXTRACT_COVER_TEXT_COLOR = "key_hook_extract_cover_text_color"
@@ -135,6 +136,7 @@ object RootConstants {
     const val DEFAULT_HOOK_DISABLE_TRANSLATION = false
     const val DEFAULT_HOOK_TRANSLATION_ONLY = false
     const val DEFAULT_HOOK_SWAP_TRANSLATION = false
+    const val DEFAULT_HOOK_NEXT_LYRIC_LINE = false
     const val DEFAULT_HOOK_EXTRACT_COVER_TEXT_COLOR = false
     const val DEFAULT_HOOK_EXTRACT_COVER_TEXT_GRADIENT = false
     const val DEFAULT_HOOK_ISLAND_GLOW_EXTRACT_COLOR = false

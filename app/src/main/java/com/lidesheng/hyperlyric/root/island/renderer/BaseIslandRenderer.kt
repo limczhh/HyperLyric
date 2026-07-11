@@ -104,9 +104,9 @@ object BaseIslandRenderer : IslandRenderer {
         val config = IslandSlotRuntimeConfig.from(prefs)
 
         IslandViewRegistry.snapshotAttached(lyricPkg)
-            .forEach { (cv, pkgName) ->
+            .forEach { (cv, _) ->
                 cv.post {
-                    updateContentForView(cv, pkgName, prefs, config)
+                    updateLyricContentForView(cv, prefs, config)
                 }
             }
     }
@@ -211,6 +211,39 @@ object BaseIslandRenderer : IslandRenderer {
         IslandHostFacade.updateHostGlow(cv, mediaInfo.albumArt, prefs)
         updateSlot(cv, IslandProbeUtils.LEFT_TEST_VIEW_TAG, config.leftMode, prefs, config, mediaInfo)
         updateSlot(cv, IslandProbeUtils.RIGHT_TEST_VIEW_TAG, config.rightMode, prefs, config, mediaInfo)
+    }
+
+    private fun updateLyricContentForView(
+        cv: ViewGroup,
+        prefs: android.content.SharedPreferences,
+        config: IslandSlotRuntimeConfig
+    ) {
+        updateLyricSlot(cv, IslandProbeUtils.LEFT_TEST_VIEW_TAG, config.leftMode, prefs, config)
+        updateLyricSlot(cv, IslandProbeUtils.RIGHT_TEST_VIEW_TAG, config.rightMode, prefs, config)
+    }
+
+    private fun updateLyricSlot(
+        cv: ViewGroup,
+        tag: String,
+        mode: Int,
+        prefs: android.content.SharedPreferences,
+        config: IslandSlotRuntimeConfig
+    ) {
+        if (mode != 7) return
+        val view = cv.findViewWithTag<View>(tag) ?: return
+        val line = IslandSlotContentAssembler.buildSlotLyricLine(
+            view = view,
+            prefs = prefs,
+            config = config,
+            isLeft = tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG
+        )
+        IslandSlotContentAssembler.applyLyricLineContent(
+            view = view,
+            prefs = prefs,
+            config = config,
+            lineOverride = line,
+            playbackActive = playbackActive
+        )
     }
 
     private fun updateSlot(

@@ -117,6 +117,20 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private var scrollUnlocked = false
     private var playbackActive = true
 
+    var isStaticPreview: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value) {
+                animator.stop()
+                scrollUnlocked = false
+                scrollStarted = false
+                lineState.reset()
+            }
+            updatePlainTextColors()
+            invalidate()
+        }
+
     val textSize: Float get() = textPaint.textSize
 
     fun setTextSize(size: Float) {
@@ -174,18 +188,21 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
 
         refreshSizes()
         animator.stop()
-        animator.startIfNeeded()
+        if (!isStaticPreview) animator.startIfNeeded()
         invalidate()
     }
 
     fun requestScroll() {
+        if (isStaticPreview) return
         doOnAttach {
+            if (isStaticPreview) return@doOnAttach
             scrollUnlocked = true
             if (isPlainText) startScrolling()
         }
     }
 
     fun seekTo(posMs: Long) {
+        if (isStaticPreview) return
         if (isPlainText) {
             startScrolling()
         } else {
@@ -195,6 +212,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     }
 
     fun updatePosition(posMs: Long) {
+        if (isStaticPreview) return
         if (isWordSync) {
             if (syncRenderer.isScrollOnly && !isOverflow) return
             if (playbackActive) {
@@ -234,15 +252,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         backgroundColors = background
         highlightColors = highlight
 
-        textPaint.apply {
-            if (primary.isEmpty()) {
-                color = Color.BLACK
-                shader = null
-            } else {
-                color = primary.firstOrNull() ?: Color.BLACK
-                shader = if (primary.size > 1) makeRainbowShader(primary) else null
-            }
-        }
+        updatePlainTextColors()
         syncRenderer.setColors(background, highlight)
         invalidate()
     }
@@ -330,7 +340,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     }
 
     private fun startScrolling() {
-        if (!isPlainText || !scrollUnlocked || scrollStarted) return
+        if (isStaticPreview || !isPlainText || !scrollUnlocked || scrollStarted) return
         scrollStarted = true
         lineState.reset()
         if (!isOverflow) return
@@ -344,6 +354,18 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private fun updateColorsIfReady() {
         if (primaryColors.isNotEmpty() && backgroundColors.isNotEmpty() && highlightColors.isNotEmpty()) {
             updateColor(primaryColors, backgroundColors, highlightColors)
+        }
+    }
+
+    private fun updatePlainTextColors() {
+        val colors = if (isStaticPreview && backgroundColors.isNotEmpty()) {
+            backgroundColors
+        } else {
+            primaryColors
+        }
+        textPaint.apply {
+            color = colors.firstOrNull() ?: Color.BLACK
+            shader = if (colors.size > 1) makeRainbowShader(colors) else null
         }
     }
 
@@ -395,8 +417,11 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             val changed = renderer.step(deltaNanos, _model, lineState, measuredWidth)
             if (changed) postInvalidateOnAnimation()
 
-            if (running) {
+            if (running && renderer.isPlaying) {
                 Choreographer.getInstance().postFrameCallback(this)
+            } else {
+                running = false
+                lastFrameNanos = 0L
             }
         }
     }
