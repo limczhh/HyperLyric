@@ -68,6 +68,10 @@
     <string name="theme_light_monet">Light (Monet)</string>
     <string name="theme_dark_monet">Dark (Monet)</string>
     <string name="title_theme">Theme Color</string>
+    <string name="title_app_language">Display Language</string>
+    <string name="language_system">Follow System</string>
+    <string name="language_simplified_chinese">简体中文</string>
+    <string name="language_english">English</string>
     <string name="monet_default">Default</string>
     <string name="monet_blue">Blue</string>
     <string name="monet_green">Green</string>

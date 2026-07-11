@@ -68,6 +68,10 @@
     <string name="theme_light_monet">浅色（莫奈）</string>
     <string name="theme_dark_monet">深色（莫奈）</string>
     <string name="title_theme">主题颜色</string>
+    <string name="title_app_language">应用显示语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_simplified_chinese">简体中文</string>
+    <string name="language_english">English</string>
     <string name="monet_default">默认</string>
     <string name="monet_blue">蓝色</string>
     <string name="monet_green">绿色</string>

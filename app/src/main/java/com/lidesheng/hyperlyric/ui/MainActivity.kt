@@ -12,6 +12,7 @@ import com.lidesheng.hyperlyric.ui.utils.ThemeUtils
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         com.lidesheng.hyperlyric.ui.utils.AppUtils.initPredictiveBackGesture(application)
+        com.lidesheng.hyperlyric.ui.utils.LocaleUtils.applyStoredLanguage(this)
         super.onCreate(savedInstanceState)
         
         val prefs = getSharedPreferences(UIConstants.PREF_NAME, MODE_PRIVATE)

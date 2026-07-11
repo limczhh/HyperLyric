@@ -7,6 +7,7 @@ object UIConstants {
     const val KEY_WORK_MODE = "key_work_mode"
     const val KEY_SETUP_COMPLETED = "key_setup_completed"
     const val KEY_THEME_MODE = "key_theme_mode"
+    const val KEY_APP_LANGUAGE = "key_app_language"
     const val KEY_MONET_COLOR = "key_monet_color"
     const val KEY_PREDICTIVE_BACK_GESTURE = "key_predictive_back_gesture"
     const val KEY_FLOATING_NAV_BAR = "key_floating_nav_bar"
@@ -18,6 +19,7 @@ object UIConstants {
     const val DEFAULT_WORK_MODE = 0
     const val DEFAULT_SETUP_COMPLETED = false
     const val DEFAULT_THEME_MODE = 0
+    const val DEFAULT_APP_LANGUAGE = 0
     const val DEFAULT_MONET_COLOR = 0
     const val DEFAULT_PREDICTIVE_BACK_GESTURE = false
     const val DEFAULT_FLOATING_NAV_BAR = false

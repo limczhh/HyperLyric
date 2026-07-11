@@ -28,6 +28,7 @@ import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
+import com.lidesheng.hyperlyric.ui.utils.LocaleUtils
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
@@ -112,20 +113,32 @@ private fun LazyListScope.settingsSections(
     }
     item(key = "personalization_content") {
         val context = LocalContext.current
+        val activity = androidx.activity.compose.LocalActivity.current
         val prefs = remember { context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) }
         var themeMode by remember { mutableIntStateOf(prefs.getInt(UIConstants.KEY_THEME_MODE, UIConstants.DEFAULT_THEME_MODE)) }
         val themeOptions = listOf(stringResource(R.string.theme_system), stringResource(R.string.theme_light), stringResource(R.string.theme_dark), stringResource(R.string.theme_system_monet), stringResource(R.string.theme_light_monet), stringResource(R.string.theme_dark_monet))
+        var appLanguage by remember { mutableIntStateOf(prefs.getInt(UIConstants.KEY_APP_LANGUAGE, UIConstants.DEFAULT_APP_LANGUAGE)) }
+        val languageOptions = listOf(stringResource(R.string.language_system), stringResource(R.string.language_simplified_chinese), stringResource(R.string.language_english))
 
         Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
             Column {
                 WindowDropdownPreference(title = stringResource(R.string.title_theme), items = themeOptions, selectedIndex = themeMode, onSelectedIndexChange = { themeMode = it; prefs.edit { putInt(UIConstants.KEY_THEME_MODE, it) } })
+                WindowDropdownPreference(
+                    title = stringResource(R.string.title_app_language),
+                    items = languageOptions,
+                    selectedIndex = appLanguage,
+                    onSelectedIndexChange = {
+                        appLanguage = it
+                        prefs.edit { putInt(UIConstants.KEY_APP_LANGUAGE, it) }
+                        LocaleUtils.applyLanguage(context, it)
+                    }
+                )
                 if (themeMode >= 3) {
                     var monetColorIndex by remember { mutableIntStateOf(prefs.getInt(UIConstants.KEY_MONET_COLOR, UIConstants.DEFAULT_MONET_COLOR)) }
                     val monetOptions = listOf(stringResource(R.string.monet_default), stringResource(R.string.monet_blue), stringResource(R.string.monet_green), stringResource(R.string.monet_red), stringResource(R.string.monet_yellow), stringResource(R.string.monet_orange), stringResource(R.string.monet_purple), stringResource(R.string.monet_pink))
                     WindowDropdownPreference(title = stringResource(R.string.title_monet), items = monetOptions, selectedIndex = monetColorIndex, onSelectedIndexChange = { monetColorIndex = it; prefs.edit { putInt(UIConstants.KEY_MONET_COLOR, it) } })
                 }
                 var predictiveBackGestureEnabled by remember { mutableStateOf(prefs.getBoolean(UIConstants.KEY_PREDICTIVE_BACK_GESTURE, UIConstants.DEFAULT_PREDICTIVE_BACK_GESTURE)) }
-                val activity = androidx.activity.compose.LocalActivity.current
                 SwitchPreference(title = stringResource(R.string.title_predictive_back), checked = predictiveBackGestureEnabled, onCheckedChange = {
                     predictiveBackGestureEnabled = it; prefs.edit { putBoolean(UIConstants.KEY_PREDICTIVE_BACK_GESTURE, it) }
                     runCatching { org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions("Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback"); val m = android.content.pm.ApplicationInfo::class.java.getDeclaredMethod("setEnableOnBackInvokedCallback", Boolean::class.javaPrimitiveType); m.isAccessible = true; m.invoke(context.applicationInfo, it) }
