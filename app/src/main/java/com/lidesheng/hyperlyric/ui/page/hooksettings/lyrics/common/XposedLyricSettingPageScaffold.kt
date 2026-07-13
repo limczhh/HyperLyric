@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.ui.page.hooksettings.xposedLyricSettings
+package com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common
 
 import android.content.Context
 import android.content.SharedPreferences

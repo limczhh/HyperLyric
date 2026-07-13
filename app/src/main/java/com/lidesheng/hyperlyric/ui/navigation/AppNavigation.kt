@@ -20,10 +20,10 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.LyricProviderPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.LyricAnimationPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.LyricSettingsPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.SuperIslandSettingsPage
-import com.lidesheng.hyperlyric.ui.page.hooksettings.xposedLyricSettings.LyricDisplayPage
-import com.lidesheng.hyperlyric.ui.page.hooksettings.xposedLyricSettings.LyricScrollPage
-import com.lidesheng.hyperlyric.ui.page.hooksettings.xposedLyricSettings.LyricTranslationPage
-import com.lidesheng.hyperlyric.ui.page.hooksettings.xposedLyricSettings.VerbatimLyricPage
+import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.display.LyricDisplayPage
+import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.scroll.LyricScrollPage
+import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.translation.LyricTranslationPage
+import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.verbatim.VerbatimLyricPage
 import com.lidesheng.hyperlyric.ui.page.DynamicIslandNotificationPage
 import com.lidesheng.hyperlyric.ui.page.HelpPage
 import com.lidesheng.hyperlyric.ui.page.ChangelogPage
