@@ -1,6 +1,5 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.scroll
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,7 +9,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -46,110 +44,114 @@ fun LazyListScope.lyricScrollSections(
         Column {
             SmallTitle(text = stringResource(id = R.string.title_marquee))
             Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
-                SwitchPreference(
-                    title = stringResource(id = R.string.title_lyric_marquee),
-                    summary = stringResource(id = R.string.summary_lyric_marquee),
-                    checked = marqueeMode,
-                    onCheckedChange = onMarqueeModeChange
-                )
-                AnimatedVisibility(visible = marqueeMode) {
-                    Column {
-                        ArrowPreference(
-                            title = stringResource(id = R.string.title_marquee_speed),
-                            endActions = {
-                                Text(
-                                    "$marqueeSpeed",
-                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                )
-                            },
-                            onClick = onMarqueeSpeedClick
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.title_marquee_delay),
-                            endActions = {
-                                Text(
-                                    stringResource(id = R.string.format_ms, marqueeDelay),
-                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                )
-                            },
-                            onClick = onMarqueeDelayClick
-                        )
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_infinite_loop),
-                            checked = marqueeInfinite,
-                            onCheckedChange = onMarqueeInfiniteChange
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.title_marquee_loop),
-                            endActions = {
-                                Text(
-                                    stringResource(id = R.string.format_ms, marqueeLoop),
-                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                )
-                            },
-                            onClick = onMarqueeLoopClick
-                        )
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_stop_at_end),
-                            checked = marqueeStopEnd,
-                            onCheckedChange = onMarqueeStopEndChange
-                        )
-                    }
+                Column {
+                    SwitchPreference(
+                        title = stringResource(id = R.string.title_lyric_marquee),
+                        summary = stringResource(id = R.string.summary_lyric_marquee),
+                        checked = marqueeMode,
+                        onCheckedChange = onMarqueeModeChange
+                    )
+                    ArrowPreference(
+                        title = stringResource(id = R.string.title_marquee_speed),
+                        endActions = {
+                            Text(
+                                "$marqueeSpeed",
+                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                color = if (marqueeMode) MiuixTheme.colorScheme.onSurfaceVariantActions else MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                            )
+                        },
+                        onClick = onMarqueeSpeedClick,
+                        enabled = marqueeMode
+                    )
+                    ArrowPreference(
+                        title = stringResource(id = R.string.title_marquee_delay),
+                        endActions = {
+                            Text(
+                                stringResource(id = R.string.format_ms, marqueeDelay),
+                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                color = if (marqueeMode) MiuixTheme.colorScheme.onSurfaceVariantActions else MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                            )
+                        },
+                        onClick = onMarqueeDelayClick,
+                        enabled = marqueeMode
+                    )
+                    SwitchPreference(
+                        title = stringResource(id = R.string.title_infinite_loop),
+                        checked = marqueeInfinite,
+                        onCheckedChange = onMarqueeInfiniteChange,
+                        enabled = marqueeMode
+                    )
+                    ArrowPreference(
+                        title = stringResource(id = R.string.title_marquee_loop),
+                        endActions = {
+                            Text(
+                                stringResource(id = R.string.format_ms, marqueeLoop),
+                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                color = if (marqueeMode) MiuixTheme.colorScheme.onSurfaceVariantActions else MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                            )
+                        },
+                        onClick = onMarqueeLoopClick,
+                        enabled = marqueeMode
+                    )
+                    SwitchPreference(
+                        title = stringResource(id = R.string.title_stop_at_end),
+                        checked = marqueeStopEnd,
+                        onCheckedChange = onMarqueeStopEndChange,
+                        enabled = marqueeMode
+                    )
                 }
-                AnimatedVisibility(visible = lyricMode == 0) {
+            }
+            if (lyricMode == 0) {
+                Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                     Column {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         SwitchPreference(
                             title = stringResource(id = R.string.title_marquee_metadata_mode),
                             summary = stringResource(id = R.string.summary_marquee_metadata_mode),
                             checked = marqueeMetadataMode,
                             onCheckedChange = onMarqueeMetadataModeChange
                         )
-                        AnimatedVisibility(visible = marqueeMetadataMode) {
-                            Column {
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.title_marquee_metadata_speed),
-                                    onClick = onMarqueeMetadataSpeedClick,
-                                    endActions = {
-                                        Text(
-                                            "$marqueeMetadataSpeed",
-                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                        )
-                                    }
-                                )
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.title_marquee_metadata_delay),
-                                    onClick = onMarqueeMetadataDelayClick,
-                                    endActions = {
-                                        Text(
-                                            stringResource(id = R.string.format_ms, marqueeMetadataDelay),
-                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                        )
-                                    }
-                                )
-                                SwitchPreference(
-                                    title = stringResource(id = R.string.title_marquee_metadata_infinite),
-                                    checked = marqueeMetadataInfinite,
-                                    onCheckedChange = onMarqueeMetadataInfiniteChange
-                                )
-                                ArrowPreference(
-                                    title = stringResource(id = R.string.title_marquee_metadata_loop),
-                                    onClick = onMarqueeMetadataLoopClick,
-                                    endActions = {
-                                        Text(
-                                            stringResource(id = R.string.format_ms, marqueeMetadataLoopDelay),
-                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                        )
-                                    }
+                        ArrowPreference(
+                            title = stringResource(id = R.string.title_marquee_metadata_speed),
+                            onClick = onMarqueeMetadataSpeedClick,
+                            enabled = marqueeMetadataMode,
+                            endActions = {
+                                Text(
+                                    "$marqueeMetadataSpeed",
+                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                    color = if (marqueeMetadataMode) MiuixTheme.colorScheme.onSurfaceVariantActions else MiuixTheme.colorScheme.disabledOnSecondaryVariant
                                 )
                             }
-                        }
+                        )
+                        ArrowPreference(
+                            title = stringResource(id = R.string.title_marquee_metadata_delay),
+                            onClick = onMarqueeMetadataDelayClick,
+                            enabled = marqueeMetadataMode,
+                            endActions = {
+                                Text(
+                                    stringResource(id = R.string.format_ms, marqueeMetadataDelay),
+                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                    color = if (marqueeMetadataMode) MiuixTheme.colorScheme.onSurfaceVariantActions else MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                                )
+                            }
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.title_marquee_metadata_infinite),
+                            checked = marqueeMetadataInfinite,
+                            onCheckedChange = onMarqueeMetadataInfiniteChange,
+                            enabled = marqueeMetadataMode
+                        )
+                        ArrowPreference(
+                            title = stringResource(id = R.string.title_marquee_metadata_loop),
+                            onClick = onMarqueeMetadataLoopClick,
+                            enabled = marqueeMetadataMode,
+                            endActions = {
+                                Text(
+                                    stringResource(id = R.string.format_ms, marqueeMetadataLoopDelay),
+                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                    color = if (marqueeMetadataMode) MiuixTheme.colorScheme.onSurfaceVariantActions else MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                                )
+                            }
+                        )
                     }
                 }
             }

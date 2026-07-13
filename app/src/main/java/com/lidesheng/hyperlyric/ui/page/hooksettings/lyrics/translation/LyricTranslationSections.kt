@@ -10,7 +10,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -56,16 +55,18 @@ fun LazyListScope.translationSections(
 
         Column {
             SmallTitle(text = stringResource(id = R.string.title_translation))
+            if (supportsNextLyricLine) {
+                Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
+                    SwitchPreference(
+                        title = stringResource(id = R.string.title_next_lyric_line),
+                        summary = stringResource(id = R.string.summary_next_lyric_line),
+                        checked = nextLyricLine,
+                        onCheckedChange = onNextLyricLineChange
+                    )
+                }
+            }
             Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                 Column {
-                    AnimatedVisibility(visible = supportsNextLyricLine) {
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_next_lyric_line),
-                            summary = stringResource(id = R.string.summary_next_lyric_line),
-                            checked = nextLyricLine,
-                            onCheckedChange = onNextLyricLineChange
-                        )
-                    }
                     SwitchPreference(
                         title = stringResource(id = R.string.title_disable_translation),
                         checked = disableTranslation,
@@ -85,10 +86,10 @@ fun LazyListScope.translationSections(
                         enabled = translationControlsEnabled
                     )
                 }
-
-                AnimatedVisibility(visible = lyricSource == "lyricon" || lyricSource == "lyricinfo") {
+            }
+            if (lyricSource == "lyricon" || lyricSource == "lyricinfo") {
+                Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
                     Column {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         SwitchPreference(
                             title = stringResource(id = R.string.title_ai_translation),
                             checked = aiTransEnabled,

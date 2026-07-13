@@ -10,7 +10,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -75,20 +74,33 @@ fun LazyListScope.lyricDisplaySections(
                         },
                         onClick = onFadingEdgeClick
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SwitchPreference(
+                        title = stringResource(id = R.string.title_center_lyric),
+                        checked = centerLyric,
+                        onCheckedChange = onCenterLyricChange
+                    )
+                }
+            }
+            Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
+                Column {
                     SwitchPreference(
                         title = stringResource(id = R.string.title_extract_cover_color),
                         checked = extractCoverColor,
                         onCheckedChange = onExtractCoverColorChange
                     )
                     AnimatedVisibility(visible = extractCoverColor) {
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_extract_cover_gradient),
-                            checked = extractCoverGradient,
-                            onCheckedChange = onExtractCoverGradientChange
-                        )
+                        Column {
+                            SwitchPreference(
+                                title = stringResource(id = R.string.title_extract_cover_gradient),
+                                checked = extractCoverGradient,
+                                onCheckedChange = onExtractCoverGradientChange
+                            )
+                        }
                     }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
+            }
+            Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp).fillMaxWidth()) {
+                Column {
                     ArrowPreference(
                         title = stringResource(id = R.string.title_custom_font),
                         endActions = {
@@ -115,12 +127,6 @@ fun LazyListScope.lyricDisplaySections(
                         title = stringResource(id = R.string.title_italic),
                         checked = fontItalic,
                         onCheckedChange = onFontItalicChange
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SwitchPreference(
-                        title = stringResource(id = R.string.title_center_lyric),
-                        checked = centerLyric,
-                        onCheckedChange = onCenterLyricChange
                     )
                 }
             }
