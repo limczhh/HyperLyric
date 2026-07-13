@@ -107,6 +107,11 @@
     <string name="option_notification_media_ambient_flow_dynamic">动态流光</string>
     <string name="option_notification_media_ambient_flow_cover_color">动态流光（封面色）</string>
     <string name="option_notification_media_ambient_flow_disabled">默认（禁用）</string>
+    <string name="title_island_expanded_media_card">超级岛展开态媒体卡片</string>
+    <string name="title_island_media_ambient_flow_mode">卡片动态流光</string>
+    <string name="option_island_media_ambient_flow_default">默认</string>
+    <string name="option_island_media_ambient_flow_cover_color">动态流光（封面色）</string>
+    <string name="option_island_media_ambient_flow_disabled">禁用</string>
     <string name="title_lyrics">音乐信息</string>
     <string name="title_lyric_anim">歌词切换动画</string>
     <string name="title_lyric_provider">歌词提供者 (Lyricon)</string>

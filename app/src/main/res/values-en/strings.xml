@@ -107,6 +107,11 @@
     <string name="option_notification_media_ambient_flow_dynamic">Ambient flow</string>
     <string name="option_notification_media_ambient_flow_cover_color">Ambient flow (cover color)</string>
     <string name="option_notification_media_ambient_flow_disabled">Default (disabled)</string>
+    <string name="title_island_expanded_media_card">Expanded HyperIsland media card</string>
+    <string name="title_island_media_ambient_flow_mode">Card ambient flow</string>
+    <string name="option_island_media_ambient_flow_default">Default</string>
+    <string name="option_island_media_ambient_flow_cover_color">Ambient flow (cover color)</string>
+    <string name="option_island_media_ambient_flow_disabled">Disabled</string>
     <string name="title_lyrics">Media Info</string>
     <string name="title_lyric_anim">Lyric Animation</string>
     <string name="title_lyric_provider">Lyric Provider (Lyricon)</string>

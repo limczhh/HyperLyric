@@ -13,6 +13,7 @@ import com.lidesheng.hyperlyric.root.island.SystemUIHookRegistry
 import com.lidesheng.hyperlyric.root.island.IslandWidthHooker
 import com.lidesheng.hyperlyric.root.island.RealIslandHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaAmbientFlowHooker
+import com.lidesheng.hyperlyric.root.mediacard.island.IslandExpandedMediaAmbientFlowHooker
 import com.lidesheng.hyperlyric.root.island.renderer.IslandRenderer
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
 import com.lidesheng.hyperlyric.root.source.LyriconSource
@@ -129,6 +130,7 @@ class HookEntry : XposedModule() {
             putBoolean(STATE_RUNTIME_READY, runtimeApp != null)
         }
         param.setSavedInstanceState(state)
+        IslandExpandedMediaAmbientFlowHooker.releaseAll()
         NotificationMediaAmbientFlowHooker.releaseAll()
         cleanupRuntime()
         HookLogger.i("HookEntry", "热重载准备完成")
@@ -141,6 +143,7 @@ class HookEntry : XposedModule() {
 
         HookIslandGlow.initialize(this)
         IslandProgressGlowHooker.initialize(this)
+        IslandExpandedMediaAmbientFlowHooker.initialize(this)
         NotificationMediaAmbientFlowHooker.initialize(this)
         val hadProgressBackgroundHook = param.oldHookHandles.any {
             isProgressGlowBackgroundDraw(it.executable)
@@ -164,6 +167,14 @@ class HookEntry : XposedModule() {
             .mapNotNull { it.executable.declaringClass.classLoader }
             .firstOrNull()
             ?: findCurrentApplication()?.classLoader
+        val hadIslandExpandedMediaFlowHook = param.oldHookHandles.any {
+            isIslandExpandedMediaAmbientFlowHook(it.executable)
+        }
+        val islandExpandedMediaClassLoader = if (hadIslandExpandedMediaFlowHook) {
+            null
+        } else {
+            findCurrentApplication()?.classLoader
+        }
 
         var replacedCount = 0
         var removedCount = 0
@@ -202,6 +213,13 @@ class HookEntry : XposedModule() {
                 HookLogger.e("HookEntry", "Failed to install notification media ambient flow hook", e)
             }
         }
+        islandExpandedMediaClassLoader?.let { classLoader ->
+            runCatching {
+                IslandExpandedMediaAmbientFlowHooker.hook(this, classLoader)
+            }.onFailure { e ->
+                HookLogger.e("HookEntry", "Failed to install expanded island media flow hook", e)
+            }
+        }
 
         val state = param.savedInstanceState as? Bundle
         if (state?.getBoolean(STATE_RUNTIME_READY) == true) {
@@ -225,6 +243,7 @@ class HookEntry : XposedModule() {
         val packageName = param.packageName
         
         if (packageName == "com.android.systemui") {
+            IslandExpandedMediaAmbientFlowHooker.hook(this, param.defaultClassLoader)
             NotificationMediaAmbientFlowHooker.hook(this, param.defaultClassLoader)
             try {
                 UnlockIslandWhitelist.hook(this, param.defaultClassLoader)
@@ -426,6 +445,8 @@ class HookEntry : XposedModule() {
                 IslandModuleRestoreHooker.AdapterUpdateViewHook()
             owner.endsWith("DynamicIslandBaseContentView") && name == "updateTemplate" ->
                 HookIslandGlow.UpdateTemplateHook()
+            isIslandExpandedMediaAmbientFlowHook(executable) ->
+                IslandExpandedMediaAmbientFlowHooker.hookerFor(executable)
             isNotificationAmbientFlowHook(executable) -> null
             isProgressGlowBackgroundDraw(executable) ->
                 IslandProgressGlowHooker.BackgroundDrawHook()
@@ -445,6 +466,11 @@ class HookEntry : XposedModule() {
     private fun isNotificationAmbientFlowHook(executable: Executable): Boolean {
         return executable is Method &&
             NotificationMediaAmbientFlowHooker.isTargetMethod(executable)
+    }
+
+    private fun isIslandExpandedMediaAmbientFlowHook(executable: Executable): Boolean {
+        return executable is Method &&
+            IslandExpandedMediaAmbientFlowHooker.isTargetMethod(executable)
     }
 
     /**

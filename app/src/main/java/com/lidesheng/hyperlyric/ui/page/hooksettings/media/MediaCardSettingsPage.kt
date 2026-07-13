@@ -21,6 +21,7 @@ import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
+import com.lidesheng.hyperlyric.ui.page.hooksettings.media.island.islandExpandedMediaCardSection
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.notification.notificationCenterMediaCardSection
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
@@ -50,6 +51,17 @@ fun MediaCardSettingsPage() {
             ).coerceIn(
                 RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED,
                 RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
+            )
+        )
+    }
+    var islandExpandedAmbientFlowMode by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE,
+                RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE
+            ).coerceIn(
+                RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DEFAULT,
+                RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
             )
         )
     }
@@ -110,6 +122,22 @@ fun MediaCardSettingsPage() {
                         }
                         PrefsBridge.putInt(
                             RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE,
+                            mode
+                        )
+                    }
+                )
+                islandExpandedMediaCardSection(
+                    ambientFlowMode = islandExpandedAmbientFlowMode,
+                    onAmbientFlowModeChange = { mode ->
+                        islandExpandedAmbientFlowMode = mode
+                        prefs.edit {
+                            putInt(
+                                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE,
+                                mode
+                            )
+                        }
+                        PrefsBridge.putInt(
+                            RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE,
                             mode
                         )
                     }
