@@ -64,7 +64,7 @@ fun SuperIslandSettingsPage() {
                 RootConstants.DEFAULT_HOOK_ISLAND_ALBUM_COVER_STYLE
             ).coerceIn(
                 RootConstants.ISLAND_ALBUM_COVER_STYLE_DEFAULT,
-                RootConstants.ISLAND_ALBUM_COVER_STYLE_APP_ICON
+                RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE
             )
         )
     }
@@ -117,10 +117,19 @@ fun SuperIslandSettingsPage() {
     val afterPauseOptions = remember {
         listOf(R.string.option_after_pause_default, R.string.option_after_pause_keep)
     }.map { stringResource(id = it) }
+    val audioCoverStyleValues = remember {
+        listOf(
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_DEFAULT,
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_CIRCLE,
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE,
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_APP_ICON
+        )
+    }
     val audioCoverStyleOptions = remember {
         listOf(
             R.string.option_audio_cover_style_default,
             R.string.option_audio_cover_style_circle,
+            R.string.option_audio_cover_style_rotating_circle,
             R.string.option_audio_cover_style_app_icon
         )
     }.map { stringResource(id = it) }
@@ -229,10 +238,11 @@ fun SuperIslandSettingsPage() {
                                     OverlayDropdownPreference(
                                         title = stringResource(id = R.string.title_audio_cover_style),
                                         items = audioCoverStyleOptions,
-                                        selectedIndex = audioCoverStyle,
-                                        onSelectedIndexChange = {
-                                            audioCoverStyle = it
-                                            saveConfig(RootConstants.KEY_HOOK_ISLAND_ALBUM_COVER_STYLE, it)
+                                        selectedIndex = audioCoverStyleValues.indexOf(audioCoverStyle).coerceAtLeast(0),
+                                        onSelectedIndexChange = { index ->
+                                            val style = audioCoverStyleValues[index]
+                                            audioCoverStyle = style
+                                            saveConfig(RootConstants.KEY_HOOK_ISLAND_ALBUM_COVER_STYLE, style)
                                         }
                                     )
                                 }

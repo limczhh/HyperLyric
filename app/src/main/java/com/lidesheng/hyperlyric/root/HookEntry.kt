@@ -52,7 +52,6 @@ class HookEntry : XposedModule() {
             private set
 
         private val SUPER_ISLAND_RUNTIME_REFRESH_KEYS = setOf(
-            RootConstants.KEY_HOOK_ISLAND_LEFT_ALBUM,
             RootConstants.KEY_HOOK_ISLAND_RIGHT_ICON,
             RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_COLOR,
             RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_GRADIENT,
@@ -331,7 +330,8 @@ class HookEntry : XposedModule() {
                             }
                         }
                     }
-                    RootConstants.KEY_HOOK_ISLAND_ALBUM_COVER_STYLE -> {
+                    RootConstants.KEY_HOOK_ISLAND_ALBUM_COVER_STYLE,
+                    RootConstants.KEY_HOOK_ISLAND_LEFT_ALBUM -> {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             IslandAlbumCoverStyleHooker.refresh()
                             BaseIslandRenderer.refreshActiveIsland()
@@ -357,6 +357,7 @@ class HookEntry : XposedModule() {
     }
 
     private fun cleanupRuntime() {
+        IslandAlbumCoverStyleHooker.cleanup()
         prefListener?.let {
             runCatching { prefs.unregisterOnSharedPreferenceChangeListener(it) }
         }

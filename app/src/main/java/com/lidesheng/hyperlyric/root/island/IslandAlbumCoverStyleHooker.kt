@@ -96,24 +96,49 @@ internal object IslandAlbumCoverStyleHooker {
         }
     }
 
+    fun onPlaybackStateChanged(isPlaying: Boolean) {
+        IslandAlbumCoverRotationController.setPlaybackActive(isPlaying)
+    }
+
+    fun cleanup() {
+        IslandAlbumCoverRotationController.cleanup()
+        synchronized(trackedHolders) {
+            trackedHolders.clear()
+        }
+    }
+
     private fun applyStyle(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {
         if (!isMediaAlbum(accessor, holder)) return
         synchronized(trackedHolders) {
             trackedHolders[holder] = TrackedHolder(WeakReference(dynamicIslandData), accessor)
         }
 
-        when (currentStyle()) {
+        val fixIcon = accessor.fixIconField.get(holder) as? ImageView ?: return
+        val style = currentStyle()
+        if (style != RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE) {
+            IslandAlbumCoverRotationController.detach(fixIcon)
+        }
+
+        when (style) {
             RootConstants.ISLAND_ALBUM_COVER_STYLE_CIRCLE -> {
-                val fixIcon = accessor.fixIconField.get(holder) as? ImageView ?: return
-                fixIcon.outlineProvider = circleOutlineProvider
-                fixIcon.clipToOutline = true
-                fixIcon.invalidateOutline()
+                applyCircleOutline(fixIcon)
             }
 
             RootConstants.ISLAND_ALBUM_COVER_STYLE_APP_ICON -> {
                 showAppIcon(accessor, holder, dynamicIslandData)
             }
+
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE -> {
+                applyCircleOutline(fixIcon)
+                IslandAlbumCoverRotationController.attach(fixIcon)
+            }
         }
+    }
+
+    private fun applyCircleOutline(fixIcon: ImageView) {
+        fixIcon.outlineProvider = circleOutlineProvider
+        fixIcon.clipToOutline = true
+        fixIcon.invalidateOutline()
     }
 
     private fun showAppIcon(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {
@@ -147,13 +172,21 @@ internal object IslandAlbumCoverStyleHooker {
     }
 
     private fun currentStyle(): Int {
-        return prefs?.getInt(
+        val sharedPrefs = prefs ?: return RootConstants.DEFAULT_HOOK_ISLAND_ALBUM_COVER_STYLE
+        if (!sharedPrefs.getBoolean(
+                RootConstants.KEY_HOOK_ISLAND_LEFT_ALBUM,
+                RootConstants.DEFAULT_HOOK_ISLAND_LEFT_ALBUM
+            )
+        ) {
+            return RootConstants.ISLAND_ALBUM_COVER_STYLE_DEFAULT
+        }
+        return sharedPrefs.getInt(
             RootConstants.KEY_HOOK_ISLAND_ALBUM_COVER_STYLE,
             RootConstants.DEFAULT_HOOK_ISLAND_ALBUM_COVER_STYLE
-        )?.coerceIn(
+        ).coerceIn(
             RootConstants.ISLAND_ALBUM_COVER_STYLE_DEFAULT,
-            RootConstants.ISLAND_ALBUM_COVER_STYLE_APP_ICON
-        ) ?: RootConstants.DEFAULT_HOOK_ISLAND_ALBUM_COVER_STYLE
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE
+        )
     }
 
     private fun runOnMain(block: () -> Unit) {

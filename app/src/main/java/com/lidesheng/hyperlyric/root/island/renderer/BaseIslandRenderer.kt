@@ -12,6 +12,7 @@ import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.IslandHostFacade
+import com.lidesheng.hyperlyric.root.island.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.IslandLyricTextInjector
 import com.lidesheng.hyperlyric.root.island.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.IslandSlotContentAssembler
@@ -132,6 +133,7 @@ object BaseIslandRenderer : IslandRenderer {
     }
 
     override fun onPlaybackStateChanged(isPlaying: Boolean) {
+        IslandAlbumCoverStyleHooker.onPlaybackStateChanged(isPlaying)
         val prefs = HookEntry.instance?.prefs ?: return
         if (!prefs.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)) {
             clearAllViews()

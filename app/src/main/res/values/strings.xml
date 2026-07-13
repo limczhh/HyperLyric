@@ -293,6 +293,7 @@
     <string name="title_audio_cover_style">音频封面样式</string>
     <string name="option_audio_cover_style_default">默认</string>
     <string name="option_audio_cover_style_circle">圆形封面</string>
+    <string name="option_audio_cover_style_rotating_circle">旋转圆形封面</string>
     <string name="option_audio_cover_style_app_icon">应用图标</string>
     <string name="title_audio_rhythm">音频律动</string>
     <string name="title_audio_rhythm_cover_color">音频律动封面色</string>

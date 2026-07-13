@@ -11,11 +11,12 @@ object ChangelogData {
         return listOf(
             ChangelogItem(
                 version = "6.3-1934",
-                title = "xxx",
+                title = "小更新",
                 summary = "- 新增“边缘光效进度条”功能\n" +
                         "- 新增“音频律动封面色”功能\n" +
+                        "- 新增“音频封面样式”自定义功能\n" +
                         "- 修复了一些错误\n" +
-                        "- xxx"
+                        "- 优化页面布局"
             ),
             ChangelogItem(
                 version = "6.2-1933",
