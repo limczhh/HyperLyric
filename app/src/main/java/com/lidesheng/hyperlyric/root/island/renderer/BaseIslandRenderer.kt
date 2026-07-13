@@ -112,7 +112,8 @@ object BaseIslandRenderer : IslandRenderer {
     }
 
     override fun updatePosition(position: Long) {
-        if ((HookEntry.instance?.prefs?.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)) != true) return
+        val prefs = HookEntry.instance?.prefs ?: return
+        if (!prefs.getBoolean(RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND, RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND)) return
         if (!shouldRenderInjectedIsland()) return
         val lyricPkg = LyriconDataBridge.currentLyricPackageName ?: return
 
@@ -125,6 +126,7 @@ object BaseIslandRenderer : IslandRenderer {
                         ?: (leftView as? SpaceGateRichLyricLineView)?.setPosition(position)
                     (rightView as? RichLyricLineView)?.setPosition(position)
                         ?: (rightView as? SpaceGateRichLyricLineView)?.setPosition(position)
+                    IslandHostFacade.updateProgressGlow(cv, lyricPkg, prefs)
                 }
             }
     }
@@ -209,6 +211,7 @@ object BaseIslandRenderer : IslandRenderer {
     ) {
         val mediaInfo = MediaMetadataHelper.getMediaInfo(cv.context, packageName, HookLogger)
         IslandHostFacade.updateHostGlow(cv, mediaInfo.albumArt, prefs)
+        IslandHostFacade.updateProgressGlow(cv, packageName, prefs)
         updateSlot(cv, IslandProbeUtils.LEFT_TEST_VIEW_TAG, config.leftMode, prefs, config, mediaInfo)
         updateSlot(cv, IslandProbeUtils.RIGHT_TEST_VIEW_TAG, config.rightMode, prefs, config, mediaInfo)
     }

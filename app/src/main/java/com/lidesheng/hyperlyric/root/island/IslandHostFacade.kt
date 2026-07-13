@@ -51,11 +51,13 @@ internal object IslandHostFacade {
 
     fun clearAndRefresh(rootView: ViewGroup) {
         IslandViewHelper.clearInjectedViews(rootView)
+        IslandProgressGlowController.clear(rootView)
         IslandViewHelper.triggerSystemRelayout(rootView)
     }
 
     fun clearInjectedViews(rootView: ViewGroup) {
         IslandViewHelper.clearInjectedViews(rootView)
+        IslandProgressGlowController.clear(rootView)
     }
 
     fun triggerSystemRelayout(rootView: ViewGroup) {
@@ -68,5 +70,9 @@ internal object IslandHostFacade {
 
     fun updateHostGlow(rootView: ViewGroup, albumArt: Bitmap?, prefs: SharedPreferences) {
         HookIslandGlow.updateMusicGlow(rootView, albumArt, prefs)
+    }
+
+    fun updateProgressGlow(rootView: ViewGroup, packageName: String, prefs: SharedPreferences) {
+        IslandProgressGlowController.update(rootView, packageName, prefs)
     }
 }

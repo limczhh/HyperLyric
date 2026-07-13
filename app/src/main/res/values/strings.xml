@@ -306,6 +306,13 @@
     <string name="option_after_pause_default">恢复默认</string>
     <string name="option_after_pause_keep">保持不变</string>
     <string name="title_glow_cover_color">边缘光效封面色</string>
+    <string name="title_island_progress_glow">边缘光效进度条</string>
+    <string name="title_island_progress_style">进度轨道样式</string>
+    <string name="option_island_progress_top_clockwise">上方起点（顺时针）</string>
+    <string name="option_island_progress_right_clockwise">右侧起点（顺时针）</string>
+    <string name="option_island_progress_bottom_clockwise">下方起点（顺时针）</string>
+    <string name="option_island_progress_left_clockwise">左侧起点（顺时针）</string>
+    <string name="option_island_progress_left_bidirectional">左侧起点（上下双向）</string>
 
     <!-- ———————————————————————— Shared ———————————————————————— -->
     <string name="filter">筛选</string>

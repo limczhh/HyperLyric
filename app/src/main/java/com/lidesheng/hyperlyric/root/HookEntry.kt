@@ -7,6 +7,7 @@ import android.os.Looper
 import com.lidesheng.hyperlyric.lyric.source.SourceManager
 import com.lidesheng.hyperlyric.root.bridge.IpcRouter
 import com.lidesheng.hyperlyric.root.island.FakeIslandTransitionHooker
+import com.lidesheng.hyperlyric.root.island.IslandProgressGlowHooker
 import com.lidesheng.hyperlyric.root.island.IslandModuleRestoreHooker
 import com.lidesheng.hyperlyric.root.island.SystemUIHookRegistry
 import com.lidesheng.hyperlyric.root.island.IslandWidthHooker
@@ -62,6 +63,7 @@ class HookEntry : XposedModule() {
             RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH,
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
             RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
+            RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW,
             RootConstants.KEY_HOOK_TEXT_SIZE,
             RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
             RootConstants.KEY_HOOK_FONT_WEIGHT,
@@ -133,6 +135,26 @@ class HookEntry : XposedModule() {
         instance = this
         HookLogger.module = this
 
+        HookIslandGlow.initialize(this)
+        IslandProgressGlowHooker.initialize(this)
+        val hadProgressBackgroundHook = param.oldHookHandles.any {
+            isProgressGlowBackgroundDraw(it.executable)
+        }
+        val progressBackgroundClassLoader = if (hadProgressBackgroundHook) {
+            null
+        } else {
+            param.oldHookHandles.asSequence()
+                .mapNotNull { it.executable.declaringClass.classLoader }
+                .distinct()
+                .firstOrNull { classLoader ->
+                    runCatching {
+                        classLoader.loadClass(
+                            "miui.systemui.dynamicisland.DynamicIslandBackgroundView"
+                        )
+                    }.isSuccess
+                }
+        }
+
         var replacedCount = 0
         var removedCount = 0
         param.oldHookHandles.forEach { handle ->
@@ -140,6 +162,11 @@ class HookEntry : XposedModule() {
             if (replacement != null) {
                 runCatching {
                     handle.replaceHook(replacement)
+                    if (isProgressGlowBackgroundDraw(handle.executable)) {
+                        IslandProgressGlowHooker.adoptBackgroundHook(
+                            handle.executable.declaringClass
+                        )
+                    }
                     replacedCount++
                 }.onFailure {
                     handle.unhook()
@@ -151,11 +178,20 @@ class HookEntry : XposedModule() {
             }
         }
 
+        if (!hadProgressBackgroundHook && progressBackgroundClassLoader != null) {
+            runCatching {
+                IslandProgressGlowHooker.hook(this, progressBackgroundClassLoader)
+            }.onFailure { e ->
+                HookLogger.e("HookEntry", "Failed to install island background progress hook", e)
+            }
+        }
+
         val state = param.savedInstanceState as? Bundle
         if (state?.getBoolean(STATE_RUNTIME_READY) == true) {
             findCurrentApplication()?.let { app ->
                 Handler(Looper.getMainLooper()).post {
                     initializeSystemEnvironment(app)
+                    BaseIslandRenderer.refreshActiveIsland()
                 }
             }
                 ?: HookLogger.w("HookEntry", "热重载后未取得当前 Application，等待 Application.onCreate")
@@ -369,8 +405,19 @@ class HookEntry : XposedModule() {
                 IslandModuleRestoreHooker.AdapterUpdateViewHook()
             owner.endsWith("DynamicIslandBaseContentView") && name == "updateTemplate" ->
                 HookIslandGlow.UpdateTemplateHook()
+            isProgressGlowBackgroundDraw(executable) ->
+                IslandProgressGlowHooker.BackgroundDrawHook()
             else -> null
         }
+    }
+
+    private fun isProgressGlowBackgroundDraw(executable: Executable): Boolean {
+        return executable is Method &&
+            executable.name == "onDraw" &&
+            executable.parameterTypes.size == 1 &&
+            executable.parameterTypes[0].name == "android.graphics.Canvas" &&
+            executable.declaringClass.name ==
+            "miui.systemui.dynamicisland.DynamicIslandBackgroundView"
     }
 
     /**

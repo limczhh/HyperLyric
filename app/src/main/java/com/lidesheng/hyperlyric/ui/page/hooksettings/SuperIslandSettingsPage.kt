@@ -66,6 +66,18 @@ fun SuperIslandSettingsPage() {
     var rightContentWidth by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH, RootConstants.DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH).coerceIn(20, 100)) }
     var afterPauseBehavior by remember { mutableIntStateOf(prefs.getInt(RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE, RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE)) }
     var extractGlowColor by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR, RootConstants.DEFAULT_HOOK_ISLAND_GLOW_EXTRACT_COLOR)) }
+    var progressGlow by remember { mutableStateOf(prefs.getBoolean(RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW, RootConstants.DEFAULT_HOOK_ISLAND_PROGRESS_GLOW)) }
+    var progressStyle by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_PROGRESS_STYLE,
+                RootConstants.DEFAULT_HOOK_ISLAND_PROGRESS_STYLE
+            ).coerceIn(
+                RootConstants.ISLAND_PROGRESS_STYLE_TOP_CLOCKWISE,
+                RootConstants.ISLAND_PROGRESS_STYLE_LEFT_BIDIRECTIONAL
+            )
+        )
+    }
 
     var showLeftPaddingDialog by remember { mutableStateOf(false) }
     var showRightPaddingDialog by remember { mutableStateOf(false) }
@@ -90,6 +102,15 @@ fun SuperIslandSettingsPage() {
     }.map { stringResource(id = it) }
     val afterPauseOptions = remember {
         listOf(R.string.option_after_pause_default, R.string.option_after_pause_keep)
+    }.map { stringResource(id = it) }
+    val progressStyleOptions = remember {
+        listOf(
+            R.string.option_island_progress_top_clockwise,
+            R.string.option_island_progress_right_clockwise,
+            R.string.option_island_progress_bottom_clockwise,
+            R.string.option_island_progress_left_clockwise,
+            R.string.option_island_progress_left_bidirectional
+        )
     }.map { stringResource(id = it) }
 
     val backdrop = rememberBlurBackdrop()
@@ -232,6 +253,27 @@ fun SuperIslandSettingsPage() {
                                 checked = extractGlowColor,
                                 onCheckedChange = { extractGlowColor = it; saveConfig(RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR, it) }
                             )
+                            SwitchPreference(
+                                title = stringResource(id = R.string.title_island_progress_glow),
+                                checked = progressGlow,
+                                onCheckedChange = { progressGlow = it; saveConfig(RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW, it) }
+                            )
+                            AnimatedVisibility(visible = progressGlow) {
+                                Column {
+                                    OverlayDropdownPreference(
+                                        title = stringResource(id = R.string.title_island_progress_style),
+                                        items = progressStyleOptions,
+                                        selectedIndex = progressStyle,
+                                        onSelectedIndexChange = {
+                                            progressStyle = it
+                                            saveConfig(
+                                                RootConstants.KEY_HOOK_ISLAND_PROGRESS_STYLE,
+                                                it
+                                            )
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

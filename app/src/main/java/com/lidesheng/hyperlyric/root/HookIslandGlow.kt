@@ -30,9 +30,13 @@ object HookIslandGlow {
     private val prefs: SharedPreferences?
         get() = if (::module.isInitialized) (module as? HookEntry)?.prefs else null
 
-    fun init(xposedModule: XposedModule, cl: ClassLoader) {
-        if (!hookedClassLoaders.add(cl)) return
+    fun initialize(xposedModule: XposedModule) {
         module = xposedModule
+    }
+
+    fun init(xposedModule: XposedModule, cl: ClassLoader) {
+        initialize(xposedModule)
+        if (!hookedClassLoaders.add(cl)) return
 
         try {
             val baseContentViewClass = cl.loadClass(BASE_CONTENT_VIEW_CLASS)

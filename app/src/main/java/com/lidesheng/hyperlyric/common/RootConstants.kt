@@ -63,6 +63,8 @@ object RootConstants {
     const val KEY_HOOK_EXTRACT_COVER_TEXT_COLOR = "key_hook_extract_cover_text_color"
     const val KEY_HOOK_EXTRACT_COVER_TEXT_GRADIENT = "key_hook_extract_cover_text_gradient"
     const val KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR = "key_hook_island_glow_extract_color"
+    const val KEY_HOOK_ISLAND_PROGRESS_GLOW = "key_hook_island_progress_glow"
+    const val KEY_HOOK_ISLAND_PROGRESS_STYLE = "key_hook_island_progress_style"
 
     // ================= FONT KEYS =================
     const val KEY_HOOK_CUSTOM_FONT_PATH = "key_hook_custom_font_path"
@@ -140,6 +142,13 @@ object RootConstants {
     const val DEFAULT_HOOK_EXTRACT_COVER_TEXT_COLOR = false
     const val DEFAULT_HOOK_EXTRACT_COVER_TEXT_GRADIENT = false
     const val DEFAULT_HOOK_ISLAND_GLOW_EXTRACT_COLOR = false
+    const val DEFAULT_HOOK_ISLAND_PROGRESS_GLOW = false
+    const val ISLAND_PROGRESS_STYLE_TOP_CLOCKWISE = 0
+    const val ISLAND_PROGRESS_STYLE_RIGHT_CLOCKWISE = 1
+    const val ISLAND_PROGRESS_STYLE_BOTTOM_CLOCKWISE = 2
+    const val ISLAND_PROGRESS_STYLE_LEFT_CLOCKWISE = 3
+    const val ISLAND_PROGRESS_STYLE_LEFT_BIDIRECTIONAL = 4
+    const val DEFAULT_HOOK_ISLAND_PROGRESS_STYLE = ISLAND_PROGRESS_STYLE_TOP_CLOCKWISE
     const val DEFAULT_HOOK_WORD_MOTION_ENABLED = false
     const val DEFAULT_HOOK_WORD_MOTION_CJK_LIFT = 0.05f
     const val DEFAULT_HOOK_WORD_MOTION_CJK_WAVE = 2.8f

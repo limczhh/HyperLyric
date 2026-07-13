@@ -34,8 +34,22 @@ object MediaMetadataHelper {
         val title: String = "",
         val artist: String = "",
         val album: String = "",
-        val albumArt: Bitmap? = null
+        val albumArt: Bitmap? = null,
+        val duration: Long = -1L
     )
+
+    data class PlaybackProgress(
+        val position: Long = -1L,
+        val duration: Long = -1L,
+        val isPlaying: Boolean = false
+    ) {
+        val fraction: Float
+            get() = if (position >= 0L && duration > 0L) {
+                (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+            } else {
+                -1f
+            }
+    }
 
     /**
      * 获取指定包名的当前媒体信息
@@ -60,6 +74,22 @@ object MediaMetadataHelper {
             estimatePlaybackPosition(findController(context, packageName)?.playbackState)
         } catch (_: Exception) {
             -1
+        }
+    }
+
+    fun getPlaybackProgress(context: Context, packageName: String): PlaybackProgress {
+        if (packageName.isEmpty()) return PlaybackProgress()
+        return try {
+            val controller = findController(context, packageName) ?: return PlaybackProgress()
+            val state = controller.playbackState
+            val duration = controller.metadata?.extractDuration() ?: -1L
+            PlaybackProgress(
+                position = estimatePlaybackPosition(state),
+                duration = duration,
+                isPlaying = state?.state == PlaybackState.STATE_PLAYING
+            )
+        } catch (_: Exception) {
+            PlaybackProgress()
         }
     }
 
@@ -154,8 +184,17 @@ object MediaMetadataHelper {
             title = mediaDescription.title?.toString().orEmpty(),
             artist = mediaDescription.subtitle?.toString().orEmpty(),
             album = mediaDescription.description?.toString().orEmpty(),
-            albumArt = extractAlbumArt()
+            albumArt = extractAlbumArt(),
+            duration = extractDuration()
         )
+    }
+
+    private fun MediaMetadata.extractDuration(): Long {
+        return try {
+            getLong(MediaMetadata.METADATA_KEY_DURATION).takeIf { it > 0L } ?: -1L
+        } catch (_: Exception) {
+            -1L
+        }
     }
 
 }
