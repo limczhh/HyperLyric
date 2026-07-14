@@ -307,6 +307,8 @@
     <string name="label_right_padding">Right Padding</string>
     <string name="title_audio_cover">Audio Cover</string>
     <string name="title_audio_cover_style">Audio cover style</string>
+    <string name="title_hide_audio_cover_source">Hide audio cover source badge</string>
+    <string name="title_hide_media_device_switch">Hide device switch button</string>
     <string name="option_audio_cover_style_default">Default</string>
     <string name="option_audio_cover_style_circle">Circular cover</string>
     <string name="option_audio_cover_style_rotating_circle">Rotating circular cover</string>

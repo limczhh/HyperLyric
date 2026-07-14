@@ -11,12 +11,17 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 fun LazyListScope.notificationCenterMediaCardSection(
     cardTheme: Int,
     onCardThemeChange: (Int) -> Unit,
     coverStyle: Int,
     onCoverStyleChange: (Int) -> Unit,
+    hideCoverSource: Boolean,
+    onHideCoverSourceChange: (Boolean) -> Unit,
+    hideDeviceSwitch: Boolean,
+    onHideDeviceSwitchChange: (Boolean) -> Unit,
     ambientFlowMode: Int,
     onAmbientFlowModeChange: (Int) -> Unit
 ) {
@@ -28,23 +33,6 @@ fun LazyListScope.notificationCenterMediaCardSection(
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            val themeValues = listOf(
-                RootConstants.MEDIA_CARD_THEME_FOLLOW_SYSTEM,
-                RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT,
-                RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK
-            )
-            OverlayDropdownPreference(
-                title = stringResource(R.string.title_media_card_background_theme),
-                items = listOf(
-                    stringResource(R.string.option_media_card_theme_follow_system_default),
-                    stringResource(R.string.option_media_card_theme_always_light),
-                    stringResource(R.string.option_media_card_theme_always_dark)
-                ),
-                selectedIndex = themeValues.indexOf(cardTheme).coerceAtLeast(0),
-                onSelectedIndexChange = { index ->
-                    onCardThemeChange(themeValues[index])
-                }
-            )
             val coverStyleValues = listOf(
                 RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_DEFAULT,
                 RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_CIRCLE,
@@ -62,6 +50,33 @@ fun LazyListScope.notificationCenterMediaCardSection(
                 selectedIndex = coverStyleValues.indexOf(coverStyle).coerceAtLeast(0),
                 onSelectedIndexChange = { index ->
                     onCoverStyleChange(coverStyleValues[index])
+                }
+            )
+            SwitchPreference(
+                title = stringResource(R.string.title_hide_audio_cover_source),
+                checked = hideCoverSource,
+                onCheckedChange = onHideCoverSourceChange
+            )
+            SwitchPreference(
+                title = stringResource(R.string.title_hide_media_device_switch),
+                checked = hideDeviceSwitch,
+                onCheckedChange = onHideDeviceSwitchChange
+            )
+            val themeValues = listOf(
+                RootConstants.MEDIA_CARD_THEME_FOLLOW_SYSTEM,
+                RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT,
+                RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK
+            )
+            OverlayDropdownPreference(
+                title = stringResource(R.string.title_media_card_background_theme),
+                items = listOf(
+                    stringResource(R.string.option_media_card_theme_follow_system_default),
+                    stringResource(R.string.option_media_card_theme_always_light),
+                    stringResource(R.string.option_media_card_theme_always_dark)
+                ),
+                selectedIndex = themeValues.indexOf(cardTheme).coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    onCardThemeChange(themeValues[index])
                 }
             )
             val modeValues = listOf(

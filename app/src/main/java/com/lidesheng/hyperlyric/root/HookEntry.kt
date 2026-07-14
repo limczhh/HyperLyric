@@ -383,7 +383,9 @@ class HookEntry : XposedModule() {
                             NotificationMediaAmbientFlowHooker.refreshCardTheme()
                         }
                     }
-                    RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_COVER_STYLE -> {
+                    RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_COVER_STYLE,
+                    RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE,
+                    RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH -> {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             NotificationMediaCoverStyleHooker.refresh()
                         }

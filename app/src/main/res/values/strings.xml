@@ -308,6 +308,8 @@
     <string name="label_right_padding">右边距</string>
     <string name="title_audio_cover">音频封面</string>
     <string name="title_audio_cover_style">音频封面样式</string>
+    <string name="title_hide_audio_cover_source">隐藏音频封面的来源标识</string>
+    <string name="title_hide_media_device_switch">隐藏设备切换按钮</string>
     <string name="option_audio_cover_style_default">默认</string>
     <string name="option_audio_cover_style_circle">圆形封面</string>
     <string name="option_audio_cover_style_rotating_circle">旋转圆形封面</string>

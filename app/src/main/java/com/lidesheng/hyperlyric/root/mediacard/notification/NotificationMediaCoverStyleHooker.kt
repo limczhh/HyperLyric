@@ -33,6 +33,7 @@ object NotificationMediaCoverStyleHooker {
     private const val MEDIA_DATA_CLASS =
         "com.android.systemui.media.controls.shared.model.MediaData"
     private const val CONSTRAINT_START = 6
+    private const val CONSTRAINT_END = 7
     private const val CONSTRAINT_TOP = 3
 
     private val hookedClassLoaders = Collections.synchronizedSet(
@@ -96,7 +97,7 @@ object NotificationMediaCoverStyleHooker {
     fun isTargetMethod(method: Method): Boolean {
         return when (method.declaringClass.name) {
             VIEW_CONTROLLER_CLASS -> when (method.name) {
-                "attach", "bindMediaData" -> method.parameterCount == 1
+                "attach", "bindMediaData", "setSeamless" -> method.parameterCount == 1
                 "detach" -> method.parameterCount == 0
                 else -> false
             }
@@ -162,12 +163,13 @@ object NotificationMediaCoverStyleHooker {
     private class ControllerHook(private val methodName: String) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val controller = chain.thisObject ?: return chain.proceed()
+            if (methodName == "setSeamless" && hideDeviceSwitch()) return null
             if (methodName == "detach") {
                 activeControllers.remove(controller)
                 restoreStyle(controller)
             }
             val result = chain.proceed()
-            if (methodName != "detach") {
+            if (methodName == "attach" || methodName == "bindMediaData") {
                 runCatching {
                     activeControllers.add(controller)
                     val mediaData = if (methodName == "bindMediaData") {
@@ -259,6 +261,20 @@ object NotificationMediaCoverStyleHooker {
         ) ?: RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_COVER_STYLE
     }
 
+    private fun hideCoverSource(): Boolean {
+        return prefs?.getBoolean(
+            RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE,
+            RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE
+        ) ?: RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE
+    }
+
+    private fun hideDeviceSwitch(): Boolean {
+        return prefs?.getBoolean(
+            RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH,
+            RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH
+        ) ?: RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH
+    }
+
     private fun resolveApi(classLoader: ClassLoader?): NativeApi? {
         classLoader ?: return null
         nativeApis[classLoader]?.let { return it }
@@ -305,6 +321,7 @@ object NotificationMediaCoverStyleHooker {
         private val mediaDataIsPlayingField: Field,
         private val layoutContextField: Field,
         private val normalLayoutField: Field,
+        private val normalAlbumLayoutField: Field,
         private val loadLayoutMethod: Method,
         private val updateLayoutMethod: Method,
         private val setVisibilityMethod: Method,
@@ -323,35 +340,62 @@ object NotificationMediaCoverStyleHooker {
         }
 
         fun applyLoadedLayout(controller: Any, style: Int) {
-            if (style != RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN) return
+            val hideSource = hideCoverSource()
+            val hideDevice = hideDeviceSwitch()
+            if (
+                style != RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN &&
+                !hideSource &&
+                !hideDevice
+            ) return
             val normalLayout = normalLayoutField.get(controller)
             val context = layoutContextField.get(controller) as Context
             val ids = LayoutResourceIds.from(context)
-            setGoneMarginMethod.invoke(
-                normalLayout,
-                ids.headerTitle,
-                CONSTRAINT_START,
-                context.dp(26f)
-            )
-            setGoneMarginMethod.invoke(
-                normalLayout,
-                ids.headerArtist,
-                CONSTRAINT_START,
-                context.dp(26f)
-            )
-            setGoneMarginMethod.invoke(
-                normalLayout,
-                ids.actions,
-                CONSTRAINT_TOP,
-                context.dp(67.5f)
-            )
-            setGoneMarginMethod.invoke(
-                normalLayout,
-                ids.action0,
-                CONSTRAINT_TOP,
-                context.dp(78.5f)
-            )
-            setVisibilityMethod.invoke(normalLayout, ids.albumArt, View.GONE)
+            if (style == RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN) {
+                setGoneMarginMethod.invoke(
+                    normalLayout,
+                    ids.headerTitle,
+                    CONSTRAINT_START,
+                    context.dp(26f)
+                )
+                setGoneMarginMethod.invoke(
+                    normalLayout,
+                    ids.headerArtist,
+                    CONSTRAINT_START,
+                    context.dp(26f)
+                )
+                setGoneMarginMethod.invoke(
+                    normalLayout,
+                    ids.actions,
+                    CONSTRAINT_TOP,
+                    context.dp(67.5f)
+                )
+                setGoneMarginMethod.invoke(
+                    normalLayout,
+                    ids.action0,
+                    CONSTRAINT_TOP,
+                    context.dp(78.5f)
+                )
+                setVisibilityMethod.invoke(normalLayout, ids.albumArt, View.GONE)
+            }
+            if (hideSource) {
+                val normalAlbumLayout = normalAlbumLayoutField.get(controller)
+                setVisibilityMethod.invoke(normalAlbumLayout, ids.coverSource, View.GONE)
+            }
+            if (hideDevice) {
+                setVisibilityMethod.invoke(normalLayout, ids.mediaSeamless, View.GONE)
+                setGoneMarginMethod.invoke(
+                    normalLayout,
+                    ids.headerTitle,
+                    CONSTRAINT_END,
+                    context.dp(26f)
+                )
+                setGoneMarginMethod.invoke(
+                    normalLayout,
+                    ids.headerArtist,
+                    CONSTRAINT_END,
+                    context.dp(26f)
+                )
+            }
         }
 
         fun reloadAndApplyLayout(controller: Any) {
@@ -368,7 +412,9 @@ object NotificationMediaCoverStyleHooker {
             val headerTitle: Int,
             val headerArtist: Int,
             val actions: Int,
-            val action0: Int
+            val action0: Int,
+            val coverSource: Int,
+            val mediaSeamless: Int
         ) {
             companion object {
                 fun from(context: Context): LayoutResourceIds {
@@ -377,7 +423,9 @@ object NotificationMediaCoverStyleHooker {
                         headerTitle = context.requireId("header_title"),
                         headerArtist = context.requireId("header_artist"),
                         actions = context.requireId("actions"),
-                        action0 = context.requireId("action0")
+                        action0 = context.requireId("action0"),
+                        coverSource = context.requireId("icon"),
+                        mediaSeamless = context.requireId("media_seamless")
                     )
                 }
 
@@ -411,12 +459,16 @@ object NotificationMediaCoverStyleHooker {
                 val detach = viewControllerClass.getDeclaredMethod("detach").apply {
                     isAccessible = true
                 }
+                val setSeamless = viewControllerClass.getDeclaredMethod(
+                    "setSeamless",
+                    mediaDataClass
+                ).apply { isAccessible = true }
                 val loadLayout = layoutControllerClass.getDeclaredMethod("loadLayout\$1").apply {
                     isAccessible = true
                 }
 
                 return NativeApi(
-                    hookMethods = listOf(attach, bind, detach, loadLayout),
+                    hookMethods = listOf(attach, bind, detach, setSeamless, loadLayout),
                     holderField = viewControllerClass.getDeclaredField("holder").apply {
                         isAccessible = true
                     },
@@ -438,6 +490,9 @@ object NotificationMediaCoverStyleHooker {
                     normalLayoutField = layoutControllerClass.getDeclaredField("normalLayout").apply {
                         isAccessible = true
                     },
+                    normalAlbumLayoutField = layoutControllerClass.getDeclaredField(
+                        "normalAlbumLayout"
+                    ).apply { isAccessible = true },
                     loadLayoutMethod = loadLayout,
                     updateLayoutMethod = layoutControllerClass.getDeclaredMethod("updateLayout\$6").apply {
                         isAccessible = true

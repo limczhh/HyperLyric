@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -84,6 +85,22 @@ fun MediaCardSettingsPage() {
             ).coerceIn(
                 RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_DEFAULT,
                 RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN
+            )
+        )
+    }
+    var hideNotificationCoverSource by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE,
+                RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE
+            )
+        )
+    }
+    var hideNotificationDeviceSwitch by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH,
+                RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH
             )
         )
     }
@@ -164,6 +181,34 @@ fun MediaCardSettingsPage() {
                         PrefsBridge.putInt(
                             RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_COVER_STYLE,
                             style
+                        )
+                    },
+                    hideCoverSource = hideNotificationCoverSource,
+                    onHideCoverSourceChange = { hidden ->
+                        hideNotificationCoverSource = hidden
+                        prefs.edit {
+                            putBoolean(
+                                RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE,
+                                hidden
+                            )
+                        }
+                        PrefsBridge.putBoolean(
+                            RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_COVER_SOURCE,
+                            hidden
+                        )
+                    },
+                    hideDeviceSwitch = hideNotificationDeviceSwitch,
+                    onHideDeviceSwitchChange = { hidden ->
+                        hideNotificationDeviceSwitch = hidden
+                        prefs.edit {
+                            putBoolean(
+                                RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH,
+                                hidden
+                            )
+                        }
+                        PrefsBridge.putBoolean(
+                            RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_HIDE_DEVICE_SWITCH,
+                            hidden
                         )
                     },
                     ambientFlowMode = notificationAmbientFlowMode,
