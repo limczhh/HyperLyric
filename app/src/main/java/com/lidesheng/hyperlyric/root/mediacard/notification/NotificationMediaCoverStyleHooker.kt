@@ -10,6 +10,7 @@ import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.mediacard.MediaCoverRotationController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
@@ -150,7 +151,7 @@ object NotificationMediaCoverStyleHooker {
                 }
             }
             controllers.forEach(::restoreStyle)
-            NotificationMediaCoverRotationController.cleanup()
+            MediaCoverRotationController.cleanup()
             layoutControllers.clear()
             activeControllers.clear()
             viewStates.clear()
@@ -225,15 +226,15 @@ object NotificationMediaCoverStyleHooker {
 
         when (style) {
             RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_CIRCLE -> {
-                NotificationMediaCoverRotationController.detach(albumImage)
+                MediaCoverRotationController.detach(albumImage)
                 state.applyCircle()
             }
             RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_ROTATING_CIRCLE -> {
                 state.applyCircle()
-                NotificationMediaCoverRotationController.attach(albumImage, isPlaying)
+                MediaCoverRotationController.attach(albumImage, isPlaying)
             }
             RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN -> {
-                NotificationMediaCoverRotationController.detach(albumImage)
+                MediaCoverRotationController.detach(albumImage)
                 state.restoreOutlines()
                 albumView.visibility = View.GONE
             }
@@ -246,7 +247,7 @@ object NotificationMediaCoverStyleHooker {
         val holder = api.getHolder(controller) ?: return
         val albumView = api.getAlbumView(holder)
         val state = viewStates.remove(albumView) ?: return
-        NotificationMediaCoverRotationController.detach(state.albumImage)
+        MediaCoverRotationController.detach(state.albumImage)
         state.restoreOutlines()
         state.albumView.visibility = View.VISIBLE
     }

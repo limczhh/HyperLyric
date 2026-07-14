@@ -115,6 +115,33 @@ fun MediaCardSettingsPage() {
             )
         )
     }
+    var islandExpandedCoverStyle by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_COVER_STYLE,
+                RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_COVER_STYLE
+            ).coerceIn(
+                RootConstants.ISLAND_EXPANDED_MEDIA_COVER_STYLE_DEFAULT,
+                RootConstants.ISLAND_EXPANDED_MEDIA_COVER_STYLE_HIDDEN
+            )
+        )
+    }
+    var hideIslandExpandedCoverSource by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_COVER_SOURCE,
+                RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_COVER_SOURCE
+            )
+        )
+    }
+    var hideIslandExpandedDeviceSwitch by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_DEVICE_SWITCH,
+                RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_DEVICE_SWITCH
+            )
+        )
+    }
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
@@ -236,6 +263,48 @@ fun MediaCardSettingsPage() {
                         PrefsBridge.putInt(
                             RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_CARD_THEME,
                             theme
+                        )
+                    },
+                    coverStyle = islandExpandedCoverStyle,
+                    onCoverStyleChange = { style ->
+                        islandExpandedCoverStyle = style
+                        prefs.edit {
+                            putInt(
+                                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_COVER_STYLE,
+                                style
+                            )
+                        }
+                        PrefsBridge.putInt(
+                            RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_COVER_STYLE,
+                            style
+                        )
+                    },
+                    hideCoverSource = hideIslandExpandedCoverSource,
+                    onHideCoverSourceChange = { hidden ->
+                        hideIslandExpandedCoverSource = hidden
+                        prefs.edit {
+                            putBoolean(
+                                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_COVER_SOURCE,
+                                hidden
+                            )
+                        }
+                        PrefsBridge.putBoolean(
+                            RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_COVER_SOURCE,
+                            hidden
+                        )
+                    },
+                    hideDeviceSwitch = hideIslandExpandedDeviceSwitch,
+                    onHideDeviceSwitchChange = { hidden ->
+                        hideIslandExpandedDeviceSwitch = hidden
+                        prefs.edit {
+                            putBoolean(
+                                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_DEVICE_SWITCH,
+                                hidden
+                            )
+                        }
+                        PrefsBridge.putBoolean(
+                            RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_HIDE_DEVICE_SWITCH,
+                            hidden
                         )
                     },
                     ambientFlowMode = islandExpandedAmbientFlowMode,

@@ -11,10 +11,17 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 fun LazyListScope.islandExpandedMediaCardSection(
     cardTheme: Int,
     onCardThemeChange: (Int) -> Unit,
+    coverStyle: Int,
+    onCoverStyleChange: (Int) -> Unit,
+    hideCoverSource: Boolean,
+    onHideCoverSourceChange: (Boolean) -> Unit,
+    hideDeviceSwitch: Boolean,
+    onHideDeviceSwitchChange: (Boolean) -> Unit,
     ambientFlowMode: Int,
     onAmbientFlowModeChange: (Int) -> Unit
 ) {
@@ -26,6 +33,35 @@ fun LazyListScope.islandExpandedMediaCardSection(
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
+            val coverStyleValues = listOf(
+                RootConstants.ISLAND_EXPANDED_MEDIA_COVER_STYLE_DEFAULT,
+                RootConstants.ISLAND_EXPANDED_MEDIA_COVER_STYLE_CIRCLE,
+                RootConstants.ISLAND_EXPANDED_MEDIA_COVER_STYLE_ROTATING_CIRCLE,
+                RootConstants.ISLAND_EXPANDED_MEDIA_COVER_STYLE_HIDDEN
+            )
+            OverlayDropdownPreference(
+                title = stringResource(R.string.title_audio_cover_style),
+                items = listOf(
+                    stringResource(R.string.option_audio_cover_style_default),
+                    stringResource(R.string.option_audio_cover_style_circle),
+                    stringResource(R.string.option_audio_cover_style_rotating_circle),
+                    stringResource(R.string.option_audio_cover_style_hidden)
+                ),
+                selectedIndex = coverStyleValues.indexOf(coverStyle).coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    onCoverStyleChange(coverStyleValues[index])
+                }
+            )
+            SwitchPreference(
+                title = stringResource(R.string.title_hide_audio_cover_source),
+                checked = hideCoverSource,
+                onCheckedChange = onHideCoverSourceChange
+            )
+            SwitchPreference(
+                title = stringResource(R.string.title_hide_media_device_switch),
+                checked = hideDeviceSwitch,
+                onCheckedChange = onHideDeviceSwitchChange
+            )
             val themeValues = listOf(
                 RootConstants.MEDIA_CARD_THEME_FOLLOW_SYSTEM,
                 RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT,

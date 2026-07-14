@@ -1,4 +1,4 @@
-package com.lidesheng.hyperlyric.root.mediacard.notification
+package com.lidesheng.hyperlyric.root.mediacard
 
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
@@ -9,7 +9,7 @@ import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import java.util.WeakHashMap
 
-internal object NotificationMediaCoverRotationController {
+internal object MediaCoverRotationController {
     private const val ROTATION_DURATION_MS = 20_000L
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -22,7 +22,7 @@ internal object NotificationMediaCoverRotationController {
 
         override fun onViewDetachedFromWindow(view: View) {
             val imageView = view as? ImageView ?: return
-            states[imageView]?.let { stopAnimator(imageView, it, resetRotation = true) }
+            states[imageView]?.let { stopAnimator(imageView, it, resetRotation = false) }
         }
     }
 
