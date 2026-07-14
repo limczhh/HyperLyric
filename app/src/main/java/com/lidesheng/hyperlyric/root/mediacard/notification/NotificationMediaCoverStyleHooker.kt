@@ -236,7 +236,7 @@ object NotificationMediaCoverStyleHooker {
             RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN -> {
                 MediaCoverRotationController.detach(albumImage)
                 state.restoreOutlines()
-                albumView.visibility = View.GONE
+                if (albumView.visibility != View.GONE) albumView.visibility = View.GONE
             }
             else -> restoreStyle(controller)
         }
@@ -291,25 +291,38 @@ object NotificationMediaCoverStyleHooker {
         val albumOutlineProvider: ViewOutlineProvider?,
         val albumClipToOutline: Boolean,
         val imageOutlineProvider: ViewOutlineProvider?,
-        val imageClipToOutline: Boolean
+        val imageClipToOutline: Boolean,
+        var coverOutlined: Boolean = false
     ) {
         fun applyCircle() {
-            albumView.visibility = View.VISIBLE
+            if (albumView.visibility != View.VISIBLE) albumView.visibility = View.VISIBLE
+            if (
+                coverOutlined &&
+                albumView.outlineProvider === circleOutlineProvider &&
+                !albumView.clipToOutline &&
+                albumImage.outlineProvider === circleOutlineProvider &&
+                albumImage.clipToOutline
+            ) {
+                return
+            }
             albumView.outlineProvider = circleOutlineProvider
             albumView.clipToOutline = false
             albumImage.outlineProvider = circleOutlineProvider
             albumImage.clipToOutline = true
             albumView.invalidateOutline()
             albumImage.invalidateOutline()
+            coverOutlined = true
         }
 
         fun restoreOutlines() {
+            if (!coverOutlined) return
             albumView.outlineProvider = albumOutlineProvider
             albumView.clipToOutline = albumClipToOutline
             albumImage.outlineProvider = imageOutlineProvider
             albumImage.clipToOutline = imageClipToOutline
             albumView.invalidateOutline()
             albumImage.invalidateOutline()
+            coverOutlined = false
         }
     }
 

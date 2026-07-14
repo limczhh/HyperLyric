@@ -193,7 +193,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
 
         refreshSizes()
         animator.stop()
-        if (!isStaticPreview) animator.startIfNeeded()
+        if (!isStaticPreview && playbackActive) animator.startIfNeeded()
         invalidate()
     }
 
@@ -202,17 +202,22 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         doOnAttach {
             if (isStaticPreview) return@doOnAttach
             scrollUnlocked = true
-            if (isPlainText) startScrolling()
+            if (isPlainText && playbackActive) startScrolling()
         }
     }
 
     fun seekTo(posMs: Long) {
         if (isStaticPreview) return
         if (isPlainText) {
-            startScrolling()
+            if (playbackActive) startScrolling()
         } else {
             activeRenderer.seek(_model, lineState, posMs, measuredWidth, measuredHeight)
-            animator.startIfNeeded()
+            if (playbackActive) {
+                animator.startIfNeeded()
+            } else {
+                animator.stop()
+                invalidate()
+            }
         }
     }
 
@@ -231,16 +236,38 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                 invalidate()
             }
         } else {
-            startScrolling()
+            if (playbackActive) startScrolling()
         }
     }
 
     fun setPlaybackActive(active: Boolean) {
+        if (playbackActive == active) {
+            if (active) resumePlaybackAnimation() else animator.stop()
+            return
+        }
         playbackActive = active
         if (!active) {
             animator.stop()
-            (activeRenderer as? WordSyncRenderer)?.freeze(_model, lineState, measuredWidth)
-            invalidate()
+            (activeRenderer as? WordSyncRenderer)?.let { renderer ->
+                renderer.freeze(_model, lineState, measuredWidth)
+                if (isShown) invalidate()
+            }
+            return
+        }
+
+        resumePlaybackAnimation()
+    }
+
+    private fun resumePlaybackAnimation() {
+        if (isPlainText) {
+            if (!scrollUnlocked) return
+            if (!scrollStarted) {
+                startScrolling()
+            } else if (activeRenderer.isPlaying) {
+                animator.startIfNeeded()
+            }
+        } else if (activeRenderer.isPlaying && !activeRenderer.isFinished) {
+            animator.startIfNeeded()
         }
     }
 
@@ -339,13 +366,22 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         setMeasuredDimension(w, resolveSize(textHeight, hSpec))
     }
 
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible && playbackActive) {
+            resumePlaybackAnimation()
+        } else {
+            animator.stop()
+        }
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         reset()
     }
 
     private fun startScrolling() {
-        if (isStaticPreview || !isPlainText || !scrollUnlocked || scrollStarted) return
+        if (!playbackActive || isStaticPreview || !isPlainText || !scrollUnlocked || scrollStarted) return
         scrollStarted = true
         lineState.reset()
         if (!isOverflow) return
@@ -406,7 +442,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         private var lastFrameNanos = 0L
 
         fun startIfNeeded() {
-            if (!running && isAttachedToWindow) {
+            if (playbackActive && !running && isAttachedToWindow && isShown) {
                 running = true
                 lastFrameNanos = 0L
                 post { Choreographer.getInstance().postFrameCallback(this) }
@@ -420,7 +456,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         }
 
         override fun doFrame(frameTimeNanos: Long) {
-            if (!running || !isAttachedToWindow) {
+            if (!running || !playbackActive || !isAttachedToWindow || !isShown) {
                 running = false
                 return
             }

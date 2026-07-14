@@ -14,6 +14,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
+import java.lang.ref.WeakReference
 import java.lang.reflect.Method
 import java.util.Collections
 import java.util.WeakHashMap
@@ -75,12 +76,28 @@ internal object IslandProgressGlowHooker {
                 stateByBackgroundView[backgroundView] = it
             }
         }
-        state.fraction = fraction.coerceIn(0f, 1f)
-        state.progressStartColor = progressStartColor
-        state.progressEndColor = progressEndColor
-        state.trackColor = trackColor
-        state.progressStyle = progressStyle
-        backgroundView.invalidate()
+        val normalizedFraction = fraction.coerceIn(0f, 1f)
+        val changed = synchronized(state) {
+            if (
+                state.initialized &&
+                state.fraction == normalizedFraction &&
+                state.progressStartColor == progressStartColor &&
+                state.progressEndColor == progressEndColor &&
+                state.trackColor == trackColor &&
+                state.progressStyle == progressStyle
+            ) {
+                false
+            } else {
+                state.initialized = true
+                state.fraction = normalizedFraction
+                state.progressStartColor = progressStartColor
+                state.progressEndColor = progressEndColor
+                state.trackColor = trackColor
+                state.progressStyle = progressStyle
+                true
+            }
+        }
+        if (changed) backgroundView.invalidate()
     }
 
     fun clearMediaProgress(backgroundView: View) {
@@ -116,7 +133,8 @@ internal object IslandProgressGlowHooker {
         }
     }
 
-    private class ProgressState(private val backgroundView: View) {
+    private class ProgressState(backgroundView: View) {
+        private val backgroundViewRef = WeakReference(backgroundView)
         private val actualLeft = findGetter(backgroundView, "getActualLeft")
         private val actualTop = findGetter(backgroundView, "getActualTop")
         private val actualRight = findGetter(backgroundView, "getActualWidth")
@@ -141,6 +159,18 @@ internal object IslandProgressGlowHooker {
         private val topLeftArc = RectF()
         private val pathMeasure = PathMeasure()
         private val islandRadius = resolveIslandRadius(backgroundView)
+        private var trackLeft = Float.NaN
+        private var trackTop = Float.NaN
+        private var trackRight = Float.NaN
+        private var trackBottom = Float.NaN
+        private var trackRadius = Float.NaN
+        private var trackLength = 0f
+        private var trackVersion = 0
+        private var progressPathTrackVersion = -1
+        private var progressPathFraction = Float.NaN
+        private var progressPathStyle = Int.MIN_VALUE
+
+        var initialized: Boolean = false
 
         @Volatile
         var fraction: Float = 0f
@@ -180,43 +210,7 @@ internal object IslandProgressGlowHooker {
             val radius = (islandRadius + halfStroke - EDGE_OVERLAP_PX).coerceAtMost(
                 minOf(pathRight - pathLeft, pathBottom - pathTop) / 2f
             )
-            val centerX = (pathLeft + pathRight) / 2f
-
-            trackPath.reset()
-            trackPath.moveTo(centerX, pathTop)
-            trackPath.lineTo(pathRight - radius, pathTop)
-            topRightArc.set(
-                pathRight - radius * 2f,
-                pathTop,
-                pathRight,
-                pathTop + radius * 2f
-            )
-            trackPath.arcTo(topRightArc, -90f, 90f, false)
-            trackPath.lineTo(pathRight, pathBottom - radius)
-            bottomRightArc.set(
-                pathRight - radius * 2f,
-                pathBottom - radius * 2f,
-                pathRight,
-                pathBottom
-            )
-            trackPath.arcTo(bottomRightArc, 0f, 90f, false)
-            trackPath.lineTo(pathLeft + radius, pathBottom)
-            bottomLeftArc.set(
-                pathLeft,
-                pathBottom - radius * 2f,
-                pathLeft + radius * 2f,
-                pathBottom
-            )
-            trackPath.arcTo(bottomLeftArc, 90f, 90f, false)
-            trackPath.lineTo(pathLeft, pathTop + radius)
-            topLeftArc.set(
-                pathLeft,
-                pathTop,
-                pathLeft + radius * 2f,
-                pathTop + radius * 2f
-            )
-            trackPath.arcTo(topLeftArc, 180f, 90f, false)
-            trackPath.close()
+            updateTrackPath(pathLeft, pathTop, pathRight, pathBottom, radius)
 
             trackPaint.strokeWidth = drawStroke
             trackPaint.color = trackColor
@@ -225,28 +219,86 @@ internal object IslandProgressGlowHooker {
             progressPaint.alpha = PROGRESS_ALPHA
 
             canvas.drawPath(trackPath, trackPaint)
-            if (fraction <= 0f) return
-            if (fraction >= 1f) {
+            val currentFraction = fraction
+            if (currentFraction <= 0f) return
+            if (currentFraction >= 1f) {
                 canvas.drawPath(trackPath, progressPaint)
                 return
             }
 
+            updateProgressPath(currentFraction, progressStyle)
+            canvas.drawPath(progressPath, progressPaint)
+        }
+
+        private fun updateTrackPath(
+            left: Float,
+            top: Float,
+            right: Float,
+            bottom: Float,
+            radius: Float
+        ) {
+            if (
+                trackLeft == left && trackTop == top && trackRight == right &&
+                trackBottom == bottom && trackRadius == radius
+            ) {
+                return
+            }
+            trackLeft = left
+            trackTop = top
+            trackRight = right
+            trackBottom = bottom
+            trackRadius = radius
+
+            val centerX = (left + right) / 2f
+            trackPath.reset()
+            trackPath.moveTo(centerX, top)
+            trackPath.lineTo(right - radius, top)
+            topRightArc.set(right - radius * 2f, top, right, top + radius * 2f)
+            trackPath.arcTo(topRightArc, -90f, 90f, false)
+            trackPath.lineTo(right, bottom - radius)
+            bottomRightArc.set(
+                right - radius * 2f,
+                bottom - radius * 2f,
+                right,
+                bottom
+            )
+            trackPath.arcTo(bottomRightArc, 0f, 90f, false)
+            trackPath.lineTo(left + radius, bottom)
+            bottomLeftArc.set(left, bottom - radius * 2f, left + radius * 2f, bottom)
+            trackPath.arcTo(bottomLeftArc, 90f, 90f, false)
+            trackPath.lineTo(left, top + radius)
+            topLeftArc.set(left, top, left + radius * 2f, top + radius * 2f)
+            trackPath.arcTo(topLeftArc, 180f, 90f, false)
+            trackPath.close()
             pathMeasure.setPath(trackPath, false)
+            trackLength = pathMeasure.length
+            trackVersion++
+        }
+
+        private fun updateProgressPath(fraction: Float, style: Int) {
+            if (
+                progressPathTrackVersion == trackVersion &&
+                progressPathFraction == fraction &&
+                progressPathStyle == style
+            ) {
+                return
+            }
+            progressPathTrackVersion = trackVersion
+            progressPathFraction = fraction
+            progressPathStyle = style
             progressPath.reset()
-            val pathLength = pathMeasure.length
-            if (progressStyle == RootConstants.ISLAND_PROGRESS_STYLE_LEFT_BIDIRECTIONAL) {
-                val branchLength = pathLength * 0.5f * fraction
+            if (style == RootConstants.ISLAND_PROGRESS_STYLE_LEFT_BIDIRECTIONAL) {
+                val branchLength = trackLength * 0.5f * fraction
                 appendWrappedSegment(
-                    startDistance = pathLength * LEFT_START_FRACTION - branchLength,
+                    startDistance = trackLength * LEFT_START_FRACTION - branchLength,
                     segmentLength = branchLength * 2f
                 )
             } else {
                 appendWrappedSegment(
-                    startDistance = pathLength * startFraction(progressStyle),
-                    segmentLength = pathLength * fraction
+                    startDistance = trackLength * startFraction(style),
+                    segmentLength = trackLength * fraction
                 )
             }
-            canvas.drawPath(progressPath, progressPaint)
         }
 
         private fun updateProgressPaint(pathLeft: Float, pathRight: Float) {
@@ -288,6 +340,7 @@ internal object IslandProgressGlowHooker {
         }
 
         private fun Method.invokeInt(): Int? {
+            val backgroundView = backgroundViewRef.get() ?: return null
             return runCatching { invoke(backgroundView) as? Int }.getOrNull()
         }
 

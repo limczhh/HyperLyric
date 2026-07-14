@@ -17,6 +17,7 @@ import com.lidesheng.hyperlyric.root.island.RealIslandHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaAmbientFlowHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.island.IslandExpandedMediaAmbientFlowHooker
+import com.lidesheng.hyperlyric.root.mediacard.notification.background.MediaBackgroundRendererPool
 import com.lidesheng.hyperlyric.root.island.renderer.IslandRenderer
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
 import com.lidesheng.hyperlyric.root.source.LyriconSource
@@ -133,6 +134,7 @@ class HookEntry : XposedModule() {
         IslandExpandedMediaAmbientFlowHooker.releaseAll()
         NotificationMediaCoverStyleHooker.releaseAll()
         NotificationMediaAmbientFlowHooker.releaseAll()
+        MediaBackgroundRendererPool.releaseAll()
         cleanupRuntime()
         HookLogger.i("HookEntry", "热重载准备完成")
         return true

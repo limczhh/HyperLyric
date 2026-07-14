@@ -30,9 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger
 internal object NotificationMediaBackgroundController {
     private const val TAG = "NotificationMediaBackground"
     private val states = Collections.synchronizedMap(WeakHashMap<Any, ControllerState>())
-    private val renderers = Collections.synchronizedMap(
-        WeakHashMap<ClassLoader, NotificationMediaBackgroundRenderer>()
-    )
     private val unavailableLoaders = Collections.synchronizedSet(
         Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     )
@@ -198,10 +195,7 @@ internal object NotificationMediaBackgroundController {
             state.request.incrementAndGet()
             restoreMediaBackground(state)
         }
-        val rendererSnapshot = synchronized(renderers) { renderers.values.toList() }
-        rendererSnapshot.forEach(NotificationMediaBackgroundRenderer::close)
         states.clear()
-        renderers.clear()
         unavailableLoaders.clear()
         supportedLoaders.clear()
         val seekBarSnapshot = synchronized(seekBarStates) { seekBarStates.toMap() }
@@ -313,10 +307,8 @@ internal object NotificationMediaBackgroundController {
 
     private fun resolveRenderer(classLoader: ClassLoader?): NotificationMediaBackgroundRenderer? {
         classLoader ?: return null
-        renderers[classLoader]?.let { return it }
         if (unavailableLoaders.contains(classLoader)) return null
-        return runCatching { NotificationMediaBackgroundRenderer(classLoader) }
-            .onSuccess { renderers[classLoader] = it }
+        return runCatching { MediaBackgroundRendererPool.get(classLoader) }
             .onFailure { error ->
                 unavailableLoaders.add(classLoader)
                 HookLogger.w(TAG, "Native Monet media background API unavailable: ${error.message}")

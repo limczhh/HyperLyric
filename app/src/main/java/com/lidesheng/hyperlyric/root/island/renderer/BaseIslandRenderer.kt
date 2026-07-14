@@ -14,6 +14,7 @@ import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.IslandLyricTextInjector
 import com.lidesheng.hyperlyric.root.island.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.IslandSlotContentAssembler
 import com.lidesheng.hyperlyric.root.island.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.IslandViewRegistry
@@ -117,15 +118,22 @@ object BaseIslandRenderer : IslandRenderer {
         if (!shouldRenderInjectedIsland()) return
         val lyricPkg = LyriconDataBridge.currentLyricPackageName ?: return
 
-        IslandViewRegistry.snapshotAttached(lyricPkg)
-            .forEach { (cv, _) ->
+        IslandViewRegistry.snapshotAttachedInjectedViews(lyricPkg)
+            .forEach { (cv, indexedViews) ->
                 cv.post {
-                    val leftView = cv.findViewWithTag<View>(IslandProbeUtils.LEFT_TEST_VIEW_TAG)
-                    val rightView = cv.findViewWithTag<View>(IslandProbeUtils.RIGHT_TEST_VIEW_TAG)
-                    (leftView as? RichLyricLineView)?.setPosition(position)
-                        ?: (leftView as? SpaceGateRichLyricLineView)?.setPosition(position)
-                    (rightView as? RichLyricLineView)?.setPosition(position)
-                        ?: (rightView as? SpaceGateRichLyricLineView)?.setPosition(position)
+                    if (indexedViews.isEmpty()) {
+                        setPosition(
+                            cv.findViewWithTag(IslandProbeUtils.LEFT_TEST_VIEW_TAG),
+                            position
+                        )
+                        setPosition(
+                            cv.findViewWithTag(IslandProbeUtils.RIGHT_TEST_VIEW_TAG),
+                            position
+                        )
+                        IslandViewRegistry.refreshInjectedViews(cv)
+                    } else {
+                        indexedViews.forEach { view -> setPosition(view, position) }
+                    }
                     IslandHostFacade.updateProgressGlow(cv, lyricPkg, prefs)
                 }
             }
@@ -138,6 +146,7 @@ object BaseIslandRenderer : IslandRenderer {
             return
         }
         playbackActive = isPlaying
+        IslandProgressGlowController.onPlaybackStateChanged(isPlaying)
         HookLogger.d("BaseIslandRenderer", "播放状态变化: 正在播放=$isPlaying")
         val behavior = prefs.getInt(
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
@@ -175,21 +184,44 @@ object BaseIslandRenderer : IslandRenderer {
 
     private fun applyPlaybackStateToActiveViews(isPlaying: Boolean) {
         val lyricPkg = LyriconDataBridge.currentLyricPackageName
-        IslandViewRegistry.snapshotAttached()
-            .forEach { (cv, pkgName) ->
-                if (lyricPkg == null || pkgName == lyricPkg) {
-                    cv.post {
-                        setPlaybackActive(cv.findViewWithTag(IslandProbeUtils.LEFT_TEST_VIEW_TAG), isPlaying)
-                        setPlaybackActive(cv.findViewWithTag(IslandProbeUtils.RIGHT_TEST_VIEW_TAG), isPlaying)
+        IslandViewRegistry.snapshotAttachedInjectedViews(lyricPkg)
+            .forEach { (cv, indexedViews) ->
+                cv.post {
+                    if (indexedViews.isEmpty()) {
+                        setPlaybackActiveRecursively(cv, isPlaying)
+                        IslandViewRegistry.refreshInjectedViews(cv)
+                    } else {
+                        indexedViews.forEach { view ->
+                            setPlaybackActive(view, isPlaying)
+                        }
                     }
                 }
             }
     }
 
-    private fun setPlaybackActive(view: View?, isPlaying: Boolean) {
+    private fun setPlaybackActive(view: View, isPlaying: Boolean) {
         when (view) {
             is RichLyricLineView -> view.setPlaybackActive(isPlaying)
             is SpaceGateRichLyricLineView -> view.setPlaybackActive(isPlaying)
+        }
+    }
+
+    private fun setPosition(view: View?, position: Long) {
+        when (view) {
+            is RichLyricLineView -> view.setPosition(position)
+            is SpaceGateRichLyricLineView -> view.setPosition(position)
+        }
+    }
+
+    private fun setPlaybackActiveRecursively(view: View, isPlaying: Boolean) {
+        when (view) {
+            is RichLyricLineView,
+            is SpaceGateRichLyricLineView -> setPlaybackActive(view, isPlaying)
+            is ViewGroup -> {
+                for (index in 0 until view.childCount) {
+                    setPlaybackActiveRecursively(view.getChildAt(index), isPlaying)
+                }
+            }
         }
     }
 
@@ -279,4 +311,5 @@ object BaseIslandRenderer : IslandRenderer {
             mediaInfo = mediaInfo
         )
     }
+
 }

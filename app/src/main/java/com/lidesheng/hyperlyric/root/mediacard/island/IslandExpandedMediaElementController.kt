@@ -106,6 +106,15 @@ internal object IslandExpandedMediaElementController {
         var deviceSwitchHidden: Boolean = false
     ) {
         fun applyCircle() {
+            if (
+                coverOutlined &&
+                elements.albumView.outlineProvider === circleOutlineProvider &&
+                !elements.albumView.clipToOutline &&
+                elements.albumImage.outlineProvider === circleOutlineProvider &&
+                elements.albumImage.clipToOutline
+            ) {
+                return
+            }
             elements.albumView.outlineProvider = circleOutlineProvider
             elements.albumView.clipToOutline = false
             elements.albumImage.outlineProvider = circleOutlineProvider
@@ -116,6 +125,13 @@ internal object IslandExpandedMediaElementController {
         }
 
         fun hideCover() {
+            if (
+                coverHidden &&
+                elements.albumView.visibility == View.GONE &&
+                elements.albumImage.visibility == View.GONE
+            ) {
+                return
+            }
             if (elements.albumView.visibility != View.GONE) {
                 albumVisibility = elements.albumView.visibility
             }
@@ -174,6 +190,7 @@ internal object IslandExpandedMediaElementController {
 
         fun applyCoverSourceHidden(hidden: Boolean) {
             if (hidden) {
+                if (coverSourceHidden && elements.coverSource.visibility == View.GONE) return
                 if (elements.coverSource.visibility != View.GONE) {
                     coverSourceVisibility = elements.coverSource.visibility
                 }
@@ -187,6 +204,7 @@ internal object IslandExpandedMediaElementController {
 
         fun applyDeviceSwitchHidden(hidden: Boolean) {
             if (hidden) {
+                if (deviceSwitchHidden && elements.deviceSwitch.visibility == View.GONE) return
                 if (elements.deviceSwitch.visibility != View.GONE) {
                     deviceSwitchVisibility = elements.deviceSwitch.visibility
                 }

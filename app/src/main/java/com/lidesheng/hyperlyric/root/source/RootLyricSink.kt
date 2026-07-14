@@ -33,13 +33,24 @@ class RootLyricSink(
     private var lastPositionDispatchTimeMs = 0L
     private var pendingPosition: Long? = null
     private var positionDispatchScheduled = false
+    private var playbackActive = false
+    private var lastReceivedPosition = Long.MIN_VALUE
+    private var lastDispatchedPosition = Long.MIN_VALUE
+    private val positionDispatchRunnable = Runnable {
+        positionDispatchScheduled = false
+        val latest = pendingPosition ?: return@Runnable
+        pendingPosition = null
+        dispatchPosition(latest)
+    }
 
     private companion object {
         const val MIN_POSITION_DISPATCH_INTERVAL_MS = 33L
     }
 
     override fun onSongChanged(song: Any?) {
-
+        cancelPendingPositionDispatch()
+        lastReceivedPosition = Long.MIN_VALUE
+        lastDispatchedPosition = Long.MIN_VALUE
         activeAiTranslationJob?.cancel()
         activeAiTranslationJob = null
 
@@ -75,8 +86,10 @@ class RootLyricSink(
         activeAiTranslationJob?.cancel()
         activeAiTranslationJob = null
         aiSetDisplayTranslation = false
-        pendingPosition = null
-        positionDispatchScheduled = false
+        playbackActive = false
+        cancelPendingPositionDispatch()
+        lastReceivedPosition = Long.MIN_VALUE
+        lastDispatchedPosition = Long.MIN_VALUE
         renderer.clearAllViews()
         LyriconDataBridge.clearState()
     }
@@ -91,24 +104,30 @@ class RootLyricSink(
     }
 
     override fun onPlaybackStateChanged(isPlaying: Boolean) {
+        playbackActive = isPlaying
+        if (!isPlaying) cancelPendingPositionDispatch()
         renderer.onPlaybackStateChanged(isPlaying)
     }
 
     override fun onPositionChanged(position: Long) {
+        if (position == lastReceivedPosition) return
+        lastReceivedPosition = position
         val lyricChanged = LyriconDataBridge.updatePosition(position)
         if (lyricChanged) {
             renderer.updateLyricLine()
         }
-        dispatchPositionThrottled(position)
+        if (playbackActive) {
+            dispatchPositionThrottled(position)
+        } else {
+            dispatchPosition(position)
+        }
     }
 
     private fun dispatchPositionThrottled(position: Long) {
         val now = SystemClock.uptimeMillis()
         val elapsed = now - lastPositionDispatchTimeMs
         if (elapsed >= MIN_POSITION_DISPATCH_INTERVAL_MS) {
-            lastPositionDispatchTimeMs = now
-            pendingPosition = null
-            renderer.updatePosition(position)
+            dispatchPosition(position, now)
             return
         }
 
@@ -116,13 +135,21 @@ class RootLyricSink(
         if (positionDispatchScheduled) return
 
         positionDispatchScheduled = true
-        mainHandler.postDelayed({
-            positionDispatchScheduled = false
-            val latest = pendingPosition ?: return@postDelayed
-            pendingPosition = null
-            lastPositionDispatchTimeMs = SystemClock.uptimeMillis()
-            renderer.updatePosition(latest)
-        }, MIN_POSITION_DISPATCH_INTERVAL_MS - elapsed)
+        mainHandler.postDelayed(positionDispatchRunnable, MIN_POSITION_DISPATCH_INTERVAL_MS - elapsed)
+    }
+
+    private fun dispatchPosition(position: Long, now: Long = SystemClock.uptimeMillis()) {
+        if (position == lastDispatchedPosition) return
+        lastPositionDispatchTimeMs = now
+        lastDispatchedPosition = position
+        pendingPosition = null
+        renderer.updatePosition(position)
+    }
+
+    private fun cancelPendingPositionDispatch() {
+        mainHandler.removeCallbacks(positionDispatchRunnable)
+        pendingPosition = null
+        positionDispatchScheduled = false
     }
 
     private fun startAiTranslation(song: Song, prefs: SharedPreferences) {

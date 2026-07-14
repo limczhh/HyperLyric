@@ -16,7 +16,7 @@ import android.os.Looper
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
-import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundRenderer
+import com.lidesheng.hyperlyric.root.mediacard.notification.background.MediaBackgroundRendererPool
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaColorConfig
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedModule
@@ -52,17 +52,16 @@ internal interface IslandExpandedMediaBackgroundApi {
     fun prepareCustomBackground(target: IslandExpandedBackgroundTarget)
     fun restoreNativeBackground(target: IslandExpandedBackgroundTarget)
     fun applyCustomForeground(holder: Any, colors: NotificationMediaColorConfig)
-    fun applyAllCustomForeground(binder: Any, colors: NotificationMediaColorConfig)
 }
 
 internal object IslandExpandedMediaBackgroundController {
     private const val TAG = "IslandExpandedMediaBg"
     private val states = Collections.synchronizedMap(WeakHashMap<Any, BinderState>())
-    private val renderers = Collections.synchronizedMap(
-        WeakHashMap<ClassLoader, NotificationMediaBackgroundRenderer>()
-    )
     private val fakeStates = Collections.synchronizedMap(
         WeakHashMap<View, FakeState>()
+    )
+    private val foregroundColors = Collections.synchronizedMap(
+        WeakHashMap<Any, NotificationMediaColorConfig>()
     )
     private val latestLock = Any()
 
@@ -134,76 +133,77 @@ internal object IslandExpandedMediaBackgroundController {
         api: IslandExpandedMediaBackgroundApi
     ): Boolean {
         if (!isActive()) return false
-        val presentation = synchronized(latestLock) {
-            latestPresentation?.let { latest ->
-                FakePresentation(
-                    latest.identity,
-                    latest.bitmap.copy(Bitmap.Config.ARGB_8888, true),
-                    latest.colors,
-                    Rect(latest.visibleSource)
-                )
-            }
-        } ?: return false
         api.prepareCustomBackground(target)
         val view = target.customBackgroundView
-        val transitionRoot = target.extensionBackgroundView ?: run {
-            presentation.bitmap.recycle()
-            return false
-        }
-        val state = fakeStates[view]
-        if (state?.identity == presentation.identity) {
-            presentation.bitmap.recycle()
-            state.originalOccludingBackgrounds.forEach { (occludingView, _) ->
-                occludingView.background = null
-            }
-            transitionRoot.background = state.transitionBackground
-            view.background = null
-        } else {
-            val originalTransitionBackground = state?.originalTransitionBackground
-                ?: transitionRoot.background
-            val originalOccludingBackgrounds = state?.originalOccludingBackgrounds
-                ?: target.transitionOccludingViews.map { it to it.background }
-            originalOccludingBackgrounds.forEach { (occludingView, _) ->
-                occludingView.background = null
-            }
-            val transitionBackground = FakeTransitionBackgroundDrawable(
-                presentation.bitmap,
-                target.transitionContentBounds
-                    ?: descendantBounds(transitionRoot, target.expandedView),
-                presentation.visibleSource,
-                presentation.colors.backgroundEnd
-            )
-            transitionRoot.background = transitionBackground
-            view.background = null
-            fakeStates.put(
-                view,
-                FakeState(
-                    presentation.identity,
-                    transitionBackground,
+        val transitionRoot = target.extensionBackgroundView ?: return false
+        val presentation = acquireLatestPresentation() ?: return false
+        var retainedByState = false
+        try {
+            val state = fakeStates[view]
+            if (state?.identity == presentation.identity) {
+                state.originalOccludingBackgrounds.forEach { (occludingView, _) ->
+                    occludingView.background = null
+                }
+                transitionRoot.background = state.transitionBackground
+                view.background = null
+            } else {
+                val originalTransitionBackground = state?.originalTransitionBackground
+                    ?: transitionRoot.background
+                val originalOccludingBackgrounds = state?.originalOccludingBackgrounds
+                    ?: target.transitionOccludingViews.map { it to it.background }
+                originalOccludingBackgrounds.forEach { (occludingView, _) ->
+                    occludingView.background = null
+                }
+                val transitionBackground = FakeTransitionBackgroundDrawable(
                     presentation.bitmap,
-                    target,
-                    api,
-                    originalTransitionBackground,
-                    originalOccludingBackgrounds
+                    target.transitionContentBounds
+                        ?: descendantBounds(transitionRoot, target.expandedView),
+                    presentation.visibleSource,
+                    presentation.colors.backgroundEnd
                 )
-            )
-                ?.bitmap
-                ?.takeUnless(Bitmap::isRecycled)
-                ?.recycle()
+                transitionRoot.background = transitionBackground
+                view.background = null
+                val previous = fakeStates.put(
+                    view,
+                    FakeState(
+                        presentation.identity,
+                        transitionBackground,
+                        presentation,
+                        target,
+                        api,
+                        originalTransitionBackground,
+                        originalOccludingBackgrounds
+                    )
+                )
+                retainedByState = true
+                previous?.let(::releaseFakeState)
+            }
+            applyMiniBarTint(miniBar, presentation.colors.textPrimary.withAlpha(0x99))
+            return true
+        } finally {
+            if (!retainedByState) releasePresentation(presentation)
         }
-        miniBar?.backgroundTintList = ColorStateList.valueOf(
-            presentation.colors.textPrimary.withAlpha(0x99)
-        )
-        return true
     }
 
     fun applyForeground(binder: Any, api: IslandExpandedMediaBackgroundApi) {
+        states[binder]?.targets?.values?.forEach { target ->
+            val colors = target.colors ?: return@forEach
+            target.holders.forEach { holder -> applyForeground(holder, colors, api) }
+        }
+    }
+
+    fun applyForeground(
+        binder: Any,
+        holder: Any,
+        api: IslandExpandedMediaBackgroundApi
+    ): Boolean {
         val colors = states[binder]
             ?.targets
             ?.values
             ?.firstNotNullOfOrNull(TargetState::colors)
-            ?: return
-        api.applyAllCustomForeground(binder, colors)
+            ?: return false
+        applyForeground(holder, colors, api)
+        return true
     }
 
     fun onExpandedViewShown(view: View) {
@@ -223,35 +223,26 @@ internal object IslandExpandedMediaBackgroundController {
                 if (states[binding.binder] !== binding.binderState || !isActive()) {
                     return@forEach
                 }
-                if (binding.targetState.appliedStyle == currentStyle()) {
-                    forceBackgroundAttached(binding.targetState, binding.binderState.api)
-                }
                 apply(binding.binder, binding.binderState.api)
             }
         }
     }
 
-    fun onNativeBackgroundUpdated(view: View) {
-        if (!isActive()) return
-        val binderSnapshot = synchronized(states) { states.values.toList() }
-        binderSnapshot.forEach { binderState ->
-            binderState.targets.values.forEach { targetState ->
-                if (targetState.target.nativeBackgroundViews.any { it === view }) {
-                    forceBackgroundAttached(targetState, binderState.api)
+    fun shouldSkipNativeBackgroundUpdate(view: View): Boolean {
+        if (!isActive()) return false
+        val hasRealBackground = synchronized(states) {
+            states.values.any { binderState ->
+                binderState.targets.values.any { targetState ->
+                    targetState.customApplied &&
+                        targetState.background != null &&
+                        targetState.target.nativeBackgroundViews.any { it === view }
                 }
             }
         }
-        val fakeSnapshot = synchronized(fakeStates) { fakeStates.values.toList() }
-        fakeSnapshot.forEach { state ->
-            if (state.target.nativeBackgroundViews.any { it === view }) {
-                state.api.prepareCustomBackground(state.target)
-                state.originalOccludingBackgrounds.forEach { (occludingView, _) ->
-                    occludingView.background = null
-                }
-                state.target.extensionBackgroundView?.background = state.transitionBackground
-                state.target.customBackgroundView.background = null
-                state.target.customBackgroundView.invalidate()
-                state.target.extensionBackgroundView?.invalidate()
+        if (hasRealBackground) return true
+        return synchronized(fakeStates) {
+            fakeStates.values.any { state ->
+                state.target.nativeBackgroundViews.any { it === view }
             }
         }
     }
@@ -266,13 +257,17 @@ internal object IslandExpandedMediaBackgroundController {
             view.background = background
         }
         api.restoreNativeBackground(target)
-        state.bitmap.takeUnless(Bitmap::isRecycled)?.recycle()
+        releaseFakeState(state)
     }
 
     fun releaseAll() {
         executor.shutdownNow()
         val snapshot = synchronized(states) { states.values.toList() }
         val fakeSnapshot = synchronized(fakeStates) { fakeStates.values.toList() }
+        states.clear()
+        fakeStates.clear()
+        foregroundColors.clear()
+        retireLatestPresentation()
         val cleanup = Runnable {
             snapshot.forEach { state ->
                 state.targets.values.forEach { target ->
@@ -287,21 +282,11 @@ internal object IslandExpandedMediaBackgroundController {
                     view.background = background
                 }
                 state.api.restoreNativeBackground(state.target)
-                if (!state.bitmap.isRecycled) state.bitmap.recycle()
+                releaseFakeState(state)
             }
         }
         if (Looper.myLooper() == Looper.getMainLooper()) cleanup.run()
         else Handler(Looper.getMainLooper()).post(cleanup)
-        states.clear()
-
-        val rendererSnapshot = synchronized(renderers) { renderers.values.toList() }
-        rendererSnapshot.forEach(NotificationMediaBackgroundRenderer::close)
-        renderers.clear()
-        fakeStates.clear()
-        synchronized(latestLock) {
-            latestPresentation?.bitmap?.recycle()
-            latestPresentation = null
-        }
     }
 
     private fun applyTarget(
@@ -319,11 +304,22 @@ internal object IslandExpandedMediaBackgroundController {
             TargetState(
                 target = host.target,
                 miniBar = host.miniBar,
-                originalMiniBarTint = host.miniBar?.backgroundTintList
+                originalMiniBarTint = host.miniBar?.backgroundTintList,
+                holders = hosts.map { it.holder }
             )
         }
         targetState.target = host.target
-        targetState.miniBar = host.miniBar
+        if (targetState.miniBar !== host.miniBar) {
+            targetState.miniBar?.backgroundTintList = targetState.originalMiniBarTint
+            targetState.miniBar = host.miniBar
+            targetState.originalMiniBarTint = host.miniBar?.backgroundTintList
+            targetState.appliedMiniBarColor = null
+        }
+        val nextHolders = hosts.map { it.holder }
+        targetState.holders
+            .filter { previous -> nextHolders.none { current -> current === previous } }
+            .forEach(foregroundColors::remove)
+        targetState.holders = nextHolders
         val width = host.target.viewportWidth?.takeIf { it > 0 }
             ?: view.width.takeIf { it > 0 }
             ?: view.measuredWidth.takeIf { it > 0 }
@@ -360,10 +356,8 @@ internal object IslandExpandedMediaBackgroundController {
         ) {
             ensureBackgroundAttached(targetState, api)
             targetState.colors?.let { colors ->
-                hosts.forEach { api.applyCustomForeground(it.holder, colors) }
-                targetState.miniBar?.backgroundTintList = ColorStateList.valueOf(
-                    colors.textPrimary.withAlpha(0x99)
-                )
+                hosts.forEach { applyForeground(it.holder, colors, api) }
+                applyMiniBarTint(targetState, colors.textPrimary.withAlpha(0x99))
             }
             return
         }
@@ -373,11 +367,21 @@ internal object IslandExpandedMediaBackgroundController {
         targetState.renderPending = true
         val request = targetState.request.incrementAndGet()
         val classLoader = binder.javaClass.classLoader ?: return
-        val renderer = synchronized(renderers) {
-            renderers.getOrPut(classLoader) { NotificationMediaBackgroundRenderer(classLoader) }
-        }
 
         executor.execute {
+            val renderer = runCatching { MediaBackgroundRendererPool.get(classLoader) }
+                .onFailure { error ->
+                    HookLogger.e(TAG, "Failed to initialize media background renderer", error)
+                }
+                .getOrNull()
+            if (renderer == null) {
+                view.post {
+                    if (states[binder] === binderState && targetState.request.get() == request) {
+                        targetState.renderPending = false
+                    }
+                }
+                return@execute
+            }
             val renderHeight = if (
                 style == RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT
             ) {
@@ -407,6 +411,7 @@ internal object IslandExpandedMediaBackgroundController {
                 }
                 return@execute
             }
+            val presentationBitmap = rendered.bitmap.copy(Bitmap.Config.ARGB_8888, false)
 
             view.post {
                 if (
@@ -414,6 +419,7 @@ internal object IslandExpandedMediaBackgroundController {
                     currentStyle() != style || !isActive()
                 ) {
                     rendered.bitmap.recycle()
+                    presentationBitmap.recycle()
                     return@post
                 }
                 if (
@@ -422,12 +428,21 @@ internal object IslandExpandedMediaBackgroundController {
                 ) {
                     rendered.bitmap.recycle()
                     ensureBackgroundAttached(targetState, api)
-                    hosts.forEach { api.applyCustomForeground(it.holder, rendered.colors) }
-                    targetState.miniBar?.backgroundTintList = ColorStateList.valueOf(
+                    hosts.forEach { applyForeground(it.holder, rendered.colors, api) }
+                    applyMiniBarTint(
+                        targetState,
                         rendered.colors.textPrimary.withAlpha(0x99)
                     )
                     targetState.colors = rendered.colors
                     targetState.renderPending = false
+                    updateLatest(
+                        token,
+                        rendered.artworkFingerprint,
+                        presentationBitmap,
+                        rendered.colors,
+                        width,
+                        height
+                    )
                     return@post
                 }
 
@@ -437,10 +452,8 @@ internal object IslandExpandedMediaBackgroundController {
                     rendered.bitmap,
                     currentColorAnimation() && targetState.appliedStyle == style
                 )
-                hosts.forEach { api.applyCustomForeground(it.holder, rendered.colors) }
-                targetState.miniBar?.backgroundTintList = ColorStateList.valueOf(
-                    rendered.colors.textPrimary.withAlpha(0x99)
-                )
+                hosts.forEach { applyForeground(it.holder, rendered.colors, api) }
+                applyMiniBarTint(targetState, rendered.colors.textPrimary.withAlpha(0x99))
                 targetState.customApplied = true
                 targetState.appliedStyle = style
                 targetState.appliedToken = token
@@ -450,7 +463,7 @@ internal object IslandExpandedMediaBackgroundController {
                 updateLatest(
                     token,
                     rendered.artworkFingerprint,
-                    rendered.bitmap,
+                    presentationBitmap,
                     rendered.colors,
                     width,
                     height
@@ -464,8 +477,11 @@ internal object IslandExpandedMediaBackgroundController {
         api: IslandExpandedMediaBackgroundApi
     ) {
         state.miniBar?.backgroundTintList = state.originalMiniBarTint
-        if (state.customApplied) api.restoreNativeBackground(state.target)
+        state.appliedMiniBarColor = null
+        state.holders.forEach(foregroundColors::remove)
+        val customApplied = state.customApplied
         state.customApplied = false
+        if (customApplied) api.restoreNativeBackground(state.target)
         state.appliedStyle = null
         state.renderPending = false
         state.appliedToken = null
@@ -486,18 +502,6 @@ internal object IslandExpandedMediaBackgroundController {
         api.prepareCustomBackground(state.target)
         view.background = background
         state.transitionBackground = null
-    }
-
-    private fun forceBackgroundAttached(
-        state: TargetState,
-        api: IslandExpandedMediaBackgroundApi
-    ) {
-        val background = state.background ?: return
-        api.prepareCustomBackground(state.target)
-        val view = state.target.customBackgroundView
-        view.background = background
-        state.transitionBackground = null
-        view.invalidate()
     }
 
     private fun setBackground(state: TargetState, bitmap: Bitmap, animate: Boolean) {
@@ -553,24 +557,92 @@ internal object IslandExpandedMediaBackgroundController {
     private fun updateLatest(
         token: String,
         fingerprint: Long,
-        bitmap: Bitmap,
+        presentationBitmap: Bitmap,
         colors: NotificationMediaColorConfig,
         viewportWidth: Int,
         viewportHeight: Int
     ) {
         val identity = "$token:$fingerprint"
+        val visibleSource = centerCropSourceRect(
+            presentationBitmap.width,
+            presentationBitmap.height,
+            viewportWidth,
+            viewportHeight
+        )
+        var recycleNew = false
+        var retiredBitmap: Bitmap? = null
         synchronized(latestLock) {
-            if (latestPresentation?.identity == identity) return
-            val cacheBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-            val visibleSource = centerCropSourceRect(
-                cacheBitmap.width,
-                cacheBitmap.height,
-                viewportWidth,
-                viewportHeight
-            )
-            latestPresentation?.bitmap?.recycle()
-            latestPresentation = LatestPresentation(identity, cacheBitmap, colors, visibleSource)
+            if (latestPresentation?.identity == identity) {
+                recycleNew = true
+            } else {
+                latestPresentation?.let { previous ->
+                    previous.retired = true
+                    if (previous.referenceCount == 0) retiredBitmap = previous.bitmap
+                }
+                latestPresentation = LatestPresentation(
+                    identity,
+                    presentationBitmap,
+                    colors,
+                    visibleSource
+                )
+            }
         }
+        if (recycleNew && !presentationBitmap.isRecycled) presentationBitmap.recycle()
+        retiredBitmap?.takeUnless(Bitmap::isRecycled)?.recycle()
+    }
+
+    private fun acquireLatestPresentation(): LatestPresentation? {
+        return synchronized(latestLock) {
+            latestPresentation?.also { it.referenceCount++ }
+        }
+    }
+
+    private fun releasePresentation(presentation: LatestPresentation) {
+        val bitmap = synchronized(latestLock) {
+            if (presentation.referenceCount > 0) presentation.referenceCount--
+            if (presentation.retired && presentation.referenceCount == 0) {
+                presentation.bitmap
+            } else {
+                null
+            }
+        }
+        bitmap?.takeUnless(Bitmap::isRecycled)?.recycle()
+    }
+
+    private fun retireLatestPresentation() {
+        val bitmap = synchronized(latestLock) {
+            val latest = latestPresentation ?: return@synchronized null
+            latestPresentation = null
+            latest.retired = true
+            latest.bitmap.takeIf { latest.referenceCount == 0 }
+        }
+        bitmap?.takeUnless(Bitmap::isRecycled)?.recycle()
+    }
+
+    private fun releaseFakeState(state: FakeState) {
+        releasePresentation(state.presentation)
+    }
+
+    private fun applyForeground(
+        holder: Any,
+        colors: NotificationMediaColorConfig,
+        api: IslandExpandedMediaBackgroundApi
+    ) {
+        if (foregroundColors[holder] == colors) return
+        api.applyCustomForeground(holder, colors)
+        foregroundColors[holder] = colors
+    }
+
+    private fun applyMiniBarTint(state: TargetState, color: Int) {
+        if (state.appliedMiniBarColor == color) return
+        applyMiniBarTint(state.miniBar, color)
+        state.appliedMiniBarColor = color
+    }
+
+    private fun applyMiniBarTint(view: View?, color: Int) {
+        view ?: return
+        if (view.backgroundTintList?.defaultColor == color) return
+        view.backgroundTintList = ColorStateList.valueOf(color)
     }
 
     private fun descendantBounds(root: View, descendant: View): Rect {
@@ -649,7 +721,8 @@ internal object IslandExpandedMediaBackgroundController {
     private data class TargetState(
         var target: IslandExpandedBackgroundTarget,
         var miniBar: View?,
-        val originalMiniBarTint: ColorStateList?,
+        var originalMiniBarTint: ColorStateList?,
+        var holders: List<Any>,
         var token: String? = null,
         var appliedToken: String? = null,
         var artworkFingerprint: Long? = null,
@@ -659,29 +732,25 @@ internal object IslandExpandedMediaBackgroundController {
         var transitionBackground: Drawable? = null,
         var customApplied: Boolean = false,
         var appliedStyle: Int? = null,
+        var appliedMiniBarColor: Int? = null,
         var renderPending: Boolean = false,
         var layoutPending: Boolean = false,
         val request: AtomicInteger = AtomicInteger()
     )
 
-    private data class LatestPresentation(
+    private class LatestPresentation(
         val identity: String,
         val bitmap: Bitmap,
         val colors: NotificationMediaColorConfig,
-        val visibleSource: Rect
-    )
-
-    private data class FakePresentation(
-        val identity: String,
-        val bitmap: Bitmap,
-        val colors: NotificationMediaColorConfig,
-        val visibleSource: Rect
+        val visibleSource: Rect,
+        var referenceCount: Int = 0,
+        var retired: Boolean = false
     )
 
     private data class FakeState(
         val identity: String,
         val transitionBackground: Drawable,
-        val bitmap: Bitmap,
+        val presentation: LatestPresentation,
         val target: IslandExpandedBackgroundTarget,
         val api: IslandExpandedMediaBackgroundApi,
         val originalTransitionBackground: Drawable?,

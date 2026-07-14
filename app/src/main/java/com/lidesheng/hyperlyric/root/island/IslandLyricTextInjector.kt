@@ -44,6 +44,7 @@ internal object IslandLyricTextInjector {
         }
 
         IslandHostFacade.applyHostSettings(rootView, prefs)
+        IslandViewRegistry.refreshInjectedViews(rootView)
         return changed
     }
 
@@ -59,6 +60,7 @@ internal object IslandLyricTextInjector {
             changed = restoreExistingSlotLightweight(rootView, IslandProbeUtils.RIGHT_PARENT_NAME, IslandProbeUtils.RIGHT_TEST_VIEW_TAG) || changed
         }
         IslandHostFacade.applyHostSettings(rootView, prefs)
+        IslandViewRegistry.refreshInjectedViews(rootView)
         return changed
     }
 
@@ -83,6 +85,7 @@ internal object IslandLyricTextInjector {
         }
 
         IslandHostFacade.applyHostSettings(rootView, prefs)
+        IslandViewRegistry.refreshInjectedViews(rootView)
         return changed
     }
 

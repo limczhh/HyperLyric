@@ -41,7 +41,8 @@ object MediaMetadataHelper {
     data class PlaybackProgress(
         val position: Long = -1L,
         val duration: Long = -1L,
-        val isPlaying: Boolean = false
+        val isPlaying: Boolean = false,
+        val playbackSpeed: Float = 0f
     ) {
         val fraction: Float
             get() = if (position >= 0L && duration > 0L) {
@@ -86,7 +87,8 @@ object MediaMetadataHelper {
             PlaybackProgress(
                 position = estimatePlaybackPosition(state),
                 duration = duration,
-                isPlaying = state?.state == PlaybackState.STATE_PLAYING
+                isPlaying = state?.state == PlaybackState.STATE_PLAYING,
+                playbackSpeed = state?.playbackSpeed ?: 0f
             )
         } catch (_: Exception) {
             PlaybackProgress()
@@ -120,22 +122,29 @@ object MediaMetadataHelper {
     }
 
     private fun findController(context: Context, packageName: String): MediaController? {
-        return selectController(findControllers(context, packageName))
-    }
-
-    private fun findControllers(context: Context, packageName: String): List<MediaController> {
         ensureSessionSnapshot(context)
-        val matches = activeControllers.filter { it.packageName == packageName }
-        if (matches.isNotEmpty()) return matches
-        return run {
-            refreshSessionSnapshot()
-            activeControllers.filter { it.packageName == packageName }
-        }
+        selectController(activeControllers, packageName)?.let { return it }
+        refreshSessionSnapshot()
+        return selectController(activeControllers, packageName)
     }
 
-    private fun selectController(controllers: List<MediaController>): MediaController? {
-        return controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            ?: controllers.maxByOrNull { it.playbackState?.lastPositionUpdateTime ?: 0L }
+    private fun selectController(
+        controllers: List<MediaController>,
+        packageName: String
+    ): MediaController? {
+        var latestController: MediaController? = null
+        var latestUpdateTime = Long.MIN_VALUE
+        controllers.forEach { controller ->
+            if (controller.packageName != packageName) return@forEach
+            val state = controller.playbackState
+            if (state?.state == PlaybackState.STATE_PLAYING) return controller
+            val updateTime = state?.lastPositionUpdateTime ?: 0L
+            if (latestController == null || updateTime > latestUpdateTime) {
+                latestController = controller
+                latestUpdateTime = updateTime
+            }
+        }
+        return latestController
     }
 
     private fun ensureSessionSnapshot(context: Context) {

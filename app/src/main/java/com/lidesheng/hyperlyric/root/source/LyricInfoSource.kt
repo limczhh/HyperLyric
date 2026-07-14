@@ -57,7 +57,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
     }
 
     override fun stop() {
-        positionJob?.cancel()
+        stopPositionPolling()
         try { manager.removeOnActiveSessionsChangedListener(sessionListener) } catch (_: Exception) {}
         trackedControllers.forEach { (ctrl, cb) ->
             try { ctrl.unregisterCallback(cb) } catch (_: Exception) {}
@@ -72,7 +72,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         lastLyricHash = 0
         activePkg = null
         activeController = null
-        positionJob?.cancel()
+        stopPositionPolling()
     }
 
     private fun onActiveSessionsChanged(controllers: List<MediaController>?) {
@@ -92,7 +92,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                     override fun onMetadataChanged(metadata: MediaMetadata?) = onMetadataUpdate(ctrl)
                     override fun onPlaybackStateChanged(state: PlaybackState?) {
                         if (ctrl.sessionToken == activeController?.sessionToken) {
-                            sink?.onPlaybackStateChanged(state?.state == PlaybackState.STATE_PLAYING)
+                            handlePlaybackState(ctrl, state)
                         }
                     }
                     override fun onSessionDestroyed() = onActiveSessionsChanged(manager.getActiveSessions(null))
@@ -121,10 +121,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
             if (currentHash == lastLyricHash && pkg == activePkg) {
                 if (controller.sessionToken != activeController?.sessionToken) {
                     activeController = controller
-                    sink?.onPlaybackStateChanged(
-                        controller.playbackState?.state == PlaybackState.STATE_PLAYING
-                    )
-                    startPositionPolling(controller)
+                    handlePlaybackState(controller, controller.playbackState)
                 }
                 return
             }
@@ -143,8 +140,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                 LyriconDataBridge.updateSong(song)
                 sink?.onSongChanged(song)
                 sink?.onMetadata(title = songName, artist = artist, album = "", publisher = pkg)
-                sink?.onPlaybackStateChanged(controller.playbackState?.state == PlaybackState.STATE_PLAYING)
-                startPositionPolling(controller)
+                handlePlaybackState(controller, controller.playbackState)
                 HookLogger.d("LyricInfoSource", "歌词就绪: $songName | ${song.lyrics!!.size}行")
             }
         } else if (hasLyrics && pkg == activePkg) {
@@ -166,7 +162,12 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         positionJob = positionScope.launch {
             while (isActive) {
                 try {
-                    val position = MediaMetadataHelper.estimatePlaybackPosition(controller.playbackState)
+                    val state = controller.playbackState
+                    if (state?.state != PlaybackState.STATE_PLAYING) {
+                        dispatchPosition(state)
+                        break
+                    }
+                    val position = MediaMetadataHelper.estimatePlaybackPosition(state)
                     if (position >= 0L && activeController?.sessionToken == controller.sessionToken) {
                         sink?.onPositionChanged(position)
                     }
@@ -174,5 +175,27 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                 delay(33)
             }
         }
+    }
+
+    private fun handlePlaybackState(controller: MediaController, state: PlaybackState?) {
+        if (controller.sessionToken != activeController?.sessionToken) return
+        val isPlaying = state?.state == PlaybackState.STATE_PLAYING
+        sink?.onPlaybackStateChanged(isPlaying)
+        dispatchPosition(state)
+        if (isPlaying) {
+            startPositionPolling(controller)
+        } else {
+            stopPositionPolling()
+        }
+    }
+
+    private fun dispatchPosition(state: PlaybackState?) {
+        val position = MediaMetadataHelper.estimatePlaybackPosition(state)
+        if (position >= 0L) sink?.onPositionChanged(position)
+    }
+
+    private fun stopPositionPolling() {
+        positionJob?.cancel()
+        positionJob = null
     }
 }

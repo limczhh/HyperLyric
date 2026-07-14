@@ -3,7 +3,6 @@ package com.lidesheng.hyperlyric.root.mediacard.notification
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +11,7 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.mediacard.MediaArtworkSampler
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -83,7 +83,8 @@ object NotificationMediaAmbientFlowHooker {
                 runCatching {
                     method.isAccessible = true
                     xposedModule.deoptimize(method)
-                    xposedModule.hook(method).intercept(hookerFor(method) ?: return@runCatching)
+                    xposedModule.hook(method)
+                        .intercept(hookerFor(method) ?: return@runCatching)
                     installed++
                     if (method.name in NATIVE_BACKGROUND_UPDATE_METHODS) {
                         installedNativeUpdates.add(method.name)
@@ -183,8 +184,9 @@ object NotificationMediaAmbientFlowHooker {
                     } else {
                         prepareCardTheme(controller)
                     }
+                }.onFailure {
+                    HookLogger.e(TAG, "Failed to prepare native media card theme", it)
                 }
-                    .onFailure { HookLogger.e(TAG, "Failed to prepare native media card theme", it) }
             }
             val result = chain.proceed()
             runCatching {
@@ -312,25 +314,39 @@ object NotificationMediaAmbientFlowHooker {
 
         val packageName = readField(mediaData, "packageName") as? String ?: return
         val artwork = readField(mediaData, "artwork") as? Icon
-        val colorToken = "$mode:$packageName:${artwork?.hashCode() ?: 0}"
-        if (state.colorToken == colorToken) return
-        state.colorToken = colorToken
+        val song = readField(mediaData, "song")?.toString().orEmpty()
+        val artist = readField(mediaData, "artist")?.toString().orEmpty()
+        val artworkUpdated = readField(controller, "isArtWorkUpdate") == true
+        val colorToken = "$mode:$packageName:$song:$artist"
+        if (state.pendingColorToken == colorToken) return
+        if (!artworkUpdated && state.colorToken == colorToken) return
+        state.pendingColorToken = colorToken
         val request = state.colorRequest.incrementAndGet()
-        val bitmap = loadArtwork(view, artwork, packageName, state.nativeApi) ?: return
+        val context = view.context
 
         colorExecutor.execute {
+            val current = states[controller]
+            if (current !== state || current.colorRequest.get() != request) return@execute
             val palette = runCatching {
-                extractPalette(mode, bitmap, state.nativeApi)
+                val bitmap = loadArtwork(context, artwork, packageName)
+                    ?: return@runCatching null
+                try {
+                    extractPalette(mode, bitmap, state.nativeApi)
+                } finally {
+                    bitmap.recycle()
+                }
             }.getOrElse { error ->
                 HookLogger.e(TAG, "Failed to extract media artwork colors", error)
                 null
             }
-            bitmap.recycle()
-            palette ?: return@execute
             view.post {
-                val current = states[controller]
-                if (current === state && current.colorRequest.get() == request) {
-                    applyPalette(current, palette)
+                val latest = states[controller]
+                if (latest === state && latest.colorRequest.get() == request) {
+                    latest.pendingColorToken = null
+                    if (palette != null) {
+                        applyPalette(latest, palette)
+                        latest.colorToken = colorToken
+                    }
                 }
             }
         }
@@ -365,14 +381,19 @@ object NotificationMediaAmbientFlowHooker {
         }
         val index = (parent.indexOfChild(mediaBg) + 1).coerceAtMost(parent.childCount)
         parent.addView(view, index, mediaBg.layoutParams)
+        state.colorRequest.incrementAndGet()
         state.view = view
         state.nativeApi = nativeApi
+        state.colorToken = null
+        state.pendingColorToken = null
         state.hasColors = false
         return view
     }
 
     private fun removeView(controller: Any) {
         val state = states.remove(controller) ?: return
+        state.colorRequest.incrementAndGet()
+        state.pendingColorToken = null
         disposeState(state)
     }
 
@@ -391,17 +412,15 @@ object NotificationMediaAmbientFlowHooker {
     }
 
     private fun loadArtwork(
-        view: View,
+        context: Context,
         artwork: Icon?,
-        packageName: String,
-        nativeApi: NativeMusicBgApi?
+        packageName: String
     ): Bitmap? {
         val drawable = runCatching {
-            artwork?.loadDrawable(view.context)
-                ?: view.context.packageManager.getApplicationIcon(packageName)
+            artwork?.loadDrawable(context)
+                ?: context.packageManager.getApplicationIcon(packageName)
         }.getOrNull() ?: return null
-        val bitmap = nativeApi?.drawableToBitmap(drawable) ?: return null
-        return bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        return MediaArtworkSampler.sample(drawable)
     }
 
     private fun extractPalette(
@@ -520,6 +539,7 @@ object NotificationMediaAmbientFlowHooker {
         var view: View? = null,
         var nativeApi: NativeMusicBgApi? = null,
         var colorToken: String? = null,
+        var pendingColorToken: String? = null,
         var isPlaying: Boolean = false,
         var hasColors: Boolean = false,
         val colorRequest: AtomicInteger = AtomicInteger()
@@ -618,7 +638,6 @@ object NotificationMediaAmbientFlowHooker {
         private val startMethod: Method,
         private val resumeMethod: Method,
         private val pauseMethod: Method,
-        private val drawableToBitmapMethod: Method,
         private val getMainColorMethod: Method,
         private val getPaletteColorMethod: Method
     ) {
@@ -640,10 +659,6 @@ object NotificationMediaAmbientFlowHooker {
 
         fun pause(view: View) {
             pauseMethod.invoke(view)
-        }
-
-        fun drawableToBitmap(drawable: Drawable): Bitmap? {
-            return drawableToBitmapMethod.invoke(null, drawable) as? Bitmap
         }
 
         fun extractSystemPalette(bitmap: Bitmap): MediaPalette {
@@ -675,12 +690,6 @@ object NotificationMediaAmbientFlowHooker {
                 val resume = viewClass.getDeclaredMethod("resume").apply { isAccessible = true }
                 val pause = viewClass.getDeclaredMethod("pause").apply { isAccessible = true }
 
-                val drawableUtils = classLoader.loadClass("com.miui.utils.DrawableUtils")
-                val drawableToBitmap = drawableUtils.getDeclaredMethod(
-                    "drawable2Bitmap",
-                    Drawable::class.java
-                ).apply { isAccessible = true }
-
                 val miPalette = classLoader.loadClass("miuix.mipalette.MiPalette")
                 miPalette.declaredMethods.firstOrNull { method ->
                     method.name == "init" && method.parameterCount == 0
@@ -703,7 +712,6 @@ object NotificationMediaAmbientFlowHooker {
                     startMethod = start,
                     resumeMethod = resume,
                     pauseMethod = pause,
-                    drawableToBitmapMethod = drawableToBitmap,
                     getMainColorMethod = getMainColor,
                     getPaletteColorMethod = getPaletteColor
                 )

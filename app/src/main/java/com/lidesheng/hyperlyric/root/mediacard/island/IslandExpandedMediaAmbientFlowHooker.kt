@@ -24,6 +24,7 @@ import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.island.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.mediacard.MediaArtworkSampler
 import com.lidesheng.hyperlyric.root.mediacard.island.background.IslandExpandedBackgroundTarget
 import com.lidesheng.hyperlyric.root.mediacard.island.background.IslandExpandedMediaBackgroundApi
 import com.lidesheng.hyperlyric.root.mediacard.island.background.IslandExpandedMediaBackgroundController
@@ -70,6 +71,7 @@ object IslandExpandedMediaAmbientFlowHooker {
         WeakHashMap<View, SeekBarThemeState>()
     )
     private val restoringNativeForeground = ThreadLocal<Boolean>()
+    private val bindingBinder = ThreadLocal<Any?>()
     private val colorExecutor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "HyperLyric-IslandMediaColor").apply { isDaemon = true }
     }
@@ -184,7 +186,7 @@ object IslandExpandedMediaAmbientFlowHooker {
         if (Looper.myLooper() == Looper.getMainLooper()) cleanup.run()
         else Handler(Looper.getMainLooper()).post(cleanup)
         binderStates.clear()
-        colorExecutor.shutdownNow()
+        colorExecutor.shutdown()
     }
 
     private enum class Action { ATTACH, BIND, DETACH, ALBUM, SEAMLESS }
@@ -193,7 +195,20 @@ object IslandExpandedMediaAmbientFlowHooker {
         override fun intercept(chain: Chain): Any? {
             val binder = chain.thisObject ?: return chain.proceed()
             if (action == Action.DETACH) cleanupBinder(binder)
-            val result = chain.proceed()
+            val nestedInBind = action != Action.BIND && bindingBinder.get() === binder
+            val previousBinding = if (action == Action.BIND) bindingBinder.get() else null
+            if (action == Action.BIND) bindingBinder.set(binder)
+            val result = try {
+                chain.proceed()
+            } finally {
+                if (action == Action.BIND) {
+                    if (previousBinding == null) bindingBinder.remove()
+                    else bindingBinder.set(previousBinding)
+                }
+            }
+            if (nestedInBind && (action == Action.ALBUM || action == Action.SEAMLESS)) {
+                return result
+            }
             runCatching {
                 when (action) {
                     Action.ATTACH -> {
@@ -246,7 +261,14 @@ object IslandExpandedMediaAmbientFlowHooker {
             if (IslandExpandedMediaBackgroundController.isActive()) {
                 val api = nativeApi ?: return chain.proceed()
                 return runCatching {
-                    IslandExpandedMediaBackgroundController.apply(binder, api)
+                    if (!IslandExpandedMediaBackgroundController.applyForeground(
+                            binder,
+                            holder,
+                            api
+                        )
+                    ) {
+                        IslandExpandedMediaBackgroundController.apply(binder, api)
+                    }
                     null
                 }.getOrElse { error ->
                     HookLogger.e(TAG, "Failed to preserve custom expanded foreground", error)
@@ -283,11 +305,15 @@ object IslandExpandedMediaAmbientFlowHooker {
 
     internal class BackgroundUpdateHook : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
-            (chain.args.firstOrNull() as? View)?.let(
-                IslandExpandedMediaBackgroundController::onNativeBackgroundUpdated
-            )
-            return result
+            val view = chain.args.firstOrNull() as? View
+            return if (
+                view != null &&
+                IslandExpandedMediaBackgroundController.shouldSkipNativeBackgroundUpdate(view)
+            ) {
+                null
+            } else {
+                chain.proceed()
+            }
         }
     }
 
@@ -570,26 +596,14 @@ object IslandExpandedMediaAmbientFlowHooker {
 
         if (IslandExpandedMediaBackgroundController.isActive()) {
             binderStates.remove(binder)?.request?.incrementAndGet()
-            views.forEach { view ->
-                if (view.getTag(ORIGINAL_ALPHA_TAG_KEY) == null) {
-                    view.setTag(ORIGINAL_ALPHA_TAG_KEY, view.alpha)
-                }
-                view.alpha = 0f
-                api.pause(view)
-            }
+            views.forEach { view -> hideAmbientFlow(view, api) }
             return
         }
 
         when (currentMode()) {
             RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DISABLED -> {
                 binderStates.remove(binder)?.request?.incrementAndGet()
-                views.forEach { view ->
-                    if (view.getTag(ORIGINAL_ALPHA_TAG_KEY) == null) {
-                        view.setTag(ORIGINAL_ALPHA_TAG_KEY, view.alpha)
-                    }
-                    view.alpha = 0f
-                    api.pause(view)
-                }
+                views.forEach { view -> hideAmbientFlow(view, api) }
             }
 
             RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR -> {
@@ -614,22 +628,28 @@ object IslandExpandedMediaAmbientFlowHooker {
             }
             return
         }
+        val bitmap = MediaArtworkSampler.sample(drawable) ?: return
         state.colorToken = token
         state.palette = null
         val request = state.request.incrementAndGet()
 
-        val source = api.drawableToBitmap(drawable) ?: return
-        val bitmap = source.copy(Bitmap.Config.ARGB_8888, false)
         runCatching {
             colorExecutor.execute {
+                if (binderStates[binder] !== state || state.request.get() != request) {
+                    bitmap.recycle()
+                    return@execute
+                }
                 val palette = runCatching { extractPalette(bitmap) }
                     .onFailure { HookLogger.e(TAG, "Failed to extract expanded media colors", it) }
                     .getOrNull()
                 bitmap.recycle()
-                palette ?: return@execute
                 primaryView.post {
                     val current = binderStates[binder]
                     if (current !== state || current.request.get() != request) return@post
+                    if (palette == null) {
+                        current.colorToken = null
+                        return@post
+                    }
                     if (currentMode() !=
                         RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
                     ) return@post
@@ -666,6 +686,16 @@ object IslandExpandedMediaAmbientFlowHooker {
         val original = view.getTag(ORIGINAL_ALPHA_TAG_KEY) as? Float ?: return
         view.setTag(ORIGINAL_ALPHA_TAG_KEY, null)
         if (view.alpha == 0f) view.alpha = original
+    }
+
+    private fun hideAmbientFlow(view: View, api: NativeApi) {
+        val alreadyHidden = view.getTag(ORIGINAL_ALPHA_TAG_KEY) != null && view.alpha == 0f
+        if (alreadyHidden) return
+        if (view.getTag(ORIGINAL_ALPHA_TAG_KEY) == null) {
+            view.setTag(ORIGINAL_ALPHA_TAG_KEY, view.alpha)
+        }
+        view.alpha = 0f
+        api.pause(view)
     }
 
     private fun isExpandedIslandView(view: View): Boolean {
@@ -821,8 +851,7 @@ object IslandExpandedMediaAmbientFlowHooker {
         private val setSeekBarForegroundMethod: Method,
         private val setSeekBarBackgroundMethod: Method,
         private val pauseMethod: Method,
-        private val setGradientColorMethod: Method,
-        private val drawableToBitmapMethod: Method
+        private val setGradientColorMethod: Method
     ) : IslandExpandedMediaBackgroundApi {
         private val expandedBackgroundMethods = Collections.synchronizedMap(
             WeakHashMap<ClassLoader, ExpandedBackgroundMethods>()
@@ -953,13 +982,6 @@ object IslandExpandedMediaAmbientFlowHooker {
                 BlendModeColorFilter(colors.textPrimary, BlendMode.SRC_IN)
             )
             setSeekBarHeadGlowAlpha(seekBar, state.originalHeadGlowAlpha)
-        }
-
-        override fun applyAllCustomForeground(
-            binder: Any,
-            colors: NotificationMediaColorConfig
-        ) {
-            getHolders(binder).forEach { holder -> applyCustomForeground(holder, colors) }
         }
 
         fun getSeekBarShaderColorFilter(seekBar: View): ColorFilter? {
@@ -1140,10 +1162,6 @@ object IslandExpandedMediaAmbientFlowHooker {
             setGradientColorMethod.invoke(view, mainColor, colors)
         }
 
-        fun drawableToBitmap(drawable: Drawable): Bitmap? {
-            return drawableToBitmapMethod.invoke(null, drawable) as? Bitmap
-        }
-
         companion object {
             fun create(classLoader: ClassLoader): NativeApi {
                 val binderClass = classLoader.loadClass(BINDER_CLASS)
@@ -1151,7 +1169,6 @@ object IslandExpandedMediaAmbientFlowHooker {
                     "com.android.systemui.statusbar.notification.mediaisland.MiuiIslandMediaViewHolder"
                 )
                 val musicBgViewClass = classLoader.loadClass(MUSIC_BG_VIEW_CLASS)
-                val drawableUtilsClass = classLoader.loadClass("com.miui.utils.DrawableUtils")
                 val mediaDataClass = classLoader.loadClass(
                     "com.android.systemui.media.controls.shared.model.MediaData"
                 )
@@ -1288,10 +1305,6 @@ object IslandExpandedMediaAmbientFlowHooker {
                         "setGradientColor",
                         Int::class.javaPrimitiveType,
                         IntArray::class.java
-                    ).apply { isAccessible = true },
-                    drawableToBitmapMethod = drawableUtilsClass.getDeclaredMethod(
-                        "drawable2Bitmap",
-                        Drawable::class.java
                     ).apply { isAccessible = true }
                 )
             }

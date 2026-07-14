@@ -42,16 +42,14 @@ internal object IslandAlbumCoverRotationController {
 
     fun detach(view: ImageView) {
         runOnMain {
-            val state = states.remove(view) ?: run {
-                view.rotation = 0f
-                return@runOnMain
-            }
+            val state = states.remove(view) ?: return@runOnMain
             view.removeOnAttachStateChangeListener(attachStateListener)
             stopAnimator(view, state, resetRotation = true)
         }
     }
 
     fun setPlaybackActive(active: Boolean) {
+        if (playbackActive == active) return
         playbackActive = active
         runOnMain {
             states.toList().forEach { (view, state) ->
