@@ -3,14 +3,16 @@ package com.lidesheng.hyperlyric.root.mediacard.notification
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
-import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPalette
+import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPaletteExtractor
 import com.lidesheng.hyperlyric.root.mediacard.MediaArtworkSampler
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -328,13 +330,9 @@ object NotificationMediaAmbientFlowHooker {
             val current = states[controller]
             if (current !== state || current.colorRequest.get() != request) return@execute
             val palette = runCatching {
-                val bitmap = loadArtwork(context, artwork, packageName)
+                val drawable = loadArtwork(context, artwork, packageName)
                     ?: return@runCatching null
-                try {
-                    extractPalette(mode, bitmap, state.nativeApi)
-                } finally {
-                    bitmap.recycle()
-                }
+                extractPalette(mode, drawable, state.nativeApi)
             }.getOrElse { error ->
                 HookLogger.e(TAG, "Failed to extract media artwork colors", error)
                 null
@@ -379,10 +377,10 @@ object NotificationMediaAmbientFlowHooker {
             outlineProvider = mediaBg.outlineProvider
             clipToOutline = true
         }
-        val layoutParams = copyLayoutParams(mediaBg.layoutParams) ?: run {
+        val layoutParams = createFillParentLayoutParams(mediaBg.layoutParams) ?: run {
             HookLogger.w(
                 TAG,
-                "Unable to copy native media background layout params; ambient flow view skipped"
+                "Unable to create isolated media background constraints; ambient flow view skipped"
             )
             stopView(view, nativeApi)
             return null
@@ -398,27 +396,24 @@ object NotificationMediaAmbientFlowHooker {
         return view
     }
 
-    private fun copyLayoutParams(source: ViewGroup.LayoutParams): ViewGroup.LayoutParams? {
+    private fun createFillParentLayoutParams(
+        source: ViewGroup.LayoutParams
+    ): ViewGroup.LayoutParams? {
         val sourceClass = source.javaClass
-        val copyConstructor = sourceClass.declaredConstructors
-            .asSequence()
-            .filter { constructor ->
-                constructor.parameterCount == 1 &&
-                    constructor.parameterTypes[0].isAssignableFrom(sourceClass)
-            }
-            .minByOrNull { constructor ->
-                when (constructor.parameterTypes[0]) {
-                    sourceClass -> 0
-                    ViewGroup.MarginLayoutParams::class.java -> 1
-                    ViewGroup.LayoutParams::class.java -> 2
-                    else -> 3
-                }
-            }
-            ?: return null
-
         return runCatching {
-            copyConstructor.isAccessible = true
-            copyConstructor.newInstance(source) as? ViewGroup.LayoutParams
+            val intType = Int::class.javaPrimitiveType ?: return null
+            val constructor = sourceClass.getDeclaredConstructor(intType, intType).apply {
+                isAccessible = true
+            }
+            val params = constructor.newInstance(0, 0) as ViewGroup.LayoutParams
+            listOf("leftToLeft", "topToTop", "rightToRight", "bottomToBottom")
+                .forEach { fieldName ->
+                    sourceClass.getDeclaredField(fieldName).apply {
+                        isAccessible = true
+                        setInt(params, 0)
+                    }
+                }
+            params
         }.getOrNull()
     }
 
@@ -447,36 +442,36 @@ object NotificationMediaAmbientFlowHooker {
         context: Context,
         artwork: Icon?,
         packageName: String
-    ): Bitmap? {
-        val drawable = runCatching {
+    ): Drawable? {
+        return runCatching {
             artwork?.loadDrawable(context)
                 ?: context.packageManager.getApplicationIcon(packageName)
-        }.getOrNull() ?: return null
-        return MediaArtworkSampler.sample(drawable)
+        }.getOrNull()
     }
 
     private fun extractPalette(
         mode: Int,
-        bitmap: Bitmap,
+        drawable: Drawable,
         nativeApi: NativeMusicBgApi?
-    ): MediaPalette? {
+    ): MediaAmbientFlowPalette? {
         if (
             mode == RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DYNAMIC &&
             nativeApi != null
         ) {
-            return nativeApi.extractSystemPalette(bitmap)
+            return nativeApi.extractSystemPalette(drawable)
         }
 
-        val maxColors = if (
-            mode == RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
-        ) 3 else 1
-        val extracted = ColorExtractor.extractThemePalette(bitmap, maxColors).rawColors
-        val mainColor = extracted.firstOrNull() ?: return null
-        val colors = IntArray(3) { index -> extracted.getOrElse(index) { mainColor } }
-        return MediaPalette(mainColor, colors)
+        val bitmap = MediaArtworkSampler.sample(drawable) ?: return null
+        return try {
+            val mainColor = MediaAmbientFlowPaletteExtractor.extractCoverMainColor(bitmap)
+                ?: return null
+            nativeApi?.createPalette(mainColor)
+        } finally {
+            bitmap.recycle()
+        }
     }
 
-    private fun applyPalette(state: ControllerState, palette: MediaPalette) {
+    private fun applyPalette(state: ControllerState, palette: MediaAmbientFlowPalette) {
         val view = state.view ?: return
         val nativeApi = state.nativeApi ?: return
         if (!nativeApi.accepts(view)) return
@@ -579,11 +574,6 @@ object NotificationMediaAmbientFlowHooker {
 
     private data class ControllerThemeState(val originalContext: Context)
 
-    private data class MediaPalette(
-        val mainColor: Int,
-        val colors: IntArray
-    )
-
     private fun newColorExecutor() = Executors.newSingleThreadExecutor { task ->
         Thread(task, "HyperLyric-MediaColor").apply { isDaemon = true }
     }
@@ -671,7 +661,8 @@ object NotificationMediaAmbientFlowHooker {
         private val resumeMethod: Method,
         private val pauseMethod: Method,
         private val getMainColorMethod: Method,
-        private val getPaletteColorMethod: Method
+        private val getPaletteColorMethod: Method,
+        private val drawableToBitmapMethod: Method
     ) {
         fun createView(context: Context): View = constructor.newInstance(context) as View
 
@@ -693,14 +684,19 @@ object NotificationMediaAmbientFlowHooker {
             pauseMethod.invoke(view)
         }
 
-        fun extractSystemPalette(bitmap: Bitmap): MediaPalette {
+        fun extractSystemPalette(drawable: Drawable): MediaAmbientFlowPalette {
+            val bitmap = drawableToBitmapMethod.invoke(null, drawable) as Bitmap
             val mainColor = getMainColorMethod.invoke(null, bitmap) as Int
+            return createPalette(mainColor)
+        }
+
+        fun createPalette(mainColor: Int): MediaAmbientFlowPalette {
             val colors = intArrayOf(
                 getPaletteColor(mainColor, "primary", 12),
                 getPaletteColor(mainColor, "primary", 10),
                 getPaletteColor(mainColor, "tertiary", 12)
             )
-            return MediaPalette(mainColor, colors)
+            return MediaAmbientFlowPalette(mainColor, colors)
         }
 
         private fun getPaletteColor(mainColor: Int, role: String, tone: Int): Int {
@@ -721,6 +717,13 @@ object NotificationMediaAmbientFlowHooker {
                 val start = viewClass.getDeclaredMethod("start").apply { isAccessible = true }
                 val resume = viewClass.getDeclaredMethod("resume").apply { isAccessible = true }
                 val pause = viewClass.getDeclaredMethod("pause").apply { isAccessible = true }
+
+                val drawableUtils = classLoader.loadClass("com.miui.utils.DrawableUtils")
+                val drawableToBitmap = drawableUtils.declaredMethods.single { method ->
+                    method.name == "drawable2Bitmap" &&
+                        method.parameterTypes.contentEquals(arrayOf(Drawable::class.java)) &&
+                        method.returnType == Bitmap::class.java
+                }.apply { isAccessible = true }
 
                 val miPalette = classLoader.loadClass("miuix.mipalette.MiPalette")
                 miPalette.declaredMethods.firstOrNull { method ->
@@ -745,7 +748,8 @@ object NotificationMediaAmbientFlowHooker {
                     resumeMethod = resume,
                     pauseMethod = pause,
                     getMainColorMethod = getMainColor,
-                    getPaletteColorMethod = getPaletteColor
+                    getPaletteColorMethod = getPaletteColor,
+                    drawableToBitmapMethod = drawableToBitmap
                 )
             }
         }

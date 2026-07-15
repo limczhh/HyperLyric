@@ -20,10 +20,11 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import com.lidesheng.hyperlyric.common.RootConstants
-import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.island.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPalette
+import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPaletteExtractor
 import com.lidesheng.hyperlyric.root.mediacard.MediaArtworkSampler
 import com.lidesheng.hyperlyric.root.mediacard.island.background.IslandExpandedBackgroundTarget
 import com.lidesheng.hyperlyric.root.mediacard.island.background.IslandExpandedMediaBackgroundApi
@@ -639,7 +640,10 @@ object IslandExpandedMediaAmbientFlowHooker {
                     bitmap.recycle()
                     return@execute
                 }
-                val palette = runCatching { extractPalette(bitmap) }
+                val palette = runCatching {
+                    MediaAmbientFlowPaletteExtractor.extractCoverMainColor(bitmap)
+                        ?.let(api::createPalette)
+                }
                     .onFailure { HookLogger.e(TAG, "Failed to extract expanded media colors", it) }
                     .getOrNull()
                 bitmap.recycle()
@@ -662,15 +666,6 @@ object IslandExpandedMediaAmbientFlowHooker {
             bitmap.recycle()
             HookLogger.e(TAG, "Failed to schedule expanded media color extraction", error)
         }
-    }
-
-    private fun extractPalette(bitmap: Bitmap): MediaPalette? {
-        val extracted = ColorExtractor.extractThemePalette(bitmap, 3).rawColors
-        val mainColor = extracted.firstOrNull() ?: return null
-        return MediaPalette(
-            mainColor = mainColor,
-            colors = IntArray(3) { index -> extracted.getOrElse(index) { mainColor } }
-        )
     }
 
     private fun cleanupBinder(binder: Any) {
@@ -773,13 +768,8 @@ object IslandExpandedMediaAmbientFlowHooker {
 
     private data class BinderState(
         var colorToken: String? = null,
-        var palette: MediaPalette? = null,
+        var palette: MediaAmbientFlowPalette? = null,
         val request: AtomicInteger = AtomicInteger()
-    )
-
-    private data class MediaPalette(
-        val mainColor: Int,
-        val colors: IntArray
     )
 
     private data class ViewThemeState(
@@ -851,7 +841,8 @@ object IslandExpandedMediaAmbientFlowHooker {
         private val setSeekBarForegroundMethod: Method,
         private val setSeekBarBackgroundMethod: Method,
         private val pauseMethod: Method,
-        private val setGradientColorMethod: Method
+        private val setGradientColorMethod: Method,
+        private val getPaletteColorMethod: Method
     ) : IslandExpandedMediaBackgroundApi {
         private val expandedBackgroundMethods = Collections.synchronizedMap(
             WeakHashMap<ClassLoader, ExpandedBackgroundMethods>()
@@ -1162,6 +1153,19 @@ object IslandExpandedMediaAmbientFlowHooker {
             setGradientColorMethod.invoke(view, mainColor, colors)
         }
 
+        fun createPalette(mainColor: Int): MediaAmbientFlowPalette {
+            val colors = intArrayOf(
+                getPaletteColor(mainColor, "primary", 12),
+                getPaletteColor(mainColor, "primary", 10),
+                getPaletteColor(mainColor, "tertiary", 12)
+            )
+            return MediaAmbientFlowPalette(mainColor, colors)
+        }
+
+        private fun getPaletteColor(mainColor: Int, role: String, tone: Int): Int {
+            return getPaletteColorMethod.invoke(null, mainColor, role, tone) as Int
+        }
+
         companion object {
             fun create(classLoader: ClassLoader): NativeApi {
                 val binderClass = classLoader.loadClass(BINDER_CLASS)
@@ -1172,6 +1176,16 @@ object IslandExpandedMediaAmbientFlowHooker {
                 val mediaDataClass = classLoader.loadClass(
                     "com.android.systemui.media.controls.shared.model.MediaData"
                 )
+                val miPaletteClass = classLoader.loadClass("miuix.mipalette.MiPalette")
+                miPaletteClass.declaredMethods.firstOrNull { method ->
+                    method.name == "init" && method.parameterCount == 0
+                }?.apply { isAccessible = true }?.invoke(null)
+                val getPaletteColor = miPaletteClass.getDeclaredMethod(
+                    "getPaletteColor",
+                    Int::class.javaPrimitiveType,
+                    String::class.java,
+                    Int::class.javaPrimitiveType
+                ).apply { isAccessible = true }
                 val attach = binderClass.declaredMethods.single {
                     it.name == "attach" && it.parameterCount == 2
                 }.apply { isAccessible = true }
@@ -1305,7 +1319,8 @@ object IslandExpandedMediaAmbientFlowHooker {
                         "setGradientColor",
                         Int::class.javaPrimitiveType,
                         IntArray::class.java
-                    ).apply { isAccessible = true }
+                    ).apply { isAccessible = true },
+                    getPaletteColorMethod = getPaletteColor
                 )
             }
         }
