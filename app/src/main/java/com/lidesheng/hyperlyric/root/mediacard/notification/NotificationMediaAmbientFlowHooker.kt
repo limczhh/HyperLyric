@@ -379,8 +379,16 @@ object NotificationMediaAmbientFlowHooker {
             outlineProvider = mediaBg.outlineProvider
             clipToOutline = true
         }
+        val layoutParams = copyLayoutParams(mediaBg.layoutParams) ?: run {
+            HookLogger.w(
+                TAG,
+                "Unable to copy native media background layout params; ambient flow view skipped"
+            )
+            stopView(view, nativeApi)
+            return null
+        }
         val index = (parent.indexOfChild(mediaBg) + 1).coerceAtMost(parent.childCount)
-        parent.addView(view, index, mediaBg.layoutParams)
+        parent.addView(view, index, layoutParams)
         state.colorRequest.incrementAndGet()
         state.view = view
         state.nativeApi = nativeApi
@@ -388,6 +396,30 @@ object NotificationMediaAmbientFlowHooker {
         state.pendingColorToken = null
         state.hasColors = false
         return view
+    }
+
+    private fun copyLayoutParams(source: ViewGroup.LayoutParams): ViewGroup.LayoutParams? {
+        val sourceClass = source.javaClass
+        val copyConstructor = sourceClass.declaredConstructors
+            .asSequence()
+            .filter { constructor ->
+                constructor.parameterCount == 1 &&
+                    constructor.parameterTypes[0].isAssignableFrom(sourceClass)
+            }
+            .minByOrNull { constructor ->
+                when (constructor.parameterTypes[0]) {
+                    sourceClass -> 0
+                    ViewGroup.MarginLayoutParams::class.java -> 1
+                    ViewGroup.LayoutParams::class.java -> 2
+                    else -> 3
+                }
+            }
+            ?: return null
+
+        return runCatching {
+            copyConstructor.isAccessible = true
+            copyConstructor.newInstance(source) as? ViewGroup.LayoutParams
+        }.getOrNull()
     }
 
     private fun removeView(controller: Any) {
