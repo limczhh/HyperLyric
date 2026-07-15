@@ -11,19 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import com.lidesheng.hyperlyric.R
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -47,31 +47,32 @@ fun LazyListScope.aboutPageSections(
 ) {
     item(key = "about_header") {
         val version = aboutAppVersion ?: stringResource(R.string.version_unknown)
-        val context = LocalContext.current
-        val appIcon = remember(context) {
-            context.applicationInfo.loadIcon(context.packageManager).toBitmap().asImageBitmap()
-        }
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(20.dp))
             Image(
-                bitmap = appIcon,
+                painter = painterResource(R.drawable.ic_launcher_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(80.dp),
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.tint(Color.White),
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colorResource(R.color.app_icon_red)),
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "HyperLyric",
-                style = MiuixTheme.textStyles.title1,
-                fontSize = 30.sp,
+                style = MiuixTheme.textStyles.title2,
                 fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface,
             )
             Text(
                 text = version,
-                style = MiuixTheme.textStyles.body1,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
