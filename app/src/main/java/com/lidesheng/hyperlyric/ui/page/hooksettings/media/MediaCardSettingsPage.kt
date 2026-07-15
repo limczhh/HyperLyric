@@ -51,7 +51,7 @@ fun MediaCardSettingsPage() {
                 RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE
             ).coerceIn(
                 RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED,
-                RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
+                RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL
             )
         )
     }
@@ -62,7 +62,7 @@ fun MediaCardSettingsPage() {
                 RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_BACKGROUND_STYLE
             ).coerceIn(
                 RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_DEFAULT,
-                RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT
+                RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_SOFT_COVER
             )
         )
     }
@@ -90,6 +90,17 @@ fun MediaCardSettingsPage() {
             )
         )
     }
+    var notificationSoftCoverTone by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE,
+                RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE
+            ).coerceIn(
+                RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT,
+                RootConstants.MEDIA_SOFT_COVER_TONE_DARK
+            )
+        )
+    }
     var islandExpandedAmbientFlowMode by remember {
         mutableIntStateOf(
             prefs.getInt(
@@ -97,7 +108,7 @@ fun MediaCardSettingsPage() {
                 RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE
             ).coerceIn(
                 RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DEFAULT,
-                RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
+                RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL
             )
         )
     }
@@ -108,7 +119,7 @@ fun MediaCardSettingsPage() {
                 RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE
             ).coerceIn(
                 RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_DEFAULT,
-                RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT
+                RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_SOFT_COVER
             )
         )
     }
@@ -133,6 +144,17 @@ fun MediaCardSettingsPage() {
             prefs.getBoolean(
                 RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_AUTO_INVERT,
                 RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_AUTO_INVERT
+            )
+        )
+    }
+    var islandExpandedSoftCoverTone by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE,
+                RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE
+            ).coerceIn(
+                RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT,
+                RootConstants.MEDIA_SOFT_COVER_TONE_DARK
             )
         )
     }
@@ -365,6 +387,17 @@ fun MediaCardSettingsPage() {
                             enabled
                         )
                     },
+                    softCoverTone = notificationSoftCoverTone,
+                    onSoftCoverToneChange = { tone ->
+                        notificationSoftCoverTone = tone
+                        prefs.edit {
+                            putInt(RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE, tone)
+                        }
+                        PrefsBridge.putInt(
+                            RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE,
+                            tone
+                        )
+                    },
                     ambientFlowMode = notificationAmbientFlowMode,
                     onAmbientFlowModeChange = { mode ->
                         notificationAmbientFlowMode = mode
@@ -488,6 +521,20 @@ fun MediaCardSettingsPage() {
                         PrefsBridge.putBoolean(
                             RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_AUTO_INVERT,
                             enabled
+                        )
+                    },
+                    softCoverTone = islandExpandedSoftCoverTone,
+                    onSoftCoverToneChange = { tone ->
+                        islandExpandedSoftCoverTone = tone
+                        prefs.edit {
+                            putInt(
+                                RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE,
+                                tone
+                            )
+                        }
+                        PrefsBridge.putInt(
+                            RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE,
+                            tone
                         )
                     },
                     ambientFlowMode = islandExpandedAmbientFlowMode,

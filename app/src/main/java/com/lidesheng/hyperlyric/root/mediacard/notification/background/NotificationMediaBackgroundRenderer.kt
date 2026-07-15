@@ -24,7 +24,11 @@ import android.media.ImageReader
 import android.util.LruCache
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
+import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.color.ColorExtractor
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowTone
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaSoftArtworkFactory
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaSoftPaletteExtractor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -79,6 +83,7 @@ internal class NotificationMediaBackgroundRenderer(
         style: Int,
         blurAmount: Int,
         autoInvert: Boolean,
+        softCoverTone: Int,
         width: Int,
         height: Int
     ): RenderedNotificationMediaBackground? {
@@ -92,6 +97,7 @@ internal class NotificationMediaBackgroundRenderer(
             style,
             blurAmount,
             autoInvert,
+            softCoverTone,
             width,
             height
         )
@@ -104,6 +110,7 @@ internal class NotificationMediaBackgroundRenderer(
         style: Int,
         blurAmount: Int,
         autoInvert: Boolean,
+        softCoverTone: Int,
         width: Int,
         height: Int
     ): RenderedNotificationMediaBackground? {
@@ -120,6 +127,7 @@ internal class NotificationMediaBackgroundRenderer(
             style,
             blurAmount,
             autoInvert,
+            softCoverTone,
             width,
             height
         )
@@ -131,6 +139,7 @@ internal class NotificationMediaBackgroundRenderer(
         style: Int,
         blurAmount: Int,
         autoInvert: Boolean,
+        softCoverTone: Int,
         width: Int,
         height: Int
     ): RenderedNotificationMediaBackground? {
@@ -143,6 +152,7 @@ internal class NotificationMediaBackgroundRenderer(
             style,
             blurAmount,
             autoInvert,
+            softCoverTone,
             darkMode,
             width,
             height
@@ -155,12 +165,13 @@ internal class NotificationMediaBackgroundRenderer(
             source.recycle()
             return null
         }
-        val colors = colorConfig(style, profile, autoInvert)
+        val colors = colorConfig(style, profile, autoInvert, softCoverTone)
         val result = when (style) {
             1 -> renderCoverArt(source, colors, darkMode, fingerprint, width, height)
             2 -> renderBlurredCover(source, colors, blurAmount, width, height)
             3 -> renderRadialGradient(source, colors, width, height)
             4 -> renderLinearGradient(source, colors, width, height)
+            5 -> renderSoftCover(profile.rawColors, softCoverTone, width, height)
             else -> null
         }
         source.recycle()
@@ -172,7 +183,8 @@ internal class NotificationMediaBackgroundRenderer(
     private fun colorConfig(
         style: Int,
         profile: ArtworkProfile,
-        autoInvert: Boolean
+        autoInvert: Boolean,
+        softCoverTone: Int
     ): NotificationMediaColorConfig {
         val palette = profile.palette
         return when (style) {
@@ -189,6 +201,25 @@ internal class NotificationMediaBackgroundRenderer(
                 val text = palette.accent1[if (reverse) 8 else 2]
                 val background = palette.accent1[if (reverse) 3 else 8]
                 NotificationMediaColorConfig(text, text, background, background)
+            }
+            5 -> {
+                val tone = softCoverTone.toFlowTone()
+                val surface = MediaSoftArtworkFactory.appearance(tone).surface
+                if (tone == MediaFlowTone.LIGHT) {
+                    NotificationMediaColorConfig(
+                        0xff1d1d1f.toInt(),
+                        0xa61d1d1f.toInt(),
+                        surface,
+                        surface
+                    )
+                } else {
+                    NotificationMediaColorConfig(
+                        Color.WHITE,
+                        0xccffffff.toInt(),
+                        surface,
+                        surface
+                    )
+                }
             }
             else -> NotificationMediaColorConfig(Color.WHITE, Color.WHITE, Color.BLACK, Color.BLACK)
         }
@@ -328,6 +359,18 @@ internal class NotificationMediaBackgroundRenderer(
         return result
     }
 
+    private fun renderSoftCover(
+        rawColors: List<Int>,
+        softCoverTone: Int,
+        width: Int,
+        height: Int
+    ): Bitmap = MediaSoftArtworkFactory.renderStatic(
+        palette = MediaSoftPaletteExtractor.fromColors(rawColors),
+        tone = softCoverTone.toFlowTone(),
+        width = width,
+        height = height
+    )
+
     private fun Canvas.drawCircleGradient(
         start: Int,
         end: Int,
@@ -361,7 +404,7 @@ internal class NotificationMediaBackgroundRenderer(
             extracted.getOrNull(2)?.let { Color.valueOf(it) }
         )
         val palette = monet.palette(wallpaperColors) ?: return null
-        val profile = ArtworkProfile(palette, bitmap.brightness())
+        val profile = ArtworkProfile(palette, bitmap.brightness(), extracted.toList())
         synchronized(cacheLock) {
             if (!closed) profileCache.put(fingerprint, profile)
         }
@@ -495,9 +538,17 @@ internal class NotificationMediaBackgroundRenderer(
         return this and 0x00ffffff or (alpha.coerceIn(0, 255) shl 24)
     }
 
+    private fun Int.toFlowTone(): MediaFlowTone =
+        if (this == RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT) {
+            MediaFlowTone.LIGHT
+        } else {
+            MediaFlowTone.DARK
+        }
+
     private data class ArtworkProfile(
         val palette: MonetPalette,
-        val brightness: Float
+        val brightness: Float,
+        val rawColors: List<Int>
     )
 
     private data class CachedBackground(
@@ -510,6 +561,7 @@ internal class NotificationMediaBackgroundRenderer(
         val style: Int,
         val blurAmount: Int,
         val autoInvert: Boolean,
+        val softCoverTone: Int,
         val darkMode: Boolean,
         val width: Int,
         val height: Int

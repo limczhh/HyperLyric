@@ -91,8 +91,9 @@ internal object NotificationMediaBackgroundController {
         val style = currentStyle()
         val blurAmount = currentBlurAmount()
         val autoInvert = currentAutoInvert()
+        val softCoverTone = currentSoftCoverTone()
         val artworkUpdated = readField(controller, "isArtWorkUpdate") == true
-        val token = "$style:$blurAmount:$autoInvert:$packageName:$width:$height"
+        val token = "$style:$blurAmount:$autoInvert:$softCoverTone:$packageName:$width:$height"
         if (state.token == token && (state.customApplied || state.renderPending) && !artworkUpdated) {
             return
         }
@@ -105,7 +106,7 @@ internal object NotificationMediaBackgroundController {
             val rendered = runCatching {
                 renderer.render(
                     context, artwork, packageName, style, blurAmount,
-                    autoInvert, width, height
+                    autoInvert, softCoverTone, width, height
                 )
             }.onFailure { error ->
                 HookLogger.e(TAG, "渲染通知中心媒体背景失败", error)
@@ -326,9 +327,17 @@ internal object NotificationMediaBackgroundController {
             RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_BACKGROUND_STYLE
         )?.coerceIn(
             RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_DEFAULT,
-            RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT
+            RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_SOFT_COVER
         ) ?: RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_BACKGROUND_STYLE
     }
+
+    private fun currentSoftCoverTone(): Int = prefs?.getInt(
+        RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE,
+        RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE
+    )?.coerceIn(
+        RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT,
+        RootConstants.MEDIA_SOFT_COVER_TONE_DARK
+    ) ?: RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_SOFT_COVER_TONE
 
     private fun currentBlurAmount(): Int = prefs?.getInt(
         RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_BACKGROUND_BLUR,

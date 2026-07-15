@@ -51,10 +51,11 @@ fun LazyListScope.aboutPageSections(
     item(key = "about_header") {
         val version = aboutAppVersion ?: stringResource(R.string.version_unknown)
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
             Box(
                 modifier = Modifier
                     .size(80.dp)

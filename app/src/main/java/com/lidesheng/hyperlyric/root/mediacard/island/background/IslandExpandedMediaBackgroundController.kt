@@ -186,24 +186,29 @@ internal object IslandExpandedMediaBackgroundController {
         }
     }
 
-    fun applyForeground(binder: Any, api: IslandExpandedMediaBackgroundApi) {
+    fun applyForeground(
+        binder: Any,
+        api: IslandExpandedMediaBackgroundApi,
+        force: Boolean = false
+    ) {
         states[binder]?.targets?.values?.forEach { target ->
             val colors = target.colors ?: return@forEach
-            target.holders.forEach { holder -> applyForeground(holder, colors, api) }
+            target.holders.forEach { holder -> applyForeground(holder, colors, api, force) }
         }
     }
 
     fun applyForeground(
         binder: Any,
         holder: Any,
-        api: IslandExpandedMediaBackgroundApi
+        api: IslandExpandedMediaBackgroundApi,
+        force: Boolean = false
     ): Boolean {
         val colors = states[binder]
             ?.targets
             ?.values
             ?.firstNotNullOfOrNull(TargetState::colors)
             ?: return false
-        applyForeground(holder, colors, api)
+        applyForeground(holder, colors, api, force)
         return true
     }
 
@@ -350,7 +355,8 @@ internal object IslandExpandedMediaBackgroundController {
         }
         val blurAmount = currentBlurAmount()
         val autoInvert = currentAutoInvert()
-        val token = "$style:$blurAmount:$autoInvert:$packageName:$width:$height"
+        val softCoverTone = currentSoftCoverTone()
+        val token = "$style:$blurAmount:$autoInvert:$softCoverTone:$packageName:$width:$height"
         if (
             targetState.customApplied && targetState.token == token &&
             targetState.lastArtwork === artwork
@@ -398,6 +404,7 @@ internal object IslandExpandedMediaBackgroundController {
                     style,
                     blurAmount,
                     autoInvert,
+                    softCoverTone,
                     width,
                     renderHeight
                 )
@@ -627,9 +634,10 @@ internal object IslandExpandedMediaBackgroundController {
     private fun applyForeground(
         holder: Any,
         colors: NotificationMediaColorConfig,
-        api: IslandExpandedMediaBackgroundApi
+        api: IslandExpandedMediaBackgroundApi,
+        force: Boolean = false
     ) {
-        if (foregroundColors[holder] == colors) return
+        if (!force && foregroundColors[holder] == colors) return
         api.applyCustomForeground(holder, colors)
         foregroundColors[holder] = colors
     }
@@ -686,9 +694,17 @@ internal object IslandExpandedMediaBackgroundController {
             RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE
         )?.coerceIn(
             RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_DEFAULT,
-            RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT
+            RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_SOFT_COVER
         ) ?: RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE
     }
+
+    private fun currentSoftCoverTone(): Int = prefs?.getInt(
+        RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE,
+        RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE
+    )?.coerceIn(
+        RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT,
+        RootConstants.MEDIA_SOFT_COVER_TONE_DARK
+    ) ?: RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE
 
     private fun currentBlurAmount(): Int = prefs?.getInt(
         RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_BACKGROUND_BLUR,

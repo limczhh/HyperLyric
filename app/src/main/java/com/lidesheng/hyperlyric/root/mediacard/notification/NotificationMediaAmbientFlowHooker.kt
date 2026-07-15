@@ -15,6 +15,10 @@ import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
 import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPalette
 import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPaletteExtractor
 import com.lidesheng.hyperlyric.root.mediacard.MediaArtworkSampler
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowArtwork
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowBackgroundView
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowOverlayLayout
+import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowTone
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -178,7 +182,7 @@ object NotificationMediaAmbientFlowHooker {
             if (!SystemUiEnhancementGate.isEnabled()) {
                 if (action == Action.DETACH) {
                     activeControllers.remove(controller)
-                    removeView(controller)
+                    removeView(controller, forgetState = true)
                     NotificationMediaBackgroundController.onDetach(controller)
                     restoreCardTheme(controller)
                 }
@@ -190,7 +194,7 @@ object NotificationMediaAmbientFlowHooker {
             }
             if (action == Action.DETACH) {
                 activeControllers.remove(controller)
-                removeView(controller)
+                removeView(controller, forgetState = true)
                 NotificationMediaBackgroundController.onDetach(controller)
                 restoreCardTheme(controller)
             } else {
@@ -259,7 +263,10 @@ object NotificationMediaAmbientFlowHooker {
         val refresh = Runnable {
             val snapshot = synchronized(activeControllers) { activeControllers.toList() }
             snapshot.forEach { controller ->
-                runCatching { refreshCardTheme(controller) }
+                runCatching {
+                    refreshCardTheme(controller)
+                    syncView(controller)
+                }
                     .onFailure { HookLogger.e(TAG, "刷新通知中心媒体卡片主题失败", it) }
             }
         }
@@ -279,6 +286,14 @@ object NotificationMediaAmbientFlowHooker {
                 .onFailure { HookLogger.e(TAG, "恢复通知中心原生媒体背景失败", it) }
         }
         controllers.forEach(::syncView)
+    }
+
+    fun refreshAmbientFlow() {
+        val refresh = Runnable {
+            synchronized(activeControllers) { activeControllers.toList() }.forEach(::syncView)
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) refresh.run()
+        else Handler(Looper.getMainLooper()).post(refresh)
     }
 
     private fun prepareCardTheme(controller: Any) {
@@ -313,12 +328,15 @@ object NotificationMediaAmbientFlowHooker {
         }
         if (currentMode() != RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED) {
             ensureView(controller)
+            states[controller]?.lastMediaData?.let { bind(controller, it) }
         } else {
             removeView(controller)
         }
     }
 
     private fun bind(controller: Any, mediaData: Any?) {
+        val state = states.getOrPut(controller) { ControllerState() }
+        if (mediaData != null) state.lastMediaData = mediaData
         if (NotificationMediaBackgroundController.isActive(controller)) {
             removeView(controller)
             return
@@ -330,9 +348,9 @@ object NotificationMediaAmbientFlowHooker {
         }
         mediaData ?: return
         val view = ensureView(controller) ?: return
-        val state = states.getOrPut(controller) { ControllerState() }
         val isPlaying = readField(mediaData, "isPlaying") == true
         state.isPlaying = isPlaying
+        configureCustomView(state)
         syncPlayback(state)
 
         val packageName = readField(mediaData, "packageName") as? String ?: return
@@ -340,7 +358,8 @@ object NotificationMediaAmbientFlowHooker {
         val song = readField(mediaData, "song")?.toString().orEmpty()
         val artist = readField(mediaData, "artist")?.toString().orEmpty()
         val artworkUpdated = readField(controller, "isArtWorkUpdate") == true
-        val colorToken = "$mode:$packageName:$song:$artist"
+        val paletteMode = if (isCustomMode(mode)) "custom" else mode.toString()
+        val colorToken = "$paletteMode:$packageName:$song:$artist"
         if (state.pendingColorToken == colorToken) return
         if (!artworkUpdated && state.colorToken == colorToken) return
         state.pendingColorToken = colorToken
@@ -353,7 +372,20 @@ object NotificationMediaAmbientFlowHooker {
             val palette = runCatching {
                 val drawable = loadArtwork(context, artwork, packageName)
                     ?: return@runCatching null
-                extractPalette(mode, drawable, state.nativeApi)
+                if (isCustomMode(mode)) {
+                    val bitmap = MediaArtworkSampler.sample(drawable) ?: return@runCatching null
+                    try {
+                        MediaFlowColorPayload.Custom(
+                            MediaFlowArtwork.prepare(bitmap) ?: return@runCatching null
+                        )
+                    } finally {
+                        bitmap.recycle()
+                    }
+                } else {
+                    extractPalette(mode, drawable, state.nativeApi)?.let {
+                        MediaFlowColorPayload.Native(it)
+                    }
+                }
             }.getOrElse { error ->
             HookLogger.e(TAG, "提取通知中心媒体封面颜色失败", error)
                 null
@@ -373,23 +405,33 @@ object NotificationMediaAmbientFlowHooker {
 
     private fun ensureView(controller: Any): View? {
         val state = states.getOrPut(controller) { ControllerState() }
-        state.view?.takeIf { it.parent != null }?.let { return it }
+        val customMode = isCustomMode(currentMode())
+        state.view?.takeIf { it.parent != null && state.customView == customMode }?.let {
+            return it
+        }
+        disposeState(state)
 
         val holder = readField(controller, "holder") ?: return null
         val mediaBg = readField(holder, "mediaBg") as? View ?: return null
         val parent = mediaBg.parent as? ViewGroup ?: return null
-        val nativeApi = resolveNativeApi(controller.javaClass.classLoader) ?: return null
+        val nativeApi = if (customMode) null else {
+            resolveNativeApi(controller.javaClass.classLoader) ?: return null
+        }
 
         for (index in 0 until parent.childCount) {
             val existing = parent.getChildAt(index)
             if (existing.tag == VIEW_TAG) {
-                stopView(existing, nativeApi)
+                stopView(existing, state.nativeApi ?: nativeApi)
                 parent.removeView(existing)
                 break
             }
         }
 
-        val view = nativeApi.createView(mediaBg.context)
+        val view = if (customMode) {
+            MediaFlowBackgroundView(mediaBg.context)
+        } else {
+            requireNotNull(nativeApi).createView(mediaBg.context)
+        }
         view.apply {
             tag = VIEW_TAG
             isClickable = false
@@ -398,7 +440,7 @@ object NotificationMediaAmbientFlowHooker {
             outlineProvider = mediaBg.outlineProvider
             clipToOutline = true
         }
-        val layoutParams = createFillParentLayoutParams(mediaBg.layoutParams) ?: run {
+        val layoutParams = MediaFlowOverlayLayout.createConstraintFill(mediaBg.layoutParams) ?: run {
             HookLogger.w(
                 TAG,
                 "无法创建独立媒体背景约束，跳过流光视图"
@@ -411,35 +453,15 @@ object NotificationMediaAmbientFlowHooker {
         state.colorRequest.incrementAndGet()
         state.view = view
         state.nativeApi = nativeApi
+        state.customView = customMode
         state.colorToken = null
         state.pendingColorToken = null
         state.hasColors = false
         return view
     }
 
-    private fun createFillParentLayoutParams(
-        source: ViewGroup.LayoutParams
-    ): ViewGroup.LayoutParams? {
-        val sourceClass = source.javaClass
-        return runCatching {
-            val intType = Int::class.javaPrimitiveType ?: return null
-            val constructor = sourceClass.getDeclaredConstructor(intType, intType).apply {
-                isAccessible = true
-            }
-            val params = constructor.newInstance(0, 0) as ViewGroup.LayoutParams
-            listOf("leftToLeft", "topToTop", "rightToRight", "bottomToBottom")
-                .forEach { fieldName ->
-                    sourceClass.getDeclaredField(fieldName).apply {
-                        isAccessible = true
-                        setInt(params, 0)
-                    }
-                }
-            params
-        }.getOrNull()
-    }
-
-    private fun removeView(controller: Any) {
-        val state = states.remove(controller) ?: return
+    private fun removeView(controller: Any, forgetState: Boolean = false) {
+        val state = (if (forgetState) states.remove(controller) else states[controller]) ?: return
         state.colorRequest.incrementAndGet()
         state.pendingColorToken = null
         disposeState(state)
@@ -451,6 +473,7 @@ object NotificationMediaAmbientFlowHooker {
         (view.parent as? ViewGroup)?.removeView(view)
         state.view = null
         state.nativeApi = null
+        state.customView = false
     }
 
     private fun stopView(view: View, nativeApi: NativeMusicBgApi?) {
@@ -501,8 +524,28 @@ object NotificationMediaAmbientFlowHooker {
         syncPlayback(state)
     }
 
+    private fun applyPalette(state: ControllerState, payload: MediaFlowColorPayload) {
+        when (payload) {
+            is MediaFlowColorPayload.Native -> applyPalette(state, payload.palette)
+            is MediaFlowColorPayload.Custom -> {
+                val view = state.view as? MediaFlowBackgroundView ?: return
+                state.hasColors = true
+                view.visibility = View.VISIBLE
+                view.update(
+                    artwork = payload.artwork,
+                    tone = currentFlowTone(view.context),
+                    playing = state.isPlaying
+                )
+            }
+        }
+    }
+
     private fun syncPlayback(state: ControllerState) {
         val view = state.view ?: return
+        if (view is MediaFlowBackgroundView) {
+            configureCustomView(state)
+            return
+        }
         val nativeApi = state.nativeApi ?: return
         if (!nativeApi.accepts(view)) return
         if (state.isPlaying && state.hasColors) {
@@ -511,6 +554,15 @@ object NotificationMediaAmbientFlowHooker {
         } else {
             nativeApi.pause(view)
         }
+    }
+
+    private fun configureCustomView(state: ControllerState) {
+        val view = state.view as? MediaFlowBackgroundView ?: return
+        view.visibility = if (state.hasColors) View.VISIBLE else View.INVISIBLE
+        view.update(
+            tone = currentFlowTone(view.context),
+            playing = state.isPlaying && state.hasColors
+        )
     }
 
     private fun resolveNativeApi(classLoader: ClassLoader?): NativeMusicBgApi? {
@@ -572,8 +624,21 @@ object NotificationMediaAmbientFlowHooker {
             RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE
         )?.coerceIn(
             RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED,
-            RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR
+            RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL
         ) ?: RootConstants.DEFAULT_HOOK_NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE
+    }
+
+    private fun isCustomMode(mode: Int): Boolean =
+        mode == RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL
+
+    private fun currentFlowTone(context: Context): MediaFlowTone {
+        val light = when (currentCardTheme()) {
+            RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT -> true
+            RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK -> false
+            else -> context.resources.configuration.uiMode and
+                Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
+        }
+        return if (light) MediaFlowTone.LIGHT else MediaFlowTone.DARK
     }
 
     private fun currentCardTheme(): Int {
@@ -592,12 +657,19 @@ object NotificationMediaAmbientFlowHooker {
     private data class ControllerState(
         var view: View? = null,
         var nativeApi: NativeMusicBgApi? = null,
+        var customView: Boolean = false,
+        var lastMediaData: Any? = null,
         var colorToken: String? = null,
         var pendingColorToken: String? = null,
         var isPlaying: Boolean = false,
         var hasColors: Boolean = false,
         val colorRequest: AtomicInteger = AtomicInteger()
     )
+
+    private sealed interface MediaFlowColorPayload {
+        data class Native(val palette: MediaAmbientFlowPalette) : MediaFlowColorPayload
+        data class Custom(val artwork: MediaFlowArtwork) : MediaFlowColorPayload
+    }
 
     private data class ControllerThemeState(val originalContext: Context)
 

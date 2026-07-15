@@ -41,6 +41,8 @@ fun LazyListScope.islandExpandedMediaCardSection(
     onBackgroundBlurChange: (Int) -> Unit,
     backgroundAutoInvert: Boolean,
     onBackgroundAutoInvertChange: (Boolean) -> Unit,
+    softCoverTone: Int,
+    onSoftCoverToneChange: (Int) -> Unit,
     ambientFlowMode: Int,
     onAmbientFlowModeChange: (Int) -> Unit
 ) {
@@ -93,7 +95,8 @@ fun LazyListScope.islandExpandedMediaCardSection(
                 RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_COVER_ART,
                 RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_BLURRED_COVER,
                 RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_RADIAL_GRADIENT,
-                RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT
+                RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT,
+                RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_SOFT_COVER
             )
             OverlayDropdownPreference(
                 title = stringResource(R.string.title_notification_media_background_style),
@@ -102,7 +105,8 @@ fun LazyListScope.islandExpandedMediaCardSection(
                     stringResource(R.string.option_notification_media_background_cover_art),
                     stringResource(R.string.option_notification_media_background_blurred_cover),
                     stringResource(R.string.option_notification_media_background_radial_gradient),
-                    stringResource(R.string.option_notification_media_background_linear_gradient)
+                    stringResource(R.string.option_notification_media_background_linear_gradient),
+                    stringResource(R.string.option_notification_media_background_soft_cover)
                 ),
                 selectedIndex = backgroundStyleValues.indexOf(backgroundStyle).coerceAtLeast(0),
                 onSelectedIndexChange = { index ->
@@ -131,16 +135,18 @@ fun LazyListScope.islandExpandedMediaCardSection(
                         }
                     )
                     val modeValues = listOf(
-                        RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DEFAULT,
-                        RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR,
-                        RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DISABLED
+                      RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DEFAULT,
+                      RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR,
+                      RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL,
+                      RootConstants.ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE_DISABLED
                     )
                     OverlayDropdownPreference(
                         title = stringResource(R.string.title_island_media_ambient_flow_mode),
                         items = listOf(
-                            stringResource(R.string.option_island_media_ambient_flow_default),
-                            stringResource(R.string.option_island_media_ambient_flow_cover_color),
-                            stringResource(R.string.option_island_media_ambient_flow_disabled)
+                          stringResource(R.string.option_island_media_ambient_flow_default),
+                          stringResource(R.string.option_island_media_ambient_flow_cover_color),
+                          stringResource(R.string.option_media_ambient_flow_custom_full),
+                          stringResource(R.string.option_island_media_ambient_flow_disabled)
                         ),
                         selectedIndex = modeValues.indexOf(ambientFlowMode).coerceAtLeast(0),
                         onSelectedIndexChange = { index ->
@@ -151,6 +157,28 @@ fun LazyListScope.islandExpandedMediaCardSection(
             }
             AnimatedVisibility(visible = customBackground) {
                 Column {
+                    AnimatedVisibility(
+                        visible = backgroundStyle ==
+                            RootConstants.ISLAND_EXPANDED_MEDIA_BACKGROUND_STYLE_SOFT_COVER
+                    ) {
+                        Column {
+                            val toneValues = listOf(
+                                RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT,
+                                RootConstants.MEDIA_SOFT_COVER_TONE_DARK
+                            )
+                            OverlayDropdownPreference(
+                                title = stringResource(R.string.title_media_soft_cover_tone),
+                                items = listOf(
+                                    stringResource(R.string.option_media_soft_cover_tone_light),
+                                    stringResource(R.string.option_media_soft_cover_tone_dark)
+                                ),
+                                selectedIndex = toneValues.indexOf(softCoverTone).coerceAtLeast(0),
+                                onSelectedIndexChange = { index ->
+                                    onSoftCoverToneChange(toneValues[index])
+                                }
+                            )
+                        }
+                    }
                     SwitchPreference(
                         title = stringResource(
                             R.string.title_notification_media_background_color_animation

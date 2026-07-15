@@ -115,6 +115,7 @@
     <string name="title_notification_media_ambient_flow_mode">Card ambient flow</string>
     <string name="option_notification_media_ambient_flow_dynamic">Ambient flow</string>
     <string name="option_notification_media_ambient_flow_cover_color">Ambient flow (cover color)</string>
+    <string name="option_media_ambient_flow_custom_full">Cover flow</string>
     <string name="option_notification_media_ambient_flow_disabled">Disabled (default)</string>
     <string name="title_notification_media_background_style">Card background style</string>
     <string name="option_notification_media_background_default">Default</string>
@@ -122,6 +123,10 @@
     <string name="option_notification_media_background_blurred_cover">Blurred cover</string>
     <string name="option_notification_media_background_radial_gradient">Radial gradient</string>
     <string name="option_notification_media_background_linear_gradient">Linear gradient</string>
+    <string name="option_notification_media_background_soft_cover">Soft cover</string>
+    <string name="title_media_soft_cover_tone">Soft cover tone</string>
+    <string name="option_media_soft_cover_tone_light">Light</string>
+    <string name="option_media_soft_cover_tone_dark">Dark</string>
     <string name="title_notification_media_background_color_animation">Background transition</string>
     <string name="title_notification_media_background_blur">Background blur strength</string>
     <string name="title_notification_media_background_auto_invert">Auto-invert bright covers</string>
