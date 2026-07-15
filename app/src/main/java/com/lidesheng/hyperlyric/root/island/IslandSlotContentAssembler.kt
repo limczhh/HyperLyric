@@ -47,31 +47,37 @@ internal object IslandSlotContentAssembler {
         val nextLinePreview = isNextLinePreviewEnabled(prefs, config)
         val disableAll = TranslationHelper.isTranslationDisabled(prefs) || nextLinePreview
         val translationOnly = TranslationHelper.isTranslationOnly(prefs)
+        val lyricSong = LyriconDataBridge.currentSong
+        val lyricTitle = lyricSong?.name?.takeIf { it.isNotBlank() }
+            ?: LyriconDataBridge.currentSongName?.takeIf { it.isNotBlank() }
+        val lyricArtist = lyricSong?.artist?.takeIf { it.isNotBlank() }
+        val mediaColorKey = CoverColorHelper.updateMediaSession(
+            packageName = LyriconDataBridge.currentLyricPackageName.orEmpty(),
+            title = lyricTitle ?: mediaInfo.title,
+            artist = lyricArtist ?: mediaInfo.artist,
+            album = mediaInfo.album
+        )
+        val albumBitmap = mediaInfo.albumArt.takeUnless {
+            lyricTitle != null &&
+                mediaInfo.title.isNotBlank() &&
+                normalizeMediaText(lyricTitle) != normalizeMediaText(mediaInfo.title)
+        }
         val signature = listOf(
             config.styleSignature,
             mode,
+            mediaColorKey,
             mediaInfo.title,
             mediaInfo.artist,
             mediaInfo.album,
-            mediaInfo.albumArt?.generationId ?: 0
+            albumBitmap?.generationId ?: 0
         ).joinToString("|")
 
         if (!force && lastStyleSignatures[view] == signature) return
-        val mediaColorKey = if (mediaInfo.albumArt != null || CoverColorHelper.currentMediaKey() == null) {
-            CoverColorHelper.updateMediaSession(
-                packageName = LyriconDataBridge.currentLyricPackageName.orEmpty(),
-                title = mediaInfo.title,
-                artist = mediaInfo.artist,
-                album = mediaInfo.album
-            )
-        } else {
-            CoverColorHelper.currentMediaKey()
-        }
         val style = LyricStyleHelper.buildStyle(
             prefs = prefs,
             res = view.resources,
             mode = mode,
-            albumBitmap = mediaInfo.albumArt,
+            albumBitmap = albumBitmap,
             mediaColorKey = mediaColorKey
         )
         when (view) {
@@ -87,6 +93,10 @@ internal object IslandSlotContentAssembler {
             }
         }
         lastStyleSignatures[view] = signature
+    }
+
+    private fun normalizeMediaText(value: String): String {
+        return value.trim().lowercase().filterNot(Char::isWhitespace)
     }
 
     fun applySlotContent(
