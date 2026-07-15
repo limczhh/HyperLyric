@@ -107,16 +107,17 @@ jobs:
           AS="$BTDIR/apksigner"
 
           V_NAME="${{ steps.gate.outputs.name }}"
+          V_CODE="${{ steps.gate.outputs.code }}"
 
           # online
           ONLINE_IN=$(echo app/build/outputs/apk/online/release/*.apk)
           $ZA -v -p 4 $ONLINE_IN online-aligned.apk
-          $AS sign --ks release.jks --ks-pass env:STORE_PASS --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS --out HyperLyric-v${V_NAME}-online.apk online-aligned.apk
+          $AS sign --ks release.jks --ks-pass env:STORE_PASS --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS --out "HyperLyric-${V_CODE}-${V_NAME}-online-release.apk" online-aligned.apk
 
           # offline
           OFFLINE_IN=$(echo app/build/outputs/apk/offline/release/*.apk)
           $ZA -v -p 4 $OFFLINE_IN offline-aligned.apk
-          $AS sign --ks release.jks --ks-pass env:STORE_PASS --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS --out HyperLyric-v${V_NAME}-offline.apk offline-aligned.apk
+          $AS sign --ks release.jks --ks-pass env:STORE_PASS --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS --out "HyperLyric-${V_CODE}-${V_NAME}-offline-release.apk" offline-aligned.apk
 
       - name: 生成发布说明 Generate Release Body
         if: github.event_name != 'pull_request' && steps.gate.outputs.skip == 'false'
@@ -136,13 +137,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.gate.outputs.code }}-${{ steps.gate.outputs.name }}
-          name: HyperLyric v${{ steps.gate.outputs.name }}
+          name: ${{ steps.gate.outputs.code }}-${{ steps.gate.outputs.name }}
           body: ${{ steps.release_body.outputs.body }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
-            HyperLyric-v${{ steps.gate.outputs.name }}-online.apk
-            HyperLyric-v${{ steps.gate.outputs.name }}-offline.apk
+            HyperLyric-${{ steps.gate.outputs.code }}-${{ steps.gate.outputs.name }}-online-release.apk
+            HyperLyric-${{ steps.gate.outputs.code }}-${{ steps.gate.outputs.name }}-offline-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
