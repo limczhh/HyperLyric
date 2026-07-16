@@ -15,6 +15,7 @@ object IslandViewHelper {
 
     private val SYSTEMUI_PKG_NAMES = arrayOf("miui.systemui.plugin", "com.android.systemui")
     private val originalMargins = WeakHashMap<View, MarginSnapshot>()
+    private val isRelayouting = ThreadLocal.withInitial { false }
 
     /**
      * 切换超级岛内部容器（如图标、文本容器）的可见性
@@ -131,21 +132,30 @@ object IslandViewHelper {
 
     /**
      * 触发超级岛系统的布局刷新
+     *
+     * 使用 ThreadLocal 防止重入：triggerSystemRelayout 调用的系统方法可能被
+     * Hook 拦截后再次触发 triggerSystemRelayout，导致无限递归。
      */
     fun triggerSystemRelayout(islandView: ViewGroup) {
+        if (isRelayouting.get() == true) return
         HookLogger.d("IslandViewHelper","正在触发布局刷新")
-        runCatching {
-            val viewClass = islandView.javaClass
-            // 优先尝试 updateBigIslandViewWidth
-            val updateWidthMethod = viewClass.methods.find { it.name == "updateBigIslandViewWidth" }
-            if (updateWidthMethod != null) {
-                updateWidthMethod.invoke(islandView)
-            } else {
-                // 兜底尝试 calculateBigIslandWidth
-                viewClass.methods.find { it.name == "calculateBigIslandWidth" }?.invoke(islandView)
+        isRelayouting.set(true)
+        try {
+            runCatching {
+                val viewClass = islandView.javaClass
+                // 优先尝试 updateBigIslandViewWidth
+                val updateWidthMethod = viewClass.methods.find { it.name == "updateBigIslandViewWidth" }
+                if (updateWidthMethod != null) {
+                    updateWidthMethod.invoke(islandView)
+                } else {
+                    // 兜底尝试 calculateBigIslandWidth
+                    viewClass.methods.find { it.name == "calculateBigIslandWidth" }?.invoke(islandView)
+                }
+            }.onFailure { e ->
+                HookLogger.e("IslandViewHelper", "超级岛布局刷新失败", e)
             }
-        }.onFailure { e ->
-            HookLogger.e("IslandViewHelper", "超级岛布局刷新失败", e)
+        } finally {
+            isRelayouting.set(false)
         }
     }
 

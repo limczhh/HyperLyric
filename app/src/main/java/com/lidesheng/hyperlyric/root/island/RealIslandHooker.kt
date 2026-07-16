@@ -25,7 +25,8 @@ internal object RealIslandHooker {
                         }
                         if (IslandLyricTextInjector.restoreExistingSlotsLightweight(contentView)) {
                             IslandLyricTextInjector.refreshCurrentContent(contentView)
-                HookLogger.d(TAG, "updateBigIslandView 前已轻量恢复歌词视图")
+                            IslandHostFacade.triggerSystemRelayout(contentView)
+                HookLogger.d(TAG, "updateBigIslandView 前已轻量恢复歌词视图并重新布局")
                         }
                     }
                 }
@@ -98,7 +99,8 @@ internal object RealIslandHooker {
 
                 if (IslandLyricTextInjector.restoreExistingSlotsLightweight(contentView)) {
                     IslandLyricTextInjector.refreshCurrentContent(contentView)
-                HookLogger.d(TAG, "$eventName 后已轻量恢复歌词视图")
+                    IslandHostFacade.triggerSystemRelayout(contentView)
+                HookLogger.d(TAG, "$eventName 后已轻量恢复歌词视图并重新布局")
                 }
             }.onFailure { e ->
             HookLogger.e(TAG, "$eventName 后恢复歌词视图失败", e)

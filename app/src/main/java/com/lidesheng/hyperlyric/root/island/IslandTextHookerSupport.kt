@@ -50,11 +50,14 @@ internal object IslandTextHookerSupport {
 
         val realView = callNoArgMethodResult(fakeView, "getRealView") as? ViewGroup ?: return
         IslandViewRegistry.register(realView, mediaInfo.packageName)
-        IslandLyricTextInjector.restoreExistingSlotsLightweight(realView)
+        val changed = IslandLyricTextInjector.restoreExistingSlotsLightweight(realView)
         IslandLyricTextInjector.refreshCurrentContent(realView)
         realView.visibility = View.VISIBLE
         (callNoArgMethodResult(realView, "getBackgroundView") as? View)?.visibility = View.VISIBLE
-        HookLogger.d(TAG, "fake view 过渡结束后已恢复真实岛: 来源=$source")
+        if (changed) {
+            IslandHostFacade.triggerSystemRelayout(realView)
+        }
+        HookLogger.d(TAG, "fake view 过渡结束后已恢复真实岛: 来源=$source, 重新布局=$changed")
     }
 
     fun isCurrentLyricIsland(mediaInfo: IslandProbeUtils.MediaIslandInfo): Boolean {
@@ -81,9 +84,12 @@ internal object IslandTextHookerSupport {
         return BaseIslandRenderer.shouldRenderInjectedIsland(viewGroup.context, mediaInfo.packageName)
     }
 
-    fun hardClearInjectedIsland(viewGroup: ViewGroup) {
+    fun hardClearInjectedIsland(viewGroup: ViewGroup, suppressRelayout: Boolean = false) {
         IslandViewRegistry.unregister(viewGroup)
         IslandHostFacade.clearInjectedViews(viewGroup)
+        if (!suppressRelayout) {
+            IslandHostFacade.triggerSystemRelayout(viewGroup)
+        }
     }
 
     fun restoreAdapterModule(adapter: Any?, moduleType: String?, source: String) {

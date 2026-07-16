@@ -17,7 +17,7 @@ internal object IslandWidthHooker {
                 val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(currentData) ?: return@runCatching
                 if (!IslandTextHookerSupport.isCurrentLyricIsland(mediaInfo)) return@runCatching
                 if (!IslandTextHookerSupport.shouldRenderInjectedIsland(contentView, mediaInfo)) {
-                    IslandTextHookerSupport.hardClearInjectedIsland(contentView)
+                    IslandTextHookerSupport.hardClearInjectedIsland(contentView, suppressRelayout = true)
                     return@runCatching
                 }
 
