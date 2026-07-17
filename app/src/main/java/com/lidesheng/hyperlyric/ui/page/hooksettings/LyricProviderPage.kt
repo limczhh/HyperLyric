@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,9 +54,14 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Slider
+import top.yukonga.miuix.kmp.basic.Text
+import com.lidesheng.hyperlyric.common.PrefsBridge
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+
 
 @Composable
 fun LyricProviderPage() {
@@ -209,6 +216,40 @@ private fun LazyListScope.providerSections(
                                 if (module.tags.isNotEmpty()) {
                                     ModuleTagsFlow(module.tags)
                                 }
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                                var delayMs by remember(packageName) {
+                                    androidx.compose.runtime.mutableIntStateOf(
+                                        PrefsBridge.getInt("lyric_delay_$packageName", 0)
+                                    )
+                                }
+                                BasicComponent(
+                                    title = "歌词延迟",
+                                    summary = "（正数延迟，负数提前）",
+                                    endActions = {
+                                        Text(
+                                            text = when {
+                                                delayMs == 0 -> "0ms"
+                                                delayMs > 0 -> "延后 ${delayMs}ms"
+                                                else -> "提前 ${-delayMs}ms"
+                                            },
+                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                        )
+                                    },
+                                    bottomAction = {
+                                        Slider(
+                                            value = delayMs.toFloat(),
+                                            onValueChange = {
+                                                delayMs = it.toInt()
+                                            },
+                                            onValueChangeFinished = {
+                                                PrefsBridge.putInt("lyric_delay_$packageName", delayMs)
+                                            },
+                                            valueRange = -3000f..3000f
+                                        )
+                                    },
+                                    insideMargin = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp)
+                                )
                             }
                         }
                     }

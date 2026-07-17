@@ -4,6 +4,7 @@ import android.app.Application
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.lyric.source.LyricSource
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
+import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.proify.lyricon.lyric.model.Song
@@ -121,7 +122,13 @@ class LyriconSource : LyricSource {
         }
 
         override fun onPositionChanged(position: Long) {
-            sink?.onPositionChanged(position)
+            val pkg = LyriconDataBridge.currentLyricPackageName
+            val delay = if (pkg != null) {
+                HookEntry.instance?.prefs?.getInt("lyric_delay_$pkg", 0) ?: 0
+            } else {
+                0
+            }
+            sink?.onPositionChanged(position - delay)
         }
 
         override fun onSeekTo(position: Long) {}
