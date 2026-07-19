@@ -1,0 +1,22 @@
+name: 其它反馈 (Other)
+description: 提交其它类型的反馈或讨论 / Submit other feedback or discussion
+title: "[OTHER] <简短描述您的反馈主题 / Short description of the topic>"
+labels: ["discussion"]
+body:
+  - type: input
+    id: topic
+    attributes:
+      label: 反馈主题 / Feedback Topic
+    validations:
+      required: true
+  - type: textarea
+    id: content
+    attributes:
+      label: 详细内容说明 / Detailed Specifications
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: 相关附件或截图 / Relevant Attachments or Screenshots
+      placeholder: 拖拽附件至此处上传... (Drag & drop attachments here to upload...)

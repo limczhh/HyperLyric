@@ -1,0 +1,81 @@
+name: 缺陷反馈 (Bug Report)
+description: 提交 HyperLyric 在使用过程中遇到的 Bug 反馈 / Submit bug reports for HyperLyric
+title: "[BUG] <简短描述您遇到的问题 / Short description of the issue>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        注意：本项目不接受任何移植包、官改包以及修改版 com.android.systemui 或 miui.systemui.plugin 的问题反馈。
+        Note: Bug reports from ported ROMs, custom official ROMs, or modified com.android.systemui / miui.systemui.plugin are not accepted.
+
+        提示：请在导出日志前，先在应用设置内将“日志输出等级”改为“调试日志”，然后复现一次您遇到的问题，再行导出日志。
+        Tip: Before exporting logs, please change "Log Level" to "Debug" in the app settings, reproduce the issue, and then export the logs.
+  - type: dropdown
+    id: system_platform
+    attributes:
+      label: 系统平台 / System Platform
+      options:
+        - HyperOS 3
+        - HyperOS 2
+        - 其他安卓系统 (Other Android Systems)
+    validations:
+      required: true
+  - type: input
+    id: system_platform_other
+    attributes:
+      label: 具体系统平台说明 / Detailed System Platform Specification
+  - type: dropdown
+    id: bug_aspect
+    attributes:
+      label: 问题属于哪一方面 / Which part does the bug relate to?
+      options:
+        - 通知型歌词相关的 Bug (Notification Lyric related Bug)
+        - Xposed 模块相关的 Bug (Xposed module related Bug)
+    validations:
+      required: true
+  - type: dropdown
+    id: lyric_source
+    attributes:
+      label: 歌词源 / Lyric Source
+      options:
+        - Lyricon
+        - SuperLyric
+        - LyricInfo
+        - 其他（或未使用歌词源） (Other / No source used)
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题详细描述 / Detailed Description of the Issue
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to Reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期效果 / Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: LSPosed 日志或 HyperLyric 日志 / LSPosed Logs or HyperLyric Logs
+      description: |
+        请将从 LSPosed 管理器导出的日志文件，或应用内导出的日志文件以选择或拖动文件方式直接上传，或者在此处直接粘贴您的网盘分享链接。
+        Please upload the logs exported from LSPosed manager or from within the app by dragging/dropping, or paste your cloud drive sharing link here directly.
+      placeholder: 拖拽上传文件，或在此直接粘贴网盘分享链接 (Drag & drop files here, or paste cloud drive link directly)
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图 / 录屏 / 网盘链接 / Screenshots / Screen Recordings / Cloud Drive Links
+      description: |
+        如果有的话，请将相关的错误截图或操作录屏拖入本框中上传，或者在此处直接粘贴您的网盘分享链接、屏幕录制分享链接。
+        If any, please drag & drop screenshots/recordings here, or paste cloud drive links / video sharing links directly.
+      placeholder: 拖拽上传文件，或在此直接粘贴网盘分享链接 (Drag & drop files here, or paste cloud drive link directly)

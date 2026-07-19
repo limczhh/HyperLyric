@@ -1,0 +1,16 @@
+name: 新功能建议 (Feature Request)
+description: 为 HyperLyric 提交新功能改进建议 / Submit feature suggestions for HyperLyric
+title: "[FEAT] <简短描述您的功能建议 / Short description of feature suggestion>"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: 功能建议具体描述 / Detailed Description of Feature Suggestion
+    validations:
+      required: true
+  - type: textarea
+    id: design_drafts
+    attributes:
+      label: 界面设计或效果图 / UI Design or Mockups
+      placeholder: 拖拽图片附件至此处上传... (Drag & drop image attachments here to upload...)

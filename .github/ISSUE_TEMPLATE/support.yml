@@ -1,0 +1,26 @@
+name: 问题咨询与支持 (Support)
+description: 提交有关 HyperLyric 的使用疑问与咨询 / Submit questions and support requests for HyperLyric
+title: "[SUPPORT] <简短描述您的问题 / Short description of the issue>"
+labels: ["help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 自查声明与指南 / Self-Check Declaration & Guides
+        在提交问题咨询之前，请确保您已经查阅了以下内容，许多常见的使用困惑都可以立刻得到解答：
+        Before submitting a question, please ensure you have checked the following guides, where most common issues are already addressed:
+
+        1. [README](https://github.com/limczhh/HyperLyric/blob/main/README.md)
+        2. 应用内使用帮助页面 / App Help Page
+        3. [Issue 列表 / Issue List](https://github.com/limczhh/HyperLyric/issues)
+  - type: textarea
+    id: question_description
+    attributes:
+      label: 问题详细描述 / Detailed Description of the Issue
+    validations:
+      required: true
+  - type: textarea
+    id: additional_info
+    attributes:
+      label: 其它补充信息 / 运行截图 / Other Additional Info / Screenshots
+      placeholder: 拖拽图片或补充说明... (Drag & drop images or add descriptions...)
