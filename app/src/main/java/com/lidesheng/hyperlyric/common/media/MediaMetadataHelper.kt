@@ -190,9 +190,17 @@ object MediaMetadataHelper {
     private fun MediaMetadata.toMediaInfo(): MediaInfo {
         val mediaDescription = description
         return MediaInfo(
-            title = mediaDescription.title?.toString().orEmpty(),
-            artist = mediaDescription.subtitle?.toString().orEmpty(),
-            album = mediaDescription.description?.toString().orEmpty(),
+            title = getString(MediaMetadata.METADATA_KEY_TITLE)
+                ?: getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+                ?: mediaDescription.title?.toString().orEmpty(),
+            artist = getString(MediaMetadata.METADATA_KEY_ARTIST)
+                ?: getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+                ?: getString(MediaMetadata.METADATA_KEY_AUTHOR)
+                ?: getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE)
+                ?: mediaDescription.subtitle?.toString().orEmpty(),
+            album = getString(MediaMetadata.METADATA_KEY_ALBUM)
+                ?: getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION)
+                ?: mediaDescription.description?.toString().orEmpty(),
             albumArt = extractAlbumArt(),
             duration = extractDuration()
         )
