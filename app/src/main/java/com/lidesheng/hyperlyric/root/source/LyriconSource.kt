@@ -31,6 +31,49 @@ class LyriconSource : LyricSource {
         return json.decodeFromString(jsonString)
     }
 
+    private fun cleanArtistName(artist: String?, songName: String?): String? {
+        if (artist.isNullOrBlank()) return artist
+        if (songName.isNullOrBlank()) return artist
+
+        val trimmedArtist = artist.trim()
+        val trimmedSong = songName.trim()
+
+        if (trimmedArtist.equals(trimmedSong, ignoreCase = true)) {
+            return null
+        }
+
+        var currentArtist = trimmedArtist
+        var index = currentArtist.indexOf(trimmedSong, ignoreCase = true)
+        while (index != -1) {
+            val beforeOk = index == 0 || !currentArtist[index - 1].isLetterOrDigit()
+            val afterOk = index + trimmedSong.length == currentArtist.length || !currentArtist[index + trimmedSong.length].isLetterOrDigit()
+
+            if (beforeOk && afterOk) {
+                currentArtist = currentArtist.substring(0, index) + currentArtist.substring(index + trimmedSong.length)
+                index = currentArtist.indexOf(trimmedSong, ignoreCase = true)
+            } else {
+                index = currentArtist.indexOf(trimmedSong, index + 1, ignoreCase = true)
+            }
+        }
+
+        var cleaned = currentArtist.trim()
+        val charactersToTrim = charArrayOf('-', '_', '—', '~', '～', '/', '\\', '|', '(', ')', '[', ']', '【', '】', '（', '）', ' ')
+
+        cleaned = cleaned.trim { it in charactersToTrim }.trim()
+
+        cleaned = cleaned.replace(Regex("\\(\\s*\\)"), "")
+            .replace(Regex("\\[\\s*\\]"), "")
+            .replace(Regex("\\{\\s*\\}"), "")
+            .replace(Regex("【\\s*】"), "")
+            .replace(Regex("（\\s*）"), "")
+            .trim { it in charactersToTrim }
+            .trim()
+
+        cleaned = cleaned.replace(Regex("\\s+"), " ")
+
+        return if (cleaned.isBlank()) null else cleaned
+    }
+
     override val id = "lyricon"
     override val displayName = "Lyricon"
 
@@ -146,7 +189,9 @@ class LyriconSource : LyricSource {
 
 
         override fun onSongChanged(song: Song?) {
-            val localSong = song?.toLocalSong()
+            val localSong = song?.toLocalSong()?.apply {
+                artist = cleanArtistName(artist, name)
+            }
             LyriconDataBridge.updateSong(localSong)
             sink?.onSongChanged(localSong)
             BaseIslandRenderer.refreshActiveIsland()
