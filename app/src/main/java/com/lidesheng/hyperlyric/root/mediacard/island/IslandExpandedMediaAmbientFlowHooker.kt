@@ -1383,8 +1383,8 @@ object IslandExpandedMediaAmbientFlowHooker {
                 current = current?.parent as? View ?: return null
                 if (current.javaClass.name == EXPANDED_VIEW_CLASS) expandedView = current
                 if (expandedView != null && current.javaClass.isOrExtends(BASE_CONTENT_VIEW_CLASS)) {
-                    val owner = current ?: return null
-                    val expanded = expandedView ?: return null
+                    val owner = current
+                    val expanded = expandedView
                     fun dimension(name: String): Int {
                         return (owner.javaClass.methods.single {
                             it.name == name && it.parameterTypes.isEmpty()

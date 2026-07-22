@@ -36,8 +36,10 @@ object ContributorsProvider {
                 val drawableName = "contributor_" + safeLogin
                 
                 try {
+                    val drawableDir = File(projectDir, "src/main/res/drawable")
+                    drawableDir.listFiles()?.filter { it.name.startsWith(drawableName + ".") }?.forEach { it.delete() }
                     val imgBytes = URL(avatarUrl).readBytes()
-                    File(projectDir, "src/main/res/drawable/" + drawableName + ".png").writeBytes(imgBytes)
+                    File(drawableDir, "$drawableName.png").writeBytes(imgBytes)
                 } catch(e: Exception) {
                     println("Failed to download avatar for " + login)
                 }

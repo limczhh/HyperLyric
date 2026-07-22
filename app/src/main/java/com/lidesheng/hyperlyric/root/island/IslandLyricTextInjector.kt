@@ -395,8 +395,8 @@ internal object IslandLyricTextInjector {
     }
 
     fun linkViews(rootView: ViewGroup) {
-        val leftView = rootView.findViewWithTag<SpaceGateRichLyricLineView>(IslandProbeUtils.LEFT_TEST_VIEW_TAG)
-        val rightView = rootView.findViewWithTag<SpaceGateRichLyricLineView>(IslandProbeUtils.RIGHT_TEST_VIEW_TAG)
+        val leftView = rootView.findViewWithTag<View>(IslandProbeUtils.LEFT_TEST_VIEW_TAG) as? SpaceGateRichLyricLineView
+        val rightView = rootView.findViewWithTag<View>(IslandProbeUtils.RIGHT_TEST_VIEW_TAG) as? SpaceGateRichLyricLineView
 
         leftView?.main?.spaceGateEnabled = false
         leftView?.secondary?.spaceGateEnabled = false

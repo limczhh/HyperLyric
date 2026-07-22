@@ -325,7 +325,8 @@ internal object IslandMusicWaveColorHooker {
             val result = chain.proceed()
             runCatching {
                 val bitmap = chain.args.firstOrNull() as? Bitmap ?: return@runCatching
-                nativeColors = colorAccessor?.read()
+                val holder = chain.thisObject
+                nativeColors = colorAccessor?.read(holder)
 
                 val sharedPrefs = prefs ?: return@runCatching
                 if (!isEnabled(sharedPrefs)) {
@@ -367,7 +368,7 @@ internal object IslandMusicWaveColorHooker {
                 }
                 val sharedPrefs = prefs
                 if (sharedPrefs != null && isEnabled(sharedPrefs)) {
-                    desiredColors?.let { colorAccessor?.write(it) }
+                    desiredColors?.let { colorAccessor?.write(it, holder) }
                 }
                 lottieView.invalidate()
             }.onFailure { e ->
@@ -393,14 +394,30 @@ internal object IslandMusicWaveColorHooker {
         val topField: Field,
         val bottomField: Field
     ) {
-        fun read(): WaveColors = WaveColors(
-            top = topField.getInt(null),
-            bottom = bottomField.getInt(null)
+        fun read(holder: Any? = null): WaveColors = WaveColors(
+            top = getInt(topField, holder),
+            bottom = getInt(bottomField, holder)
         )
 
-        fun write(colors: WaveColors) {
-            topField.setInt(null, colors.top)
-            bottomField.setInt(null, colors.bottom)
+        fun write(colors: WaveColors, holder: Any? = null) {
+            setInt(topField, colors.top, holder)
+            setInt(bottomField, colors.bottom, holder)
+        }
+
+        private fun getInt(field: Field, holder: Any?): Int {
+            return if (java.lang.reflect.Modifier.isStatic(field.modifiers)) {
+                field.getInt(null)
+            } else {
+                field.getInt(holder)
+            }
+        }
+
+        private fun setInt(field: Field, value: Int, holder: Any?) {
+            if (java.lang.reflect.Modifier.isStatic(field.modifiers)) {
+                field.setInt(null, value)
+            } else if (holder != null) {
+                field.setInt(holder, value)
+            }
         }
     }
 }
