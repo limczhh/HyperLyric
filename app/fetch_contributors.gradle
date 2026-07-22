@@ -1,0 +1,78 @@
+import groovy.json.JsonSlurper
+import java.net.URL
+import java.io.File
+
+tasks.register("generateContributors") {
+    doLast {
+        try {
+            def url = new URL("https://api.github.com/repos/limczhh/HyperLyric/contributors")
+            def connection = url.openConnection()
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+            def response = connection.getInputStream().getText("UTF-8")
+            
+            def jsonParser = new JsonSlurper()
+            def contributors = jsonParser.parseText(response)
+            
+            def content = """package com.lidesheng.hyperlyric.ui.utils
+
+data class ContributorItem(
+    val name: String,
+    val summary: String,
+    val githubUrl: String,
+    val avatarRes: Int
+)
+
+object ContributorsProvider {
+    val list = listOf(
+"""
+            for (user in contributors) {
+                def login = user.login
+                def htmlUrl = user.html_url
+                // GitHub 头像 URL 默认带有 ?v=4 等参数，我们直接追加 &s=120 限制分辨率为 120x120
+                def avatarUrl = user.avatar_url + "&s=120"
+                if (login.endsWith("[bot]")) continue
+                
+                def safeLogin = login.toLowerCase().replace("-", "_")
+                def drawableName = "contributor_" + safeLogin
+                
+                try {
+                    def imgBytes = new URL(avatarUrl).getBytes()
+                    def ext = ".png"
+                    if (imgBytes.length >= 2 && imgBytes[0] == (byte) 0xFF && imgBytes[1] == (byte) 0xD8) {
+                        ext = ".jpg"
+                    } else if (imgBytes.length >= 4 && imgBytes[0] == (byte) 0x52 && imgBytes[1] == (byte) 0x49 && imgBytes[2] == (byte) 0x46 && imgBytes[3] == (byte) 0x46) {
+                        ext = ".webp"
+                    } else if (imgBytes.length >= 3 && imgBytes[0] == (byte) 0x47 && imgBytes[1] == (byte) 0x49 && imgBytes[2] == (byte) 0x46) {
+                        ext = ".gif"
+                    }
+                    new File(projectDir, "src/main/res/drawable/" + drawableName + ext).bytes = imgBytes
+                } catch(Exception e) {
+                    println("Failed to download avatar for " + login)
+                }
+                
+                def name = login
+                try {
+                    def userUrl = new URL("https://api.github.com/users/" + login)
+                    def userConn = userUrl.openConnection()
+                    userConn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    def userResp = userConn.getInputStream().getText("UTF-8")
+                    def userDetail = jsonParser.parseText(userResp)
+                    if (userDetail.name) {
+                        name = userDetail.name
+                    }
+                } catch(Exception e) {
+                    // Fallback to login
+                }
+                
+                content += "        ContributorItem(\"" + name + "\", \"@" + login + "\", \"" + htmlUrl + "\", com.lidesheng.hyperlyric.R.drawable." + drawableName + "),\n"
+            }
+            content += "    )\n}\n"
+            
+            def file = new File(projectDir, "src/main/java/com/lidesheng/hyperlyric/ui/utils/ContributorsProvider.kt")
+            file.text = content
+            println("ContributorsProvider.kt generated.")
+        } catch (Exception e) {
+            println("Failed to fetch contributors: " + e.message)
+        }
+    }
+}

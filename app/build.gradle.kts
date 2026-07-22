@@ -130,7 +130,7 @@ dependencies {
     implementation(libs.daimajia.easing) { artifact { type = "aar" } }
 }
 
-apply(from = "fetch_contributors.gradle.kts")
+apply(from = "fetch_contributors.gradle")
 tasks.named("preBuild") {
     dependsOn("generateContributors")
 }

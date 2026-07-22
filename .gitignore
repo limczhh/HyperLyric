@@ -25,4 +25,4 @@ app/src/test
 AGENTS.md
 CLAUDE.md
 app/src/main/java/com/lidesheng/hyperlyric/ui/utils/ContributorsProvider.kt
-app/src/main/res/drawable/contributor_*.png
+app/src/main/res/drawable/contributor_*
