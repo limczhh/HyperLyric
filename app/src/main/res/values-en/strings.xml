@@ -396,9 +396,9 @@
     <string name="summary_help_supported_devices">Only supports HyperOS 3 devices with LSPosed v2.0+ installed</string>
     <string name="summary_help_prerequisites">① Enable HyperLyric in LSPosed and turn on the \"Super Island Lyrics\" switch on the home page\n② Select a lyric source and download the corresponding provider\n③ Restart System UI or reboot your device as required by the lyric source</string>
     <string name="title_help_lyric_sources">Lyric Sources</string>
-    <string name="summary_help_source_lyricon">Restart System UI</string>
-    <string name="summary_help_source_superlyric">Reboot device</string>
-    <string name="summary_help_source_lyricinfo">Restart System UI</string>
+    <string name="summary_help_source_lyricon">Requires installing and enabling Lyricon Central and the corresponding lyric provider plugin for your music app. Restart SystemUI to apply. \nAfter each SystemUI restart, you need to restart the music app to receive lyrics properly. If lyrics are missing, it may be due to incompatibility between the lyric provider and your music app, rather than HyperLyric. \nYou can visit the Help page to download relevant plugins.</string>
+    <string name="summary_help_source_superlyric">Requires the SuperLyric module. Please restart your device on first use to activate SuperLyric. \nCheck the SuperLyric app for app-specific setup instructions. If no lyrics are shown, enable API test in the SuperLyric app to verify if lyrics are output; it may be an incompatibility between SuperLyric and your music app rather than HyperLyric. \nDue to SuperLyric\'s output limitations, "Show Next Lyric Line" and "AI Translation" are unavailable. \nYou can visit the Help page to download relevant plugins.</string>
+    <string name="summary_help_source_lyricinfo">Extracts lyrics based on system media metadata. You can visit the Help page to view the list of supported music apps and related details.</string>
     <string name="tag_download_lyricon">Download Lyricon Api</string>
     <string name="tag_download_providers">Download LyricProvider</string>
     <string name="tag_download_superlyric">Download SuperLyric</string>
