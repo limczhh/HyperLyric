@@ -21,6 +21,33 @@ object CoverColorHelper {
         album: String,
         duration: Long = -1L
     ): String {
+        val mediaKey = buildMediaKey(packageName, title, artist, album, duration)
+        activeMediaKey = mediaKey
+        return mediaKey
+    }
+
+    /**
+     * 只解析歌曲键，不改变当前活动歌曲。
+     * 原生 MusicWave 回调可能晚于歌词渲染到达，不能让它把活动键切回旧歌。
+     */
+    @Synchronized
+    fun resolveMediaKey(
+        packageName: String,
+        title: String,
+        artist: String,
+        album: String,
+        duration: Long = -1L
+    ): String {
+        return buildMediaKey(packageName, title, artist, album, duration)
+    }
+
+    private fun buildMediaKey(
+        packageName: String,
+        title: String,
+        artist: String,
+        album: String,
+        duration: Long
+    ): String {
         val lyricSong = LyriconDataBridge.currentSong?.takeIf {
             val lyricPackage = LyriconDataBridge.currentLyricPackageName
             (lyricPackage.isNullOrBlank() ||
@@ -48,9 +75,7 @@ object CoverColorHelper {
                 resolvedTitle.isBlank() && resolvedArtist.isBlank()
             }.orEmpty()
         ).joinToString("\u001F")
-        val mediaKey = "${packageName.normalizeMediaText()}\u001F$identity"
-        activeMediaKey = mediaKey
-        return mediaKey
+        return "${packageName.normalizeMediaText()}\u001F$identity"
     }
 
     @Synchronized

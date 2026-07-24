@@ -13,11 +13,13 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.IslandLyricTextInjector
+import com.lidesheng.hyperlyric.root.island.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.IslandSlotContentAssembler
 import com.lidesheng.hyperlyric.root.island.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.IslandViewRegistry
+import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 object BaseIslandRenderer : IslandRenderer {
@@ -54,7 +56,11 @@ object BaseIslandRenderer : IslandRenderer {
         mainHandler.postDelayed(refreshRunnable, REFRESH_DEBOUNCE_MS)
     }
 
-    fun refreshAlbumColors(packageName: String, albumArt: Bitmap) {
+    fun refreshAlbumColors(
+        packageName: String,
+        albumArt: Bitmap,
+        expectedMediaColorKey: String? = null
+    ) {
         if (albumArt.isRecycled) return
         mainHandler.post refresh@{
             if (albumArt.isRecycled ||
@@ -77,6 +83,29 @@ object BaseIslandRenderer : IslandRenderer {
                     val mediaInfo = MediaMetadataHelper
                         .getMediaInfo(rootView.context, packageName, HookLogger)
                         .copy(albumArt = albumArt)
+                    val currentMediaColorKey = CoverColorHelper.resolveMediaKey(
+                        packageName = packageName,
+                        title = mediaInfo.title,
+                        artist = mediaInfo.artist,
+                        album = mediaInfo.album,
+                        duration = mediaInfo.duration
+                    )
+                    if (expectedMediaColorKey != null &&
+                        currentMediaColorKey != expectedMediaColorKey
+                    ) {
+                        HookLogger.d(
+                            "BaseIslandRenderer",
+                            "忽略已过期的原生封面颜色刷新"
+                        )
+                        return@updateColors
+                    }
+                    CoverColorHelper.updateMediaSession(
+                        packageName = packageName,
+                        title = mediaInfo.title,
+                        artist = mediaInfo.artist,
+                        album = mediaInfo.album,
+                        duration = mediaInfo.duration
+                    )
                     refreshSlotColors(
                         rootView,
                         IslandProbeUtils.LEFT_TEST_VIEW_TAG,
@@ -99,6 +128,7 @@ object BaseIslandRenderer : IslandRenderer {
                         mediaInfo,
                         prefs
                     )
+                    IslandMusicWaveColorHooker.refresh()
                 }
             }
         }
@@ -337,6 +367,7 @@ object BaseIslandRenderer : IslandRenderer {
         IslandHostFacade.updateProgressGlow(cv, packageName, mediaInfo, prefs)
         updateSlot(cv, IslandProbeUtils.LEFT_TEST_VIEW_TAG, config.leftMode, prefs, config, mediaInfo)
         updateSlot(cv, IslandProbeUtils.RIGHT_TEST_VIEW_TAG, config.rightMode, prefs, config, mediaInfo)
+        IslandMusicWaveColorHooker.refresh()
     }
 
     private fun updateLyricContentForView(
