@@ -80,8 +80,8 @@ internal object IslandTextHookerSupport {
 
     /** Clears the current lyric presentation but keeps the real island registered for resume. */
     fun clearInjectedIsland(viewGroup: ViewGroup, suppressRelayout: Boolean = false) {
-        IslandHostFacade.clearInjectedViews(viewGroup)
-        if (!suppressRelayout) {
+        val changed = IslandHostFacade.clearInjectedViews(viewGroup)
+        if (!suppressRelayout && changed) {
             IslandHostFacade.triggerSystemRelayout(viewGroup)
         }
     }

@@ -15,6 +15,7 @@ object IslandViewHelper {
 
     private val SYSTEMUI_PKG_NAMES = arrayOf("miui.systemui.plugin", "com.android.systemui")
     private val originalMargins = WeakHashMap<View, MarginSnapshot>()
+    private val originalVisibilities = WeakHashMap<View, Int>()
     private val isRelayouting = ThreadLocal.withInitial { false }
 
     /**
@@ -30,7 +31,12 @@ object IslandViewHelper {
                 for (pkg in SYSTEMUI_PKG_NAMES) {
                     val id = res.getIdentifier(containerName, "id", pkg)
                     if (id != 0) {
-                        parent.findViewById<View>(id)?.visibility = if (show) View.VISIBLE else View.GONE
+                        parent.findViewById<View>(id)?.let { container ->
+                            setVisibilityForInjection(
+                                container,
+                                if (show) View.VISIBLE else View.GONE
+                            )
+                        }
                     }
                 }
             }
@@ -56,8 +62,10 @@ object IslandViewHelper {
                         if (textContainer != null) {
                             val lp = textContainer.layoutParams as? ViewGroup.MarginLayoutParams
                             if (lp != null) {
-                                originalMargins.getOrPut(textContainer) {
-                                    MarginSnapshot(lp.marginStart, lp.marginEnd)
+                                synchronized(originalMargins) {
+                                    originalMargins.getOrPut(textContainer) {
+                                        MarginSnapshot(lp.marginStart, lp.marginEnd)
+                                    }
                                 }
                                 if (clearStart) lp.marginStart = 0
                                 if (clearEnd) lp.marginEnd = 0
@@ -75,33 +83,75 @@ object IslandViewHelper {
     /**
      * 清理所有注入的视图并恢复系统原生组件
      */
-    fun clearInjectedViews(rootView: ViewGroup) {
-        hideInjectedView(rootView, IslandProbeUtils.LEFT_TEST_VIEW_TAG)
-        hideInjectedView(rootView, IslandProbeUtils.LEFT_TEST_WRAPPER_TAG)
-        hideInjectedView(rootView, IslandProbeUtils.RIGHT_TEST_VIEW_TAG)
-        hideInjectedView(rootView, IslandProbeUtils.RIGHT_TEST_WRAPPER_TAG)
-        hideInjectedView(rootView, "HYPERLYRIC_TEST_VIEW_WRAPPER_LEFT")
-        hideInjectedView(rootView, "HYPERLYRIC_TEST_VIEW_WRAPPER_RIGHT")
- 
-        // 恢复系统原有组件的可见性
-        toggleContainer(rootView, "island_container_module_image_text_1", "island_container_module_icon", true)
-        toggleContainer(rootView, "island_container_module_image_text_2", "island_container_module_icon", true)
+    fun clearInjectedViews(rootView: ViewGroup): Boolean {
+        val hasNativeState = hasRememberedNativeState(rootView)
+        val hiddenCount =
+            hideInjectedSlot(
+                rootView,
+                IslandProbeUtils.LEFT_TEST_WRAPPER_TAG,
+                IslandProbeUtils.LEFT_TEST_VIEW_TAG
+            ) +
+                hideInjectedSlot(
+                    rootView,
+                    IslandProbeUtils.RIGHT_TEST_WRAPPER_TAG,
+                    IslandProbeUtils.RIGHT_TEST_VIEW_TAG
+                ) +
+                hideInjectedView(rootView, "HYPERLYRIC_TEST_VIEW_WRAPPER_LEFT") +
+                hideInjectedView(rootView, "HYPERLYRIC_TEST_VIEW_WRAPPER_RIGHT")
 
+        if (!hasNativeState && hiddenCount == 0) return false
+
+        restoreContainerVisibility(rootView, IslandProbeUtils.LEFT_PARENT_NAME, "island_container_module_icon")
+        restoreContainerVisibility(rootView, IslandProbeUtils.RIGHT_PARENT_NAME, "island_container_module_icon")
+        restoreContainerVisibility(rootView, IslandProbeUtils.LEFT_PARENT_NAME, IslandProbeUtils.TEXT_CONTAINER_NAME)
+        restoreContainerVisibility(rootView, IslandProbeUtils.RIGHT_PARENT_NAME, IslandProbeUtils.TEXT_CONTAINER_NAME)
         restoreTextContainerMargins(rootView, "island_container_module_image_text_1")
         restoreTextContainerMargins(rootView, "island_container_module_image_text_2")
         showOriginalTexts(rootView, "island_container_module_image_text_1")
         showOriginalTexts(rootView, "island_container_module_image_text_2")
+
+        if (hiddenCount > 0) {
+            HookLogger.d("IslandViewHelper", "已隐藏歌词注入视图并恢复原生媒体岛: 数量=$hiddenCount")
+        }
+        return true
     }
 
-    private fun hideInjectedView(rootView: ViewGroup, tag: String) {
-        val view = rootView.findViewWithTag<View>(tag) ?: return
+    fun showForInjection(view: View) {
+        setVisibilityForInjection(view, View.VISIBLE)
+    }
+
+    fun hideNativeChildren(container: ViewGroup, keepView: View) {
+        for (index in 0 until container.childCount) {
+            val child = container.getChildAt(index)
+            if (child === keepView) {
+                child.visibility = View.VISIBLE
+                continue
+            }
+            val tag = child.tag as? String
+            if (tag?.startsWith("HYPERLYRIC") == true) continue
+            rememberOriginalVisibility(child)
+            child.visibility = View.GONE
+        }
+    }
+
+    private fun hideInjectedSlot(rootView: ViewGroup, wrapperTag: String, targetTag: String): Int {
+        if (rootView.findViewWithTag<View>(wrapperTag) != null) {
+            return hideInjectedView(rootView, wrapperTag)
+        }
+        return hideInjectedView(rootView, targetTag)
+    }
+
+    private fun hideInjectedView(rootView: ViewGroup, tag: String): Int {
+        val view = rootView.findViewWithTag<View>(tag) ?: return 0
         val wrapper = view as? MaxWidthFrameLayout
         if (wrapper == null && view.javaClass.name == MaxWidthFrameLayout::class.java.name) {
             (view.parent as? ViewGroup)?.removeView(view)
-            return
+            return 1
         }
+        val changed = view.visibility != View.GONE || wrapper?.keepVisible == true
         wrapper?.keepVisible = false
         view.visibility = View.GONE
+        return if (changed) 1 else 0
     }
 
     /**
@@ -110,19 +160,15 @@ object IslandViewHelper {
     @SuppressLint("DiscouragedApi")
     fun showOriginalTexts(rootView: ViewGroup, parentName: String) {
         try {
-            val res = rootView.resources
-            val slotId = res.getIdentifier(parentName, "id", "miui.systemui.plugin")
-            if (slotId == 0) return
-            val parent = rootView.findViewById<ViewGroup>(slotId) ?: return
-            
-            val textSlotId = res.getIdentifier("island_container_module_text", "id", "miui.systemui.plugin")
-            val container = if (textSlotId != 0) (parent.findViewById(textSlotId) ?: parent) else parent
+            val parent = findViewByName(rootView, parentName) as? ViewGroup ?: return
+            val container = findViewByName(parent, IslandProbeUtils.TEXT_CONTAINER_NAME) as? ViewGroup
+                ?: parent
 
             for (i in 0 until container.childCount) {
                 val child = container.getChildAt(i)
                 val tag = child.tag as? String ?: ""
                 if (!tag.startsWith("HYPERLYRIC")) {
-                    child.visibility = View.VISIBLE
+                    restoreVisibility(child, View.VISIBLE)
                 }
             }
         } catch (e: Exception) {
@@ -178,12 +224,68 @@ object IslandViewHelper {
     private fun restoreTextContainerMargins(rootView: ViewGroup, parentName: String) {
         val parent = findViewByName(rootView, parentName) as? ViewGroup ?: return
         val container = findViewByName(parent, "island_container_module_text") ?: return
-        val snapshot = originalMargins[container] ?: return
+        val snapshot = synchronized(originalMargins) {
+            originalMargins.remove(container)
+        } ?: return
         val lp = container.layoutParams as? ViewGroup.MarginLayoutParams ?: return
         if (lp.marginStart != snapshot.marginStart || lp.marginEnd != snapshot.marginEnd) {
             lp.marginStart = snapshot.marginStart
             lp.marginEnd = snapshot.marginEnd
             container.layoutParams = lp
+        }
+    }
+
+    private fun restoreContainerVisibility(rootView: ViewGroup, parentName: String, containerName: String) {
+        val parent = findViewByName(rootView, parentName) as? ViewGroup ?: return
+        val container = findViewByName(parent, containerName) ?: return
+        restoreVisibility(container, View.VISIBLE)
+    }
+
+    private fun setVisibilityForInjection(view: View, visibility: Int) {
+        rememberOriginalVisibility(view)
+        view.visibility = visibility
+    }
+
+    private fun rememberOriginalVisibility(view: View) {
+        synchronized(originalVisibilities) {
+            originalVisibilities.getOrPut(view) { view.visibility }
+        }
+    }
+
+    private fun restoreVisibility(view: View, fallback: Int) {
+        val visibility = synchronized(originalVisibilities) {
+            originalVisibilities.remove(view)
+        } ?: fallback
+        view.visibility = visibility
+    }
+
+    private fun hasRememberedNativeState(rootView: ViewGroup): Boolean {
+        for (parentName in arrayOf(IslandProbeUtils.LEFT_PARENT_NAME, IslandProbeUtils.RIGHT_PARENT_NAME)) {
+            val parent = findViewByName(rootView, parentName) as? ViewGroup ?: continue
+            val icon = findViewByName(parent, "island_container_module_icon")
+            val text = findViewByName(parent, IslandProbeUtils.TEXT_CONTAINER_NAME)
+            if (icon != null && hasRememberedVisibility(icon)) return true
+            if (text != null) {
+                if (hasRememberedVisibility(text) || hasRememberedMargin(text)) return true
+                if (text is ViewGroup) {
+                    for (index in 0 until text.childCount) {
+                        if (hasRememberedVisibility(text.getChildAt(index))) return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    private fun hasRememberedVisibility(view: View): Boolean {
+        return synchronized(originalVisibilities) {
+            originalVisibilities.containsKey(view)
+        }
+    }
+
+    private fun hasRememberedMargin(view: View): Boolean {
+        return synchronized(originalMargins) {
+            originalMargins.containsKey(view)
         }
     }
 

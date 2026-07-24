@@ -151,7 +151,7 @@ internal object IslandLyricTextInjector {
 
         val wrapperTag = "${viewTag}_WRAPPER"
 
-        container.visibility = View.VISIBLE
+        IslandViewHelper.showForInjection(container)
 
         val prefs = HookEntry.instance?.prefs ?: return false
 
@@ -183,7 +183,7 @@ internal object IslandLyricTextInjector {
                 changed = true
             }
             changed = forceWrapperLayout(existingWrapper, container, widthPx) || changed
-            hideNativeChildren(container, existingWrapper)
+            IslandViewHelper.hideNativeChildren(container, existingWrapper)
             return changed
         }
 
@@ -199,7 +199,7 @@ internal object IslandLyricTextInjector {
         container.addView(wrapperView, FrameLayout.LayoutParams(wrapperLayoutWidth(config), FrameLayout.LayoutParams.MATCH_PARENT).apply {
             gravity = Gravity.CENTER_VERTICAL
         })
-        hideNativeChildren(container, wrapperView)
+        IslandViewHelper.hideNativeChildren(container, wrapperView)
 
         forceWrapperLayout(wrapperView, container, widthPx)
 
@@ -217,7 +217,7 @@ internal object IslandLyricTextInjector {
         var changed = false
         wrapper.keepVisible = true
         if (container.visibility != View.VISIBLE) {
-            container.visibility = View.VISIBLE
+            IslandViewHelper.showForInjection(container)
             changed = true
         }
         if (wrapper.visibility != View.VISIBLE) {
@@ -228,7 +228,7 @@ internal object IslandLyricTextInjector {
             targetView.visibility = View.VISIBLE
             changed = true
         }
-        hideNativeChildren(container, wrapper)
+        IslandViewHelper.hideNativeChildren(container, wrapper)
         return changed
     }
 
@@ -241,7 +241,7 @@ internal object IslandLyricTextInjector {
         var changed = false
         wrapper.keepVisible = true
         if (container.visibility != View.VISIBLE) {
-            container.visibility = View.VISIBLE
+            IslandViewHelper.showForInjection(container)
             changed = true
         }
         if (wrapper.visibility != View.VISIBLE) {
@@ -252,7 +252,7 @@ internal object IslandLyricTextInjector {
             targetView.visibility = View.VISIBLE
             changed = true
         }
-        hideNativeChildren(container, wrapper)
+        IslandViewHelper.hideNativeChildren(container, wrapper)
         return changed
     }
 
@@ -408,10 +408,4 @@ internal object IslandLyricTextInjector {
         }
     }
 
-    private fun hideNativeChildren(container: ViewGroup, keepView: View) {
-        for (i in 0 until container.childCount) {
-            val child = container.getChildAt(i)
-            child.visibility = if (child == keepView) View.VISIBLE else View.GONE
-        }
-    }
 }

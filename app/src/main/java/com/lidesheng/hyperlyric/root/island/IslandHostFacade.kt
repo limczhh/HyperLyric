@@ -51,14 +51,17 @@ internal object IslandHostFacade {
     }
 
     fun clearAndRefresh(rootView: ViewGroup) {
-        IslandViewHelper.clearInjectedViews(rootView)
+        val changed = IslandViewHelper.clearInjectedViews(rootView)
         IslandProgressGlowController.clear(rootView)
-        IslandViewHelper.triggerSystemRelayout(rootView)
+        if (changed) {
+            IslandViewHelper.triggerSystemRelayout(rootView)
+        }
     }
 
-    fun clearInjectedViews(rootView: ViewGroup) {
-        IslandViewHelper.clearInjectedViews(rootView)
+    fun clearInjectedViews(rootView: ViewGroup): Boolean {
+        val changed = IslandViewHelper.clearInjectedViews(rootView)
         IslandProgressGlowController.clear(rootView)
+        return changed
     }
 
     fun triggerSystemRelayout(rootView: ViewGroup) {
