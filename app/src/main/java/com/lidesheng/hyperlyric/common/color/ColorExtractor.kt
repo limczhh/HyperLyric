@@ -153,7 +153,15 @@ object ColorExtractor {
     private fun kMeansLabOptimized(lArr: FloatArray, aArr: FloatArray, bArr: FloatArray, wArr: FloatArray, k: Int): List<FloatArray> {
         val size = lArr.size
         val cL = FloatArray(k); val cA = FloatArray(k); val cB = FloatArray(k); val assignments = IntArray(size)
-        repeat(k) { i -> val idx = Random.nextInt(size); cL[i] = lArr[idx]; cA[i] = aArr[idx]; cB[i] = bArr[idx] }
+        var seed = 1
+        val seedStep = maxOf(1, size / 256)
+        for (i in 0 until size step seedStep) {
+            seed = 31 * seed + lArr[i].toBits()
+            seed = 31 * seed + aArr[i].toBits()
+            seed = 31 * seed + bArr[i].toBits()
+        }
+        val random = Random(seed)
+        repeat(k) { i -> val idx = random.nextInt(size); cL[i] = lArr[idx]; cA[i] = aArr[idx]; cB[i] = bArr[idx] }
         repeat(KMEANS_ITERATIONS) {
             for (i in 0 until size) {
                 var minDist = Float.MAX_VALUE; var closest = 0

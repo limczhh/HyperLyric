@@ -99,7 +99,8 @@ object HookIslandGlow {
                 packageName = pkgName,
                 title = mediaInfo.title,
                 artist = mediaInfo.artist,
-                album = mediaInfo.album
+                album = mediaInfo.album,
+                duration = mediaInfo.duration
             )
             val useGradient = sharedPrefs.getBoolean(
                 RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_GRADIENT,

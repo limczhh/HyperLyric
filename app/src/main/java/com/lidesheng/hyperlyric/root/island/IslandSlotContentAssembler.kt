@@ -55,7 +55,8 @@ internal object IslandSlotContentAssembler {
             packageName = LyriconDataBridge.currentLyricPackageName.orEmpty(),
             title = lyricTitle ?: mediaInfo.title,
             artist = lyricArtist ?: mediaInfo.artist,
-            album = mediaInfo.album
+            album = mediaInfo.album,
+            duration = mediaInfo.duration
         )
         val albumBitmap = mediaInfo.albumArt.takeUnless {
             lyricTitle != null &&

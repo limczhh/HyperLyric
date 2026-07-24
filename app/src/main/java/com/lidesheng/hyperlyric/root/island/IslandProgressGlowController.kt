@@ -251,7 +251,8 @@ internal object IslandProgressGlowController {
                 packageName = packageName,
                 title = it.title,
                 artist = it.artist,
-                album = it.album
+                album = it.album,
+                duration = it.duration
             )
         } ?: CoverColorHelper.currentMediaKey()
         val palette = mediaInfo?.albumArt?.let {
