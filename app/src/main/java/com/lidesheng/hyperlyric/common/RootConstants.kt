@@ -62,7 +62,6 @@ object RootConstants {
     const val KEY_HOOK_ISLAND_EXPANDED_MEDIA_SOFT_COVER_TONE =
         "key_hook_island_expanded_media_soft_cover_tone"
 
-    const val KEY_HOOK_MAX_LEFT_WIDTH = "key_hook_max_left_width"
     const val KEY_HOOK_REMOVE_FOCUS_WHITELIST = "key_hook_remove_focus_whitelist"
     const val KEY_HOOK_REMOVE_ISLAND_WHITELIST = "key_hook_remove_island_whitelist"
 
@@ -79,7 +78,6 @@ object RootConstants {
     const val KEY_HOOK_ISLAND_MUSIC_WAVE_GRADIENT = "key_hook_island_music_wave_gradient"
 
     // ================= ANIMATION & MARQUEE KEYS =================
-    const val KEY_HOOK_ANIM_MODE = "key_hook_anim_mode"
     const val KEY_HOOK_ANIM_ENABLE = "key_hook_anim_enable"
     const val KEY_HOOK_ANIM_ID = "key_hook_anim_id"
     const val KEY_HOOK_MARQUEE_MODE = "key_hook_marquee_mode"
@@ -152,17 +150,16 @@ object RootConstants {
     const val ISLAND_ALBUM_COVER_STYLE_APP_ICON = 2
     const val ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE = 3
     const val DEFAULT_HOOK_ISLAND_ALBUM_COVER_STYLE = ISLAND_ALBUM_COVER_STYLE_DEFAULT
-    const val DEFAULT_HOOK_MAX_LEFT_WIDTH = 100
     const val DEFAULT_HOOK_REMOVE_FOCUS_WHITELIST = false
     const val DEFAULT_HOOK_REMOVE_ISLAND_WHITELIST = false
     const val DEFAULT_HOOK_ISLAND_CONTENT_LEFT = 5
     const val DEFAULT_HOOK_ISLAND_CONTENT_RIGHT = 7
-    const val DEFAULT_HOOK_ISLAND_LEFT_PADDING_LEFT = 5
+    const val DEFAULT_HOOK_ISLAND_LEFT_PADDING_LEFT = 2
     const val DEFAULT_HOOK_ISLAND_LEFT_PADDING_RIGHT = 0
     const val DEFAULT_HOOK_ISLAND_RIGHT_PADDING_LEFT = 0
     const val DEFAULT_HOOK_ISLAND_RIGHT_PADDING_RIGHT = 0
-    const val DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH = 80
-    const val DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH = 100
+    const val DEFAULT_HOOK_ISLAND_LEFT_CONTENT_MAX_WIDTH = 70
+    const val DEFAULT_HOOK_ISLAND_RIGHT_CONTENT_MAX_WIDTH = 72
     const val DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE = 0
     const val NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED = 0
     const val NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DYNAMIC = 1
@@ -233,22 +230,22 @@ object RootConstants {
     const val DEFAULT_HOOK_FADING_EDGE_LENGTH = 15
     const val DEFAULT_HOOK_GRADIENT_PROGRESS = true
     const val DEFAULT_HOOK_CENTER_LYRIC = false
-    const val DEFAULT_HOOK_ISLAND_RIGHT_ICON = false
+    const val DEFAULT_HOOK_ISLAND_RIGHT_ICON = true
     const val DEFAULT_HOOK_ISLAND_MUSIC_WAVE_COLOR = false
     const val DEFAULT_HOOK_ISLAND_MUSIC_WAVE_GRADIENT = false
 
     const val DEFAULT_HOOK_ANIM_ENABLE = false
-    const val DEFAULT_HOOK_ANIM_ID = "yoyo_default"
+    const val DEFAULT_HOOK_ANIM_ID = "default"
     const val DEFAULT_HOOK_MARQUEE_MODE = false
     const val DEFAULT_HOOK_MARQUEE_SPEED = 30
     const val DEFAULT_HOOK_MARQUEE_DELAY = 1500
     const val DEFAULT_HOOK_MARQUEE_LOOP_DELAY = 1000
     const val DEFAULT_HOOK_MARQUEE_INFINITE = false
     const val DEFAULT_HOOK_MARQUEE_STOP_END = true
-    const val DEFAULT_HOOK_MARQUEE_METADATA_SPEED = 25
+    const val DEFAULT_HOOK_MARQUEE_METADATA_SPEED = 10
     const val DEFAULT_HOOK_MARQUEE_METADATA_MODE = true
-    const val DEFAULT_HOOK_MARQUEE_METADATA_DELAY = 1000
-    const val DEFAULT_HOOK_MARQUEE_METADATA_LOOP_DELAY = 0
+    const val DEFAULT_HOOK_MARQUEE_METADATA_DELAY = 4000
+    const val DEFAULT_HOOK_MARQUEE_METADATA_LOOP_DELAY = 5000
     const val DEFAULT_HOOK_MARQUEE_METADATA_INFINITE = true
 
     const val DEFAULT_HOOK_SYLLABLE_RELATIVE = true
