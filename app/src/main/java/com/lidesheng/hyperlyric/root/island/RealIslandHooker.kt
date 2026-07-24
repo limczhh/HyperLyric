@@ -51,12 +51,13 @@ internal object RealIslandHooker {
                     return@runCatching
                 }
 
+                IslandViewRegistry.register(contentView, info.packageName)
+
                 if (!IslandTextHookerSupport.isCurrentLyricIsland(info)) {
                     IslandTextHookerSupport.clearOnlyWhenPackageIsDefinitelyDifferent(contentView, info)
                     return@runCatching
                 }
 
-                IslandViewRegistry.register(contentView, info.packageName)
                 if (!IslandTextHookerSupport.shouldRenderInjectedIsland()) {
                     IslandTextHookerSupport.clearInjectedIsland(contentView)
                     return@runCatching
