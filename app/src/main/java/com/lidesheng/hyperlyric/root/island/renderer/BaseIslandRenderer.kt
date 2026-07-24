@@ -185,8 +185,11 @@ object BaseIslandRenderer : IslandRenderer {
             clearAllViews()
             return
         }
+        val stateChanged = playbackActive != isPlaying
         playbackActive = isPlaying
-        IslandProgressGlowController.onPlaybackStateChanged(isPlaying)
+        if (stateChanged) {
+            IslandProgressGlowController.onPlaybackStateChanged(isPlaying)
+        }
         HookLogger.d("BaseIslandRenderer", "播放状态变化: 正在播放=$isPlaying")
         val behavior = prefs.getInt(
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
@@ -196,17 +199,63 @@ object BaseIslandRenderer : IslandRenderer {
         if (isPlaying) {
             if (clearedByPause) {
                 clearedByPause = false
-                refreshActiveIsland()
-            } else {
+                restoreActiveViewsAfterPause(prefs)
+            } else if (stateChanged) {
                 applyPlaybackStateToActiveViews(true)
             }
-                HookLogger.d("BaseIslandRenderer", "播放已继续，等待进度或歌词事件")
+            HookLogger.d("BaseIslandRenderer", "播放已继续，等待进度或歌词事件")
         } else if (behavior == 0) {
-            clearActiveViewsForPause()
+            if (!clearedByPause) {
+                clearActiveViewsForPause()
                 HookLogger.d("BaseIslandRenderer", "已暂停，恢复原生媒体岛")
-        } else {
+            } else {
+                HookLogger.d("BaseIslandRenderer", "忽略重复暂停状态，原生媒体岛已恢复")
+            }
+        } else if (stateChanged) {
             applyPlaybackStateToActiveViews(false)
-                HookLogger.d("BaseIslandRenderer", "已暂停，保留当前歌词注入")
+            HookLogger.d("BaseIslandRenderer", "已暂停，保留当前歌词注入")
+        }
+    }
+
+    private fun restoreActiveViewsAfterPause(prefs: android.content.SharedPreferences) {
+        val lyricPkg = LyriconDataBridge.currentLyricPackageName
+            ?.takeIf { it.isNotEmpty() }
+            ?: return
+        val config = IslandSlotRuntimeConfig.from(prefs)
+        val activeViews = IslandViewRegistry.snapshotAttached(lyricPkg)
+        if (activeViews.isEmpty()) {
+            refreshActiveIsland()
+            return
+        }
+
+        activeViews.forEach { (cv, _) ->
+            cv.post {
+                if (!shouldRenderInjectedIsland() ||
+                    LyriconDataBridge.currentLyricPackageName != lyricPkg
+                ) {
+                    return@post
+                }
+
+                val changed = if (IslandLyricTextInjector.hasInjectedLyricText(cv)) {
+                    IslandLyricTextInjector.restoreExistingSlotsLightweight(cv)
+                } else {
+                    IslandLyricTextInjector.injectSlots(
+                        cv,
+                        reconfigureExisting = false,
+                        suppressAnimation = true
+                    )
+                }
+                val expectsInjectedView = config.leftMode != 0 || config.rightMode != 0
+                if (expectsInjectedView && !IslandLyricTextInjector.hasInjectedLyricText(cv)) {
+                    refreshActiveIsland()
+                    return@post
+                }
+
+                setPlaybackActiveRecursively(cv, true)
+                if (changed) {
+                    IslandHostFacade.triggerSystemRelayout(cv)
+                }
+            }
         }
     }
 

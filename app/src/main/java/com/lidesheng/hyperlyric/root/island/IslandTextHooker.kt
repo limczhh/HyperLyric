@@ -33,14 +33,6 @@ internal object IslandTextHooker {
             }
 
             contentViewClass.methods
-                .filter { it.name == "calculateBigIslandWidth" && it.parameterTypes.isEmpty() }
-                .forEach { method ->
-                    module.deoptimize(method)
-                    module.hook(method).intercept(IslandWidthHooker.CalculateWidthHook())
-                    HookLogger.d(TAG, "已 Hook calculateBigIslandWidth: $method")
-                }
-
-            contentViewClass.methods
                 .filter { it.name == "hideIslandLayout" || it.name == "showIslandLayout" }
                 .filter { it.parameterTypes.isEmpty() }
                 .forEach { method ->

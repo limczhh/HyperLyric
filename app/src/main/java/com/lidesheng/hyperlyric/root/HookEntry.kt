@@ -11,7 +11,6 @@ import com.lidesheng.hyperlyric.root.island.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.IslandModuleRestoreHooker
 import com.lidesheng.hyperlyric.root.island.SystemUIHookRegistry
-import com.lidesheng.hyperlyric.root.island.IslandWidthHooker
 import com.lidesheng.hyperlyric.root.island.RealIslandHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaAmbientFlowHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
@@ -476,8 +475,6 @@ class HookEntry : XposedModule() {
                 AppCreateHooker()
             name == "updateBigIslandView" ->
                 RealIslandHooker.UpdateBigIslandViewHook()
-            name == "calculateBigIslandWidth" ->
-                IslandWidthHooker.CalculateWidthHook()
             name == "hideIslandLayout" || name == "showIslandLayout" ->
                 RealIslandHooker.LayoutVisibilityHook(name)
             name == "onTrackingFakeViewStart" ->
