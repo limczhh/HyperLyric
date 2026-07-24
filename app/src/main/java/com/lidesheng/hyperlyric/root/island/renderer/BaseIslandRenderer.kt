@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.island.renderer
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -51,6 +52,56 @@ object BaseIslandRenderer : IslandRenderer {
     override fun refreshActiveIsland() {
         mainHandler.removeCallbacks(refreshRunnable)
         mainHandler.postDelayed(refreshRunnable, REFRESH_DEBOUNCE_MS)
+    }
+
+    fun refreshAlbumColors(packageName: String, albumArt: Bitmap) {
+        if (albumArt.isRecycled) return
+        mainHandler.post refresh@{
+            if (albumArt.isRecycled ||
+                LyriconDataBridge.currentLyricPackageName != packageName ||
+                !shouldRenderInjectedIsland()
+            ) {
+                return@refresh
+            }
+
+            val prefs = HookEntry.instance?.prefs ?: return@refresh
+            val config = IslandSlotRuntimeConfig.from(prefs)
+            IslandViewRegistry.snapshotAttached(packageName).forEach { (rootView, _) ->
+                rootView.post updateColors@{
+                    if (albumArt.isRecycled ||
+                        LyriconDataBridge.currentLyricPackageName != packageName ||
+                        !shouldRenderInjectedIsland()
+                    ) {
+                        return@updateColors
+                    }
+                    val mediaInfo = MediaMetadataHelper
+                        .getMediaInfo(rootView.context, packageName, HookLogger)
+                        .copy(albumArt = albumArt)
+                    refreshSlotColors(
+                        rootView,
+                        IslandProbeUtils.LEFT_TEST_VIEW_TAG,
+                        config.leftMode,
+                        prefs,
+                        config,
+                        mediaInfo
+                    )
+                    refreshSlotColors(
+                        rootView,
+                        IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
+                        config.rightMode,
+                        prefs,
+                        config,
+                        mediaInfo
+                    )
+                    IslandHostFacade.updateProgressGlow(
+                        rootView,
+                        packageName,
+                        mediaInfo,
+                        prefs
+                    )
+                }
+            }
+        }
     }
 
     private fun performRefreshActiveIsland() {
@@ -300,6 +351,26 @@ object BaseIslandRenderer : IslandRenderer {
             lineOverride = lineOverride,
             playbackActive = playbackActive,
             mediaInfo = mediaInfo
+        )
+    }
+
+    private fun refreshSlotColors(
+        rootView: ViewGroup,
+        tag: String,
+        mode: Int,
+        prefs: android.content.SharedPreferences,
+        config: IslandSlotRuntimeConfig,
+        mediaInfo: MediaMetadataHelper.MediaInfo
+    ) {
+        if (mode == 0) return
+        val view = rootView.findViewWithTag<View>(tag) ?: return
+        IslandSlotContentAssembler.configureView(
+            view = view,
+            prefs = prefs,
+            config = config,
+            mode = mode,
+            mediaInfo = mediaInfo,
+            force = true
         )
     }
 

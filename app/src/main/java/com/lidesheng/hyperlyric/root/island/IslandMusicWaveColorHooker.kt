@@ -11,6 +11,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
+import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
 import com.lidesheng.hyperlyric.root.mediacard.MediaArtworkSampler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -82,6 +83,11 @@ internal object IslandMusicWaveColorHooker {
                     isAccessible = true
                 }
             )
+            val dataField = holderClass.declaredFields.firstOrNull {
+                it.name == "data"
+            }?.apply {
+                isAccessible = true
+            }
 
             val setLottieColorMethod = holderClass.declaredMethods.firstOrNull {
                 it.name == "setLottieColor" &&
@@ -90,7 +96,9 @@ internal object IslandMusicWaveColorHooker {
             if (setLottieColorMethod != null) {
                 setLottieColorMethod.isAccessible = true
                 xposedModule.deoptimize(setLottieColorMethod)
-                xposedModule.hook(setLottieColorMethod).intercept(SetLottieColorHook())
+                xposedModule.hook(setLottieColorMethod).intercept(
+                    SetLottieColorHook(dataField)
+                )
             } else {
                 HookLogger.w(TAG, "音频律动原生取色接口不可用: target=setLottieColor")
             }
@@ -275,6 +283,32 @@ internal object IslandMusicWaveColorHooker {
         )
     }
 
+    private fun usesAlbumColors(sharedPrefs: SharedPreferences): Boolean {
+        val lyricColorEnabled = sharedPrefs.getBoolean(
+            RootConstants.KEY_HOOK_EXTRACT_COVER_TEXT_COLOR,
+            RootConstants.DEFAULT_HOOK_EXTRACT_COVER_TEXT_COLOR
+        )
+        val progressColorEnabled = sharedPrefs.getBoolean(
+            RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW,
+            RootConstants.DEFAULT_HOOK_ISLAND_PROGRESS_GLOW
+        ) && sharedPrefs.getBoolean(
+            RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
+            RootConstants.DEFAULT_HOOK_ISLAND_GLOW_EXTRACT_COLOR
+        )
+        return lyricColorEnabled || progressColorEnabled
+    }
+
+    private fun refreshAlbumColorConsumers(
+        packageName: String?,
+        bitmap: Bitmap,
+        shouldRefresh: Boolean
+    ) {
+        if (!shouldRefresh) return
+        val targetPackage = packageName ?: return
+        HookLogger.d(TAG, "原生封面取色完成，刷新当前歌词岛动态颜色")
+        BaseIslandRenderer.refreshAlbumColors(targetPackage, bitmap)
+    }
+
     private fun withNativeAlpha(color: Int): Int {
         return (color and 0x00FFFFFF) or (NATIVE_COLOR_ALPHA shl 24)
     }
@@ -320,15 +354,24 @@ internal object IslandMusicWaveColorHooker {
         }
     }
 
-    private class SetLottieColorHook : Hooker {
+    private class SetLottieColorHook(
+        private val dataField: Field?
+    ) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
             runCatching {
                 val bitmap = chain.args.firstOrNull() as? Bitmap ?: return@runCatching
                 val holder = chain.thisObject
                 nativeColors = colorAccessor?.read(holder)
+                val lyricPackageName = holder
+                    ?.let { dataField?.get(it) }
+                    ?.let(IslandProbeUtils::extractMediaIslandInfo)
+                    ?.takeIf(IslandTextHookerSupport::isCurrentLyricIsland)
+                    ?.packageName
 
                 val sharedPrefs = prefs ?: return@runCatching
+                val shouldRefreshAlbumColors =
+                    lyricPackageName != null && usesAlbumColors(sharedPrefs)
                 if (!isEnabled(sharedPrefs)) {
                     colorRequest.incrementAndGet()
                     desiredColors = null
@@ -336,17 +379,29 @@ internal object IslandMusicWaveColorHooker {
                     pendingToken = null
                     inputToken = null
                     overrideApplied = false
-                    invalidateTrackedLottieViews()
+                    runOnMain {
+                        invalidateTrackedLottieViews()
+                        refreshAlbumColorConsumers(
+                            lyricPackageName,
+                            bitmap,
+                            shouldRefreshAlbumColors
+                        )
+                    }
                     return@runCatching
                 }
 
                 runOnMain {
                     runCatching { scheduleOptimizedColors(bitmap, sharedPrefs) }.onFailure { e ->
-            HookLogger.e(TAG, "应用音频律动颜色失败", e)
+                        HookLogger.e(TAG, "应用音频律动颜色失败", e)
                     }
+                    refreshAlbumColorConsumers(
+                        lyricPackageName,
+                        bitmap,
+                        shouldRefreshAlbumColors
+                    )
                 }
             }.onFailure { e ->
-            HookLogger.e(TAG, "读取原生音频律动颜色失败", e)
+                HookLogger.e(TAG, "读取原生音频律动颜色失败", e)
             }
             return result
         }
