@@ -32,10 +32,16 @@ internal object IslandNativeRefreshCoordinator {
     }
 
     fun request(
-        onComplete: (ViewGroup) -> Unit
+        onComplete: (ViewGroup) -> Unit,
+        targetRoot: ViewGroup? = null,
+        onUnavailable: (() -> Unit)? = null
     ) {
         runOnMain {
-            pendingRequest = RefreshRequest(onComplete)
+            pendingRequest = RefreshRequest(
+                onComplete = onComplete,
+                targetRoot = targetRoot,
+                onUnavailable = onUnavailable
+            )
             mainHandler.removeCallbacks(requestRunnable)
             mainHandler.postDelayed(requestRunnable, REQUEST_DEBOUNCE_MS)
         }
@@ -67,32 +73,45 @@ internal object IslandNativeRefreshCoordinator {
 
         val packageName = LyriconDataBridge.currentLyricPackageName
             ?.takeIf { it.isNotEmpty() }
-            ?: return
+            ?: run {
+                notifyUnavailable(request)
+                return
+            }
 
         var accepted = false
-        IslandPresentationCoordinator.snapshotAttachedHosts(packageName).forEach { token ->
-            if (!isEligibleHost(token)) return@forEach
+        IslandPresentationCoordinator.snapshotAttachedHosts(packageName)
+            .filter { token -> request.targetRoot == null || token.root === request.targetRoot }
+            .forEach { token ->
+                if (!isEligibleHost(token)) return@forEach
 
-            val target = resolveTarget(token) ?: return@forEach
-            val existing = activeRefreshes[token.root]
-            if (existing != null) {
-                existing.request = request
-                accepted = true
-                return@forEach
+                val target = resolveTarget(token) ?: return@forEach
+                val existing = activeRefreshes[token.root]
+                if (existing != null) {
+                    existing.request = request
+                    accepted = true
+                    return@forEach
+                }
+
+                val active = ActiveRefresh(token, request)
+                activeRefreshes[token.root] = active
+                if (invokeNativeUpdate(target, active)) {
+                    accepted = true
+                } else if (activeRefreshes[token.root] === active) {
+                    activeRefreshes.remove(token.root)
+                }
             }
 
-            val active = ActiveRefresh(token, request)
-            activeRefreshes[token.root] = active
-            if (invokeNativeUpdate(target, active)) {
-                accepted = true
-            } else if (activeRefreshes[token.root] === active) {
-                activeRefreshes.remove(token.root)
-            }
-        }
-
-        if (!accepted && activeRefreshes.isEmpty()) {
+        if (!accepted) {
             HookLogger.d(TAG, "未找到可执行小米原生超级岛刷新的当前媒体岛")
+            notifyUnavailable(request)
         }
+    }
+
+    private fun notifyUnavailable(request: RefreshRequest) {
+        runCatching { request.onUnavailable?.invoke() }
+            .onFailure { error ->
+                HookLogger.e(TAG, "小米原生超级岛刷新回退失败", error)
+            }
     }
 
     private fun isEligibleHost(token: IslandViewRegistry.HostToken): Boolean {
@@ -132,7 +151,16 @@ internal object IslandNativeRefreshCoordinator {
         } as? Number)?.toFloat() ?: return null
         val updateMethod = windowView.javaClass.methods.firstOrNull(::isNativeUpdateMethod)
             ?: run {
-                HookLogger.w(TAG, "小米超级岛原生刷新接口不可用: target=updateDynamicIslandView")
+                val candidates = windowView.javaClass.methods
+                    .filter { it.name.contains("DynamicIsland", ignoreCase = true) }
+                    .joinToString(separator = ";") { method ->
+                        "${method.name}(${method.parameterTypes.joinToString(",") { it.name }})"
+                    }
+                HookLogger.w(
+                    TAG,
+                    "小米超级岛原生刷新接口不可用: target=updateDynamicIslandView, " +
+                            "window=${windowView.javaClass.name}, candidates=$candidates"
+                )
                 return null
             }
 
@@ -148,13 +176,14 @@ internal object IslandNativeRefreshCoordinator {
 
     private fun invokeNativeUpdate(target: NativeTarget, active: ActiveRefresh): Boolean {
         return runCatching {
-            target.updateMethod.invoke(
-                target.windowView,
-                target.data,
-                false,
-                target.maxWidth,
-                false
-            )
+            val arguments = when (target.updateMethod.parameterTypes.size) {
+                // HyperOS 3 removed the trailing transition flag from this API.
+                3 -> arrayOf(target.data, false, target.maxWidth)
+                // Keep compatibility with older HyperOS releases.
+                4 -> arrayOf(target.data, false, target.maxWidth, false)
+                else -> error("unexpected updateDynamicIslandView signature")
+            }
+            target.updateMethod.invoke(target.windowView, *arguments)
             active.settleRunnable = Runnable {
                 activeRefreshes[target.root]?.let { current ->
                     if (current === active) complete(target.root, current, "settle_timeout")
@@ -168,7 +197,8 @@ internal object IslandNativeRefreshCoordinator {
             HookLogger.d(
                 TAG,
                 "已请求小米原生超级岛刷新: root=${System.identityHashCode(target.root)}, " +
-                        "keyHash=${target.key.hashCode()}, maxWidth=${target.maxWidth}"
+                        "keyHash=${target.key.hashCode()}, maxWidth=${target.maxWidth}, " +
+                        "parameterCount=${target.updateMethod.parameterTypes.size}"
             )
             true
         }.getOrElse { error ->
@@ -205,11 +235,14 @@ internal object IslandNativeRefreshCoordinator {
 
     private fun isNativeUpdateMethod(method: Method): Boolean {
         val types = method.parameterTypes
-        return method.name == "updateDynamicIslandView" &&
-                types.size == 4 &&
-                types[1] == Boolean::class.javaPrimitiveType &&
-                types[2] == Float::class.javaPrimitiveType &&
-                types[3] == Boolean::class.javaPrimitiveType
+        if (method.name != "updateDynamicIslandView" ||
+            (types.size != 3 && types.size != 4) ||
+            types[1] != Boolean::class.javaPrimitiveType ||
+            types[2] != Float::class.javaPrimitiveType
+        ) {
+            return false
+        }
+        return types.size == 3 || types[3] == Boolean::class.javaPrimitiveType
     }
 
     private fun runOnMain(block: () -> Unit) {
@@ -221,7 +254,9 @@ internal object IslandNativeRefreshCoordinator {
     }
 
     private data class RefreshRequest(
-        val onComplete: (ViewGroup) -> Unit
+        val onComplete: (ViewGroup) -> Unit,
+        val targetRoot: ViewGroup?,
+        val onUnavailable: (() -> Unit)?
     )
 
     private class ActiveRefresh(

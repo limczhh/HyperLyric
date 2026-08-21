@@ -386,21 +386,29 @@ internal object IslandSlotStructureInjector {
             wrapper.minimumWidth = 0
             changed = true
         }
-        // Dynamic width is refined from the current lyric line after the wrapper is attached.
-        // Keep that measured value during a lifecycle re-ensure (especially pause/keep),
-        // otherwise the paused path skips the width refresh and leaves the wrapper at the
-        // configured maximum until playback resumes.
-        val targetMaxWidthPx = if (config.geometry.isDynamicWidth && wrapper.maxWidthPx > 0) {
-            minOf(wrapper.maxWidthPx, widthPx)
+        // Keep the configured cap separate from the current dynamic target. The target is
+        // refreshed from the lyric line after the wrapper is attached and must survive lifecycle
+        // re-ensure paths (especially pause/keep), where content refresh can be skipped.
+        val targetMaxWidthPx = widthPx
+        val targetDesiredWidthPx = if (config.geometry.isDynamicWidth) {
+            wrapper.desiredWidthPx.takeIf { it > 0 }?.coerceAtMost(widthPx) ?: widthPx
         } else {
-            widthPx
+            -1
         }
         if (wrapper.maxWidthPx != targetMaxWidthPx) {
             wrapper.maxWidthPx = targetMaxWidthPx
             changed = true
         }
+        if (wrapper.desiredWidthPx != targetDesiredWidthPx) {
+            wrapper.desiredWidthPx = targetDesiredWidthPx
+            changed = true
+        }
         val layoutParams = wrapper.layoutParams
-        val expectedWidth = wrapperLayoutWidth(config)
+        val expectedWidth = if (config.geometry.isDynamicWidth && wrapper.desiredWidthPx > 0) {
+            wrapper.desiredWidthPx
+        } else {
+            wrapperLayoutWidth(config)
+        }
         if (layoutParams != null && (layoutParams.width != expectedWidth || layoutParams.height != FrameLayout.LayoutParams.MATCH_PARENT)) {
             layoutParams.width = expectedWidth
             layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT
@@ -480,7 +488,7 @@ internal object IslandSlotStructureInjector {
     }
 
     private fun wrapperLayoutWidth(config: IslandSlotRuntimeConfig): Int {
-        return if (config.isSplitMode) {
+        return if (config.geometry.isDynamicWidth || config.isSplitMode) {
             FrameLayout.LayoutParams.WRAP_CONTENT
         } else {
             FrameLayout.LayoutParams.MATCH_PARENT

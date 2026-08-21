@@ -10,6 +10,7 @@ import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
+import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.view.MaxWidthFrameLayout
 import java.util.WeakHashMap
@@ -246,10 +247,22 @@ internal object IslandDynamicWidthCoordinator {
         ) ?: return false
         val wrapper = rootView.findViewWithTag<View>("${viewTag}_WRAPPER")
             as? MaxWidthFrameLayout ?: return false
-        if (wrapper.maxWidthPx == targetWidthPx) return false
+        val configuredMaxWidthPx = config.geometry.widthPx(rootView, parentName) ?: return false
+        val layoutParams = wrapper.layoutParams
+        val widthChanged = wrapper.desiredWidthPx != targetWidthPx ||
+                wrapper.maxWidthPx != configuredMaxWidthPx ||
+                (layoutParams != null && layoutParams.width != targetWidthPx)
+        if (!widthChanged) return false
 
-        wrapper.maxWidthPx = targetWidthPx
+        wrapper.maxWidthPx = configuredMaxWidthPx
+        wrapper.desiredWidthPx = targetWidthPx
+        if (layoutParams != null && layoutParams.width != targetWidthPx) {
+            layoutParams.width = targetWidthPx
+            wrapper.layoutParams = layoutParams
+        }
         wrapper.requestLayout()
+        wrapper.parent?.requestLayout()
+        rootView.requestLayout()
         return true
     }
 
@@ -269,7 +282,25 @@ internal object IslandDynamicWidthCoordinator {
                 if (IslandViewRegistry.tokenFor(rootView) != null &&
                     IslandPresentationCoordinator.isPlaybackActive()
                 ) {
-                    IslandHostFacade.triggerSystemRelayout(rootView)
+                    IslandNativeRefreshCoordinator.request(
+                        onComplete = { refreshedRoot ->
+                            // Xiaomi rebuilds the module hierarchy during the native update.
+                            // Re-read the lyric width after that callback in case the rebuild
+                            // replaced the injected wrapper or applied a newer lyric line.
+                            requestRefresh(refreshedRoot)
+                        },
+                        targetRoot = rootView,
+                        onUnavailable = {
+                            val token = IslandViewRegistry.tokenFor(rootView)
+                            if (token != null &&
+                                IslandPresentationCoordinator.isCurrentHost(token) &&
+                                !IslandPresentationCoordinator.isHostFrozenForFakeTransition(token) &&
+                                IslandPresentationCoordinator.isPlaybackActive()
+                            ) {
+                                IslandHostFacade.triggerSystemRelayout(rootView)
+                            }
+                        }
+                    )
                 }
             } finally {
                 synchronized(relayoutPending) {
