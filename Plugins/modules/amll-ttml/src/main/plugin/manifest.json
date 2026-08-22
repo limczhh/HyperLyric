@@ -1,0 +1,57 @@
+{
+  "id": "hyperlyric.amll.ttml",
+  "name": "AMLL TTML 逐字歌词",
+  "nameLocales": {
+    "en": "AMLL TTML Lyrics"
+  },
+  "summary": "从 AMLL TTML DataBase 获取高质量逐字歌词（背景人声/翻译/罗马音），未命中时保持当前歌词源",
+  "summaryLocales": {
+    "en": "Fetch high-quality word-level lyrics (background vocals/translation/roma) from the AMLL TTML database; falls back to the current lyric source on miss"
+  },
+  "author": "HyperLyric",
+  "version": "1.1.0",
+  "apiVersion": 1,
+  "entry": "com.lidesheng.hyperlyric.plugin.amll.ttml.AmllTtmlPlugin",
+  "activationSettingKey": "enabled",
+  "cacheScopes": [
+    {
+      "id": "ttml",
+      "title": "AMLL 歌词缓存",
+      "summary": "清理已缓存的 AMLL TTML 歌词",
+      "titleLocales": {
+        "en": "AMLL Lyrics Cache"
+      },
+      "summaryLocales": {
+        "en": "Clear cached AMLL TTML lyrics"
+      }
+    }
+  ],
+  "settings": [
+    {
+      "type": "switch",
+      "key": "enabled",
+      "title": "AMLL TTML 逐字歌词",
+      "titleLocales": {
+        "en": "AMLL TTML Lyrics"
+      },
+      "summary": "从 AMLL TTML 词库获取更高质量的逐字歌词，未命中时保持当前歌词源",
+      "summaryLocales": {
+        "en": "Fetch higher-quality word-level lyrics from the AMLL TTML database; falls back to the current lyric source on miss"
+      },
+      "default": false
+    },
+    {
+      "type": "switch",
+      "key": "platform_probe",
+      "title": "歌曲 ID 平台探测",
+      "titleLocales": {
+        "en": "Platform ID Probe"
+      },
+      "summary": "将歌曲 ID 依次尝试网易云/QQ/Apple/Spotify 精确匹配并校验歌名歌手，关闭后仅按歌名歌手搜索",
+      "summaryLocales": {
+        "en": "Try the song ID against NCM/QQ/Apple/Spotify exact endpoints with title/artist verification; disable to use metadata search only"
+      },
+      "default": true
+    }
+  ]
+}
