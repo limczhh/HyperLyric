@@ -257,11 +257,6 @@ jobs:
           "$APKSIGNER" verify --verbose "$ONLINE_OUT"
           "$APKSIGNER" verify --verbose "$OFFLINE_OUT"
 
-          (
-            cd "$GITHUB_WORKSPACE"
-            sha256sum "$(basename "$ONLINE_OUT")" "$(basename "$OFFLINE_OUT")" > sha256sums.txt
-          )
-
       - name: 准备并校验正式插件 Prepare and Verify Stable Plugins
         shell: bash
         run: |
@@ -311,11 +306,6 @@ jobs:
             printf -- '- `%s` %s\n' "$plugin_id" "$plugin_version" >> plugin-release-summary.md
           done
 
-          (
-            cd "$GITHUB_WORKSPACE"
-            sha256sum plugin-release-assets/*.zip >> sha256sums.txt
-          )
-
       - name: 生成 Release 说明 Generate Release Notes
         shell: bash
         run: |
@@ -328,12 +318,6 @@ jobs:
             echo
             echo '## 正式插件'
             cat plugin-release-summary.md
-            echo
-            echo '## SHA-256 校验'
-            echo
-            echo '```text'
-            cat sha256sums.txt
-            echo '```'
           } > release-body.md
 
       - name: 创建 Draft Release Create Draft Release

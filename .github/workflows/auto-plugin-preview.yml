@@ -63,11 +63,37 @@ jobs:
 
       - name: 校验并准备预览插件 Prepare Plugin Preview Assets
         id: prepare
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
         shell: bash
         run: |
           set -euo pipefail
 
           SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+          ZERO_SHA='0000000000000000000000000000000000000000'
+          if [[ -n "$BEFORE_SHA" && "$BEFORE_SHA" != "$ZERO_SHA" ]] && \
+             git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            COMMIT_RANGE="${BEFORE_SHA}..${GITHUB_SHA}"
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            COMMIT_RANGE='HEAD^..HEAD'
+          else
+            COMMIT_RANGE='HEAD'
+          fi
+
+          mapfile -t plugin_updates < <(
+            git log --no-merges --reverse -n 20 "$COMMIT_RANGE" \
+              --pretty=format:'%s' -- Plugins
+          )
+
+          : > plugin-preview-updates.txt
+          if [[ "${#plugin_updates[@]}" -eq 0 ]]; then
+            echo '- 本次未检测到 Plugins 目录的更新提交。' > plugin-preview-updates.txt
+          else
+            for plugin_update in "${plugin_updates[@]}"; do
+              printf -- '- %s\n' "$plugin_update" >> plugin-preview-updates.txt
+            done
+          fi
+
           mkdir -p plugin-preview-assets
           mapfile -t plugin_zips < <(
             find Plugins/modules -type f \
@@ -88,10 +114,11 @@ jobs:
           for plugin_zip in "${plugin_zips[@]}"; do
             manifest="$(unzip -p "$plugin_zip" manifest.json)"
             plugin_id="$(jq -r '.id // empty' <<< "$manifest")"
+            plugin_display_name="$(jq -r '.name // empty' <<< "$manifest")"
             plugin_version="$(jq -r '.version // empty' <<< "$manifest")"
             api_version="$(jq -r '.apiVersion // empty' <<< "$manifest")"
 
-            if [[ -z "$plugin_id" || -z "$plugin_version" || -z "$api_version" ]]; then
+            if [[ -z "$plugin_id" || -z "$plugin_display_name" || -z "$plugin_version" || -z "$api_version" ]]; then
               echo "::error::插件 Manifest 缺少必填字段: $plugin_zip"
               exit 1
             fi
@@ -109,23 +136,23 @@ jobs:
             fi
 
             plugin_ids["$plugin_id"]="$plugin_version"
-            plugin_name="$(basename "$plugin_zip" .zip)-preview-${SHORT_SHA}.zip"
-            cp "$plugin_zip" "plugin-preview-assets/$plugin_name"
-            printf '%s\n' "$GITHUB_WORKSPACE/plugin-preview-assets/$plugin_name" >> plugin-preview-files.txt
-            printf -- '- `%s` %s\n' "$plugin_id" "$plugin_version" >> plugin-preview-summary.md
+            plugin_asset_name="$(basename "$plugin_zip" .zip)-preview-${SHORT_SHA}.zip"
+            cp "$plugin_zip" "plugin-preview-assets/$plugin_asset_name"
+            printf '%s\n' "$GITHUB_WORKSPACE/plugin-preview-assets/$plugin_asset_name" >> plugin-preview-files.txt
+            printf -- '- %s\n  ID: %s\n  版本: %s · API: %s\n' \
+              "$plugin_display_name" "$plugin_id" "$plugin_version" "$api_version" \
+              >> plugin-preview-summary.md
           done
 
           {
-            echo '自动构建的插件预览版。此预览不会创建 GitHub Release。'
+            echo '更新内容：'
+            cat plugin-preview-updates.txt
             echo
-            echo "Commit: $GITHUB_SHA"
-            echo
-            echo '## 插件'
+            echo '插件版本：'
             cat plugin-preview-summary.md
             echo
-            echo '## 相关提交'
-            git log -n 20 --no-merges --pretty=format:'- %s (%h)' -- Plugins/api Plugins/modules build.gradle.kts settings.gradle.kts
-          } > plugin-preview-notes.md
+            echo '此预览仅用于测试，不会创建 GitHub Release。'
+          } > plugin-preview-notes.txt
 
           {
             echo 'plugins<<EOF'
@@ -139,8 +166,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RELEASE_TAG: plugin-preview-${{ github.sha }}
           RELEASE_URL: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
-          RELEASE_NOTES_ZH_FILE: plugin-preview-notes.md
+          RELEASE_NOTES_ZH_FILE: plugin-preview-notes.txt
           ANNOUNCEMENT_HEADER: 自动构建的插件预览版
+          ANNOUNCEMENT_LINK_LABEL: 对应提交
+          ANNOUNCEMENT_NOTES_LABEL: 插件信息
           PLUGIN_FILES: ${{ steps.prepare.outputs.plugins }}
         shell: bash
         run: bash .github/scripts/send-telegram-release.sh

@@ -62,13 +62,17 @@ telegram_request() {
 
 RELEASE_NOTES_ZH="$(<"$RELEASE_NOTES_ZH_FILE")"
 ANNOUNCEMENT_HEADER="${ANNOUNCEMENT_HEADER:-}"
+ANNOUNCEMENT_LINK_LABEL="${ANNOUNCEMENT_LINK_LABEL:-下载地址}"
+ANNOUNCEMENT_NOTES_LABEL="${ANNOUNCEMENT_NOTES_LABEL:-更新日志}"
 
 if [[ -n "$ANNOUNCEMENT_HEADER" ]]; then
-  CAPTION="$(printf '%s\n\n下载地址：%s\n\n更新日志：\n%s' \
-    "$ANNOUNCEMENT_HEADER" "$RELEASE_URL" "$RELEASE_NOTES_ZH")"
+  CAPTION="$(printf '%s\n\n%s：%s\n\n%s：\n%s' \
+    "$ANNOUNCEMENT_HEADER" "$ANNOUNCEMENT_LINK_LABEL" "$RELEASE_URL" \
+    "$ANNOUNCEMENT_NOTES_LABEL" "$RELEASE_NOTES_ZH")"
 else
-  CAPTION="$(printf '下载地址：%s\n\n更新日志：\n%s' \
-    "$RELEASE_URL" "$RELEASE_NOTES_ZH")"
+  CAPTION="$(printf '%s：%s\n\n%s：\n%s' \
+    "$ANNOUNCEMENT_LINK_LABEL" "$RELEASE_URL" \
+    "$ANNOUNCEMENT_NOTES_LABEL" "$RELEASE_NOTES_ZH")"
 fi
 
 if (( ${#CAPTION} > 1024 )); then

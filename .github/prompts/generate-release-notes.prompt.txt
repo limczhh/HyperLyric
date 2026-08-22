@@ -13,4 +13,4 @@ Rules:
 - Merge related entries and keep the Markdown body within 850 characters so it can be sent as a Telegram media caption.
 - Keep meaningful user-visible changes when shortening the draft.
 
-Return only the Markdown body. Do not include a top-level `##` heading, an introduction, a conclusion, an English translation, HTML comments, or a SHA-256 section.
+Return only the Markdown body. Do not include a top-level `##` heading, an introduction, a conclusion, an English translation, or HTML comments.
