@@ -56,14 +56,16 @@ The entry class must be public and have a no-argument constructor. See [Plugin A
 
 ## R8 and ZIP output
 
-Release plugins must be checked with R8. Keep at least:
+Release plugins must be checked against their runtime boundaries after R8. A plugin module should keep only its own entry points and members reached through the Manifest, reflection, or the Plugin API contract, including at least:
 
 - the Manifest entry class and its no-argument constructor;
 - `onLoad`, `onEnable`, `onConfigChanged`, `onUnload`;
 - `HyperLyricExtension.id`, `LyricProcessorExtension.stage`, and `processResult`;
-- `PluginSong`, `PluginSongResult`, field enums, update modes, and other protocol DTOs.
+- other plugin implementation types that are actually looked up by class name or serialized by the plugin itself.
 
-Use `Plugins/modules/demo-logger/proguard-rules.pro` as a reference. Keep only protocol members instead of keeping the whole plugin.
+Do not add duplicate keep rules in plugin modules for `PluginSong`, `PluginSongResult`, field enums, or other Plugin API types. `Plugins/api` is a `compileOnly` dependency and is not packaged into the plugin DEX. The host's [`app/proguard-rules.pro`](../../../app/proguard-rules.pro) keeps the names and method descriptors of these public types stable. Plugin-side rules cannot protect API classes inside the host, and packaging a private copy of the API in the ZIP is not a valid workaround.
+
+Use `Plugins/modules/demo-logger/proguard-rules.pro` as a reference: keep the exact entry class declared by the Manifest and only the members invoked by the host through the protocol. Do not keep the whole plugin package.
 
 A plugin ZIP normally contains:
 

@@ -58,14 +58,16 @@ Manifest 位于 `src/main/plugin/manifest.json`：
 
 ## R8 和 ZIP
 
-Release 插件必须验证 R8 结果。至少保留：
+Release 插件必须验证 R8 后的运行时边界。插件模块只保护插件自身由 Manifest、反射或 Plugin API 协议访问的入口和成员，至少包括：
 
 - Manifest 中的入口类及无参数构造函数；
 - `onLoad`、`onEnable`、`onConfigChanged`、`onUnload`；
 - `HyperLyricExtension.id`、`LyricProcessorExtension.stage` 和 `processResult`；
-- `PluginSong`、`PluginSongResult`、字段枚举、更新模式和其他协议 DTO。
+- 其他确实按类名反射或由插件自行序列化的插件实现类型。
 
-可以参考 `Plugins/modules/demo-logger/proguard-rules.pro`，只保留协议需要的成员，不要把整个插件包都设为 keep。
+不要在插件模块中为 `PluginSong`、`PluginSongResult`、字段枚举或其他 Plugin API 类型重复添加 keep 规则。`Plugins/api` 是 `compileOnly` 依赖，不会打入插件 DEX；这些公共类型的名称和方法描述符由宿主的 [`app/proguard-rules.pro`](../../app/proguard-rules.pro) 负责稳定。插件侧的同名规则既不能保护宿主中的 API 类，也不应通过把 API 打入 ZIP 来解决。
+
+可以参考 `Plugins/modules/demo-logger/proguard-rules.pro`：精确保留 Manifest 声明的入口类，并只保留宿主通过协议调用的成员；不要把整个插件包都设为 keep。
 
 插件 ZIP 通常包含：
 

@@ -30,19 +30,3 @@
     public void clearAll();
     public boolean clearEntry(java.lang.String);
 }
-
-# Keep the immutable protocol DTOs and enum fields used across the host/plugin ClassLoader.
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginSong { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginSongResult { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginSongField { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginLyricsUpdateMode { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginLyricField { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginProcessorStage { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginMediaInfo { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginProcessingContext { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginLyricLine { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginWord { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginMetadata { *; }
--keep,allowoptimization,allowobfuscation public interface com.lidesheng.hyperlyric.plugin.api.PluginCache { *; }
--keep,allowoptimization,allowobfuscation public interface com.lidesheng.hyperlyric.plugin.api.PluginCacheExtension { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginCacheEntry { *; }

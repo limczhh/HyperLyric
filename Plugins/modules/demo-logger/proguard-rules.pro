@@ -1,6 +1,6 @@
 # The manifest resolves the entry class by its original binary name.
 # Keep the no-argument constructor because Runtime instantiates it reflectively.
--keep,allowoptimization class * implements com.lidesheng.hyperlyric.plugin.api.HyperLyricPlugin {
+-keep,allowoptimization class com.lidesheng.hyperlyric.plugin.demo.DemoPlugin {
     <init>();
 }
 
@@ -26,17 +26,3 @@
         com.lidesheng.hyperlyric.plugin.api.PluginProcessingContext
     );
 }
-
-# Keep the immutable protocol DTOs and enum fields used across the host/plugin ClassLoader.
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginSong { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginSongResult { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginSongField { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginLyricsUpdateMode { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginLyricField { *; }
--keep,allowoptimization,allowobfuscation public enum com.lidesheng.hyperlyric.plugin.api.PluginProcessorStage { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginMediaInfo { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginProcessingContext { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginLyricLine { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginWord { *; }
--keep,allowoptimization,allowobfuscation public class com.lidesheng.hyperlyric.plugin.api.PluginMetadata { *; }
--keep,allowoptimization,allowobfuscation public interface com.lidesheng.hyperlyric.plugin.api.PluginCache { *; }

@@ -1,6 +1,5 @@
 ﻿package com.lidesheng.hyperlyric.service.utils.shizuku
 
-import androidx.annotation.Keep
 import com.lidesheng.hyperlyric.IPrivilegedService
 import com.lidesheng.hyperlyric.IPrivilegedLogCallback
 import com.lidesheng.hyperlyric.utils.LogManager
@@ -12,7 +11,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-@Keep
 class PrivilegedServiceImpl : IPrivilegedService.Stub() {
 
     companion object {
