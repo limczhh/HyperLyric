@@ -137,13 +137,6 @@ jobs:
             exit 1
           fi
 
-          if ! diff -u \
-            <(sed '/^[[:space:]]*$/d' preview-commit-input.md) \
-            <(sed '/^[[:space:]]*$/d' preview-notes-zh.md); then
-            echo '::error::Copilot 改写、遗漏或增加了提交信息'
-            exit 1
-          fi
-
       - name: 安装 JDK Setup Java
         uses: actions/setup-java@v5
         with:

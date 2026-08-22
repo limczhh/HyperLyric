@@ -139,19 +139,15 @@ jobs:
             plugin_asset_name="$(basename "$plugin_zip" .zip)-preview-${SHORT_SHA}.zip"
             cp "$plugin_zip" "plugin-preview-assets/$plugin_asset_name"
             printf '%s\n' "$GITHUB_WORKSPACE/plugin-preview-assets/$plugin_asset_name" >> plugin-preview-files.txt
-            printf -- '- %s\n  ID: %s\n  版本: %s · API: %s\n' \
+            printf -- '%s\nID：%s · 版本：%s · API：%s\n\n' \
               "$plugin_display_name" "$plugin_id" "$plugin_version" "$api_version" \
               >> plugin-preview-summary.md
           done
 
           {
+            cat plugin-preview-summary.md
             echo '更新内容：'
             cat plugin-preview-updates.txt
-            echo
-            echo '插件版本：'
-            cat plugin-preview-summary.md
-            echo
-            echo '此预览仅用于测试，不会创建 GitHub Release。'
           } > plugin-preview-notes.txt
 
           {
@@ -167,9 +163,8 @@ jobs:
           RELEASE_TAG: plugin-preview-${{ github.sha }}
           RELEASE_URL: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
           RELEASE_NOTES_ZH_FILE: plugin-preview-notes.txt
-          ANNOUNCEMENT_HEADER: 自动构建的插件预览版
-          ANNOUNCEMENT_LINK_LABEL: 对应提交
-          ANNOUNCEMENT_NOTES_LABEL: 插件信息
+          ANNOUNCEMENT_HEADER: 自动构建的插件预览版。可能包含不稳定的代码或变更。
+          ANNOUNCEMENT_PLAIN_BODY: "true"
           PLUGIN_FILES: ${{ steps.prepare.outputs.plugins }}
         shell: bash
         run: bash .github/scripts/send-telegram-release.sh
