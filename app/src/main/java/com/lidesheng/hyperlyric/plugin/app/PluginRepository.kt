@@ -102,10 +102,26 @@ class PluginRepository(private val context: Context) {
             "插件 API 版本高于当前 HyperLyric"
         }
 
-        val fileName = PluginRemoteFileNames.forId(archive.manifest.id)
+        val pluginId = archive.manifest.id
+        val wasInstalled = pluginId in registry.getStringSet(
+            PluginConstants.LOCAL_INSTALLED_IDS_KEY,
+            emptySet()
+        ).orEmpty()
+        val previousFileName = if (wasInstalled) {
+            registry.getString(
+                PluginConstants.LOCAL_FILE_PREFIX + pluginId,
+                PluginRemoteFileNames.forId(pluginId)
+            )
+        } else {
+            null
+        }
+        val fileName = PluginRemoteFileNames.forRevision(
+            pluginId = pluginId,
+            revision = UUID.randomUUID().toString().replace("-", "")
+        )
         writeRemoteFile(service, fileName, bytes)
 
-        val wasEnabled = archive.manifest.id in registry.getStringSet(
+        val wasEnabled = pluginId in registry.getStringSet(
             PluginConstants.REMOTE_ENABLED_IDS_KEY,
             emptySet()
         ).orEmpty()
@@ -116,10 +132,10 @@ class PluginRepository(private val context: Context) {
         registry.edit()
             .putStringSet(PluginConstants.LOCAL_INSTALLED_IDS_KEY, installedIds)
             .putString(
-                PluginConstants.LOCAL_MANIFEST_PREFIX + archive.manifest.id,
+                PluginConstants.LOCAL_MANIFEST_PREFIX + pluginId,
                 PluginManifestCodec.encode(archive.manifest)
             )
-            .putString(PluginConstants.LOCAL_FILE_PREFIX + archive.manifest.id, fileName)
+            .putString(PluginConstants.LOCAL_FILE_PREFIX + pluginId, fileName)
             .putStringSet(
                 PluginConstants.REMOTE_ENABLED_IDS_KEY,
                 registry.getStringSet(PluginConstants.REMOTE_ENABLED_IDS_KEY, emptySet()).orEmpty()
@@ -129,6 +145,9 @@ class PluginRepository(private val context: Context) {
         ensureDefaults(archive.manifest)
         syncConfig(service, archive.manifest)
         syncRegistry(service)
+        if (previousFileName != null && previousFileName != fileName) {
+            runCatching { service.deleteRemoteFile(previousFileName) }
+        }
 
         return InstalledPlugin(archive.manifest, fileName, wasEnabled)
     }
@@ -392,8 +411,19 @@ class PluginRepository(private val context: Context) {
             PluginConstants.REMOTE_ENABLED_IDS_KEY,
             emptySet()
         ).orEmpty()
-        service.getRemotePreferences(PluginConstants.REMOTE_REGISTRY_PREFS)
-            .edit()
+        val installedFiles = listInstalled().associate { it.manifest.id to it.fileName }
+        val remote = service.getRemotePreferences(PluginConstants.REMOTE_REGISTRY_PREFS)
+        val editor = remote.edit()
+        remote.all.keys
+            .filter { key ->
+                key.startsWith(PluginConstants.REMOTE_FILE_PREFIX) &&
+                    key.removePrefix(PluginConstants.REMOTE_FILE_PREFIX) !in installedFiles
+            }
+            .forEach(editor::remove)
+        installedFiles.forEach { (pluginId, fileName) ->
+            editor.putString(PluginConstants.remoteFileKey(pluginId), fileName)
+        }
+        editor
             .putStringSet(PluginConstants.REMOTE_ENABLED_IDS_KEY, enabled)
             .putStringSet(
                 PluginConstants.REMOTE_CACHE_CLEAR_TOKENS_KEY,

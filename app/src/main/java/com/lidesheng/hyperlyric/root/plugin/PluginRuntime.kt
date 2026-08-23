@@ -157,7 +157,7 @@ class PluginRuntime(
         }
 
         enabledIds.sorted().forEach { pluginId ->
-            val fileName = PluginRemoteFileNames.forId(pluginId)
+            val fileName = resolvePluginFileName(registry, pluginId)
             if (fileName !in remoteFiles) {
                 HookLogger.w(TAG, "插件文件不存在: id=$pluginId, file=$fileName")
                 return@forEach
@@ -602,7 +602,7 @@ class PluginRuntime(
     private fun findOrLoadPluginForCache(pluginId: String): LoadedPlugin? =
         synchronized(pluginLoadLock) {
             loadedPlugins.firstOrNull { it.manifest.id == pluginId } ?: run {
-                val fileName = PluginRemoteFileNames.forId(pluginId)
+                val fileName = resolvePluginFileName(registryPreferences, pluginId)
                 val remoteFiles = runCatching { module.listRemoteFiles().toSet() }
                     .getOrElse { error ->
                         HookLogger.w(TAG, "读取插件远程文件列表失败，无法管理缓存: id=$pluginId", error)
@@ -621,6 +621,14 @@ class PluginRuntime(
                 }.getOrNull()
             }
         }
+
+    private fun resolvePluginFileName(
+        registry: SharedPreferences?,
+        pluginId: String,
+    ): String = registry
+        ?.getString(PluginConstants.remoteFileKey(pluginId), null)
+        ?.takeIf(String::isNotBlank)
+        ?: PluginRemoteFileNames.forId(pluginId)
 
     private fun cacheOperationFailure(
         request: PluginCacheOperationRequest,

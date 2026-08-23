@@ -10,4 +10,12 @@ object PluginRemoteFileNames {
             .joinToString("") { byte -> "%02x".format(byte) }
         return "hyperlyric_plugin_$digest.zip"
     }
+
+    /**
+     * A new immutable name for one installed archive. The registry publishes this name only
+     * after the complete archive has been written, so readers never observe a file being
+     * replaced in place.
+     */
+    fun forRevision(pluginId: String, revision: String): String =
+        "${forId(pluginId).removeSuffix(".zip")}_$revision.zip"
 }

@@ -10,6 +10,8 @@ object PluginConstants {
 
     const val REMOTE_REGISTRY_PREFS = "hyperlyric.plugin.registry"
     const val REMOTE_ENABLED_IDS_KEY = "enabled_ids"
+    /** Published remote file names; the file is written before this mapping is updated. */
+    const val REMOTE_FILE_PREFIX = "file."
     /** App-side uninstall tombstones consumed by the SystemUI runtime. */
     const val REMOTE_CACHE_CLEAR_TOKENS_KEY = "cache_clear_tokens"
     /** Bounded request/response queues for App-side plugin cache management. */
@@ -35,6 +37,8 @@ object PluginConstants {
     const val MAX_CACHE_OPERATION_TIMEOUT_MS = 6_000L
 
     fun configGroup(pluginId: String): String = "plugin.$pluginId"
+
+    fun remoteFileKey(pluginId: String): String = REMOTE_FILE_PREFIX + pluginId
 
     fun storagePreferences(pluginId: String): String = "hyperlyric_plugin_data_$pluginId"
 
