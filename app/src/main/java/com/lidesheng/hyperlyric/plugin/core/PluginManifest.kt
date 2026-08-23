@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.plugin.core
 
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingOption
+import com.lidesheng.hyperlyric.plugin.api.PluginSettingGroup
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingInputType
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingSpec
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingType
@@ -55,6 +56,7 @@ object PluginManifestCodec {
         require(entryPattern.matches(entry)) { "Invalid plugin entry" }
 
         val settings = decodeSettings(json.optJSONArray("settings"))
+        val groups = decodeSettingGroups(json.optJSONArray("settingGroups"))
         val cacheScopes = decodeCacheScopes(json.optJSONArray("cacheScopes"))
         activationSettingKey?.let { key ->
             val setting = settings.firstOrNull { it.key == key }
@@ -75,7 +77,7 @@ object PluginManifestCodec {
             nameByLocale = decodeLocalizedMap(json.optJSONObject("nameLocales")),
             summaryByLocale = decodeLocalizedMap(json.optJSONObject("summaryLocales")),
             activationSettingKey = activationSettingKey,
-            settings = PluginSettingsSchema(settings),
+            settings = PluginSettingsSchema(settings = settings, groups = groups),
             cacheScopes = cacheScopes
         )
     }
@@ -127,6 +129,7 @@ object PluginManifestCodec {
             if (!setting.backup) {
                 settingJson.put("backup", false)
             }
+            setting.group?.takeIf { it.isNotBlank() }?.let { settingJson.put("group", it) }
             setting.defaultValue?.let { settingJson.put("default", encodeDefault(setting.type, it)) }
             if (setting.options.isNotEmpty()) {
                 settingJson.put(
@@ -155,6 +158,18 @@ object PluginManifestCodec {
             settings.put(settingJson)
         }
         if (settings.length() > 0) json.put("settings", settings)
+        val groups = JSONArray()
+        manifest.settings.groups.forEach { group ->
+            groups.put(
+                JSONObject()
+                    .put("id", group.id)
+                    .put("title", group.title)
+                    .also { groupJson ->
+                        putLocalizedMap(groupJson, "titleLocales", group.titleByLocale)
+                    }
+            )
+        }
+        if (groups.length() > 0) json.put("settingGroups", groups)
         if (manifest.cacheScopes.isNotEmpty()) {
             json.put(
                 "cacheScopes",
@@ -195,6 +210,28 @@ object PluginManifestCodec {
                         summary = item.optionalString("summary"),
                         titleByLocale = decodeLocalizedMap(item.optJSONObject("titleLocales")),
                         summaryByLocale = decodeLocalizedMap(item.optJSONObject("summaryLocales"))
+                    )
+                )
+            }
+        }
+    }
+
+    private fun decodeSettingGroups(array: JSONArray?): List<PluginSettingGroup> {
+        if (array == null) return emptyList()
+        require(array.length() <= MAX_SETTING_GROUPS) { "Too many plugin setting groups" }
+        val ids = HashSet<String>()
+        return buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index)
+                    ?: throw IllegalArgumentException("Plugin setting group must be an object")
+                val id = item.requiredString("id")
+                require(idPattern.matches(id)) { "Invalid plugin setting group id" }
+                require(ids.add(id)) { "Duplicate plugin setting group id: $id" }
+                add(
+                    PluginSettingGroup(
+                        id = id,
+                        title = item.requiredString("title"),
+                        titleByLocale = decodeLocalizedMap(item.optJSONObject("titleLocales"))
                     )
                 )
             }
@@ -254,7 +291,8 @@ object PluginManifestCodec {
                             item.optString("inputType", PluginSettingInputType.DEFAULT.wireName)
                         ) ?: throw IllegalArgumentException("Unsupported setting input type"),
                         conflictsWith = decodeStringArray(item.optJSONArray("conflictsWith")),
-                        backup = item.optBoolean("backup", true)
+                        backup = item.optBoolean("backup", true),
+                        group = item.optionalString("group")?.takeIf { it.isNotBlank() }
                     )
                 )
             }
@@ -336,4 +374,5 @@ object PluginManifestCodec {
         opt(key)?.takeUnless { it === JSONObject.NULL }?.toString()?.toFloatOrNull()
 
     private const val MAX_CACHE_SCOPES = 32
+    private const val MAX_SETTING_GROUPS = 32
 }

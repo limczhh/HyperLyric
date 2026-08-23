@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.plugin.api.PluginSettingGroup
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingSpec
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingInputType
 import com.lidesheng.hyperlyric.plugin.api.PluginSettingType
@@ -63,6 +64,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
@@ -84,6 +86,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 import kotlin.math.max
 import kotlin.math.roundToInt
+
+private const val DEFAULT_PLUGIN_SETTING_GROUP_ID = "default"
 
 @Composable
 fun PluginManagerPage() {
@@ -389,6 +393,12 @@ private fun PluginSettingsPageContent(
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val settingsByGroup = plugin.manifest.settings.settings
+        .filter { it.key != activationSetting?.key }
+        .groupBy { it.group }
+    val settingGroupDefinitions = remember(plugin.manifest.id) {
+        plugin.manifest.settings.groups.associateBy { it.id }
+    }
 
     if (showUninstallDialog) {
         WindowDialog(
@@ -520,28 +530,45 @@ private fun PluginSettingsPageContent(
                         )
                     }
                 }
-                item(key = "plugin_settings") {
-                    Card(
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .fillMaxWidth()
-                    ) {
-                        if (plugin.manifest.settings.settings.none {
-                                it.key != activationSetting?.key
-                            }
+                if (settingsByGroup.isEmpty()) {
+                    item(key = "plugin_settings_empty") {
+                        Card(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .padding(bottom = 12.dp)
+                                .fillMaxWidth()
                         ) {
                             Text(
                                 text = stringResource(R.string.summary_plugin_no_settings),
                                 modifier = Modifier.padding(16.dp)
                             )
-                        } else {
-                            PluginSettingsContent(
-                                manifest = plugin.manifest,
-                                repository = repository,
-                                pluginEnabled = enabled,
-                                hiddenSettingKey = activationSetting?.key
-                            )
+                        }
+                    }
+                } else {
+                    settingsByGroup.entries.forEachIndexed { index, (group, settings) ->
+                        val groupId = group ?: DEFAULT_PLUGIN_SETTING_GROUP_ID
+                        val groupTitle = settingGroupDefinitions[groupId]
+                            ?.localizedTitle(context)
+                            ?.takeIf { it.isNotBlank() }
+                        groupTitle?.let { title ->
+                            item(key = "plugin_settings_title_${groupId}_$index") {
+                                SmallTitle(text = title)
+                            }
+                        }
+                        item(key = "plugin_settings_${groupId}_$index") {
+                            Card(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .padding(bottom = 12.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                PluginSettingsContent(
+                                    manifest = plugin.manifest,
+                                    repository = repository,
+                                    pluginEnabled = enabled,
+                                    settings = settings
+                                )
+                            }
                         }
                     }
                 }
@@ -583,7 +610,7 @@ private fun PluginSettingsContent(
     manifest: com.lidesheng.hyperlyric.plugin.core.PluginManifest,
     repository: PluginRepository,
     pluginEnabled: Boolean,
-    hiddenSettingKey: String? = null,
+    settings: List<PluginSettingSpec>,
 ) {
     val context = LocalContext.current
     val preferences = remember(manifest.id) { repository.configPreferences(manifest.id) }
@@ -591,7 +618,6 @@ private fun PluginSettingsContent(
     var editing by remember(manifest.id) { mutableStateOf<PluginSettingSpec?>(null) }
     var editingMulti by remember(manifest.id) { mutableStateOf<PluginSettingSpec?>(null) }
     val _revision = revision
-    val settings = manifest.settings.settings.filter { it.key != hiddenSettingKey }
 
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision++ }
@@ -609,7 +635,7 @@ private fun PluginSettingsContent(
     fun saveSwitch(setting: PluginSettingSpec, checked: Boolean) {
         repository.setSettingValue(manifest, setting, checked.toString())
         if (checked && setting.conflictsWith.isNotEmpty()) {
-            settings
+            manifest.settings.settings
                 .filter { it.key in setting.conflictsWith && it.type == PluginSettingType.SWITCH }
                 .forEach { conflicting ->
                     repository.setSettingValue(manifest, conflicting, false.toString())
@@ -847,6 +873,12 @@ internal fun com.lidesheng.hyperlyric.plugin.core.PluginManifest.localizedSummar
 )
 
 internal fun PluginSettingSpec.localizedTitle(context: Context): String = resolveLocalizedText(
+    context = context,
+    fallback = title,
+    values = titleByLocale
+)
+
+internal fun PluginSettingGroup.localizedTitle(context: Context): String = resolveLocalizedText(
     context = context,
     fallback = title,
     values = titleByLocale

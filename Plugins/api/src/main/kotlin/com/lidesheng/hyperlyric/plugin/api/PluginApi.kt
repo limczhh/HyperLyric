@@ -279,6 +279,12 @@ public enum class PluginSettingInputType(public val wireName: String) {
     }
 }
 
+public data class PluginSettingGroup(
+    val id: String,
+    val title: String,
+    val titleByLocale: Map<String, String> = emptyMap(),
+)
+
 public data class PluginSettingOption(
     val value: String,
     val label: String,
@@ -308,8 +314,11 @@ public data class PluginSettingSpec(
     val conflictsWith: List<String> = emptyList(),
     /** Whether this setting value may be included in a full HyperLyric backup. */
     val backup: Boolean = true,
+    /** Optional host UI group; settings with the same group share one settings surface. */
+    val group: String? = null,
 )
 
 public data class PluginSettingsSchema(
     val settings: List<PluginSettingSpec> = emptyList(),
+    val groups: List<PluginSettingGroup> = emptyList(),
 )

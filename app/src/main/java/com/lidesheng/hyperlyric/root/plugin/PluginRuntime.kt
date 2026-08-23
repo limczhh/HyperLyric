@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 import android.os.ParcelFileDescriptor
 import android.util.AtomicFile
 import android.util.Base64
-import dalvik.system.InMemoryDexClassLoader
+import dalvik.system.DelegateLastClassLoader
 import com.lidesheng.hyperlyric.plugin.api.HYPERLYRIC_PLUGIN_API_VERSION
 import com.lidesheng.hyperlyric.plugin.api.HyperLyricExtension
 import com.lidesheng.hyperlyric.plugin.api.HyperLyricPlugin
@@ -686,13 +686,9 @@ class PluginRuntime(
             "Plugin API is newer than host"
         }
 
+        val archiveFile = materializePluginArchive(fileName, archiveBytes)
         val classLoader = withPluginClassLoaderCreation {
-            InMemoryDexClassLoader(
-                archive.dexFiles
-                    .map { java.nio.ByteBuffer.wrap(it) }
-                    .toTypedArray(),
-                parentClassLoader
-            )
+            DelegateLastClassLoader(archiveFile.path, parentClassLoader)
         }
         val entryClass = classLoader.loadClass(archive.manifest.entry)
         require(HyperLyricPlugin::class.java.isAssignableFrom(entryClass)) {
@@ -740,6 +736,31 @@ class PluginRuntime(
                     "extensions=${context.registeredExtensions().size}"
         )
         return loaded
+    }
+
+    /**
+     * DelegateLastClassLoader loads dex files from a path, so persist the already validated ZIP
+     * before creating the loader. The file is process-local cache data and can be rebuilt after a
+     * SystemUI restart.
+     */
+    private fun materializePluginArchive(fileName: String, archiveBytes: ByteArray): File {
+        val directory = File(application.codeCacheDir, "hyperlyric_plugin_dex")
+        require(directory.exists() || directory.mkdirs()) {
+            "Unable to create plugin dex cache directory"
+        }
+        val file = File(directory, fileName)
+        val atomicFile = AtomicFile(file)
+        var output: FileOutputStream? = null
+        try {
+            output = atomicFile.startWrite()
+            output.write(archiveBytes)
+            output.fd.sync()
+            atomicFile.finishWrite(output)
+        } catch (error: Throwable) {
+            output?.let(atomicFile::failWrite)
+            throw error
+        }
+        return file
     }
 
     private suspend fun runProcessor(
