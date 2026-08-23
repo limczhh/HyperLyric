@@ -131,7 +131,7 @@ private class MyProcessor(
 | `slider` | 带 `min`、`max`、`step` 的滑块 |
 | `action` | 操作项协议；当前宿主不执行插件自定义动作 |
 
-`title` 和 `summary` 用于显示名称和说明；需要多语言时使用 `titleLocales`、`summaryLocales`。`valuePresentation` 可选择 `endAction`、`summary` 或 `summaryPreview`。`inputType` 可声明 `uri` 或 `number`，`conflictsWith` 可声明互斥设置。可选的 `group` 会让同组设置在宿主 UI 中进入同一个设置 Card；未声明时使用 `default` 组。
+`title` 和 `summary` 用于显示名称和说明；需要多语言时使用 `titleLocales`、`summaryLocales`。`dialogSummary` 和 `dialogSummaryLocales` 用于在编辑弹窗标题下显示补充说明。`valuePresentation` 可选择 `endAction`、`summary` 或 `summaryPreview`。`inputType` 可声明 `uri` 或 `number`；`slider` 同时声明 `inputType: "number"` 时，宿主会使用数值弹窗而不是滑块，并按 `min`、`max` 限制浮点值。`conflictsWith` 可声明互斥设置。可选的 `group` 会让同组设置在宿主 UI 中进入同一个设置 Card；未声明时使用 `default` 组。
 
 Manifest 可以用顶层 `settingGroups` 为设置组声明 `id`、`title` 和可选的 `titleLocales`。宿主会在对应 Card 前使用 Miuix `SmallTitle` 显示组标题；未声明标题的旧插件仍保持原有布局。例如，`group: "generation"` 的设置会归入 `id: "generation"` 的设置组。
 

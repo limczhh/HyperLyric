@@ -129,7 +129,7 @@ Plugins describe settings in the Manifest. The host creates the settings UI, so 
 | `slider` | slider with `min`, `max`, and `step` |
 | `action` | action-item protocol; the current host does not run custom plugin actions |
 
-Use `title` and `summary` for the label and explanation. Use `titleLocales` and `summaryLocales` for translations. `valuePresentation` supports `endAction`, `summary`, and `summaryPreview`. `inputType` can declare `uri` or `number`, and `conflictsWith` can describe mutually exclusive settings. The optional `group` places settings with the same value in one settings Card in the host UI; omitted settings use the `default` group.
+Use `title` and `summary` for the label and explanation. Use `titleLocales` and `summaryLocales` for translations. Use `dialogSummary` and `dialogSummaryLocales` for supporting text below the edit-dialog title. `valuePresentation` supports `endAction`, `summary`, and `summaryPreview`. `inputType` can declare `uri` or `number`; when a `slider` also declares `inputType: "number"`, the host uses a numeric dialog instead of a slider while enforcing the float `min` and `max`. `conflictsWith` can describe mutually exclusive settings. The optional `group` places settings with the same value in one settings Card in the host UI; omitted settings use the `default` group.
 
 The top-level `settingGroups` array can declare a group's `id`, `title`, and optional `titleLocales`. The host renders the group title with Miuix `SmallTitle` before the corresponding Card; older plugins that do not declare group titles keep the existing layout. For example, a setting with `group: "generation"` belongs to the group with `id: "generation"`.
 
