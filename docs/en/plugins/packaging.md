@@ -16,17 +16,17 @@ Plugins/
          └─ plugin/manifest.json
 ```
 
-Use `compileOnly` for the API and host-provided libraries, and `implementation` only for runtime libraries owned by the plugin:
+Use `compileOnly` for the Plugin API because the host parent ClassLoader owns it. Use `implementation` for the Kotlin standard library and other runtime libraries required by the plugin because the plugin DEX has an isolated ClassLoader boundary:
 
 ```kotlin
 dependencies {
     compileOnly(project(":plugins:api"))
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:<host-version>")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:<kotlin-version>")
     implementation("com.example:plugin-only-library:<version>")
 }
 ```
 
-Do not depend on `:app`, and do not package `Plugins/api`, the Kotlin runtime, or other libraries already supplied by the host.
+Do not depend on `:app`, and do not package `Plugins/api` or host-internal classes. The plugin's Kotlin standard library must be carried through `implementation`; do not assume that SystemUI or an R8-optimized host provides unminified Kotlin class names.
 
 ## Manifest
 
@@ -64,6 +64,8 @@ Release plugins must be checked against their runtime boundaries after R8. A plu
 - other plugin implementation types that are actually looked up by class name or serialized by the plugin itself.
 
 Do not add duplicate keep rules in plugin modules for `PluginSong`, `PluginSongResult`, field enums, or other Plugin API types. `Plugins/api` is a `compileOnly` dependency and is not packaged into the plugin DEX. The host's [`app/proguard-rules.pro`](../../../app/proguard-rules.pro) keeps the names and method descriptors of these public types stable. Plugin-side rules cannot protect API classes inside the host, and packaging a private copy of the API in the ZIP is not a valid workaround.
+
+Runtime loads non-API types from the plugin before consulting the parent loader, but Release plugins should still use `-keepnames class <plugin-package>.**` to preserve their implementation namespace and avoid short-name collisions with older hosts or other parent-loader classes. This keeps class names only; it does not keep every member in the plugin package.
 
 Use `Plugins/modules/demo-logger/proguard-rules.pro` as a reference: keep the exact entry class declared by the Manifest and only the members invoked by the host through the protocol. Do not keep the whole plugin package.
 

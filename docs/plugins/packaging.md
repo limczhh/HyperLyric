@@ -16,17 +16,17 @@ Plugins/
          └─ plugin/manifest.json
 ```
 
-API 和宿主已经提供的运行库使用 `compileOnly`，插件自己的网络库、解析库或其他运行时依赖使用 `implementation`：
+Plugin API 使用 `compileOnly`，因为它由宿主父 ClassLoader 提供；Kotlin 标准库和插件自己的网络库、解析库或其他运行时依赖使用 `implementation`，因为插件 DEX 有独立的类加载边界：
 
 ```kotlin
 dependencies {
     compileOnly(project(":plugins:api"))
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:<host-version>")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:<kotlin-version>")
     implementation("com.example:plugin-only-library:<version>")
 }
 ```
 
-插件不能依赖 `:app`，也不要把 `Plugins/api`、Kotlin 运行库或宿主已有运行库重复打入 ZIP。
+插件不能依赖 `:app`，也不要把 `Plugins/api` 或宿主内部类打入 ZIP。插件需要的 Kotlin 标准库应通过 `implementation` 随插件携带；不能假定 SystemUI 或宿主 R8 产物会提供未混淆的 Kotlin 类名。
 
 ## Manifest
 
@@ -66,6 +66,8 @@ Release 插件必须验证 R8 后的运行时边界。插件模块只保护插�
 - 其他确实按类名反射或由插件自行序列化的插件实现类型。
 
 不要在插件模块中为 `PluginSong`、`PluginSongResult`、字段枚举或其他 Plugin API 类型重复添加 keep 规则。`Plugins/api` 是 `compileOnly` 依赖，不会打入插件 DEX；这些公共类型的名称和方法描述符由宿主的 [`app/proguard-rules.pro`](../../app/proguard-rules.pro) 负责稳定。插件侧的同名规则既不能保护宿主中的 API 类，也不应通过把 API 打入 ZIP 来解决。
+
+Runtime 对非 API 类型采用插件优先的类加载顺序，但插件 Release 仍应使用 `-keepnames class <plugin-package>.**` 保留实现类命名空间，避免旧宿主或其他父加载器中的短类名冲突。该规则只保留类名，不等同于保留整个插件包的成员。
 
 可以参考 `Plugins/modules/demo-logger/proguard-rules.pro`：精确保留 Manifest 声明的入口类，并只保留宿主通过协议调用的成员；不要把整个插件包都设为 keep。
 

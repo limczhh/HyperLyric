@@ -129,7 +129,9 @@ Plugins describe settings in the Manifest. The host creates the settings UI, so 
 | `slider` | slider with `min`, `max`, and `step` |
 | `action` | action-item protocol; the current host does not run custom plugin actions |
 
-Use `title` and `summary` for the label and explanation. Use `titleLocales` and `summaryLocales` for translations. `valuePresentation` supports `endAction`, `summary`, and `summaryPreview`. `inputType` can declare `uri` or `number`, and `conflictsWith` can describe mutually exclusive settings.
+Use `title` and `summary` for the label and explanation. Use `titleLocales` and `summaryLocales` for translations. `valuePresentation` supports `endAction`, `summary`, and `summaryPreview`. `inputType` can declare `uri` or `number`, and `conflictsWith` can describe mutually exclusive settings. The optional `group` places settings with the same value in one settings Card in the host UI; omitted settings use the `default` group.
+
+The top-level `settingGroups` array can declare a group's `id`, `title`, and optional `titleLocales`. The host renders the group title with Miuix `SmallTitle` before the corresponding Card; older plugins that do not declare group titles keep the existing layout. For example, a setting with `group: "generation"` belongs to the group with `id: "generation"`.
 
 When `activationSettingKey` is declared, the common switch at the top of the plugin page synchronizes the plugin enablement and that setting. Configuration changes call `onConfigChanged`, but take effect only on the next normal request; the current song is not rerun automatically.
 

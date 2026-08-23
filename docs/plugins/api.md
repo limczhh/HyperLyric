@@ -131,7 +131,9 @@ private class MyProcessor(
 | `slider` | 带 `min`、`max`、`step` 的滑块 |
 | `action` | 操作项协议；当前宿主不执行插件自定义动作 |
 
-`title` 和 `summary` 用于显示名称和说明；需要多语言时使用 `titleLocales`、`summaryLocales`。`valuePresentation` 可选择 `endAction`、`summary` 或 `summaryPreview`。`inputType` 可声明 `uri` 或 `number`，`conflictsWith` 可声明互斥设置。
+`title` 和 `summary` 用于显示名称和说明；需要多语言时使用 `titleLocales`、`summaryLocales`。`valuePresentation` 可选择 `endAction`、`summary` 或 `summaryPreview`。`inputType` 可声明 `uri` 或 `number`，`conflictsWith` 可声明互斥设置。可选的 `group` 会让同组设置在宿主 UI 中进入同一个设置 Card；未声明时使用 `default` 组。
+
+Manifest 可以用顶层 `settingGroups` 为设置组声明 `id`、`title` 和可选的 `titleLocales`。宿主会在对应 Card 前使用 Miuix `SmallTitle` 显示组标题；未声明标题的旧插件仍保持原有布局。例如，`group: "generation"` 的设置会归入 `id: "generation"` 的设置组。
 
 如果声明 `activationSettingKey`，插件页顶部的通用开关会同步插件启用状态和这个设置项。配置变化会触发 `onConfigChanged`，但只在下一次正常处理时生效，不会主动重跑当前歌曲。
 
