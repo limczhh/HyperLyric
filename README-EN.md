@@ -32,7 +32,7 @@ HyperLyric displays line-synced, word-synced, and separated lyrics in Xiaomi Hyp
 - **Line- and word-synced lyrics**: Lyrics are shown one line at a time. With word-level timing, each word is highlighted as the song plays; with line-level timing, the whole line changes together; lyrics without timing can still scroll.
 - **Separated lyrics**: Splits one lyric line across the left and right sides of HyperIsland while keeping word progress and scrolling. The width can stay fixed or change with the lyric.
 - **Second line**: Shows a translation, romanization, or the next lyric line. You can also swap the original and translation, show only the translation, or switch automatically.
-- **OpenAI Translation**: The Online build can generate translations through an OpenAI-compatible API. You can set the target language, model, endpoint, and prompt, skip selected source languages, or replace translations supplied by the lyric source.
+- **OpenAI Translation**: After installing the AI translation plugin, HyperLyric can generate translations through an OpenAI-compatible API. You can set the target language, model, endpoint, and prompt, skip selected source languages, or replace translations supplied by the lyric source.
 - **Lyric time offset**: Each Lyricon provider can move lyrics earlier or later independently.
 
 ### HyperIsland layout and content
@@ -108,10 +108,7 @@ HyperLyric can switch between three Xposed lyric sources. Word timing, translati
 
 ## Download
 
-Download the latest build from [GitHub Releases](https://github.com/limczhh/HyperLyric/releases):
-
-- **Online**: Adds AI translation and an online lyric source that ordinary apps can call by sending notifications.
-- **Offline**: Only removes network features; the other core features are essentially the same.
+Download the latest HyperLyric APK from [GitHub Releases](https://github.com/limczhh/HyperLyric/releases).
 
 ## Standalone notification mode
 
