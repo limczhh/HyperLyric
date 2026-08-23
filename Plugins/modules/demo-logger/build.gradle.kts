@@ -34,8 +34,8 @@ android {
 dependencies {
     // The host already contains the API and resolves it through the parent ClassLoader.
     compileOnly(project(":plugins:api"))
-    // HyperLyric itself is Kotlin-based, so do not embed a second Kotlin runtime in the ZIP.
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
+    // The plugin has an isolated ClassLoader; SystemUI is not a Kotlin runtime provider.
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
 
     // Add plugin-owned runtime libraries with implementation(...). They are packaged into the ZIP.
 }

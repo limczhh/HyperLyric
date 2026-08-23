@@ -10,6 +10,24 @@
   "apiVersion": 1,
   "entry": "com.lidesheng.hyperlyric.plugin.ai.translation.AiTranslationPlugin",
   "activationSettingKey": "enabled",
+  "settingGroups": [
+    {
+      "id": "default",
+      "title": "基础设置",
+      "titleLocales": {
+        "en": "Basic Settings",
+        "ar": "الإعدادات الأساسية"
+      }
+    },
+    {
+      "id": "generation",
+      "title": "高级设置",
+      "titleLocales": {
+        "en": "Advanced Settings",
+        "ar": "الإعدادات المتقدمة"
+      }
+    }
+  ],
   "cacheScopes": [
     {
       "id": "translation",
@@ -80,11 +98,6 @@
         "en": "Force AI Translation",
         "ar": "فرض الترجمة بالذكاء الاصطناعي"
       },
-      "summary": "使用 AI 译文覆盖歌词源提供的已有翻译",
-      "summaryLocales": {
-        "en": "Replace existing translations from the lyric source with AI translations",
-        "ar": "استبدال الترجمات الموجودة من مصدر الكلمات بترجمات الذكاء الاصطناعي"
-      },
       "default": false,
       "conflictsWith": ["skip_existing"]
     },
@@ -124,7 +137,7 @@
         "en": "Model Name",
         "ar": "اسم النموذج"
       },
-      "default": "mimo-v2-flash",
+      "default": "mimo-v2.5",
       "valuePresentation": "endAction"
     },
     {
@@ -150,6 +163,42 @@
       "default": "你是一个歌词翻译专家，遵循\"信雅达\"原则进行创作。\n\n## 核心：信雅达 (Cultural Transcreation)\n- 信/灵魂对位：深度理解原文背景与世界观。严禁句式套用，必须打破语序，以目标语言的意向逻辑重塑内核，确保\"神不散\"。\n- 雅/审美重构：捕获隐喻，拒绝平铺直叙。根据曲风炼字，民谣讲究留白意境，摇滚追求文化冲击。\n- 达/呼吸转译：彻底消除翻译腔。译文须契合旋律起伏与呼吸断句，确保副歌具备跨文化的传播记忆点。\n\n## 深度适配要求\n- 隐喻重映射：将原文的文化隐喻转化为目标受众能理解的对等词。允许逻辑倒置，用画面感取代生硬解释。\n- 背景融入：保留特定的世界观语域。译文需符合原曲设定的时空感、社会身份或情感底色。\n\n## 节奏与技术\n- 等时对齐：音节/字数必须严丝合缝适配节拍，严禁在短拍堆砌文字。\n- 动态押韵：除 Rap/特定流行强求押韵外，优先保证情绪流转自然。严禁为押韵损毁隐喻或文化美感。\n- 解构再造：拆碎原文逻辑，以母语者直觉进行\"意象创作\"，使译文像原创作品般自然。",
       "valuePresentation": "summaryPreview",
       "previewLineCount": 2
+    },
+    {
+      "type": "slider",
+      "key": "temperature",
+      "title": "temperature",
+      "dialogSummary": "Input range: 0–2.",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.1,
+      "inputType": "number",
+      "group": "generation"
+    },
+    {
+      "type": "slider",
+      "key": "top_p",
+      "title": "top_p",
+      "dialogSummary": "Input range: 0–1.",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "inputType": "number",
+      "group": "generation"
+    },
+    {
+      "type": "number",
+      "key": "max_tokens",
+      "title": "max_tokens",
+      "dialogSummary": "Input range: 0–2147483647.",
+      "default": 0,
+      "min": 0,
+      "max": 2147483647,
+      "inputType": "number",
+      "valuePresentation": "endAction",
+      "group": "generation"
     }
   ]
 }

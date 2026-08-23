@@ -58,8 +58,6 @@ internal class OpenAiTranslationClient(
             .put("response_format", JSONObject().put("type", "json_object"))
             .put("temperature", config.temperature.toDouble())
             .put("top_p", config.topP.toDouble())
-            .put("presence_penalty", 0.3)
-            .put("frequency_penalty", 0.3)
             .apply {
                 if (config.maxTokens > 0) put("max_tokens", config.maxTokens)
             }

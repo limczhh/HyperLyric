@@ -57,7 +57,7 @@ internal data class AiTranslationConfig(
 
         private const val DEFAULT_PROVIDER = "OPENAI"
         private const val DEFAULT_BASE_URL = "https://api.xiaomimimo.com/v1/"
-        private const val DEFAULT_MODEL = "mimo-v2-flash"
+        private const val DEFAULT_MODEL = "mimo-v2.5"
         private const val DEFAULT_TARGET = "中文"
         private const val DEFAULT_TEMPERATURE = 1f
         private const val DEFAULT_TOP_P = 1f

@@ -34,8 +34,8 @@ android {
 dependencies {
     // The host supplies the API through the parent ClassLoader; never package it in the ZIP.
     compileOnly(project(":plugins:api"))
-    // Kotlin is already supplied by HyperLyric and must not be duplicated in the plugin ZIP.
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
+    // The plugin has an isolated ClassLoader; SystemUI is not a Kotlin runtime provider.
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
 
     // Networking and JSON use Android platform APIs, so this plugin has no duplicate host runtime.
 

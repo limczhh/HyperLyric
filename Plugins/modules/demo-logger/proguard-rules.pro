@@ -4,6 +4,10 @@
     <init>();
 }
 
+# Keep plugin implementation names out of the host's global short-name namespace. Members may
+# still be optimized; the Runtime owns the API class identity through its parent ClassLoader.
+-keepnames class com.lidesheng.hyperlyric.plugin.demo.**
+
 # Runtime calls the lifecycle methods through the HyperLyricPlugin protocol.
 -keepclassmembers,allowoptimization class * implements com.lidesheng.hyperlyric.plugin.api.HyperLyricPlugin {
     public void onLoad(com.lidesheng.hyperlyric.plugin.api.PluginContext);
