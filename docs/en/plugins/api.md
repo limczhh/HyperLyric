@@ -133,7 +133,7 @@ Use `title` and `summary` for the label and explanation. Use `titleLocales` and 
 
 The top-level `settingGroups` array can declare a group's `id`, `title`, and optional `titleLocales`. The host renders the group title with Miuix `SmallTitle` before the corresponding Card; older plugins that do not declare group titles keep the existing layout. For example, a setting with `group: "generation"` belongs to the group with `id: "generation"`.
 
-When `activationSettingKey` is declared, the common switch at the top of the plugin page synchronizes the plugin enablement and that setting. Configuration changes call `onConfigChanged`, but take effect only on the next normal request; the current song is not rerun automatically.
+When `activationSettingKey` is declared, the common switch at the top of the plugin page synchronizes the plugin enablement and that setting. When the common switch is turned off, the host does not cancel the current song's processing; starting with the next song request, it no longer selects that plugin and cleans up its runtime at a safe point, without requiring a SystemUI restart. The plugin should still check this setting at its processing entry as a defense in depth. Other configuration changes call `onConfigChanged`, but take effect only on the next normal request; the current song is not rerun automatically.
 
 API keys and other values that should not enter backups must use `backup: false`:
 

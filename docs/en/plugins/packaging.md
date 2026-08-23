@@ -94,7 +94,7 @@ Release ZIP:
 .\gradlew.bat :plugins:my-plugin:packagePlugin --max-workers=2
 ```
 
-Install the ZIP from HyperLyric's plugin manager, configure it, and enable it. Restart SystemUI after installation, removal, or a code upgrade. Ordinary configuration changes do not require a restart.
+Install the ZIP from HyperLyric's plugin manager, configure it, and enable it. Restart SystemUI after installation, removal, or a code upgrade. Enable/disable changes and ordinary configuration changes are synchronized at runtime and do not require a restart.
 
 ## Validation checklist
 

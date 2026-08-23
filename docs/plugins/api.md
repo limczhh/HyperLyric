@@ -135,7 +135,7 @@ private class MyProcessor(
 
 Manifest 可以用顶层 `settingGroups` 为设置组声明 `id`、`title` 和可选的 `titleLocales`。宿主会在对应 Card 前使用 Miuix `SmallTitle` 显示组标题；未声明标题的旧插件仍保持原有布局。例如，`group: "generation"` 的设置会归入 `id: "generation"` 的设置组。
 
-如果声明 `activationSettingKey`，插件页顶部的通用开关会同步插件启用状态和这个设置项。配置变化会触发 `onConfigChanged`，但只在下一次正常处理时生效，不会主动重跑当前歌曲。
+如果声明 `activationSettingKey`，插件页顶部的通用开关会同步插件启用状态和这个设置项。总开关关闭后，宿主不会主动取消当前歌曲的处理；从下一次歌曲处理开始不再选择该插件，并在安全时机清理其运行生命周期，不需要重启 SystemUI。插件自身仍应在处理入口检查该设置作为防护。其他配置变化会触发 `onConfigChanged`，但只在下一次正常处理时生效，不会主动重跑当前歌曲。
 
 API Key 等不应进入备份的值必须声明 `backup: false`：
 
