@@ -46,8 +46,10 @@ import com.lidesheng.hyperlyric.plugin.app.InstalledPlugin
 import com.lidesheng.hyperlyric.plugin.app.PluginRepository
 import com.lidesheng.hyperlyric.plugin.core.PluginConstants
 import com.lidesheng.hyperlyric.root.RootApplication
+import com.lidesheng.hyperlyric.ui.component.FloatInputDialog
 import com.lidesheng.hyperlyric.ui.component.MultiSelectDialog
 import com.lidesheng.hyperlyric.ui.component.MultiSelectDialogOption
+import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.component.TextInputDialog
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route
@@ -583,6 +585,7 @@ private fun PluginSettingsPageContent(
                             plugin.manifest.cacheScopes.forEach { cacheScope ->
                                 ArrowPreference(
                                     title = cacheScope.localizedTitle(context),
+                                    summary = cacheScope.localizedSummary(context),
                                     onClick = {
                                         navigator.navigate(
                                             Route.PluginCache(plugin.manifest.id, cacheScope.id)
@@ -705,21 +708,44 @@ private fun PluginSettingsContent(
                     setting.key,
                     setting.defaultValue?.toFloatOrNull() ?: min
                 ).coerceIn(min, upperBound)
-                val step = setting.step?.takeIf { it > 0f }
-                val steps = step?.let { max(0, ((upperBound - min) / it).roundToInt() - 1) } ?: 0
-                SliderPreference(
-                    value = value,
-                    onValueChange = {
-                        repository.setSettingValue(manifest, setting, it.toString())
-                        revision++
-                    },
-                    title = title,
-                    summary = setting.localizedSummary(context),
-                    enabled = pluginEnabled,
-                    valueText = value.toString(),
-                    valueRange = min..upperBound,
-                    steps = steps
-                )
+                if (setting.inputType == PluginSettingInputType.NUMBER) {
+                    ArrowPreference(
+                        title = title,
+                        summary = setting.localizedSummary(context),
+                        endActions = {
+                            Text(
+                                text = value.toString(),
+                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                color = if (pluginEnabled) {
+                                    MiuixTheme.colorScheme.onSurfaceVariantActions
+                                } else {
+                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                                }
+                            )
+                        },
+                        enabled = pluginEnabled,
+                        holdDownState = editing?.key == setting.key,
+                        onClick = { editing = setting }
+                    )
+                } else {
+                    val step = setting.step?.takeIf { it > 0f }
+                    val steps = step?.let {
+                        max(0, ((upperBound - min) / it).roundToInt() - 1)
+                    } ?: 0
+                    SliderPreference(
+                        value = value,
+                        onValueChange = {
+                            repository.setSettingValue(manifest, setting, it.toString())
+                            revision++
+                        },
+                        title = title,
+                        summary = setting.localizedSummary(context),
+                        enabled = pluginEnabled,
+                        valueText = value.toString(),
+                        valueRange = min..upperBound,
+                        steps = steps
+                    )
+                }
             }
 
             PluginSettingType.TEXT,
@@ -775,28 +801,75 @@ private fun PluginSettingsContent(
 
     val editingSetting = editing
     if (pluginEnabled && editingSetting != null) {
-        TextInputDialog(
-            show = true,
-            title = editingSetting.localizedTitle(context),
-            initialValue = readSettingValue(preferences, editingSetting),
-            keyboardOptions = when (editingSetting.inputType) {
-                PluginSettingInputType.URI -> KeyboardOptions(keyboardType = KeyboardType.Uri)
-                PluginSettingInputType.NUMBER -> KeyboardOptions(keyboardType = KeyboardType.Number)
-                PluginSettingInputType.DEFAULT -> if (
-                    editingSetting.type == PluginSettingType.NUMBER
-                ) {
-                    KeyboardOptions(keyboardType = KeyboardType.Number)
-                } else {
-                    KeyboardOptions.Default
-                }
-            },
-            onDismiss = { editing = null },
-            onConfirm = { value ->
-                repository.setSettingValue(manifest, editingSetting, value)
-                revision++
-                editing = null
+        when (editingSetting.type) {
+            PluginSettingType.SLIDER -> {
+                val min = editingSetting.min ?: 0f
+                val upperBound = (editingSetting.max ?: 1f).coerceAtLeast(min)
+                val initialValue = preferences.getFloat(
+                    editingSetting.key,
+                    editingSetting.defaultValue?.toFloatOrNull() ?: min
+                ).coerceIn(min, upperBound)
+                FloatInputDialog(
+                    show = true,
+                    title = editingSetting.localizedTitle(context),
+                    label = editingSetting.localizedTitle(context),
+                    summary = editingSetting.localizedDialogSummary(context),
+                    initialValue = initialValue,
+                    min = min,
+                    max = upperBound,
+                    onDismiss = { editing = null },
+                    onConfirm = { value ->
+                        repository.setSettingValue(manifest, editingSetting, value.toString())
+                        revision++
+                        editing = null
+                    }
+                )
             }
-        )
+
+            PluginSettingType.NUMBER -> {
+                val min = editingSetting.min?.toInt() ?: Int.MIN_VALUE
+                val upperBound = (editingSetting.max?.toInt() ?: Int.MAX_VALUE).coerceAtLeast(min)
+                val initialValue = preferences.getLong(
+                    editingSetting.key,
+                    editingSetting.defaultValue?.toLongOrNull() ?: min.toLong()
+                ).coerceIn(min.toLong(), upperBound.toLong()).toInt()
+                NumberInputDialog(
+                    show = true,
+                    title = editingSetting.localizedTitle(context),
+                    label = editingSetting.localizedTitle(context),
+                    summary = editingSetting.localizedDialogSummary(context),
+                    initialValue = initialValue,
+                    min = min,
+                    max = upperBound,
+                    onDismiss = { editing = null },
+                    onConfirm = { value ->
+                        repository.setSettingValue(manifest, editingSetting, value.toString())
+                        revision++
+                        editing = null
+                    }
+                )
+            }
+
+            else -> {
+                TextInputDialog(
+                    show = true,
+                    title = editingSetting.localizedTitle(context),
+                    initialValue = readSettingValue(preferences, editingSetting),
+                    summary = editingSetting.localizedDialogSummary(context),
+                    keyboardOptions = when (editingSetting.inputType) {
+                        PluginSettingInputType.URI -> KeyboardOptions(keyboardType = KeyboardType.Uri)
+                        PluginSettingInputType.NUMBER -> KeyboardOptions(keyboardType = KeyboardType.Number)
+                        PluginSettingInputType.DEFAULT -> KeyboardOptions.Default
+                    },
+                    onDismiss = { editing = null },
+                    onConfirm = { value ->
+                        repository.setSettingValue(manifest, editingSetting, value)
+                        revision++
+                        editing = null
+                    }
+                )
+            }
+        }
     }
 
     val multiSetting = editingMulti

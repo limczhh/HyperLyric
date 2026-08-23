@@ -110,6 +110,7 @@ fun NumberInputDialog(
     show: Boolean,
     title: String,
     label: String,
+    summary: String? = null,
     initialValue: Int,
     min: Int,
     max: Int,
@@ -119,7 +120,12 @@ fun NumberInputDialog(
     if (!show) return
     var inputValue by remember { mutableStateOf(initialValue.toString()) }
 
-    WindowDialog(title = title, show = true, onDismissRequest = onDismiss) {
+    WindowDialog(
+        title = title,
+        summary = summary,
+        show = true,
+        onDismissRequest = onDismiss
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = inputValue,
@@ -165,6 +171,7 @@ fun TextInputDialog(
     title: String,
     initialValue: String,
     label: String = title,
+    summary: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     confirmText: String = stringResource(id = R.string.confirm),
     onDismiss: () -> Unit,
@@ -173,7 +180,12 @@ fun TextInputDialog(
     if (!show) return
     var inputValue by remember { mutableStateOf(initialValue) }
 
-    WindowDialog(title = title, show = true, onDismissRequest = onDismiss) {
+    WindowDialog(
+        title = title,
+        summary = summary,
+        show = true,
+        onDismissRequest = onDismiss
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = inputValue,
@@ -245,6 +257,7 @@ fun FloatInputDialog(
     show: Boolean,
     title: String,
     label: String,
+    summary: String? = null,
     initialValue: Float,
     min: Float,
     max: Float,
@@ -254,12 +267,17 @@ fun FloatInputDialog(
     if (!show) return
     var inputValue by remember { mutableStateOf(initialValue.toString()) }
 
-    WindowDialog(title = title, show = true, onDismissRequest = onDismiss) {
+    WindowDialog(
+        title = title,
+        summary = summary,
+        show = true,
+        onDismissRequest = onDismiss
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = inputValue,
                 onValueChange = { newValue ->
-                    if (newValue.all { it.isDigit() || it == '.' }) inputValue = newValue
+                    if (newValue.isValidDecimalInput()) inputValue = newValue
                 },
                 label = label,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -292,6 +310,21 @@ fun FloatInputDialog(
             }
         }
     }
+}
+
+private fun String.isValidDecimalInput(): Boolean {
+    if (isEmpty() || this == "-" || this == "." || this == "-.") return true
+    var decimalPointCount = 0
+    var digitCount = 0
+    for ((index, character) in withIndex()) {
+        when {
+            character == '-' && index == 0 -> Unit
+            character == '.' && decimalPointCount++ == 0 -> Unit
+            character.isDigit() -> digitCount++
+            else -> return false
+        }
+    }
+    return digitCount > 0
 }
 
 @Composable
