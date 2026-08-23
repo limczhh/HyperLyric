@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   announce:
-    name: Send Stable APKs and Plugins to Telegram
+    name: Send Stable APK and Plugins to Telegram
     if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
     runs-on: ubuntu-latest
 
@@ -54,7 +54,7 @@ jobs:
             .github/scripts
           sparse-checkout-cone-mode: false
 
-      - name: 下载已发布的 APK 和插件 Download Release APKs and Plugins
+      - name: 下载已发布的 APK 和插件 Download Release APK and Plugins
         id: assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,8 +67,7 @@ jobs:
           gh release download "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --dir release-assets \
-            --pattern 'HyperLyric-online-*.apk' \
-            --pattern 'HyperLyric-offline-*.apk' \
+            --pattern 'HyperLyric-*.apk' \
             --pattern 'hyperlyric-*-plugin.zip' \
             --clobber
 
@@ -87,8 +86,7 @@ jobs:
             printf '%s' "${files[0]}"
           }
 
-          ONLINE_APK="$(find_one_apk 'HyperLyric-online-*.apk' online)"
-          OFFLINE_APK="$(find_one_apk 'HyperLyric-offline-*.apk' offline)"
+          APK="$(find_one_apk 'HyperLyric-*.apk' HyperLyric)"
           mapfile -t PLUGIN_FILES < <(
             find release-assets -maxdepth 1 -type f \
               -name 'hyperlyric-*-plugin.zip' \
@@ -100,8 +98,7 @@ jobs:
           fi
 
           {
-            echo "online=$ONLINE_APK"
-            echo "offline=$OFFLINE_APK"
+            echo "apk=$APK"
             echo 'plugins<<EOF'
             printf '%s\n' "${PLUGIN_FILES[@]}"
             echo 'EOF'
@@ -143,8 +140,7 @@ jobs:
           generate_release_notes: false
           fail_on_unmatched_files: true
           files: |
-            release-assets/HyperLyric-online-*.apk
-            release-assets/HyperLyric-offline-*.apk
+            release-assets/HyperLyric-*.apk
 
       - name: 清理 Release 正文 Clean Release Body
         shell: bash
@@ -162,8 +158,7 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_URL: ${{ steps.release.outputs.url }}
           RELEASE_NOTES_ZH_FILE: release-notes-zh.md
-          ONLINE_APK: ${{ steps.assets.outputs.online }}
-          OFFLINE_APK: ${{ steps.assets.outputs.offline }}
+          APK: ${{ steps.assets.outputs.apk }}
           PLUGIN_FILES: ${{ steps.assets.outputs.plugins }}
         shell: bash
         run: bash .github/scripts/send-telegram-release.sh

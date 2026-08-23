@@ -8,18 +8,12 @@ set -euo pipefail
 : "${RELEASE_URL:?RELEASE_URL is required}"
 : "${RELEASE_NOTES_ZH_FILE:?RELEASE_NOTES_ZH_FILE is required}"
 
-ONLINE_APK="${ONLINE_APK:-}"
-OFFLINE_APK="${OFFLINE_APK:-}"
+APK="${APK:-}"
 PLUGIN_FILES="${PLUGIN_FILES:-}"
 
-if [[ -n "$ONLINE_APK" || -n "$OFFLINE_APK" ]]; then
-  : "${ONLINE_APK:?ONLINE_APK is required when sending APKs}"
-  : "${OFFLINE_APK:?OFFLINE_APK is required when sending APKs}"
-fi
-
 declare -a FILES=()
-if [[ -n "$ONLINE_APK" ]]; then
-  FILES+=("$ONLINE_APK" "$OFFLINE_APK")
+if [[ -n "$APK" ]]; then
+  FILES+=("$APK")
 fi
 
 if [[ -n "$PLUGIN_FILES" ]]; then

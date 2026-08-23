@@ -180,10 +180,10 @@ jobs:
             fi
           done
 
-      - name: 构建 APK 和正式插件 Build APKs and Stable Plugins
-        run: ./gradlew assembleOnlineRelease assembleOfflineRelease packageReleasePlugins --build-cache
+      - name: 构建 APK 和正式插件 Build APK and Stable Plugins
+        run: ./gradlew assembleRelease packageReleasePlugins --build-cache
 
-      - name: 对齐、签名并校验 APK Sign and Verify APKs
+      - name: 对齐、签名并校验 APK Sign and Verify APK
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           STORE_PASS: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -229,33 +229,20 @@ jobs:
             printf '%s' "${files[0]}"
           }
 
-          ONLINE_IN="$(find_single_apk app/build/outputs/apk/online/release online)"
-          OFFLINE_IN="$(find_single_apk app/build/outputs/apk/offline/release offline)"
-          ONLINE_ALIGNED="$RUNNER_TEMP/online-aligned.apk"
-          OFFLINE_ALIGNED="$RUNNER_TEMP/offline-aligned.apk"
-          ONLINE_OUT="$GITHUB_WORKSPACE/HyperLyric-online-${VERSION_TAG}.apk"
-          OFFLINE_OUT="$GITHUB_WORKSPACE/HyperLyric-offline-${VERSION_TAG}.apk"
+          APK_IN="$(find_single_apk app/build/outputs/apk/release HyperLyric)"
+          APK_ALIGNED="$RUNNER_TEMP/hyperlyric-aligned.apk"
+          APK_OUT="$GITHUB_WORKSPACE/HyperLyric-${VERSION_TAG}.apk"
 
-          "$ZIPALIGN" -v -p 4 "$ONLINE_IN" "$ONLINE_ALIGNED"
+          "$ZIPALIGN" -v -p 4 "$APK_IN" "$APK_ALIGNED"
           "$APKSIGNER" sign \
             --ks "$KEYSTORE_PATH" \
             --ks-pass env:STORE_PASS \
             --ks-key-alias "$KEY_ALIAS" \
             --key-pass env:KEY_PASS \
-            --out "$ONLINE_OUT" \
-            "$ONLINE_ALIGNED"
+            --out "$APK_OUT" \
+            "$APK_ALIGNED"
 
-          "$ZIPALIGN" -v -p 4 "$OFFLINE_IN" "$OFFLINE_ALIGNED"
-          "$APKSIGNER" sign \
-            --ks "$KEYSTORE_PATH" \
-            --ks-pass env:STORE_PASS \
-            --ks-key-alias "$KEY_ALIAS" \
-            --key-pass env:KEY_PASS \
-            --out "$OFFLINE_OUT" \
-            "$OFFLINE_ALIGNED"
-
-          "$APKSIGNER" verify --verbose "$ONLINE_OUT"
-          "$APKSIGNER" verify --verbose "$OFFLINE_OUT"
+          "$APKSIGNER" verify --verbose "$APK_OUT"
 
       - name: 准备并校验正式插件 Prepare and Verify Stable Plugins
         shell: bash
@@ -331,8 +318,7 @@ jobs:
           prerelease: false
           generate_release_notes: false
           files: |
-            HyperLyric-online-${{ steps.version.outputs.tag }}.apk
-            HyperLyric-offline-${{ steps.version.outputs.tag }}.apk
+            HyperLyric-${{ steps.version.outputs.tag }}.apk
             plugin-release-assets/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -342,4 +328,4 @@ jobs:
         shell: bash
         run: |
           rm -f "$RUNNER_TEMP/hyperlyric-release.jks"
-          rm -f "$RUNNER_TEMP/online-aligned.apk" "$RUNNER_TEMP/offline-aligned.apk"
+          rm -f "$RUNNER_TEMP/hyperlyric-aligned.apk"

@@ -174,13 +174,13 @@ jobs:
             fi
           done
 
-      - name: 构建 Online 和 Offline Preview APK Build
+      - name: 构建 Preview APK Build
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew assembleOnlineRelease assembleOfflineRelease --build-cache
+        run: ./gradlew assembleRelease --build-cache
 
-      - name: 对齐、签名并校验 APK Sign and Verify APKs
+      - name: 对齐、签名并校验 APK Sign and Verify APK
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           STORE_PASS: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -216,33 +216,20 @@ jobs:
             printf '%s' "${files[0]}"
           }
 
-          ONLINE_IN="$(find_single_apk app/build/outputs/apk/online/release online)"
-          OFFLINE_IN="$(find_single_apk app/build/outputs/apk/offline/release offline)"
-          ONLINE_ALIGNED="$RUNNER_TEMP/online-preview-aligned.apk"
-          OFFLINE_ALIGNED="$RUNNER_TEMP/offline-preview-aligned.apk"
-          ONLINE_OUT="$GITHUB_WORKSPACE/HyperLyric-online-${VERSION_TAG}.apk"
-          OFFLINE_OUT="$GITHUB_WORKSPACE/HyperLyric-offline-${VERSION_TAG}.apk"
+          APK_IN="$(find_single_apk app/build/outputs/apk/release HyperLyric)"
+          APK_ALIGNED="$RUNNER_TEMP/hyperlyric-preview-aligned.apk"
+          APK_OUT="$GITHUB_WORKSPACE/HyperLyric-${VERSION_TAG}.apk"
 
-          "$ZIPALIGN" -v -p 4 "$ONLINE_IN" "$ONLINE_ALIGNED"
+          "$ZIPALIGN" -v -p 4 "$APK_IN" "$APK_ALIGNED"
           "$APKSIGNER" sign \
             --ks "$KEYSTORE_PATH" \
             --ks-pass env:STORE_PASS \
             --ks-key-alias "$KEY_ALIAS" \
             --key-pass env:KEY_PASS \
-            --out "$ONLINE_OUT" \
-            "$ONLINE_ALIGNED"
+            --out "$APK_OUT" \
+            "$APK_ALIGNED"
 
-          "$ZIPALIGN" -v -p 4 "$OFFLINE_IN" "$OFFLINE_ALIGNED"
-          "$APKSIGNER" sign \
-            --ks "$KEYSTORE_PATH" \
-            --ks-pass env:STORE_PASS \
-            --ks-key-alias "$KEY_ALIAS" \
-            --key-pass env:KEY_PASS \
-            --out "$OFFLINE_OUT" \
-            "$OFFLINE_ALIGNED"
-
-          "$APKSIGNER" verify --verbose "$ONLINE_OUT"
-          "$APKSIGNER" verify --verbose "$OFFLINE_OUT"
+          "$APKSIGNER" verify --verbose "$APK_OUT"
 
       - name: 生成 Pre-release 说明 Generate Release Notes
         shell: bash
@@ -295,8 +282,7 @@ jobs:
           prerelease: true
           generate_release_notes: false
           files: |
-            HyperLyric-online-${{ steps.metadata.outputs.tag }}.apk
-            HyperLyric-offline-${{ steps.metadata.outputs.tag }}.apk
+            HyperLyric-${{ steps.metadata.outputs.tag }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -308,8 +294,7 @@ jobs:
           RELEASE_URL: ${{ steps.metadata.outputs.release_url }}
           ANNOUNCEMENT_HEADER: 自动构建的最新预览版
           RELEASE_NOTES_ZH_FILE: preview-notes-zh.md
-          ONLINE_APK: HyperLyric-online-${{ steps.metadata.outputs.tag }}.apk
-          OFFLINE_APK: HyperLyric-offline-${{ steps.metadata.outputs.tag }}.apk
+          APK: HyperLyric-${{ steps.metadata.outputs.tag }}.apk
         shell: bash
         run: bash .github/scripts/send-telegram-release.sh
 
@@ -318,4 +303,4 @@ jobs:
         shell: bash
         run: |
           rm -f "$RUNNER_TEMP/hyperlyric-preview-release.jks"
-          rm -f "$RUNNER_TEMP/online-preview-aligned.apk" "$RUNNER_TEMP/offline-preview-aligned.apk"
+          rm -f "$RUNNER_TEMP/hyperlyric-preview-aligned.apk"
