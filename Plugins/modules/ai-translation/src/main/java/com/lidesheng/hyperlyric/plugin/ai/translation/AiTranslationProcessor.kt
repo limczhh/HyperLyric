@@ -135,10 +135,9 @@ internal class AiTranslationProcessor(
         engine.close()
     }
 
-    fun onConfigChanged(config: PluginConfig) {
-        if (!config.getBoolean("enabled")) {
-            engine.cancelPending()
-        }
+    fun onConfigChanged(_config: PluginConfig) {
+        // Configuration is read at the next processing request. Do not cancel an in-flight
+        // translation when the plugin switch or another setting changes.
     }
 
     fun cacheExtension(): PluginCacheExtension = cacheExtension
