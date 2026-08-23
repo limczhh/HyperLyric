@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.source.ne
+package com.lidesheng.hyperlyric.online.source.ne
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

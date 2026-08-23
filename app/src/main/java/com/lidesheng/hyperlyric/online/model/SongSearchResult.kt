@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.model
+package com.lidesheng.hyperlyric.online.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

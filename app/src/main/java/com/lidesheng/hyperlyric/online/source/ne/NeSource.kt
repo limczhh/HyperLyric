@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.source.ne
+package com.lidesheng.hyperlyric.online.source.ne
 
 import android.content.Context
 import android.util.Base64

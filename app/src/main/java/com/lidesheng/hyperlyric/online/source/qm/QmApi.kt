@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.source.qm
+package com.lidesheng.hyperlyric.online.source.qm
 
 
 import kotlinx.serialization.SerialName

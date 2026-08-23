@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online
+package com.lidesheng.hyperlyric.online
 
 import android.content.Context
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory

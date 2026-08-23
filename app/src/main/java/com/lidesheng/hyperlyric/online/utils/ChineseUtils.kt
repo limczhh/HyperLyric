@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.utils
+package com.lidesheng.hyperlyric.online.utils
 
 import android.content.Context
 import com.lidesheng.hyperlyric.utils.LogManager

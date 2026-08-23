@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.online.model
+package com.lidesheng.hyperlyric.online.model
 
 interface SearchSource {
     val sourceType: Source

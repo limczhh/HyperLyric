@@ -34,19 +34,6 @@ android {
         }
     }
 
-    flavorDimensions += "version"
-    productFlavors {
-        create("online") {
-            dimension = "version"
-            buildConfigField("boolean", "ONLINE_FEATURES_ENABLED", "true")
-            isDefault = true
-        }
-        create("offline") {
-            dimension = "version"
-            buildConfigField("boolean", "ONLINE_FEATURES_ENABLED", "false")
-        }
-    }
-
     afterEvaluate {
         base {
             val vName = android.defaultConfig.versionName ?: "0"
@@ -122,9 +109,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    "onlineImplementation"(libs.retrofit2.retrofit)
-    "onlineImplementation"(libs.squareup.okhttp3)
-    "onlineImplementation"(libs.retrofit2.kotlinx.serialization.converter)
+    implementation(libs.retrofit2.retrofit)
+    implementation(libs.squareup.okhttp3)
+    implementation(libs.retrofit2.kotlinx.serialization.converter)
 
     // --- 动画库 (YoYo) ---
     implementation(libs.daimajia.animations) { artifact { type = "aar" } }

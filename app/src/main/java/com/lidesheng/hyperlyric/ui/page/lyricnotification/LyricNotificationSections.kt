@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.lidesheng.hyperlyric.BuildConfig
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.ServiceConstants
 import com.lidesheng.hyperlyric.lyric.commonMusicApps
@@ -96,60 +95,22 @@ fun LazyListScope.configSections(
         ) {
             Column {
                 val lyricSourceOptions = remember {
-                    if (BuildConfig.ONLINE_FEATURES_ENABLED) {
-                        listOf(
-                            R.string.option_service_lyric_source_auto,
-                            R.string.option_service_lyric_source_online,
-                            R.string.option_service_lyric_source_lyricinfo,
-                            R.string.option_service_lyric_source_lyric,
-                            R.string.option_service_lyric_source_title
-                        )
-                    } else {
-                        listOf(
-                            R.string.option_service_lyric_source_auto,
-                            R.string.option_service_lyric_source_lyricinfo,
-                            R.string.option_service_lyric_source_lyric,
-                            R.string.option_service_lyric_source_title
-                        )
-                    }
+                    listOf(
+                        R.string.option_service_lyric_source_auto,
+                        R.string.option_service_lyric_source_online,
+                        R.string.option_service_lyric_source_lyricinfo,
+                        R.string.option_service_lyric_source_lyric,
+                        R.string.option_service_lyric_source_title
+                    )
                 }.map { stringResource(id = it) }
-
-                val dropdownToValue: (Int) -> Int = { index ->
-                    if (BuildConfig.ONLINE_FEATURES_ENABLED) {
-                        index
-                    } else {
-                        when (index) {
-                            0 -> ServiceConstants.LYRIC_SOURCE_AUTO
-                            1 -> ServiceConstants.LYRIC_SOURCE_LYRIC_INFO
-                            2 -> ServiceConstants.LYRIC_SOURCE_LRC
-                            3 -> ServiceConstants.LYRIC_SOURCE_TITLE
-                            else -> ServiceConstants.LYRIC_SOURCE_AUTO
-                        }
-                    }
-                }
-
-                val valueToDropdown: (Int) -> Int = { value ->
-                    if (BuildConfig.ONLINE_FEATURES_ENABLED) {
-                        value
-                    } else {
-                        when (value) {
-                            ServiceConstants.LYRIC_SOURCE_AUTO -> 0
-                            ServiceConstants.LYRIC_SOURCE_LYRIC_INFO -> 1
-                            ServiceConstants.LYRIC_SOURCE_LRC -> 2
-                            ServiceConstants.LYRIC_SOURCE_TITLE -> 3
-                            else -> 0
-                        }
-                    }
-                }
 
                 WindowDropdownPreference(
                     title = stringResource(R.string.title_service_lyric_source),
                     items = lyricSourceOptions,
-                    selectedIndex = valueToDropdown(lyricSource),
+                    selectedIndex = lyricSource.takeIf { it in lyricSourceOptions.indices }
+                        ?: ServiceConstants.LYRIC_SOURCE_AUTO,
                     enabled = dynamicIslandEnabled,
-                    onSelectedIndexChange = { index ->
-                        onLyricSourceChange(dropdownToValue(index))
-                    }
+                    onSelectedIndexChange = onLyricSourceChange
                 )
 
                 val notificationTypeOptions = remember {
