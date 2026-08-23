@@ -8,7 +8,7 @@
   "summaryLocales": {
     "en": "Fetch high-quality word-level lyrics (background vocals/translation/roma) from the AMLL TTML database; falls back to the current lyric source on miss"
   },
-  "author": "HyperLyric",
+  "author": "WindDrift",
   "version": "1.1.0",
   "apiVersion": 1,
   "entry": "com.lidesheng.hyperlyric.plugin.amll.ttml.AmllTtmlPlugin",

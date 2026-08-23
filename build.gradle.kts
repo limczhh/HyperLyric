@@ -11,6 +11,7 @@ plugins {
 // and CI verification, but are intentionally excluded from user-facing release assets.
 val stablePluginPackageTasks = listOf(
     ":plugins:ai-translation:packagePlugin",
+    ":plugins:amll-ttml:packagePlugin",
 )
 
 tasks.register("packageReleasePlugins") {
