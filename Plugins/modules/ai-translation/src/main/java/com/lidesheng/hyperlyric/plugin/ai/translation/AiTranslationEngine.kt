@@ -29,6 +29,10 @@ internal class AiTranslationEngine(
         config: AiTranslationConfig,
         sourcePackageName: String? = null
     ): PluginSong? {
+        TranslationEligibility.skipReason(song)?.let { reason ->
+            translatorLogger.debug("跳过 AI 翻译: reason=$reason, song=${song.name}")
+            return null
+        }
         val lyrics = song.lyrics ?: return null
         val originalLines = lyrics.map { it.text?.trim().orEmpty() }
         val key = TranslationKey.calculate(song, originalLines, config, sourcePackageName)

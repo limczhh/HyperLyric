@@ -26,7 +26,7 @@ class TranslationCacheTest {
                 listOf(TranslationItem(0, "translated"))
             }
         ).let { engine ->
-            assertEquals("translated", engine.translate(song, config)?.lyrics?.single()?.translation)
+            assertEquals("translated", engine.translate(song, config)?.lyrics?.first()?.translation)
             engine.close()
         }
         assertEquals(1, firstCalls)
@@ -42,7 +42,7 @@ class TranslationCacheTest {
             }
         ).let { engine ->
             val translated = engine.translate(song, config)
-            assertEquals("translated", translated?.lyrics?.single()?.translation)
+            assertEquals("translated", translated?.lyrics?.first()?.translation)
             engine.close()
         }
         assertEquals(0, secondCalls)
@@ -75,7 +75,7 @@ class TranslationCacheTest {
                 listOf(TranslationItem(0, "recovered"))
             }
         ).let { engine ->
-            assertEquals("recovered", engine.translate(song, config)?.lyrics?.single()?.translation)
+            assertEquals("recovered", engine.translate(song, config)?.lyrics?.first()?.translation)
             engine.close()
         }
 
@@ -118,7 +118,9 @@ class TranslationCacheTest {
     fun networkResultIsCachedEvenWhenCurrentSongNeedsNoWriteback() {
         val cache = FakePluginCache()
         val song = song().copy(
-            lyrics = listOf(song().lyrics!!.single().copy(translation = "existing"))
+            lyrics = song().lyrics!!.mapIndexed { index, line ->
+                if (index == 0) line.copy(translation = "existing") else line
+            }
         )
         val config = config()
         var firstCalls = 0
@@ -249,7 +251,19 @@ class TranslationCacheTest {
                 begin = 0L,
                 end = 1_000L,
                 duration = 1_000L,
-                text = "original"
+                text = "original lyric content"
+            ),
+            PluginLyricLine(
+                begin = 1_000L,
+                end = 2_000L,
+                duration = 1_000L,
+                text = "second lyric content"
+            ),
+            PluginLyricLine(
+                begin = 2_000L,
+                end = 3_000L,
+                duration = 1_000L,
+                text = "third lyric content"
             )
         )
     )

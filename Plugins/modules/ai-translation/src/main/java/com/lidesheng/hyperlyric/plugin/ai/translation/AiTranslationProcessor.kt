@@ -40,11 +40,11 @@ internal class AiTranslationProcessor(
             // Media fields are a read-only Core snapshot used for lookup/cache/prompt only.
             // PluginSongMapper never writes these local query values back into Core Song.
             val querySong = song.withMediaInfo(processingContext.mediaInfo)
-            val lyrics = querySong.lyrics
-            if (lyrics.isNullOrEmpty()) {
-                gatewayLogger.debug("跳过 AI 翻译: reason=no_lyrics, song=${querySong.name}")
+            TranslationEligibility.skipReason(querySong)?.let { reason ->
+                gatewayLogger.debug("跳过 AI 翻译: reason=$reason, song=${querySong.name}")
                 return null
             }
+            val lyrics = querySong.lyrics ?: return null
 
             if (
                 config.skipExisting &&
@@ -58,36 +58,30 @@ internal class AiTranslationProcessor(
             }
 
             if (config.skipLanguages.isNotEmpty()) {
-                if (!TranslationLanguageDetector.hasEnoughText(querySong)) {
+                val detected = TranslationLanguageDetector.detect(querySong)
+                if (detected != null) {
+                    val margin = detected.secondConfidence?.let {
+                        detected.confidence - it
+                    }
+                    val confidentEnough = detected.confidence >= 0.8f &&
+                            (margin == null || margin >= 0.15f)
+                    val selected = detected.language in config.skipLanguages
+                    val confidence = "%.3f".format(java.util.Locale.US, detected.confidence)
+                    val marginText = margin?.let {
+                        "%.3f".format(java.util.Locale.US, it)
+                    } ?: "-"
                     gatewayLogger.debug(
-                        "跳过语言识别: reason=text_too_short, song=${querySong.name}"
+                        "歌词语言识别: song=${querySong.name}, detected=${detected.languageTag}, " +
+                                "confidence=$confidence, margin=$marginText, " +
+                                "hypotheses=${detected.hypothesisCount}, selected=$selected, " +
+                                "confident=$confidentEnough"
                     )
-                } else {
-                    val detected = TranslationLanguageDetector.detect(querySong)
-                    if (detected != null) {
-                        val margin = detected.secondConfidence?.let {
-                            detected.confidence - it
-                        }
-                        val confidentEnough = detected.confidence >= 0.8f &&
-                                (margin == null || margin >= 0.15f)
-                        val selected = detected.language in config.skipLanguages
-                        val confidence = "%.3f".format(java.util.Locale.US, detected.confidence)
-                        val marginText = margin?.let {
-                            "%.3f".format(java.util.Locale.US, it)
-                        } ?: "-"
+                    if (selected && confidentEnough) {
                         gatewayLogger.debug(
-                            "歌词语言识别: song=${querySong.name}, detected=${detected.languageTag}, " +
-                                    "confidence=$confidence, margin=$marginText, " +
-                                    "hypotheses=${detected.hypothesisCount}, selected=$selected, " +
-                                    "confident=$confidentEnough"
+                            "跳过 AI 翻译: reason=selected_language, song=${querySong.name}, " +
+                                    "detected=${detected.languageTag}"
                         )
-                        if (selected && confidentEnough) {
-                            gatewayLogger.debug(
-                                "跳过 AI 翻译: reason=selected_language, song=${querySong.name}, " +
-                                        "detected=${detected.languageTag}"
-                            )
-                            return null
-                        }
+                        return null
                     }
                 }
             }
