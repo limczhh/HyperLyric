@@ -78,9 +78,9 @@ internal object CurrentMediaInfoResolver {
 
     /**
      * A package name alone is not proof that the MediaSession belongs to the lyric event. Prefer
-     * an exact token or media id; otherwise require the stable artist+album fallback to match.
-     * The title is display metadata and must not participate in ownership matching because
-     * players may change it for translations, car Bluetooth displays, or other presentation
+     * an exact token or media id; otherwise require the stable album fallback to match.
+     * Title and artist are display metadata and must not participate in ownership matching because
+     * players may change them for translations, car Bluetooth displays, or other presentation
      * modes.
      */
     private fun isCurrentSession(
@@ -106,17 +106,11 @@ internal object CurrentMediaInfoResolver {
             }
         }
 
-        val pairs = listOf(
-            source.artist to sessionInfo.artist,
-            source.album to sessionInfo.album
-        ).mapNotNull { (sourceValue, sessionValue) ->
-            val left = sourceValue?.let(::normalizeText)?.takeIf { it.isNotEmpty() }
-            val right = sessionValue.let(::normalizeText).takeIf { it.isNotEmpty() }
-            if (left == null || right == null) null else left to right
-        }
-        return pairs.size >= 2 && pairs.all { (sourceValue, sessionValue) ->
-            sourceValue.equals(sessionValue, ignoreCase = true)
-        }
+        val sourceAlbum = source.album?.let(::normalizeText)?.takeIf { it.isNotEmpty() }
+            ?: return false
+        val sessionAlbum = normalizeText(sessionInfo.album).takeIf { it.isNotEmpty() }
+            ?: return false
+        return sourceAlbum.equals(sessionAlbum, ignoreCase = true)
     }
 
     private fun normalize(info: MediaMetadataHelper.MediaInfo): MediaMetadataHelper.MediaInfo =

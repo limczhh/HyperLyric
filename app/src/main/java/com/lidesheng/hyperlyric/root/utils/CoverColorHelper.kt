@@ -93,13 +93,13 @@ object CoverColorHelper {
         val trackKey = buildTrackKey(identity.songId, identity.mediaId)
         if (identity.packageName.isEmpty() ||
             (identity.sessionToken == null && trackKey == null &&
-                    (normalizedArtist.isEmpty() || normalizedAlbum.isEmpty()))
+                    normalizedAlbum.isEmpty())
         ) {
             return null
         }
 
         val fallbackSessionKey = if (identity.sessionToken == null) {
-            listOf(identity.packageName, normalizedArtist, normalizedAlbum)
+            listOf(identity.packageName, normalizedAlbum)
                 .joinToString("\u001F")
         } else {
             null
@@ -166,7 +166,7 @@ object CoverColorHelper {
 
     /**
      * 将系统媒体元数据与歌词源确认的歌曲进行匹配。会话 Token 或稳定媒体 ID
-     * 可以直接确认归属；没有这些身份时，只使用包名、艺术家和专辑进行保守兜底，
+     * 可以直接确认归属；没有这些身份时，只使用包名和专辑进行保守兜底，
      * 不让可变的标题影响颜色会话。
      */
     private fun resolveArtworkRequest(
@@ -308,15 +308,11 @@ object CoverColorHelper {
         val songIdMatches = currentSongId != null && currentSongId == incomingSongId
         if (sessionMatch == true || mediaIdMatches || songIdMatches) return true
 
-        val mediaArtist = mediaInfo.artist.normalizeMediaText()
         val mediaAlbum = mediaInfo.album.normalizeMediaText()
-        if (current.artist.isEmpty() || mediaArtist.isEmpty() ||
-            current.album.isEmpty() || mediaAlbum.isEmpty()
-        ) {
+        if (current.album.isEmpty() || mediaAlbum.isEmpty()) {
             return false
         }
-        return isCompatibleArtist(current.artist, mediaArtist) &&
-                isCompatibleAlbum(current.album, mediaAlbum)
+        return isCompatibleAlbum(current.album, mediaAlbum)
     }
 
     /**
@@ -471,10 +467,6 @@ object CoverColorHelper {
         return value.take(MAX_DEBUG_TEXT_LENGTH).let {
             if (value.length > MAX_DEBUG_TEXT_LENGTH) "$it…" else it
         }
-    }
-
-    private fun isCompatibleArtist(first: String, second: String): Boolean {
-        return first == second
     }
 
     private fun isCompatibleAlbum(first: String, second: String): Boolean {
