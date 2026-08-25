@@ -59,6 +59,10 @@ internal object IslandPresentationCoordinator {
         return evaluate(ownerEvidence(data)) == IslandRenderPolicy.Decision.TARGET
     }
 
+    fun isCurrentLyricLongPressTarget(data: Any?): Boolean {
+        return decisionEvaluator.isCurrentLyricLongPressTarget(data)
+    }
+
     fun updatePlaybackState(isPlaying: Boolean): Boolean {
         return presentationState.updatePlaybackState(isPlaying)
     }

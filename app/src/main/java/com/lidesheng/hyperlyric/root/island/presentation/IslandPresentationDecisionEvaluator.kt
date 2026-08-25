@@ -35,6 +35,18 @@ internal class IslandPresentationDecisionEvaluator(
         return mediaInfo.packageName == lyricPackageName
     }
 
+    /**
+     * Long press remains bound to the current lyric island while playback is paused. The
+     * presentation policy may suppress injected views after a pause, but it must not make the
+     * still-visible native island lose its drag-share or playback-toggle action.
+     */
+    fun isCurrentLyricLongPressTarget(data: Any?): Boolean {
+        if (!IslandProbeUtils.isSuperIslandEnabled()) return false
+        if (!LyriconDataBridge.hasLyricsForPresentation()) return false
+        val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(data) ?: return false
+        return isCurrentLyricOwner(mediaInfo)
+    }
+
     fun shouldRenderInjectedIsland(): Boolean {
         return IslandRenderPolicy.isPresentationAllowed(
             enabled = IslandProbeUtils.isSuperIslandEnabled(),

@@ -12,9 +12,9 @@ import io.github.libxposed.api.XposedModule
 import java.lang.reflect.Method
 
 /**
- * Supplies drag-share data only for islands that the normal lyric presentation policy accepts.
- * Xiaomi still owns the drag card, Intent and ClipData creation; this hook only supplies the
- * missing template data for the current long-press invocation.
+ * Supplies drag-share data only for the current lyric long-press target. Xiaomi still owns the
+ * drag card, Intent and ClipData creation; this hook only supplies the missing template data for
+ * the current long-press invocation.
  */
 internal object IslandLyricShareHooker {
     private const val TAG = "IslandDragShareHooker"
@@ -52,7 +52,7 @@ internal object IslandLyricShareHooker {
             val view = chain.args.getOrNull(0) ?: return chain.proceed()
             val data = chain.args.getOrNull(1)
             val shouldHandle = runCatching {
-                isEnabled() && IslandPresentationCoordinator.isCurrentLyricTarget(data)
+                isEnabled() && IslandPresentationCoordinator.isCurrentLyricLongPressTarget(data)
             }.onFailure { error ->
                 HookLogger.w(TAG, "判断拖拽分享目标失败，保留原生行为", error)
             }.getOrDefault(false)
