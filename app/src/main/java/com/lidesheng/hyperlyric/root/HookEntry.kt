@@ -13,6 +13,7 @@ import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHook
 import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.hooks.IslandModuleRestoreHooker
+import com.lidesheng.hyperlyric.root.island.hooks.IslandLyricShareHooker
 import com.lidesheng.hyperlyric.root.island.hooks.RealIslandHooker
 import com.lidesheng.hyperlyric.root.island.hooks.SystemUIHookRegistry
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
@@ -516,6 +517,9 @@ class HookEntry : XposedModule() {
 
             "updateView" -> IslandModuleRestoreHooker.AdapterUpdateViewHook()
                 .takeIf { owner.endsWith("IslandModuleViewHolderAdapter") }
+
+            "onLongPressed" -> IslandLyricShareHooker.LongPressedHook()
+                .takeIf { owner.endsWith("DynamicIslandBaseContentViewController") }
 
             "updateTemplate" -> HookIslandGlow.UpdateTemplateHook()
                 .takeIf { owner.endsWith("DynamicIslandBaseContentView") }

@@ -481,6 +481,8 @@
     <string name="title_behavior_after_pause">Behavior after music paused</string>
     <string name="option_after_pause_default">Restore default</string>
     <string name="option_after_pause_keep">Keep unchanged</string>
+    <string name="title_island_long_press_behavior">Super Island long-press behavior</string>
+    <string name="option_island_long_press_lyric_share">Drag to share</string>
     <string name="title_glow_cover_color">Glow Highlight Cover Color</string>
     <string name="title_island_progress_glow">Edge glow progress bar</string>
     <string name="title_island_progress_style">Progress track style</string>

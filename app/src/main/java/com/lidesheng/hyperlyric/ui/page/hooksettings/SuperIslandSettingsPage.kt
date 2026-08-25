@@ -204,6 +204,16 @@ fun SuperIslandSettingsPage() {
             )
         )
     }
+    var longPressBehavior by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
+                RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
+            ).takeIf {
+                it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE
+            } ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
+        )
+    }
     var extractGlowColor by remember {
         mutableStateOf(
             prefs.getBoolean(
@@ -342,6 +352,9 @@ fun SuperIslandSettingsPage() {
 
     val afterPauseOptions = remember {
         listOf(R.string.option_after_pause_default, R.string.option_after_pause_keep)
+    }.map { stringResource(id = it) }
+    val longPressBehaviorOptions = remember {
+        listOf(R.string.option_island_long_press_lyric_share)
     }.map { stringResource(id = it) }
     val audioCoverStyleValues = remember {
         listOf(
@@ -739,6 +752,29 @@ fun SuperIslandSettingsPage() {
                                     RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
                                     it
                                 )
+                                }
+                            )
+                        }
+                    }
+                }
+                item(key = "long_press_behavior") {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column {
+                            OverlayDropdownPreference(
+                                title = stringResource(id = R.string.title_island_long_press_behavior),
+                                items = longPressBehaviorOptions,
+                                selectedIndex = longPressBehavior,
+                                onSelectedIndexChange = {
+                                    longPressBehavior = it
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
+                                        it
+                                    )
                                 }
                             )
                         }

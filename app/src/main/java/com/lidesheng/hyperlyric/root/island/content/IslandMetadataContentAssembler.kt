@@ -46,6 +46,57 @@ internal object IslandMetadataContentAssembler {
         var lastProgressPercent: Int
     )
 
+    data class ConfiguredMusicInfoLines(
+        val firstLine: String,
+        val secondLine: String
+    )
+
+    /**
+     * Resolves the same user-defined music information lines used by the metadata renderer.
+     * This is also used by drag-share so its Title and Content stay aligned with the island.
+     */
+    fun buildConfiguredMusicInfoLines(
+        prefs: SharedPreferences,
+        mediaInfo: MediaMetadataHelper.MediaInfo,
+        playbackPosition: Long = LyriconDataBridge.currentPosition,
+        playbackDuration: Long = mediaInfo.duration
+    ): ConfiguredMusicInfoLines {
+        val songName = mediaInfo.title.takeIf { it.isNotBlank() }
+            ?: LyriconDataBridge.currentSongName.orEmpty()
+        val durationText = mediaInfo.duration.takeIf { it > 0L }
+            ?.let { formatMediaTime(it, it) }
+            .orEmpty()
+        val resolvedDuration = playbackDuration.takeIf { it > 0L } ?: mediaInfo.duration
+        val firstLineFields = MusicInfoLayoutPolicy.readFields(
+            prefs,
+            RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_FIRST_LINE,
+            MusicInfoLayoutPolicy.defaultFirstLine
+        )
+        val secondLineFields = MusicInfoLayoutPolicy.readFields(
+            prefs,
+            RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_SECOND_LINE,
+            MusicInfoLayoutPolicy.defaultSecondLine
+        )
+        val dynamicFieldOrder = readDynamicFields(firstLineFields, secondLineFields)
+        val fieldValues = linkedMapOf(
+            MusicInfoLayoutPolicy.FIELD_TITLE to songName,
+            MusicInfoLayoutPolicy.FIELD_ARTIST to mediaInfo.artist,
+            MusicInfoLayoutPolicy.FIELD_ALBUM to mediaInfo.album,
+            MusicInfoLayoutPolicy.FIELD_DURATION to durationText
+        ).apply {
+            if (dynamicFieldOrder.isNotEmpty()) {
+                putAll(buildPlaybackFieldValues(playbackPosition, resolvedDuration))
+            }
+        }
+        val separator = MusicInfoLayoutPolicy.separatorValue(
+            MusicInfoLayoutPolicy.readSeparator(prefs)
+        )
+        return ConfiguredMusicInfoLines(
+            firstLine = joinFields(firstLineFields, fieldValues, separator),
+            secondLine = joinFields(secondLineFields, fieldValues, separator)
+        )
+    }
+
     fun apply(
         view: View,
         prefs: SharedPreferences,

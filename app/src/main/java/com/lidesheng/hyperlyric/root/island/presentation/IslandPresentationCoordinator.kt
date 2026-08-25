@@ -55,6 +55,10 @@ internal object IslandPresentationCoordinator {
         return decisionEvaluator.ownerEvidence(data)
     }
 
+    fun isCurrentLyricTarget(data: Any?): Boolean {
+        return evaluate(ownerEvidence(data)) == IslandRenderPolicy.Decision.TARGET
+    }
+
     fun updatePlaybackState(isPlaying: Boolean): Boolean {
         return presentationState.updatePlaybackState(isPlaying)
     }

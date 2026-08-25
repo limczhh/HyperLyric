@@ -31,6 +31,10 @@ internal object IslandTextHooker {
         "miui.systemui.dynamicisland.module.IslandModuleViewHolderAdapter"
 
     fun hook(module: XposedModule, cl: ClassLoader) {
+        installFeature("长按拖拽分享") {
+            IslandLyricShareHooker.hook(module, cl)
+        }
+
         installFeature("解除超级岛长度限制") {
             IslandWidthLimitHooker.hook(module, cl)
         }
