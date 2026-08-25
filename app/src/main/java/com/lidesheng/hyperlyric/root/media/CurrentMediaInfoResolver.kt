@@ -78,8 +78,10 @@ internal object CurrentMediaInfoResolver {
 
     /**
      * A package name alone is not proof that the MediaSession belongs to the lyric event. Prefer
-     * an exact token or media id; otherwise require every source field that is also available
-     * from the controller to match, with at least title+artist (or two other fields).
+     * an exact token or media id; otherwise require the stable artist+album fallback to match.
+     * The title is display metadata and must not participate in ownership matching because
+     * players may change it for translations, car Bluetooth displays, or other presentation
+     * modes.
      */
     private fun isCurrentSession(
         source: LyricMediaMetadata,
@@ -105,7 +107,6 @@ internal object CurrentMediaInfoResolver {
         }
 
         val pairs = listOf(
-            source.title to sessionInfo.title,
             source.artist to sessionInfo.artist,
             source.album to sessionInfo.album
         ).mapNotNull { (sourceValue, sessionValue) ->
