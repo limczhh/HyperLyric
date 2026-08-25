@@ -119,7 +119,7 @@ internal object IslandLyricShareHooker {
             if (!PlaybackToggle.perform(controller)) {
                 HookLogger.d(
                     TAG,
-                    "当前媒体会话不支持长按暂停/播放，保留原生拖拽分享: " +
+                    "当前媒体会话不支持长按切换播放状态，保留原生拖拽分享: " +
                             "package=${controller.packageName}"
                 )
                 return chain.proceed()
