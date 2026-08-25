@@ -94,14 +94,15 @@ class SuperLyricSource : LyricSource {
                     )
                     return
                 }
-                HookLogger.d(TAG, "收到停止事件, publisher=$publisher")
-                stopPositionPolling()
-                activePublisher = null
+                // SuperLyric uses this callback for both pause/stop and publisher process
+                // termination. It is a playback-state event, not a source-session boundary;
+                // keep the publisher metadata so a pause/resume without metadata stays on the
+                // same media session.
+                HookLogger.d(TAG, "收到停止事件，保留媒体会话: publisher=$publisher")
+                stopPositionPolling(clearMetadata = false)
                 playbackStarted = false
                 @Suppress("UNNECESSARY_SAFE_CALL")
                 sink?.onPlaybackStateChanged(false)
-                @Suppress("UNNECESSARY_SAFE_CALL")
-                sink?.onStop()
             }
         }
         receiver = stub
@@ -314,18 +315,20 @@ class SuperLyricSource : LyricSource {
         }
     }
 
-    private fun stopPositionPolling() {
+    private fun stopPositionPolling(clearMetadata: Boolean = true) {
         streamGeneration.incrementAndGet()
         positionJob?.cancel()
         positionJob = null
         positionPublisher = null
-        lastMetadataKey = null
-        lastMetadataTitle = null
-        lastMetadataArtist = null
-        lastMetadataAlbum = null
         lastKnownPosition = -1L
         lastDebugLyricSignature = null
         lastDebugLyricAt = 0L
+        if (clearMetadata) {
+            lastMetadataKey = null
+            lastMetadataTitle = null
+            lastMetadataArtist = null
+            lastMetadataAlbum = null
+        }
     }
 
     companion object {

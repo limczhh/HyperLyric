@@ -59,6 +59,7 @@ class RootLyricSink(
     private var activePluginRequestKey: PluginProcessingRequestKey? = null
     private var pluginStartScheduled = false
     private val pluginRequestGeneration = AtomicLong(0L)
+    private val artworkColorRefreshRunnable = Runnable { renderer.updateTextColors() }
     private val pluginStartRunnable = Runnable {
         pluginStartScheduled = false
         startPluginProcessing()
@@ -78,11 +79,13 @@ class RootLyricSink(
         const val SPEED_CHANGE_EPSILON = 0.01f
         const val INFERRED_SPEED_BLEND = 0.75f
         const val MAX_DEBUG_TEXT_LENGTH = 80
+        const val ARTWORK_COLOR_REFRESH_DELAY_MS = 100L
     }
 
     private data class PositionSample(val position: Long, val playbackSpeed: Float)
 
     override fun onSongChanged(song: Song?) {
+        cancelArtworkColorRefresh()
         cancelPendingPositionDispatch()
         lastReceivedPosition = Long.MIN_VALUE
         lastReceivedPositionTimeMs = 0L
@@ -148,6 +151,7 @@ class RootLyricSink(
     }
 
     override fun onStop() {
+        cancelArtworkColorRefresh()
         playbackActive = false
         cancelPendingPositionDispatch()
         lastReceivedPosition = Long.MIN_VALUE
@@ -170,8 +174,19 @@ class RootLyricSink(
 
     override fun onMetadata(metadata: LyricMediaMetadata?) {
         val normalized = metadata?.normalized()
-        LyriconDataBridge.updateMediaMetadata(normalized)
         normalized?.packageName?.let(LyriconDataBridge::updateLyricPackage)
+        if (normalized?.isPackageOnlySnapshot() == true) {
+            HookLogger.dState(
+                stateId = "RootLyricSink.metadata",
+                tag = TAG,
+                state = "pending|${normalized.sourceId}|${normalized.packageName}"
+            ) {
+                "媒体元数据暂不可用: source=${normalized.sourceId}, " +
+                        "package=${normalized.packageName ?: "<empty>"}, reason=fields_missing"
+            }
+            return
+        }
+        LyriconDataBridge.updateMediaMetadata(normalized)
         if (normalized == null) {
             latestPluginMediaInfo = null
             activeMediaIdentity = null
@@ -233,8 +248,9 @@ class RootLyricSink(
             ?: mediaInfo.title.takeIf { it.isNotBlank() }
         invalidateIfPluginInputChanged()
         schedulePluginProcessing()
-        updateColorSession(mediaInfo, reason = "metadata_changed")
+        val colorSessionReady = updateColorSession(mediaInfo, reason = "metadata_changed")
         renderer.updateMetadata()
+        if (colorSessionReady) scheduleArtworkColorRefresh()
     }
 
     /** Coalesces the synchronous onSongChanged -> onMetadata event chain on the main handler. */
@@ -488,7 +504,10 @@ class RootLyricSink(
         }
     }
 
-    private fun updateColorSession(mediaInfo: MediaMetadataHelper.MediaInfo, reason: String) {
+    private fun updateColorSession(
+        mediaInfo: MediaMetadataHelper.MediaInfo,
+        reason: String
+    ): Boolean {
         val packageName = mediaInfo.identity.packageName
         val previousRevision = CoverColorHelper.currentSession()?.revision
         val current = CoverColorHelper.activateSession(
@@ -504,7 +523,7 @@ class RootLyricSink(
                         "title=\"${debugText(mediaInfo.title)}\", " +
                         "artist=\"${debugText(mediaInfo.artist)}\", identity=${mediaInfo.identity}"
             }
-            return
+            return false
         }
         HookLogger.dState(
             stateId = "RootLyricSink.colorSession",
@@ -524,14 +543,37 @@ class RootLyricSink(
             IslandMusicWaveColorHooker.refresh()
             renderer.updateTextColors()
         }
+        return true
     }
 
     private fun endColorSession() {
+        cancelArtworkColorRefresh()
         if (CoverColorHelper.endSession()) {
             IslandSlotContentFacade.invalidate()
             IslandMusicWaveColorHooker.refresh()
         }
     }
+
+    private fun scheduleArtworkColorRefresh() {
+        mainHandler.removeCallbacks(artworkColorRefreshRunnable)
+        mainHandler.postDelayed(
+            artworkColorRefreshRunnable,
+            ARTWORK_COLOR_REFRESH_DELAY_MS
+        )
+    }
+
+    private fun cancelArtworkColorRefresh() {
+        mainHandler.removeCallbacks(artworkColorRefreshRunnable)
+    }
+
+    private fun LyricMediaMetadata.isPackageOnlySnapshot(): Boolean =
+        songId == null &&
+                title == null &&
+                artist == null &&
+                album == null &&
+                duration == null &&
+                sessionToken == null &&
+                mediaId == null
 
     private val MEDIA_SONG_FIELDS = setOf(
         PluginSongField.ID,
