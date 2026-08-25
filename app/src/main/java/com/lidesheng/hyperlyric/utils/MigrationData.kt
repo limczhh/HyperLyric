@@ -14,6 +14,16 @@ data class MigrationNote(
 object MigrationData {
     val notes = listOf(
         MigrationNote(
+            versionCode = 1937,
+            items = listOf(
+                MigrationItem(
+                    text = "Online 和 Offline 版本已合并",
+                    summary = "使用 AI 翻译功能的用户请下载 AI 翻译插件并导入以继续使用",
+                    url = "https://github.com/limczhh/HyperLyric/releases/tag/1937-7.3"
+                )
+            )
+        ),
+        MigrationNote(
             versionCode = 1934,
             items = listOf(
                 MigrationItem(

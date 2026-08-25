@@ -23,6 +23,7 @@ object ChangelogData {
                         "- 优化 AI 翻译插件跳过纯音乐的判断\n" +
                         "- 优化 LyricInfo 歌词源歌词格式解析问题\n" +
                         "- 优化 SuperLyric 歌词源暂停恢复时的歌词颜色状态\n" +
+                        "- 优化应用冷启动显示效果\n" +
                         "- 移除遗留代码，优化混淆保护规则，优化安装包体积"
             ),
             ChangelogItem(
