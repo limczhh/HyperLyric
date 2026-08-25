@@ -210,7 +210,8 @@ fun SuperIslandSettingsPage() {
                 RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
                 RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
             ).takeIf {
-                it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE
+                it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE ||
+                        it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK
             } ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
         )
     }
@@ -354,7 +355,10 @@ fun SuperIslandSettingsPage() {
         listOf(R.string.option_after_pause_default, R.string.option_after_pause_keep)
     }.map { stringResource(id = it) }
     val longPressBehaviorOptions = remember {
-        listOf(R.string.option_island_long_press_lyric_share)
+        listOf(
+            R.string.option_island_long_press_lyric_share,
+            R.string.option_island_long_press_toggle_playback
+        )
     }.map { stringResource(id = it) }
     val audioCoverStyleValues = remember {
         listOf(

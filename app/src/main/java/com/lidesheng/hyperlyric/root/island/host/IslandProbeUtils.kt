@@ -1,7 +1,10 @@
 package com.lidesheng.hyperlyric.root.island.host
 
+import android.app.Notification
 import android.app.PendingIntent
+import android.media.session.MediaSession
 import android.os.Bundle
+import android.service.notification.StatusBarNotification
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
 
@@ -33,6 +36,28 @@ internal object IslandProbeUtils {
     fun isMediaIsland(data: Any?): Boolean {
         val extras = extractExtras(data) ?: return false
         return hasMediaPendingIntent(extras)
+    }
+
+    fun extractStatusBarNotification(data: Any?): StatusBarNotification? {
+        return runCatching {
+            extractExtras(data)?.getParcelable(
+                EXTRA_MIUI_SBN,
+                StatusBarNotification::class.java
+            )
+        }.getOrNull()
+    }
+
+    fun extractMediaSessionToken(data: Any?): MediaSession.Token? {
+        val notificationExtras = extractStatusBarNotification(data)
+            ?.notification
+            ?.extras
+            ?: return null
+        return runCatching {
+            notificationExtras.getParcelable(
+                Notification.EXTRA_MEDIA_SESSION,
+                MediaSession.Token::class.java
+            )
+        }.getOrNull()
     }
 
     fun getCurrentIslandData(contentView: Any?): Any? {
@@ -74,9 +99,12 @@ internal object IslandProbeUtils {
     private fun hasMediaPendingIntent(extras: Bundle): Boolean {
         return runCatching {
             @Suppress("DEPRECATION")
-            extras.getParcelable("miui.pending.intent") as? PendingIntent
+            extras.getParcelable(EXTRA_MIUI_PENDING_INTENT) as? PendingIntent
         }.getOrNull() != null
     }
+
+    private const val EXTRA_MIUI_PENDING_INTENT = "miui.pending.intent"
+    private const val EXTRA_MIUI_SBN = "miui.sbn"
 
     private fun Any?.callGetter(name: String): Any? {
         val receiver = this ?: return null
