@@ -25,65 +25,9 @@ object LyricInfoParser {
             val album = obj.optionalText("album")
             val songId = obj.optionalText("songId")
 
-            val hasTranslation = translationFormat.isNotBlank()
-            val allLines = lyricRaw.lines().filter { it.isNotBlank() }
+            val resultLines = parseLyricLines(lyricRaw, format, translationFormat)
+                ?: return null
 
-            // 提取每行的时间戳和文本
-            val parsedLines = allLines.map { line ->
-                val timeMs = extractTimeMs(line)
-                ParsedLine(timeMs, line)
-            }
-
-            // 按时间戳分组，相同时间戳的第二行为翻译
-            val resultLines = mutableListOf<RichLyricLine>()
-            var i = 0
-            while (i < parsedLines.size) {
-                val current = parsedLines[i]
-                val next = parsedLines.getOrNull(i + 1)
-
-                // 判断下一行是否是翻译（时间戳相同且有翻译格式标识）
-                val isNextTranslation = hasTranslation
-                        && next != null
-                        && next.timeMs == current.timeMs
-                        && current.timeMs >= 0
-
-                val mainLine = parseLine(current.raw, format)
-                if (mainLine != null) {
-                    if (isNextTranslation) {
-                        val transText = extractText(next.raw, translationFormat)
-                        if (!transText.isNullOrBlank()) {
-                            resultLines.add(mainLine.copy(translation = transText))
-                        } else {
-                            resultLines.add(mainLine)
-                        }
-                        i += 2 // 跳过翻译行
-                    } else {
-                        resultLines.add(mainLine)
-                        i += 1
-                    }
-                } else {
-                    i += 1
-                }
-            }
-
-            // 补全 end/duration，修正最后一个词的时间
-            for (idx in resultLines.indices) {
-                val cur = resultLines[idx]
-                val nextBegin = resultLines.getOrNull(idx + 1)?.begin
-                if (cur.end <= cur.begin) {
-                    cur.end = nextBegin ?: (cur.begin + 5000)
-                    cur.duration = cur.end - cur.begin
-                }
-                // 修正最后一个词的 end 为行级 end
-                cur.words?.lastOrNull()?.let { lastWord ->
-                    if (lastWord.end < cur.end) {
-                        lastWord.end = cur.end
-                        lastWord.duration = lastWord.end - lastWord.begin
-                    }
-                }
-            }
-
-            if (resultLines.isEmpty()) return null
             LyricInfoPayload(
                 song = Song(
                     id = songId,
@@ -100,6 +44,74 @@ object LyricInfoParser {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun parseLyricLines(
+        lyricRaw: String,
+        format: String,
+        translationFormat: String = ""
+    ): List<RichLyricLine>? {
+        if (lyricRaw.isBlank()) return null
+
+        val hasTranslation = translationFormat.isNotBlank()
+        val allLines = lyricRaw.lines().filter { it.isNotBlank() }
+
+        // 提取每行的时间戳和文本
+        val parsedLines = allLines.map { line ->
+            val timeMs = extractTimeMs(line)
+            ParsedLine(timeMs, line)
+        }
+
+        // 按时间戳分组，相同时间戳的第二行为翻译
+        val resultLines = mutableListOf<RichLyricLine>()
+        var i = 0
+        while (i < parsedLines.size) {
+            val current = parsedLines[i]
+            val next = parsedLines.getOrNull(i + 1)
+
+            // 判断下一行是否是翻译（时间戳相同且有翻译格式标识）
+            val isNextTranslation = hasTranslation
+                    && next != null
+                    && next.timeMs == current.timeMs
+                    && current.timeMs >= 0
+
+            val mainLine = parseLine(current.raw, format)
+            if (mainLine != null) {
+                if (isNextTranslation) {
+                    val transText = extractText(next.raw, translationFormat)
+                    if (!transText.isNullOrBlank()) {
+                        resultLines.add(mainLine.copy(translation = transText))
+                    } else {
+                        resultLines.add(mainLine)
+                    }
+                    i += 2 // 跳过翻译行
+                } else {
+                    resultLines.add(mainLine)
+                    i += 1
+                }
+            } else {
+                i += 1
+            }
+        }
+
+        // 补全 end/duration，修正最后一个词的时间
+        for (idx in resultLines.indices) {
+            val cur = resultLines[idx]
+            val nextBegin = resultLines.getOrNull(idx + 1)?.begin
+            if (cur.end <= cur.begin) {
+                cur.end = nextBegin ?: (cur.begin + 5000)
+                cur.duration = cur.end - cur.begin
+            }
+            // 修正最后一个词的 end 为行级 end
+            cur.words?.lastOrNull()?.let { lastWord ->
+                if (lastWord.end < cur.end) {
+                    lastWord.end = cur.end
+                    lastWord.duration = lastWord.end - lastWord.begin
+                }
+            }
+        }
+
+        return resultLines.takeIf { it.isNotEmpty() }
     }
 
     /**
@@ -154,6 +166,7 @@ object LyricInfoParser {
         if (!lm.matches()) return null
 
         val wordPart = lm.group(4) ?: ""
+        val lineTimestamp = toTimeMs(lm.group(1)!!, lm.group(2)!!, lm.group(3)!!)
 
         val wm = wordRe.matcher(wordPart)
         val words = mutableListOf<LyricWord>()
@@ -166,7 +179,17 @@ object LyricInfoParser {
             words.add(LyricWord(begin = wordBegin, end = wordBegin + 500, duration = 500, text = wordText))
         }
 
-        if (words.isEmpty()) return null
+        if (words.isEmpty()) {
+            // Some providers mark ordinary LRC lines as ELRC without adding
+            // any word-level timestamp. Keep the line instead of dropping it.
+            return if (!wordRe.matcher(wordPart).find()) parseLrcLine(trimmed) else null
+        }
+
+        // A single word beginning exactly at the line timestamp carries no
+        // intra-line timing. Treat it as a normal line to avoid word animation.
+        if (words.size == 1 && words.first().begin == lineTimestamp) {
+            return RichLyricLine(begin = lineTimestamp, text = words.first().text)
+        }
 
         // 修正每个词的 end 为下一个词的 begin
         for (i in 0 until words.size - 1) {
@@ -196,6 +219,10 @@ object LyricInfoParser {
         if (text.isBlank()) return null
         return RichLyricLine(begin = ms, text = text)
     }
+
+    private fun toTimeMs(minutes: String, seconds: String, fraction: String): Long =
+        minutes.toLong() * 60000 + seconds.toLong() * 1000 +
+                (if (fraction.length == 2) fraction.toLong() * 10 else fraction.toLong())
 
     fun diagnose(json: String): LyricInfoDiagnosis? {
         return try {
