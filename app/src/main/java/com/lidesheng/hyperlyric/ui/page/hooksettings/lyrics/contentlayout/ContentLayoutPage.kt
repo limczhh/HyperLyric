@@ -84,6 +84,14 @@ fun ContentLayoutPage() {
             )
         )
     }
+    var hideTitleAlias by remember(prefs) {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS,
+                RootConstants.DEFAULT_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS
+            )
+        )
+    }
     var editingRow by remember { mutableStateOf<Int?>(null) }
 
     val currentEditingRow = editingRow
@@ -170,6 +178,14 @@ fun ContentLayoutPage() {
             onPlaceholderFormatChange = {
                 placeholderFormat = it
                 PrefsBridge.putInt(RootConstants.KEY_HOOK_PLACEHOLDER_FORMAT, it)
+            },
+            hideTitleAlias = hideTitleAlias,
+            onHideTitleAliasChange = {
+                hideTitleAlias = it
+                PrefsBridge.putBoolean(
+                    RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS,
+                    it
+                )
             }
         )
     }

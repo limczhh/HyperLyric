@@ -59,6 +59,29 @@ object MusicInfoLayoutPolicy {
             ?: RootConstants.DEFAULT_HOOK_ISLAND_MUSIC_INFO_SEPARATOR
     }
 
+    private val titleAliasPattern =
+        Regex("""（[^（）]*）|\([^()]*\)|【[^【】]*】|\[[^\[\]]*\]""")
+    private val collapsedSpaces = Regex("\\s{2,}")
+
+    fun readHideTitleAlias(prefs: SharedPreferences): Boolean {
+        return prefs.getBoolean(
+            RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS,
+            RootConstants.DEFAULT_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS
+        )
+    }
+
+    /**
+     * 移除歌名中成对括号（全角 （）【】 与半角 ()[]）内的别名，用于显示。
+     * 移除后折叠连续空格并去除首尾空白；若结果为空则回退原标题。
+     */
+    fun stripTitleAlias(title: String): String {
+        val stripped = title
+            .replace(titleAliasPattern, "")
+            .replace(collapsedSpaces, " ")
+            .trim()
+        return stripped.ifBlank { title }
+    }
+
     fun separatorValue(separator: String): String = when (separator) {
         SEPARATOR_PLUS -> " + "
         SEPARATOR_SPACE -> " "

@@ -102,7 +102,9 @@ internal fun LazyListScope.contentLayoutSections(
     rightLyric: Boolean,
     onRightLyricChange: (Boolean) -> Unit,
     placeholderFormat: Int,
-    onPlaceholderFormatChange: (Int) -> Unit
+    onPlaceholderFormatChange: (Int) -> Unit,
+    hideTitleAlias: Boolean,
+    onHideTitleAliasChange: (Boolean) -> Unit
 ) {
     item(key = "music_info_title") {
         SmallTitle(text = stringResource(id = R.string.title_content_layout_music_info))
@@ -142,6 +144,12 @@ internal fun LazyListScope.contentLayoutSections(
                     title = stringResource(id = R.string.title_center_music_info),
                     checked = centerMusicInfo,
                     onCheckedChange = onCenterMusicInfoChange
+                )
+                SwitchPreference(
+                    title = stringResource(id = R.string.title_hide_title_alias),
+                    summary = stringResource(id = R.string.summary_hide_title_alias),
+                    checked = hideTitleAlias,
+                    onCheckedChange = onHideTitleAliasChange
                 )
             }
         }

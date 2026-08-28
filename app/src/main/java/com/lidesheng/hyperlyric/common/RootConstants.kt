@@ -19,6 +19,8 @@ object RootConstants {
         "key_hook_island_music_info_second_line"
     const val KEY_HOOK_ISLAND_MUSIC_INFO_SEPARATOR =
         "key_hook_island_music_info_separator"
+    const val KEY_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS =
+        "key_hook_island_music_info_hide_title_alias"
     const val KEY_HOOK_ISLAND_LEFT_PADDING_LEFT = "key_hook_island_left_padding_left"
     const val KEY_HOOK_ISLAND_LEFT_PADDING_RIGHT = "key_hook_island_left_padding_right"
     const val KEY_HOOK_ISLAND_RIGHT_PADDING_LEFT = "key_hook_island_right_padding_left"
@@ -243,6 +245,7 @@ object RootConstants {
     const val DEFAULT_HOOK_ISLAND_MUSIC_INFO_FIRST_LINE = "title"
     const val DEFAULT_HOOK_ISLAND_MUSIC_INFO_SECOND_LINE = "artist"
     const val DEFAULT_HOOK_ISLAND_MUSIC_INFO_SEPARATOR = "hyphen"
+    const val DEFAULT_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS = false
     const val DEFAULT_HOOK_ISLAND_LEFT_PADDING_LEFT = 2
     const val DEFAULT_HOOK_ISLAND_LEFT_PADDING_RIGHT = 0
     const val DEFAULT_HOOK_ISLAND_RIGHT_PADDING_LEFT = 0
