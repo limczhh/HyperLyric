@@ -81,7 +81,9 @@ internal object CurrentMediaInfoResolver {
      * an exact token or media id; otherwise require the stable album fallback to match.
      * Title and artist are display metadata and must not participate in ownership matching because
      * players may change them for translations, car Bluetooth displays, or other presentation
-     * modes.
+     * modes — except when the lyric source provides no album at all (e.g. 酷狗 via Lyricon):
+     * in that case the strongest remaining evidence is title+artist, and matching on them is
+     * still safer than dropping the MediaSession album art entirely.
      */
     private fun isCurrentSession(
         source: LyricMediaMetadata,
@@ -107,10 +109,25 @@ internal object CurrentMediaInfoResolver {
         }
 
         val sourceAlbum = source.album?.let(::normalizeText)?.takeIf { it.isNotEmpty() }
+        if (sourceAlbum != null) {
+            val sessionAlbum = normalizeText(sessionInfo.album).takeIf { it.isNotEmpty() }
+                ?: return false
+            return sourceAlbum.equals(sessionAlbum, ignoreCase = true)
+        }
+
+        // The lyric source exposes no album: fall back to matching both title and artist so the
+        // MediaSession album art can still be merged in. Both fields must agree; a partial or
+        // empty match is treated as unknown.
+        val sourceTitle = source.title?.let(::normalizeText)?.takeIf { it.isNotEmpty() }
             ?: return false
-        val sessionAlbum = normalizeText(sessionInfo.album).takeIf { it.isNotEmpty() }
+        val sourceArtist = source.artist?.let(::normalizeText)?.takeIf { it.isNotEmpty() }
             ?: return false
-        return sourceAlbum.equals(sessionAlbum, ignoreCase = true)
+        val sessionTitle = normalizeText(sessionInfo.title).takeIf { it.isNotEmpty() }
+            ?: return false
+        val sessionArtist = normalizeText(sessionInfo.artist).takeIf { it.isNotEmpty() }
+            ?: return false
+        return sourceTitle.equals(sessionTitle, ignoreCase = true) &&
+                sourceArtist.equals(sessionArtist, ignoreCase = true)
     }
 
     private fun normalize(info: MediaMetadataHelper.MediaInfo): MediaMetadataHelper.MediaInfo =
