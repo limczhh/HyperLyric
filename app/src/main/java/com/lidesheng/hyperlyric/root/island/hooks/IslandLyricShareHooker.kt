@@ -120,10 +120,12 @@ internal object IslandLyricShareHooker {
             }.getOrNull() ?: return chain.proceed()
 
             if (!PlaybackToggle.perform(controller)) {
+                val state = controller.playbackState
                 HookLogger.d(
                     TAG,
-                    "当前媒体会话不支持长按切换播放状态，保留原生拖拽分享: " +
-                            "package=${controller.packageName}"
+                    "长按切换播放状态失败，保留原生拖拽分享: " +
+                            "package=${controller.packageName}, " +
+                            "state=${state?.state}, actions=${state?.actions}"
                 )
                 return chain.proceed()
             }
@@ -157,7 +159,6 @@ internal object IslandLyricShareHooker {
     private object PlaybackToggle {
         fun perform(controller: MediaController): Boolean {
             val state = controller.playbackState ?: return false
-            val actions = state.actions
             val shouldPause = when (state.state) {
                 PlaybackState.STATE_PLAYING,
                 PlaybackState.STATE_BUFFERING -> true
@@ -168,37 +169,15 @@ internal object IslandLyricShareHooker {
 
                 else -> return false
             }
-            val action = if (shouldPause) {
-                when {
-                    hasAction(actions, PlaybackState.ACTION_PAUSE) -> PlaybackAction.PAUSE
-                    hasAction(actions, PlaybackState.ACTION_PLAY_PAUSE) -> PlaybackAction.PAUSE
-                    else -> return false
-                }
-            } else {
-                when {
-                    hasAction(actions, PlaybackState.ACTION_PLAY) -> PlaybackAction.PLAY
-                    hasAction(actions, PlaybackState.ACTION_PLAY_PAUSE) -> PlaybackAction.PLAY
-                    else -> return false
-                }
-            }
 
             return runCatching {
-                if (action == PlaybackAction.PAUSE) {
+                if (shouldPause) {
                     controller.transportControls.pause()
                 } else {
                     controller.transportControls.play()
                 }
                 true
             }.getOrDefault(false)
-        }
-
-        private fun hasAction(actions: Long, action: Long): Boolean {
-            return actions and action != 0L
-        }
-
-        private enum class PlaybackAction {
-            PLAY,
-            PAUSE
         }
     }
 
