@@ -10,6 +10,19 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "7.4-1938",
+                title = "修复了一些错误",
+                summary = "- 新增隐藏歌名别名功能\n" +
+                        "- 新增超级岛长按默认行为\n" +
+                        "- 修复歌词封面颜色的媒体会话误判\n" +
+                        "- 修复 Lyricon 歌词源纯文本歌词无法注入超级岛\n" +
+                        "- 修复超级岛长按切换播放状态失效\n" +
+                        "- 修复解除超级岛最大长度限制失效的问题\n" +
+                        "- 修复超级岛拖拽分享封面图丢失\n" +
+                        "- 优化歌词文字颜色跟随状态栏反色方法\n" +
+                        "- 优化插件相关日志输出内容"
+            ),
+            ChangelogItem(
                 version = "7.3-1937",
                 title = "修复已知问题",
                 summary = "- 新增插件功能，并将 AI 翻译功能移至插件\n" + 
