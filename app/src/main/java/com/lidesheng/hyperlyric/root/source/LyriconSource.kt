@@ -139,6 +139,18 @@ class LyriconSource : LyricSource {
             activeProviderDelayMs = providerInfo?.providerPackageName
                 ?.let(::readProviderDelay)
                 ?: RootConstants.DEFAULT_HOOK_LYRICON_PROVIDER_DELAY
+
+            // Lyricon providers may publish plain text without an accompanying Song. Publish the
+            // player identity at the source-session boundary so the first text event can still
+            // pass the package-aware island policy without inferring ownership from MediaSession.
+            activePlayerPackageName?.takeIf { it.isNotBlank() }?.let { packageName ->
+                sink?.onMetadata(
+                    LyricMediaMetadata(
+                        sourceId = id,
+                        packageName = packageName
+                    )
+                )
+            }
         }
 
 
