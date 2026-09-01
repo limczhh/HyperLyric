@@ -451,6 +451,8 @@
     <string name="title_content_layout_music_info">音乐信息</string>
     <string name="title_content_layout_lyric">歌词</string>
     <string name="title_center_music_info">居中显示</string>
+    <string name="title_hide_title_alias">隐藏歌名别名</string>
+    <string name="summary_hide_title_alias">移除歌名中括号内的别名”</string>
     <string name="title_content_layout_first_line">第一行</string>
     <string name="title_content_layout_second_line">第二行</string>
     <string name="summary_content_layout_select_fields">选择要显示的音乐信息字段</string>

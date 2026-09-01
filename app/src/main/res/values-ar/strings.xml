@@ -430,6 +430,8 @@
   <string name="title_content_layout_music_info">معلومات الموسيقى</string>
   <string name="title_content_layout_lyric">الكلمات</string>
   <string name="title_center_music_info">عرض في المنتصف</string>
+  <string name="title_hide_title_alias">إخفاء الاسم البديل للأغنية</string>
+  <string name="summary_hide_title_alias">إزالة الأسماء البديلة بين الأقواس من اسم الأغنية</string>
   <string name="title_content_layout_first_line">السطر الأول</string>
   <string name="title_content_layout_second_line">السطر الثاني</string>
   <string name="summary_content_layout_select_fields">اختار حقول معلومات الموسيقى اللي عايز تعرضها</string>

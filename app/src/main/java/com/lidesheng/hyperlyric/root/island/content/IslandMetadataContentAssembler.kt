@@ -61,8 +61,7 @@ internal object IslandMetadataContentAssembler {
         playbackPosition: Long = LyriconDataBridge.currentPosition,
         playbackDuration: Long = mediaInfo.duration
     ): ConfiguredMusicInfoLines {
-        val songName = mediaInfo.title.takeIf { it.isNotBlank() }
-            ?: LyriconDataBridge.currentSongName.orEmpty()
+        val songName = resolveSongName(prefs, mediaInfo)
         val durationText = mediaInfo.duration.takeIf { it > 0L }
             ?.let { formatMediaTime(it, it) }
             .orEmpty()
@@ -107,8 +106,7 @@ internal object IslandMetadataContentAssembler {
         playbackPosition: Long = LyriconDataBridge.currentPosition,
         playbackDuration: Long = mediaInfo.duration
     ): Boolean {
-        val songName = mediaInfo.title.takeIf { it.isNotBlank() }
-            ?: LyriconDataBridge.currentSongName.orEmpty()
+        val songName = resolveSongName(prefs, mediaInfo)
         val artistName = mediaInfo.artist
         val albumName = mediaInfo.album
         val durationText = mediaInfo.duration.takeIf { it > 0L }
@@ -225,6 +223,23 @@ internal object IslandMetadataContentAssembler {
                     "marquee=${config.metadataMarqueeEnabled}, force=$force"
         }
         return true
+    }
+
+    /**
+     * 解析用于展示的歌名：优先取媒体元数据标题，空白时回退歌词桥歌名；
+     * 开启“隐藏歌名别名”后移除成对括号内的别名。
+     */
+    private fun resolveSongName(
+        prefs: SharedPreferences,
+        mediaInfo: MediaMetadataHelper.MediaInfo
+    ): String {
+        val raw = mediaInfo.title.takeIf { it.isNotBlank() }
+            ?: LyriconDataBridge.currentSongName.orEmpty()
+        return if (MusicInfoLayoutPolicy.readHideTitleAlias(prefs)) {
+            MusicInfoLayoutPolicy.stripTitleAlias(raw)
+        } else {
+            raw
+        }
     }
 
     /**
