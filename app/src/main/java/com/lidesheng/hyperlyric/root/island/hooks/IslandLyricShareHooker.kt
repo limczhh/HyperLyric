@@ -1,5 +1,9 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.Icon
 import android.media.session.MediaController
 import android.media.session.PlaybackState
 import android.view.View
@@ -11,6 +15,9 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
+import java.io.ByteArrayOutputStream
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 
 /**
@@ -93,11 +100,18 @@ internal object IslandLyricShareHooker {
             HookLogger.d(
                 TAG,
                 "长按补充拖拽分享: title=${payload.title.hashCode()}, " +
-                        "contentLength=${payload.shareContent.length}"
+                        "contentLength=${payload.shareContent.length}, " +
+                        "cover=${payload.albumArt != null}"
+            )
+            val artworkReplacement = NativeShareArtworkAdapter.apply(
+                controller = chain.thisObject,
+                view = systemUiView,
+                bitmap = payload.albumArt
             )
             return try {
                 chain.proceed()
             } finally {
+                artworkReplacement?.restore()
                 replacement.restore()
             }
         }
@@ -238,6 +252,164 @@ internal object IslandLyricShareHooker {
                     it.name == name && it.parameterTypes.isEmpty()
                 }?.invoke(target)
             }.getOrNull()
+        }
+    }
+
+    private object NativeShareArtworkAdapter {
+        private const val SHARE_UTILS_CLASS =
+            "miui.systemui.dynamicisland.DynamicIslandShareUtils"
+        private const val DIMEN_CLASS = "miui.systemui.dynamicisland.R\$dimen"
+        private const val SHARE_PIC_RADIUS = "island_share_pic_radius"
+        private const val SHARE_CARD_DRAWABLE_FIELD = "shareCardDrawable"
+        private const val SHARE_ICON_BYTES_FIELD = "shareIconToByteArray"
+
+        fun apply(controller: Any?, view: View, bitmap: Bitmap?): AppliedArtwork? {
+            if (controller == null || bitmap == null || bitmap.isRecycled) return null
+
+            return runCatching {
+                val drawableField = findField(
+                    controller,
+                    SHARE_CARD_DRAWABLE_FIELD,
+                    Drawable::class.java
+                ) ?: throw NoSuchFieldException(SHARE_CARD_DRAWABLE_FIELD)
+                val bytesField = findField(
+                    controller,
+                    SHARE_ICON_BYTES_FIELD,
+                    ByteArray::class.java
+                ) ?: throw NoSuchFieldException(SHARE_ICON_BYTES_FIELD)
+                val artwork = createArtwork(view, bitmap)
+
+                drawableField.isAccessible = true
+                bytesField.isAccessible = true
+                val originalDrawable = drawableField.get(controller)
+                val originalBytes = bytesField.get(controller)
+                drawableField.set(controller, artwork.drawable)
+                bytesField.set(controller, artwork.bytes)
+                AppliedArtwork(
+                    controller = controller,
+                    drawableField = drawableField,
+                    originalDrawable = originalDrawable,
+                    bytesField = bytesField,
+                    originalBytes = originalBytes
+                )
+            }.onFailure { error ->
+                HookLogger.w(TAG, "准备拖拽分享封面失败，保留原生封面", error)
+            }.getOrNull()
+        }
+
+        private fun createArtwork(view: View, bitmap: Bitmap): PreparedArtwork {
+            return runCatching {
+                createXiaomiArtwork(view, bitmap)
+            }.onFailure { error ->
+                HookLogger.d(
+                    TAG,
+                    "小米原生拖拽分享封面处理不可用，使用兼容处理: " +
+                            error.javaClass.simpleName
+                )
+            }.getOrElse {
+                createFallbackArtwork(view, bitmap)
+            }
+        }
+
+        private fun createXiaomiArtwork(view: View, bitmap: Bitmap): PreparedArtwork {
+            val classLoader = view.javaClass.classLoader
+                ?: throw ClassNotFoundException(SHARE_UTILS_CLASS)
+            val context = view.context
+            val utilsClass = Class.forName(SHARE_UTILS_CLASS, true, classLoader)
+            val utils = utilsClass.getDeclaredField("INSTANCE").apply {
+                isAccessible = true
+            }.get(null)
+            val icon = Icon.createWithBitmap(bitmap)
+            val drawable = icon.loadDrawable(context)
+                ?: throw IllegalStateException("Icon.loadDrawable 返回为空")
+            val radius = resolveSharePicRadius(context, classLoader)
+            val roundedDrawable = utilsClass.getMethod(
+                "drawableAddRounded",
+                Context::class.java,
+                Drawable::class.java,
+                Int::class.javaPrimitiveType
+            ).invoke(utils, context, drawable, radius) as? Drawable
+                ?: throw IllegalStateException("drawableAddRounded 返回为空")
+            val iconBytes = utilsClass.getMethod(
+                "iconToByteArrayAndCompress",
+                Icon::class.java,
+                Context::class.java
+            ).invoke(utils, icon, context) as? ByteArray
+                ?: throw IllegalStateException("iconToByteArrayAndCompress 返回为空")
+            return PreparedArtwork(roundedDrawable, iconBytes)
+        }
+
+        private fun resolveSharePicRadius(context: Context, classLoader: ClassLoader): Int {
+            val dimenClass = Class.forName(DIMEN_CLASS, true, classLoader)
+            val resourceId = dimenClass.getDeclaredField(SHARE_PIC_RADIUS).apply {
+                isAccessible = true
+            }.getInt(null)
+            return context.resources.getDimensionPixelSize(resourceId)
+        }
+
+        private fun createFallbackArtwork(view: View, bitmap: Bitmap): PreparedArtwork {
+            val radiusPx = resolveFallbackRadius(view)
+            val roundedDrawable = RoundedBitmapDrawableFactory.create(view.resources, bitmap).apply {
+                cornerRadius = radiusPx * 2f
+                setAntiAlias(true)
+            }
+            val iconBytes = bitmap.toPngBytes()
+                ?: throw IllegalStateException("封面图片压缩失败")
+            return PreparedArtwork(roundedDrawable, iconBytes)
+        }
+
+        private fun resolveFallbackRadius(view: View): Float {
+            val resourceId = view.resources.getIdentifier(
+                SHARE_PIC_RADIUS,
+                "dimen",
+                view.context.packageName
+            )
+            val radius = if (resourceId != 0) {
+                view.resources.getDimensionPixelSize(resourceId).toFloat()
+            } else {
+                10f * view.resources.displayMetrics.density
+            }
+            return radius
+        }
+
+        private fun findField(controller: Any, name: String, type: Class<*>): Field? {
+            var currentClass: Class<*>? = controller.javaClass
+            while (currentClass != null) {
+                currentClass.declaredFields.firstOrNull { field ->
+                    field.name == name && type.isAssignableFrom(field.type)
+                }?.let { return it }
+                currentClass = currentClass.superclass
+            }
+            return null
+        }
+
+        private fun Bitmap.toPngBytes(): ByteArray? {
+            return ByteArrayOutputStream().use { output ->
+                if (!compress(Bitmap.CompressFormat.PNG, 100, output)) return null
+                output.toByteArray()
+            }
+        }
+
+        private data class PreparedArtwork(
+            val drawable: Drawable,
+            val bytes: ByteArray
+        )
+
+        class AppliedArtwork(
+            private val controller: Any,
+            private val drawableField: Field,
+            private val originalDrawable: Any?,
+            private val bytesField: Field,
+            private val originalBytes: Any?
+        ) {
+            fun restore() {
+                runCatching {
+                    drawableField.set(controller, originalDrawable)
+                    bytesField.set(controller, originalBytes)
+                }.onFailure { error ->
+                    HookLogger.w(TAG, "恢复原生拖拽分享封面失败", error)
+                }
+            }
         }
     }
 

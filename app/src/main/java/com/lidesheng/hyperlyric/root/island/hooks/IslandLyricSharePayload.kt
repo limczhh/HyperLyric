@@ -1,8 +1,8 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.view.View
-import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
@@ -11,7 +11,8 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 internal data class IslandLyricSharePayload(
     val title: String,
     val content: String,
-    val shareContent: String
+    val shareContent: String,
+    val albumArt: Bitmap?
 )
 
 internal object IslandLyricSharePayloadBuilder {
@@ -40,7 +41,8 @@ internal object IslandLyricSharePayloadBuilder {
         return IslandLyricSharePayload(
             title = lines.firstLine,
             content = lines.secondLine,
-            shareContent = shareFields.joinToString("\n")
+            shareContent = shareFields.joinToString("\n"),
+            albumArt = mediaInfo.albumArt
         )
     }
 
