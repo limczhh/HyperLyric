@@ -248,6 +248,12 @@ class PluginRuntime(
     internal fun processingSetFingerprint(): String =
         extensionRegistry.processingFingerprint(enabledPluginIds)
 
+    internal fun shouldAttemptProcessing(): Boolean {
+        if (closed.get()) return false
+        if (processingSetFingerprint().isNotEmpty()) return true
+        return enabledPluginIds.isNotEmpty() && enabledPluginReconcilePending.get()
+    }
+
     internal fun processSong(
         song: PluginSong,
         processingContext: PluginProcessingContext,

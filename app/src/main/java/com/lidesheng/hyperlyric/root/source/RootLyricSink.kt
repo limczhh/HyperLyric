@@ -132,11 +132,13 @@ class RootLyricSink(
             pendingRepeatedSourceSong = ownedSong
             LyriconDataBridge.refreshSongEvent()
             renderer.updateLyricLine()
-            HookLogger.i(
-                TAG,
-                "plugin_request event=request_deduplicated reason=repeated_source_event " +
-                        "fingerprint=${incomingPluginSong.hashCode()}"
-            )
+            if (pluginRuntime?.shouldAttemptProcessing() == true) {
+                HookLogger.d(
+                    TAG,
+                    "plugin_request event=request_deduplicated reason=repeated_source_event " +
+                            "fingerprint=${incomingPluginSong.hashCode()}"
+                )
+            }
             return
         }
 
@@ -252,7 +254,7 @@ class RootLyricSink(
         val repeatedSourceSong = pendingRepeatedSourceSong
         pendingRepeatedSourceSong = null
         if (repeatedSourceSong != null && (mediaChanged || sourceChanged)) {
-            HookLogger.i(
+            HookLogger.d(
                 TAG,
                 "plugin_request event=request_cancelled reason=source_media_identity_changed"
             )
@@ -290,13 +292,16 @@ class RootLyricSink(
 
     /** Coalesces the synchronous onSongChanged -> onMetadata event chain on the main handler. */
     private fun schedulePluginProcessing() {
-        if (pluginRuntime == null || pluginStartScheduled) return
+        val runtime = pluginRuntime ?: return
+        if (!runtime.shouldAttemptProcessing() || pluginStartScheduled) return
         pluginStartScheduled = true
         mainHandler.post(pluginStartRunnable)
     }
 
     /** Starts one plugin pass for the current Core-owned Song snapshot. */
     private fun startPluginProcessing() {
+        val runtime = pluginRuntime ?: return
+        if (!runtime.shouldAttemptProcessing()) return
         val baseSong = LyriconDataBridge.currentSong ?: return
         val expectedVersion = LyriconDataBridge.versionCounter.get()
         val requestKey = currentPluginRequestKey() ?: return
@@ -304,7 +309,7 @@ class RootLyricSink(
             invalidatePluginRequest(reason = "effective_input_changed")
         }
         if (pluginRequestTracker.isDuplicate(requestKey)) {
-            HookLogger.i(
+            HookLogger.d(
                 TAG,
                 "plugin_request event=request_deduplicated " +
                         "fingerprint=${requestKey.hashCode()}"
@@ -316,13 +321,13 @@ class RootLyricSink(
         val expectedRequest = pluginRequestGeneration.incrementAndGet()
         val pluginSnapshot = PluginSongMapper.toPluginSong(baseSong.deepCopy())
         val processingMediaInfo = latestPluginMediaInfo
-        HookLogger.i(
+        HookLogger.d(
             TAG,
             "plugin_request event=request_started " +
                     "fingerprint=${requestKey.hashCode()} " +
                     "generation=${expectedRequest}"
         )
-        pluginRuntime?.processSong(
+        runtime.processSong(
             song = pluginSnapshot,
             processingContext = PluginProcessingContext(mediaInfo = processingMediaInfo)
         ) { processingResult: PluginProcessingResult? ->
@@ -340,7 +345,7 @@ class RootLyricSink(
                 }
                 if (processingResult == null) {
                     if (activePluginRequestKey == requestKey) activePluginRequestKey = null
-                    HookLogger.i(
+                    HookLogger.d(
                         TAG,
                         "plugin_request event=request_completed status=no_result " +
                                 "fingerprint=${requestKey.hashCode()}"
@@ -352,7 +357,7 @@ class RootLyricSink(
                     result = processingResult.result
                 ) ?: run {
                     if (activePluginRequestKey == requestKey) activePluginRequestKey = null
-                    HookLogger.i(
+                    HookLogger.d(
                         TAG,
                         "plugin_request event=request_completed status=invalid_result " +
                                 "fingerprint=${requestKey.hashCode()}"
@@ -374,7 +379,7 @@ class RootLyricSink(
                         renderer.updateLyricLine()
                     }
                     if (activePluginRequestKey == requestKey) activePluginRequestKey = null
-                    HookLogger.i(
+                    HookLogger.d(
                         TAG,
                         "plugin_request event=request_completed status=applied " +
                                 "fingerprint=${requestKey.hashCode()}"
@@ -411,7 +416,7 @@ class RootLyricSink(
     private fun invalidatePluginRequest(reason: String) {
         val active = activePluginRequestKey
         if (active != null) {
-            HookLogger.i(
+            HookLogger.d(
                 TAG,
                 "plugin_request event=request_cancelled reason=${reason} " +
                         "fingerprint=${active.hashCode()}"
@@ -432,7 +437,7 @@ class RootLyricSink(
         requestKey: PluginProcessingRequestKey,
         reason: String
     ) {
-        HookLogger.i(
+        HookLogger.d(
             TAG,
             "plugin_request event=stale_result_ignored reason=${reason} " +
                     "fingerprint=${requestKey.hashCode()}"
