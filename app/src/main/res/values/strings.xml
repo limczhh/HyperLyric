@@ -509,6 +509,7 @@
     <string name="option_after_pause_default">恢复默认</string>
     <string name="option_after_pause_keep">保持不变</string>
     <string name="title_island_long_press_behavior">超级岛长按行为</string>
+    <string name="option_island_long_press_default">默认</string>
     <string name="option_island_long_press_lyric_share">拖拽分享</string>
     <string name="option_island_long_press_toggle_playback">切换播放状态</string>
     <string name="title_glow_cover_color">边缘光效封面色</string>

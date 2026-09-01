@@ -54,6 +54,9 @@ internal object IslandLyricShareHooker {
             val view = chain.args.getOrNull(0) ?: return chain.proceed()
             val data = chain.args.getOrNull(1)
             val behavior = readBehavior()
+            if (behavior == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_DEFAULT) {
+                return chain.proceed()
+            }
             val shouldHandle = runCatching {
                 IslandPresentationCoordinator.isCurrentLyricLongPressTarget(data)
             }.onFailure { error ->
@@ -143,7 +146,8 @@ internal object IslandLyricShareHooker {
                 ) ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
             }.getOrDefault(RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR)
                 .takeIf {
-                    it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE ||
+                    it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_DEFAULT ||
+                            it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE ||
                             it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK
                 }
                 ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR

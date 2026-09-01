@@ -210,9 +210,17 @@ fun SuperIslandSettingsPage() {
                 RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
                 RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
             ).takeIf {
-                it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE ||
+                it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_DEFAULT ||
+                        it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE ||
                         it == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK
             } ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
+        )
+    }
+    val longPressBehaviorValues = remember {
+        listOf(
+            RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_DEFAULT,
+            RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE,
+            RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK
         )
     }
     var extractGlowColor by remember {
@@ -356,6 +364,7 @@ fun SuperIslandSettingsPage() {
     }.map { stringResource(id = it) }
     val longPressBehaviorOptions = remember {
         listOf(
+            R.string.option_island_long_press_default,
             R.string.option_island_long_press_lyric_share,
             R.string.option_island_long_press_toggle_playback
         )
@@ -772,12 +781,15 @@ fun SuperIslandSettingsPage() {
                             OverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_island_long_press_behavior),
                                 items = longPressBehaviorOptions,
-                                selectedIndex = longPressBehavior,
-                                onSelectedIndexChange = {
-                                    longPressBehavior = it
+                                selectedIndex = longPressBehaviorValues.indexOf(longPressBehavior)
+                                    .coerceAtLeast(0),
+                                onSelectedIndexChange = { index ->
+                                    val behavior = longPressBehaviorValues.getOrNull(index)
+                                        ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
+                                    longPressBehavior = behavior
                                     saveConfig(
                                         RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
-                                        it
+                                        behavior
                                     )
                                 }
                             )
