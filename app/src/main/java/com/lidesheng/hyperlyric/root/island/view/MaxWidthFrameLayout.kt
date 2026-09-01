@@ -11,8 +11,16 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
 
     /**
      * 最大宽度（像素）。设置为 -1（默认）则不限制。
+     *
+     * This is deliberately kept separate from [desiredWidthPx]. A dynamic lyric update changes
+     * the desired width; it must not turn the current width into the next measurement ceiling.
      */
     var maxWidthPx: Int = -1
+
+    /**
+     * Requested content width（像素）。设置为 -1（默认）时回退到 [maxWidthPx] 或父级规格。
+     */
+    var desiredWidthPx: Int = -1
 
     /**
      * Used only by injected Super Island test blocks.
@@ -28,15 +36,36 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val givenWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val newWidth =
-            if (maxWidthPx > 0 && (givenWidth == 0 || givenWidth > maxWidthPx)) maxWidthPx else givenWidth
+        val requestedWidth = when {
+            desiredWidthPx > 0 -> desiredWidthPx
+            maxWidthPx > 0 -> maxWidthPx
+            else -> -1
+        }
+
+        if (requestedWidth <= 0) {
+            // Preserve normal FrameLayout measurement when no explicit width is configured.
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            return
+        }
+
+        val widthLimit = maxWidthPx.takeIf { it > 0 } ?: requestedWidth
+        val boundedWidth = requestedWidth.coerceAtMost(widthLimit)
+        val parentMode = MeasureSpec.getMode(widthMeasureSpec)
+        val parentSize = MeasureSpec.getSize(widthMeasureSpec)
+        val resolvedWidth = when (parentMode) {
+            MeasureSpec.UNSPECIFIED -> boundedWidth
+            MeasureSpec.AT_MOST,
+            MeasureSpec.EXACTLY -> boundedWidth.coerceAtMost(parentSize)
+            else -> boundedWidth
+        }
         super.onMeasure(
-            MeasureSpec.makeMeasureSpec(newWidth, MeasureSpec.AT_MOST),
+            MeasureSpec.makeMeasureSpec(resolvedWidth, MeasureSpec.EXACTLY),
             heightMeasureSpec
         )
-        if (maxWidthPx > 0 && measuredWidth > maxWidthPx) {
-            setMeasuredDimension(maxWidthPx, measuredHeight)
+
+        val cappedMeasuredWidth = measuredWidth.coerceAtMost(boundedWidth)
+        if (cappedMeasuredWidth != measuredWidth) {
+            setMeasuredDimension(cappedMeasuredWidth, measuredHeight)
         }
     }
 }
