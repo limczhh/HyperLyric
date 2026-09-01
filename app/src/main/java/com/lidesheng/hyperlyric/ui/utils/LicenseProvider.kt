@@ -22,6 +22,7 @@ object LicenseProvider {
             ),
             LicenseItem("HyperCeiler", "Sevtinge", "https://github.com/ReChronoRain/HyperCeiler"),
             LicenseItem("HyperOShape", "xzakota", "https://github.com/xzakota/HyperOShape"),
+            LicenseItem("HyperIsland", "1812z", "https://github.com/1812z/HyperIsland"),
             LicenseItem("KernelSU", "tiann", "https://github.com/tiann/KernelSU"),
             LicenseItem(
                 "AndroidAnimations",

@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.source.SourceManager
@@ -173,23 +174,20 @@ class HookEntry : XposedModule() {
         HookLogger.module = this
 
         var replacedCount = 0
-        var retainedNoReloadCount = 0
+        var skippedCount = 0
         param.oldHookHandles.forEach { handle ->
-            val executable = handle.executable
-            val replacement = createLyricReplacementHooker(executable)
-            if (replacement != null) {
-                runCatching {
-                    handle.replaceHook(replacement)
-                    replacedCount++
-                }.onFailure {
-                    // A failed replacement leaves the old hook in place. This is safer than
-                    // losing an active island feature while SystemUI continues to run.
-                    retainedNoReloadCount++
-                }
-            } else {
-                // Media cards deliberately fall into this branch: no replacement, no runtime
-                // config read, no mutation of an in-flight card/fake-view animation.
-                retainedNoReloadCount++
+            val replacement = createLyricReplacementHooker(handle.executable)
+            if (replacement == null) {
+                // Hooks without a current replacement, including media-card hooks, stay as-is.
+                skippedCount++
+                return@forEach
+            }
+            runCatching {
+                handle.replaceHook(replacement)
+                replacedCount++
+            }.onFailure {
+                // A failed hot replacement is resolved by restarting SystemUI.
+                skippedCount++
             }
         }
 
@@ -210,7 +208,7 @@ class HookEntry : XposedModule() {
         HookLogger.i(
             TAG,
             "超级岛歌词热重载完成: replaced=$replacedCount, " +
-                    "retainedNoReload=$retainedNoReloadCount"
+                    "skipped=$skippedCount"
         )
     }
 
@@ -223,6 +221,11 @@ class HookEntry : XposedModule() {
         val packageName = param.packageName
 
         if (packageName == "com.android.systemui") {
+            StatusBarTextColorHooker.setFollowStatusBarEnabled(
+                LyricTextColorStylePolicy.followsStatusBar(
+                    LyricTextColorStylePolicy.read(prefs)
+                )
+            )
             StatusBarTextColorHooker.setTextColorChangedListener {
                 BaseIslandRenderer.updateTextColors()
             }
@@ -435,6 +438,11 @@ class HookEntry : XposedModule() {
                         }
 
                         RootConstants.KEY_HOOK_TEXT_COLOR_STYLE -> {
+                            StatusBarTextColorHooker.setFollowStatusBarEnabled(
+                                LyricTextColorStylePolicy.followsStatusBar(
+                                    LyricTextColorStylePolicy.read(prefs)
+                                )
+                            )
                             Handler(Looper.getMainLooper()).post {
                                 BaseIslandRenderer.updateTextColors()
                             }
@@ -509,6 +517,9 @@ class HookEntry : XposedModule() {
         val owner = executable.declaringClass.name
         if (executable is Constructor<*> && owner == "dalvik.system.BaseDexClassLoader") {
             return ClassLoaderHooker(lyricsOnly = true)
+        }
+        if (executable is Constructor<*>) {
+            return StatusBarTextColorHooker.createReplacement(executable)
         }
         if (executable !is Method) return null
 
