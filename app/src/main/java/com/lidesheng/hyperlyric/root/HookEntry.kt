@@ -428,6 +428,12 @@ class HookEntry : XposedModule() {
                             }
                         }
 
+                        RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS -> {
+                            Handler(Looper.getMainLooper()).post {
+                                BaseIslandRenderer.updateMetadata()
+                            }
+                        }
+
                         RootConstants.KEY_HOOK_TEXT_COLOR_STYLE -> {
                             Handler(Looper.getMainLooper()).post {
                                 BaseIslandRenderer.updateTextColors()

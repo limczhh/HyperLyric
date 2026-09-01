@@ -427,7 +427,7 @@
     <string name="title_content_layout_lyric">Lyrics</string>
     <string name="title_center_music_info">Center display</string>
     <string name="title_hide_title_alias">Hide title alias</string>
-    <string name="summary_hide_title_alias">Remove bracketed aliases from the song title, e.g. show only the main name</string>
+    <string name="summary_hide_title_alias">Remove bracketed aliases from the song title, e.g. show only the main name; other information may be removed accidentally</string>
     <string name="title_content_layout_first_line">First line</string>
     <string name="title_content_layout_second_line">Second line</string>
     <string name="summary_content_layout_select_fields">Choose the music information fields to display</string>
