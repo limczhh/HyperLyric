@@ -130,6 +130,7 @@ class HookEntry : XposedModule() {
         null
     private var runtimeApp: Application? = null
     private var pluginRuntime: PluginRuntime? = null
+    private var rootLyricSink: RootLyricSink? = null
 
     val prefs: android.content.SharedPreferences
         get() {
@@ -317,6 +318,7 @@ class HookEntry : XposedModule() {
                 HookLogger.w(TAG, "插件 Runtime 初始化失败，继续使用原有歌词链路", error)
             }.getOrNull()
             val sink = RootLyricSink(renderer, app, prefs, pluginRuntime)
+            rootLyricSink = sink
 
             lyriconSource.initialize(app, prefs)
             superLyricSource.initialize(app)
@@ -483,6 +485,8 @@ class HookEntry : XposedModule() {
         pluginRuntime = null
         runCatching { sourceManager?.stop() }
         sourceManager = null
+        runCatching { rootLyricSink?.close() }
+        rootLyricSink = null
         lyricInfoSource = null
         runtimeApp = null
     }

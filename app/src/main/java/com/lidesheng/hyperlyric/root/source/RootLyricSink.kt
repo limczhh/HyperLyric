@@ -17,6 +17,8 @@ import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.renderer.IslandRenderer
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
+import com.lidesheng.hyperlyric.root.media.LyricColorBindingCoordinator
+import com.lidesheng.hyperlyric.root.media.LyricColorBindingUpdate
 import com.lidesheng.hyperlyric.root.plugin.PluginProcessingResult
 import com.lidesheng.hyperlyric.root.plugin.PluginProcessingRequestKey
 import com.lidesheng.hyperlyric.root.plugin.PluginProcessingRequestTracker
@@ -26,7 +28,6 @@ import com.lidesheng.hyperlyric.plugin.api.PluginMediaInfo
 import com.lidesheng.hyperlyric.plugin.api.PluginProcessingContext
 import com.lidesheng.hyperlyric.plugin.api.PluginSong
 import com.lidesheng.hyperlyric.plugin.api.PluginSongField
-import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlin.math.abs
 import java.util.concurrent.atomic.AtomicLong
@@ -36,9 +37,11 @@ class RootLyricSink(
     private val context: Context,
     private val prefs: SharedPreferences? = null,
     private val pluginRuntime: PluginRuntime? = null
-) : LyricSink {
+) : LyricSink, AutoCloseable {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile
+    private var closed = false
     private var lastPositionDispatchTimeMs = 0L
     private var pendingPosition: PositionSample? = null
     private var positionDispatchScheduled = false
@@ -59,7 +62,26 @@ class RootLyricSink(
     private var activePluginRequestKey: PluginProcessingRequestKey? = null
     private var pluginStartScheduled = false
     private val pluginRequestGeneration = AtomicLong(0L)
-    private val artworkColorRefreshRunnable = Runnable { renderer.updateTextColors() }
+    private val artworkColorRefreshRunnable = Runnable {
+        handleColorBindingUpdate(
+            LyricColorBindingCoordinator.retry(context, playbackActive),
+            reason = "delayed_retry"
+        )
+        renderer.updateTextColors()
+    }
+    private val sessionBindingRefreshRunnable = Runnable {
+        if (closed) return@Runnable
+        handleColorBindingUpdate(
+            LyricColorBindingCoordinator.retry(context, playbackActive),
+            reason = "active_sessions_changed"
+        )
+    }
+    private val activeSessionsObserver: () -> Unit = {
+        if (!closed) {
+            mainHandler.removeCallbacks(sessionBindingRefreshRunnable)
+            mainHandler.post(sessionBindingRefreshRunnable)
+        }
+    }
     private val pluginStartRunnable = Runnable {
         pluginStartScheduled = false
         startPluginProcessing()
@@ -78,11 +100,14 @@ class RootLyricSink(
         const val MAX_VALID_PLAYBACK_SPEED = 4f
         const val SPEED_CHANGE_EPSILON = 0.01f
         const val INFERRED_SPEED_BLEND = 0.75f
-        const val MAX_DEBUG_TEXT_LENGTH = 80
         const val ARTWORK_COLOR_REFRESH_DELAY_MS = 100L
     }
 
     private data class PositionSample(val position: Long, val playbackSpeed: Float)
+
+    init {
+        MediaMetadataHelper.addActiveSessionsObserver(activeSessionsObserver)
+    }
 
     override fun onSongChanged(song: Song?) {
         cancelArtworkColorRefresh()
@@ -135,7 +160,7 @@ class RootLyricSink(
             schedulePluginProcessing()
         }
         if (song == null) {
-            endColorSession()
+            endColorBinding()
         }
     }
 
@@ -167,7 +192,7 @@ class RootLyricSink(
         pendingRepeatedSourceSong = null
         cancelPendingPluginStart()
         invalidatePluginRequest(reason = "stopped")
-        endColorSession()
+        endColorBinding()
         renderer.clearAllViews()
         LyriconDataBridge.clearState()
     }
@@ -175,29 +200,39 @@ class RootLyricSink(
     override fun onMetadata(metadata: LyricMediaMetadata?) {
         val normalized = metadata?.normalized()
         normalized?.packageName?.let(LyriconDataBridge::updateLyricPackage)
-        if (normalized?.isPackageOnlySnapshot() == true) {
-            HookLogger.dState(
-                stateId = "RootLyricSink.metadata",
-                tag = TAG,
-                state = "pending|${normalized.sourceId}|${normalized.packageName}"
-            ) {
-                "媒体元数据暂不可用: source=${normalized.sourceId}, " +
-                        "package=${normalized.packageName ?: "<empty>"}, reason=fields_missing"
-            }
-            return
-        }
-        LyriconDataBridge.updateMediaMetadata(normalized)
         if (normalized == null) {
+            LyriconDataBridge.updateMediaMetadata(null)
             latestPluginMediaInfo = null
             activeMediaIdentity = null
             activeMediaSourceId = null
             pendingRepeatedSourceSong = null
             cancelPendingPluginStart()
             invalidatePluginRequest(reason = "metadata_cleared")
-            endColorSession()
+            endColorBinding()
             renderer.updateMetadata()
             return
         }
+        val colorBindingUpdate = LyricColorBindingCoordinator.updateSource(
+            context = context,
+            metadata = normalized
+        )
+        if (normalized.isPackageOnlySnapshot()) {
+            HookLogger.dState(
+                stateId = "RootLyricSink.metadata",
+                tag = TAG,
+                state = "package_only|${normalized.sourceId}|${normalized.packageName}|" +
+                        colorBindingUpdate.reason
+            ) {
+                "媒体展示字段暂不可用: source=${normalized.sourceId}, " +
+                        "package=${normalized.packageName ?: "<empty>"}, " +
+                        "colorBinding=${colorBindingUpdate.reason}"
+            }
+            handleColorBindingUpdate(colorBindingUpdate, reason = "package_only_metadata")
+            renderer.updateMetadata()
+            scheduleArtworkColorRefresh()
+            return
+        }
+        LyriconDataBridge.updateMediaMetadata(normalized)
         // This is deliberately captured before Core supplements the internal media state. A
         // plugin may only receive the package supplied by this lyric source event, never a
         // MediaSession/identity package or the previous lyric package retained by the bridge.
@@ -248,9 +283,9 @@ class RootLyricSink(
             ?: mediaInfo.title.takeIf { it.isNotBlank() }
         invalidateIfPluginInputChanged()
         schedulePluginProcessing()
-        val colorSessionReady = updateColorSession(mediaInfo, reason = "metadata_changed")
+        handleColorBindingUpdate(colorBindingUpdate, reason = "metadata_changed")
         renderer.updateMetadata()
-        if (colorSessionReady) scheduleArtworkColorRefresh()
+        scheduleArtworkColorRefresh()
     }
 
     /** Coalesces the synchronous onSongChanged -> onMetadata event chain on the main handler. */
@@ -408,6 +443,13 @@ class RootLyricSink(
         playbackActive = isPlaying
         explicitPlaybackSpeed(playbackSpeed)?.let { currentPlaybackSpeed = it }
         if (!isPlaying) cancelPendingPositionDispatch()
+        if (isPlaying) {
+            handleColorBindingUpdate(
+                update = LyricColorBindingCoordinator.onPlaybackStarted(context),
+                reason = "playback_started"
+            )
+            scheduleArtworkColorRefresh()
+        }
         renderer.onPlaybackStateChanged(isPlaying)
     }
 
@@ -492,63 +534,46 @@ class RootLyricSink(
     private fun explicitPlaybackSpeed(speed: Float): Float? =
         speed.takeIf { it.isFinite() && it in MIN_VALID_PLAYBACK_SPEED..MAX_VALID_PLAYBACK_SPEED }
 
-    private fun debugText(value: String): String {
-        val normalized = value
-            .replace('\r', ' ')
-            .replace('\n', ' ')
-            .replace('\t', ' ')
-            .trim()
-        if (normalized.isEmpty()) return "<empty>"
-        return normalized.take(MAX_DEBUG_TEXT_LENGTH).let {
-            if (normalized.length > MAX_DEBUG_TEXT_LENGTH) "$it…" else it
-        }
-    }
-
-    private fun updateColorSession(
-        mediaInfo: MediaMetadataHelper.MediaInfo,
+    private fun handleColorBindingUpdate(
+        update: LyricColorBindingUpdate,
         reason: String
-    ): Boolean {
-        val packageName = mediaInfo.identity.packageName
-        val previousRevision = CoverColorHelper.currentSession()?.revision
-        val current = CoverColorHelper.activateSession(
-            mediaInfo = mediaInfo
-        ) ?: run {
-            endColorSession()
+    ) {
+        val colorSession = update.colorSession
+        if (colorSession == null) {
             HookLogger.dState(
-                stateId = "RootLyricSink.colorSession.invalid",
+                stateId = "RootLyricSink.colorBinding",
                 tag = TAG,
-                state = "$packageName|${mediaInfo.title}|${mediaInfo.artist}|${mediaInfo.identity}"
+                state = "pending|$reason|${update.reason}"
             ) {
-                "颜色会话未更新: reason=$reason, package=${packageName.ifEmpty { "<empty>" }}, " +
-                        "title=\"${debugText(mediaInfo.title)}\", " +
-                        "artist=\"${debugText(mediaInfo.artist)}\", identity=${mediaInfo.identity}"
+                "颜色绑定未就绪: trigger=$reason, reason=${update.reason}"
             }
-            return false
+            if (update.stateChanged) {
+                IslandSlotContentFacade.invalidate()
+                IslandMusicWaveColorHooker.refresh()
+                renderer.updateTextColors()
+            }
+            return
         }
         HookLogger.dState(
-            stateId = "RootLyricSink.colorSession",
+            stateId = "RootLyricSink.colorBinding",
             tag = TAG,
-            state = "${current.revision}|${current.mediaKey}|${current.title}|${current.artist}"
+            state = "ready|${colorSession.revision}|${update.reason}"
         ) {
-            "颜色会话已同步: reason=$reason, revision=${current.revision}, " +
-                    "revisionChanged=${previousRevision != current.revision}, " +
-                    "package=${packageName.ifEmpty { "<empty>" }}, " +
-                    "title=\"${debugText(mediaInfo.title)}\", " +
-                    "artist=\"${debugText(mediaInfo.artist)}\", " +
-                    "album=\"${debugText(mediaInfo.album)}\", " +
-                    "identity=${mediaInfo.identity}, mediaKeyHash=${current.mediaKey.hashCode()}"
+            "颜色绑定已同步: trigger=$reason, selection=${update.reason}, " +
+                    "sessionRevision=${colorSession.revision}, " +
+                    "package=${colorSession.packageName}, " +
+                    "tokenHash=${colorSession.sessionToken.hashCode()}"
         }
-        if (previousRevision != current.revision) {
+        if (update.stateChanged) {
             IslandSlotContentFacade.invalidate()
             IslandMusicWaveColorHooker.refresh()
             renderer.updateTextColors()
         }
-        return true
     }
 
-    private fun endColorSession() {
+    private fun endColorBinding() {
         cancelArtworkColorRefresh()
-        if (CoverColorHelper.endSession()) {
+        if (LyricColorBindingCoordinator.clear()) {
             IslandSlotContentFacade.invalidate()
             IslandMusicWaveColorHooker.refresh()
         }
@@ -564,6 +589,15 @@ class RootLyricSink(
 
     private fun cancelArtworkColorRefresh() {
         mainHandler.removeCallbacks(artworkColorRefreshRunnable)
+    }
+
+    override fun close() {
+        closed = true
+        MediaMetadataHelper.removeActiveSessionsObserver(activeSessionsObserver)
+        mainHandler.removeCallbacks(sessionBindingRefreshRunnable)
+        cancelArtworkColorRefresh()
+        cancelPendingPositionDispatch()
+        LyricColorBindingCoordinator.clear()
     }
 
     private fun LyricMediaMetadata.isPackageOnlySnapshot(): Boolean =

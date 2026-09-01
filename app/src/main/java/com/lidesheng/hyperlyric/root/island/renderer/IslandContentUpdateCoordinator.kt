@@ -449,7 +449,14 @@ internal object IslandContentUpdateCoordinator {
         if (!usesCoverPalette) return
 
         val rawAlbumArt = mediaInfo.albumArt
-        val albumArt = rawAlbumArt?.takeUnless { it.isRecycled } ?: run {
+        val previousArtworkRevision = CoverColorHelper.currentArtworkRequest()?.revision
+        val artworkRequest = CoverColorHelper.ensureArtworkColors(mediaInfo)
+        rawAlbumArt?.takeUnless { it.isRecycled } ?: run {
+            if (previousArtworkRevision != null &&
+                CoverColorHelper.currentArtworkRequest() == null
+            ) {
+                IslandMusicWaveColorHooker.refresh()
+            }
             HookLogger.dState(
                 stateId = "IslandContentUpdateCoordinator.coverInput",
                 tag = "IslandContentUpdateCoordinator",
@@ -462,6 +469,8 @@ internal object IslandContentUpdateCoordinator {
             }
             return
         }
-        CoverColorHelper.ensureArtworkColors(mediaInfo)
+        if (artworkRequest != null && artworkRequest.revision != previousArtworkRevision) {
+            IslandMusicWaveColorHooker.refresh()
+        }
     }
 }

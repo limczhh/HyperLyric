@@ -1,32 +1,29 @@
 package com.lidesheng.hyperlyric.root.utils
 
 import android.graphics.Bitmap
+import android.media.session.MediaSession
 import com.lidesheng.hyperlyric.common.color.ColorExtractor
-import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import kotlin.math.abs
 
 object CoverColorHelper {
     private const val TAG = "CoverColorHelper"
 
-    /**
-     * 歌词源确认的颜色会话。身份和缓存键只在这里解释，渲染层不再拼接媒体字段。
-     */
+    /** A source-owned lease authorizing artwork from one exact MediaSession. */
     class ColorSession internal constructor(
         val revision: Long,
-        internal val cacheKey: ColorCacheKey,
-        internal val title: String,
-        internal val artist: String,
-        internal val album: String
+        internal val packageName: String,
+        internal val sessionToken: MediaSession.Token
     ) {
         /** Stable diagnostic token for consumers that need to invalidate animations. */
         val mediaKey: String
-            get() = cacheKey.debugKey()
+            get() = "$packageName\u001Fsession\u001F${sessionToken.hashCode()}"
     }
 
     class ArtworkRequest internal constructor(
         val colorSession: ColorSession,
         val revision: Long,
+        internal val cacheKey: ArtworkCacheKey,
         internal val fingerprint: ArtworkFingerprint
     )
 
@@ -35,27 +32,12 @@ object CoverColorHelper {
         val colors: Pair<IntArray, IntArray>
     )
 
-    internal data class ColorCacheKey(
-        val identity: MediaIdentity,
-        val fallbackSessionKey: String?,
-    ) {
-        fun debugKey(): String {
-            val trackKey = when {
-                identity.songId != null && identity.mediaId != null ->
-                    "song:${identity.songId}|media:${identity.mediaId}"
-
-                identity.songId != null -> "song:${identity.songId}"
-                identity.mediaId != null -> "media:${identity.mediaId}"
-                else -> ""
-            }
-            val key = if (identity.sessionToken != null) {
-                listOf("session", identity.sessionToken.hashCode(), trackKey)
-            } else {
-                listOf("fallback", trackKey, fallbackSessionKey.orEmpty())
-            }
-            return "${identity.packageName}\u001F${key.joinToString("\u001F")}"
-        }
-    }
+    internal data class ArtworkCacheKey(
+        val packageName: String,
+        val sessionToken: MediaSession.Token,
+        val songId: String?,
+        val mediaId: String?
+    )
 
     internal class ArtworkFingerprint(
         val pixels: IntArray
@@ -78,55 +60,25 @@ object CoverColorHelper {
     private var artworkRevision = 0L
     private var activeSession: ColorSession? = null
     private var activeArtworkRequest: ArtworkRequest? = null
-    private val keyedCache = LinkedHashMap<ColorCacheKey, CacheEntry>()
+    private val keyedCache = LinkedHashMap<ArtworkCacheKey, CacheEntry>()
 
-    /**
-     * 只有歌词源生命周期可以推进当前颜色会话。SystemUI 的封面、进度和动画回调
-     * 都只能读取此状态，避免迟到的上一首歌回调把活动歌曲切回去。
-     */
+    /** Only the lyric-source binding coordinator can advance this lease. */
     @Synchronized
-    fun activateSession(mediaInfo: MediaMetadataHelper.MediaInfo): ColorSession? {
-        val identity = mediaInfo.identity.normalized()
-        val normalizedTitle = mediaInfo.title.normalizeMediaText()
-        val normalizedArtist = mediaInfo.artist.normalizeMediaText()
-        val normalizedAlbum = mediaInfo.album.normalizeMediaText()
-        val trackKey = buildTrackKey(identity.songId, identity.mediaId)
-        if (identity.packageName.isEmpty() ||
-            (identity.sessionToken == null && trackKey == null &&
-                    normalizedAlbum.isEmpty())
-        ) {
-            return null
-        }
-
-        val fallbackSessionKey = if (identity.sessionToken == null) {
-            listOf(identity.packageName, normalizedAlbum)
-                .joinToString("\u001F")
-        } else {
-            null
-        }
-        val cacheKey = ColorCacheKey(
-            identity = identity,
-            fallbackSessionKey = fallbackSessionKey,
-        )
+    internal fun activateSession(
+        packageName: String,
+        sessionToken: MediaSession.Token
+    ): ColorSession {
+        val normalizedPackage = packageName.trim()
+        require(normalizedPackage.isNotEmpty())
         val current = activeSession
-        if (current?.cacheKey == cacheKey) {
-            val updated = ColorSession(
-                revision = current.revision,
-                cacheKey = current.cacheKey,
-                title = normalizedTitle.ifEmpty { current.title },
-                artist = normalizedArtist.ifEmpty { current.artist },
-                album = normalizedAlbum.ifEmpty { current.album }
-            )
-            activeSession = updated
-            return updated
+        if (current?.packageName == normalizedPackage && current.sessionToken == sessionToken) {
+            return current
         }
 
         return ColorSession(
             revision = ++sessionRevision,
-            cacheKey = cacheKey,
-            title = normalizedTitle,
-            artist = normalizedArtist,
-            album = normalizedAlbum
+            packageName = normalizedPackage,
+            sessionToken = sessionToken
         ).also {
             activeSession = it
             activeArtworkRequest = null
@@ -139,13 +91,12 @@ object CoverColorHelper {
         val revision = activeSession?.revision
         activeSession = null
         activeArtworkRequest = null
-        sessionRevision++
         HookLogger.dState(
             stateId = "CoverColorHelper.session",
             tag = TAG,
-            state = "ended|$revision|$sessionRevision"
+            state = "ended|$revision"
         ) {
-            "颜色会话结束: previousRevision=$revision, nextRevision=$sessionRevision"
+            "颜色会话结束: previousRevision=$revision"
         }
         return true
     }
@@ -155,7 +106,7 @@ object CoverColorHelper {
         val current = activeSession ?: return null
         if (packageName == null) return current
         return current.takeIf {
-            it.cacheKey.identity.packageName == packageName.normalizeMediaText()
+            it.packageName == packageName.trim()
         }
     }
 
@@ -164,11 +115,11 @@ object CoverColorHelper {
         return isCurrentSessionLocked(session)
     }
 
-    /**
-     * 将系统媒体元数据与歌词源确认的歌曲进行匹配。会话 Token 或稳定媒体 ID
-     * 可以直接确认归属；没有这些身份时，只使用包名和专辑进行保守兜底，
-     * 不让可变的标题影响颜色会话。
-     */
+    @Synchronized
+    fun currentSession(mediaInfo: MediaMetadataHelper.MediaInfo): ColorSession? =
+        activeSession?.takeIf { matchesSessionLocked(it, mediaInfo) }
+
+    /** Authorizes artwork only when it comes from the lease's exact MediaSession. */
     private fun resolveArtworkRequest(
         mediaInfo: MediaMetadataHelper.MediaInfo
     ): ArtworkRequest? {
@@ -195,23 +146,30 @@ object CoverColorHelper {
                 }
                 return@synchronized null
             }
-            if (!matchesArtworkMetadataLocked(current, mediaInfo)) {
+            val incomingIdentity = mediaInfo.identity.normalized()
+            if (!matchesSessionLocked(current, mediaInfo)) {
                 HookLogger.dState(
                     stateId = "CoverColorHelper.artwork",
                     tag = TAG,
-                    state = "metadata_mismatch|${current.revision}|" +
-                            "${mediaInfo.identity.packageName}|${mediaInfo.title}|${mediaInfo.artist}"
+                    state = "session_mismatch|${current.revision}|" +
+                            "${incomingIdentity.packageName}|" +
+                            "${incomingIdentity.sessionToken?.hashCode()}"
                 ) {
-                    "封面取色跳过: reason=metadata_mismatch, sessionRevision=${current.revision}, " +
-                        "sessionTitle=\"${debugText(current.title)}\", " +
-                        "sessionArtist=\"${debugText(current.artist)}\", " +
-                        "mediaTitle=\"${debugText(mediaInfo.title.normalizeMediaText())}\", " +
-                        "mediaArtist=\"${debugText(mediaInfo.artist.normalizeMediaText())}\", " +
-                        "packageMatches=${current.cacheKey.identity.packageName == mediaInfo.identity.packageName}, " +
-                        "mediaPackage=${mediaInfo.identity.packageName.ifEmpty { "<empty>" }}"
+                    "封面取色跳过: reason=session_mismatch, " +
+                            "sessionRevision=${current.revision}, " +
+                            "boundPackage=${current.packageName}, " +
+                            "boundTokenHash=${current.sessionToken.hashCode()}, " +
+                            "mediaPackage=${incomingIdentity.packageName.ifEmpty { "<empty>" }}, " +
+                            "mediaTokenHash=${incomingIdentity.sessionToken?.hashCode()}"
                 }
                 return@synchronized null
             }
+            val cacheKey = ArtworkCacheKey(
+                packageName = current.packageName,
+                sessionToken = current.sessionToken,
+                songId = incomingIdentity.songId,
+                mediaId = incomingIdentity.mediaId
+            )
 
             val activeRequest = activeArtworkRequest
             if (activeRequest != null &&
@@ -224,6 +182,7 @@ object CoverColorHelper {
             ArtworkRequest(
                 colorSession = current,
                 revision = ++artworkRevision,
+                cacheKey = cacheKey,
                 fingerprint = fingerprint
             ).also { activeArtworkRequest = it }
         }
@@ -235,7 +194,13 @@ object CoverColorHelper {
      * component callbacks (such as MusicWave) as artwork sources.
      */
     fun ensureArtworkColors(mediaInfo: MediaMetadataHelper.MediaInfo): ArtworkRequest? {
-        val bitmap = mediaInfo.albumArt ?: return null
+        val bitmap = mediaInfo.albumArt?.takeUnless { it.isRecycled } ?: run {
+            invalidateArtworkIfOwned(
+                mediaInfo = mediaInfo,
+                reason = if (mediaInfo.albumArt == null) "artwork_missing" else "artwork_recycled"
+            )
+            return null
+        }
         val request = resolveArtworkRequest(mediaInfo) ?: return null
         val cachedColors = getCachedColors(
             useGradient = true,
@@ -268,6 +233,33 @@ object CoverColorHelper {
         return current
     }
 
+    private fun invalidateArtworkIfOwned(
+        mediaInfo: MediaMetadataHelper.MediaInfo,
+        reason: String
+    ) {
+        synchronized(this) {
+            val current = activeSession ?: return
+            val incomingIdentity = mediaInfo.identity.normalized()
+            if (incomingIdentity.packageName != current.packageName ||
+                incomingIdentity.sessionToken != current.sessionToken ||
+                activeArtworkRequest == null
+            ) {
+                return
+            }
+            val previousRevision = activeArtworkRequest?.revision
+            activeArtworkRequest = null
+            artworkRevision++
+            HookLogger.dState(
+                stateId = "CoverColorHelper.artwork",
+                tag = TAG,
+                state = "invalidated|${current.revision}|$previousRevision|$reason"
+            ) {
+                "封面颜色授权已失效: reason=$reason, sessionRevision=${current.revision}, " +
+                        "previousArtworkRevision=$previousRevision"
+            }
+        }
+    }
+
     @Synchronized
     fun isCurrentArtwork(request: ArtworkRequest): Boolean {
         return isCurrentArtworkLocked(request)
@@ -278,47 +270,10 @@ object CoverColorHelper {
         return activeArtworkRequest?.takeIf(::isCurrentArtworkLocked)
     }
 
-    private fun matchesArtworkMetadataLocked(
-        current: ColorSession,
-        mediaInfo: MediaMetadataHelper.MediaInfo
-    ): Boolean {
-        val currentIdentity = current.cacheKey.identity
-        val incomingIdentity = mediaInfo.identity.normalized()
-        val sessionMatch = currentIdentity.sameSessionAs(incomingIdentity)
-        if (sessionMatch == false) return false
-
-        val currentMediaId = currentIdentity.mediaId
-        val incomingMediaId = incomingIdentity.mediaId
-        if (currentMediaId != null && incomingMediaId != null &&
-            currentMediaId != incomingMediaId
-        ) {
-            return false
-        }
-        val currentSongId = currentIdentity.songId
-        val incomingSongId = incomingIdentity.songId
-        if (currentSongId != null && incomingSongId != null &&
-            currentSongId != incomingSongId
-        ) {
-            return false
-        }
-
-        // A MediaSession token or a stable item ID is stronger than mutable display metadata.
-        // Once either one matches, a player may freely change title/artist presentation fields.
-        val mediaIdMatches = currentMediaId != null && currentMediaId == incomingMediaId
-        val songIdMatches = currentSongId != null && currentSongId == incomingSongId
-        if (sessionMatch == true || mediaIdMatches || songIdMatches) return true
-
-        val mediaAlbum = mediaInfo.album.normalizeMediaText()
-        if (current.album.isEmpty() || mediaAlbum.isEmpty()) {
-            return false
-        }
-        return isCompatibleAlbum(current.album, mediaAlbum)
-    }
-
     /**
-     * 同一歌曲与同一封面只生成一次调色板。使用归一化内容指纹而不是 Bitmap
-     * 实例或 generationId，暂停/恢复得到新 Bitmap 时仍可复用；若过渡期封面
-     * 随后被真实封面替换，则允许纠正该歌曲的缓存。
+     * One authorized artwork is extracted once. A normalized content
+     * fingerprint allows pause/resume bitmap instances to share colors while still replacing a
+     * transitional image when the session publishes its real artwork.
      */
     private fun extractColors(
         bitmap: Bitmap,
@@ -328,7 +283,7 @@ object CoverColorHelper {
         if (bitmap.isRecycled) return null
         val cachedColors = synchronized(this) {
             if (!isCurrentArtworkLocked(request)) return@synchronized null
-            keyedCache[request.colorSession.cacheKey]
+            keyedCache[request.cacheKey]
                 ?.takeIf {
                     it.artworkFingerprint.isSimilarTo(request.fingerprint)
                 }
@@ -363,12 +318,12 @@ object CoverColorHelper {
         )
         val colors = synchronized(this) {
             if (!isCurrentArtworkLocked(request)) return@synchronized null
-            val latest = keyedCache[request.colorSession.cacheKey]
+            val latest = keyedCache[request.cacheKey]
             if (latest?.artworkFingerprint?.isSimilarTo(request.fingerprint) == true) {
                 latest.colors
             } else {
                 extractedColors.also {
-                    keyedCache[request.colorSession.cacheKey] = CacheEntry(
+                    keyedCache[request.cacheKey] = CacheEntry(
                         request.fingerprint,
                         it
                     )
@@ -395,7 +350,14 @@ object CoverColorHelper {
         session: ColorSession
     ): Pair<IntArray, IntArray>? {
         if (!isCurrentSessionLocked(session)) return null
-        return keyedCache[session.cacheKey]?.colors?.forGradient(useGradient)
+        val request = activeArtworkRequest
+            ?.takeIf { it.colorSession.revision == session.revision }
+            ?.takeIf(::isCurrentArtworkLocked)
+            ?: return null
+        return keyedCache[request.cacheKey]
+            ?.takeIf { it.artworkFingerprint.isSimilarTo(request.fingerprint) }
+            ?.colors
+            ?.forGradient(useGradient)
     }
 
     @Synchronized
@@ -404,7 +366,7 @@ object CoverColorHelper {
         request: ArtworkRequest
     ): Pair<IntArray, IntArray>? {
         if (!isCurrentArtworkLocked(request)) return null
-        return keyedCache[request.colorSession.cacheKey]
+        return keyedCache[request.cacheKey]
             ?.takeIf {
                 it.artworkFingerprint.isSimilarTo(request.fingerprint)
             }
@@ -416,30 +378,30 @@ object CoverColorHelper {
     fun clearCache() {
         activeSession = null
         activeArtworkRequest = null
-        sessionRevision++
         keyedCache.clear()
     }
 
     private fun isCurrentSessionLocked(session: ColorSession): Boolean {
         val current = activeSession ?: return false
-        return current.revision == session.revision && current.cacheKey == session.cacheKey
+        return current.revision == session.revision &&
+                current.packageName == session.packageName &&
+                current.sessionToken == session.sessionToken
+    }
+
+    private fun matchesSessionLocked(
+        session: ColorSession,
+        mediaInfo: MediaMetadataHelper.MediaInfo
+    ): Boolean {
+        val incomingIdentity = mediaInfo.identity.normalized()
+        return incomingIdentity.packageName == session.packageName &&
+                incomingIdentity.sessionToken == session.sessionToken
     }
 
     private fun isCurrentArtworkLocked(request: ArtworkRequest): Boolean {
         val current = activeArtworkRequest ?: return false
         return isCurrentSessionLocked(request.colorSession) &&
                 current.revision == request.revision &&
-                current.colorSession.revision == request.colorSession.revision &&
-                current.colorSession.cacheKey == request.colorSession.cacheKey
-    }
-
-    private fun buildTrackKey(songId: String?, mediaId: String?): String? {
-        return when {
-            songId != null && mediaId != null -> "song:$songId|media:$mediaId"
-            songId != null -> "song:$songId"
-            mediaId != null -> "media:$mediaId"
-            else -> null
-        }
+                current.cacheKey == request.cacheKey
     }
 
     private fun Pair<IntArray, IntArray>.forGradient(
@@ -456,21 +418,6 @@ object CoverColorHelper {
 
     private fun Pair<IntArray, IntArray>.copyColors(): Pair<IntArray, IntArray> {
         return Pair(first.copyOf(), second.copyOf())
-    }
-
-    private fun String.normalizeMediaText(): String {
-        return trim().lowercase().replace(WHITESPACE_REGEX, " ")
-    }
-
-    private fun debugText(value: String): String {
-        if (value.isEmpty()) return "<empty>"
-        return value.take(MAX_DEBUG_TEXT_LENGTH).let {
-            if (value.length > MAX_DEBUG_TEXT_LENGTH) "$it…" else it
-        }
-    }
-
-    private fun isCompatibleAlbum(first: String, second: String): Boolean {
-        return first == second
     }
 
     /**
@@ -507,17 +454,15 @@ object CoverColorHelper {
     }
 
     private fun trimCache() {
-        while (keyedCache.size > MAX_CACHED_SONGS) {
+        while (keyedCache.size > MAX_CACHED_ARTWORKS) {
             val firstKey = keyedCache.keys.firstOrNull() ?: return
             keyedCache.remove(firstKey)
         }
     }
 
-    private val WHITESPACE_REGEX = Regex("\\s+")
     private const val MAX_PALETTE_COLORS = 4
-    private const val MAX_CACHED_SONGS = 16
+    private const val MAX_CACHED_ARTWORKS = 16
     private const val FINGERPRINT_GRID_SIZE = 8
     private const val RGB_CHANNEL_COUNT = 3
     private const val MAX_AVERAGE_CHANNEL_DELTA = 12L
-    private const val MAX_DEBUG_TEXT_LENGTH = 80
 }

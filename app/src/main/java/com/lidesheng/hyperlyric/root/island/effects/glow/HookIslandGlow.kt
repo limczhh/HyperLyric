@@ -155,7 +155,7 @@ object HookIslandGlow {
                 return@runCatching null
             }
             val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(context, pkgName, HookLogger)
-            val colorSession = CoverColorHelper.currentSession(pkgName) ?: run {
+            val colorSession = CoverColorHelper.currentSession(mediaInfo) ?: run {
                 HookLogger.dState(
                     stateId = "HookIslandGlow.prepare",
                     tag = TAG,
@@ -165,9 +165,7 @@ object HookIslandGlow {
                 }
                 return@runCatching null
             }
-            val artworkRequest = mediaInfo
-                .takeIf { it.albumArt != null }
-                ?.let { CoverColorHelper.ensureArtworkColors(it) }
+            val artworkRequest = CoverColorHelper.ensureArtworkColors(mediaInfo)
             val useGradient = LyricTextColorStylePolicy.usesCoverGradient(
                 LyricTextColorStylePolicy.read(sharedPrefs)
             )

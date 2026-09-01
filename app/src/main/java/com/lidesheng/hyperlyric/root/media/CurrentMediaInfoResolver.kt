@@ -5,13 +5,13 @@ import com.lidesheng.hyperlyric.common.HyperLogger
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
+import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 
 /**
  * Resolves the media snapshot consumed by root-side surfaces.
  *
- * Source-provided fields are preferred individually. MediaSession remains the fallback for
- * fields a lyric source does not expose only after the source and controller are confirmed to
- * describe the same current media item.
+ * Source-provided display fields are preferred individually. A source-owned color session pins
+ * MediaSession reads without letting this resolver create or change that ownership.
  */
 internal object CurrentMediaInfoResolver {
 
@@ -24,6 +24,7 @@ internal object CurrentMediaInfoResolver {
         val normalizedPackageName = packageName.trim()
         val sourceInfo = (sourceMetadata ?: LyriconDataBridge.currentLyricMediaMetadata)
             ?.normalized()
+        val colorSession = CoverColorHelper.currentSession(normalizedPackageName)
         val sourcePackage = sourceInfo?.packageName
         val sourcePackageMatches = sourcePackage.isNullOrEmpty() ||
                 sourcePackage == normalizedPackageName
@@ -31,7 +32,7 @@ internal object CurrentMediaInfoResolver {
             context = context,
             packageName = normalizedPackageName,
             logger = logger,
-            preferredSessionToken = sourceInfo?.sessionToken
+            preferredSessionToken = sourceInfo?.sessionToken ?: colorSession?.sessionToken
         )
 
         if (sourceInfo == null) return normalize(sessionInfo)
@@ -52,7 +53,8 @@ internal object CurrentMediaInfoResolver {
         val sessionMatches = isCurrentSession(
             source = sourceInfo,
             sessionInfo = sessionInfo,
-            packageName = normalizedPackageName
+            packageName = normalizedPackageName,
+            confirmedSessionToken = colorSession?.sessionToken
         )
         val fallback = if (sessionMatches) {
             sessionInfo
@@ -78,7 +80,8 @@ internal object CurrentMediaInfoResolver {
 
     /**
      * A package name alone is not proof that the MediaSession belongs to the lyric event. Prefer
-     * an exact token or media id; otherwise require the stable album fallback to match.
+     * the source-owned pinned token or an identity supplied by the source; otherwise retain the
+     * conservative album fallback for non-color metadata merging.
      * Title and artist are display metadata and must not participate in ownership matching because
      * players may change them for translations, car Bluetooth displays, or other presentation
      * modes.
@@ -86,10 +89,15 @@ internal object CurrentMediaInfoResolver {
     private fun isCurrentSession(
         source: LyricMediaMetadata,
         sessionInfo: MediaMetadataHelper.MediaInfo,
-        packageName: String
+        packageName: String,
+        confirmedSessionToken: android.media.session.MediaSession.Token?
     ): Boolean {
         val sessionIdentity = sessionInfo.identity.normalized()
         if (sessionIdentity.packageName != packageName || packageName.isEmpty()) return false
+
+        confirmedSessionToken?.let { token ->
+            return sessionIdentity.sessionToken == token
+        }
 
         source.sessionToken?.let { token ->
             if (sessionIdentity.sessionToken != token) return false

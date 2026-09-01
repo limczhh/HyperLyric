@@ -6,7 +6,6 @@ import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
-import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHooker
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
@@ -40,10 +39,9 @@ internal object IslandSlotStyleAssembler {
     ) {
         val disableAll = TranslationHelper.isTranslationDisabled(prefs) || nextLinePreviewEnabled
         val translationOnly = TranslationHelper.isTranslationOnly(prefs)
-        val lyricPackage = LyriconDataBridge.currentLyricPackageName.orEmpty()
-        val colorSession = CoverColorHelper.currentSession(lyricPackage)
+        val colorSession = CoverColorHelper.currentSession(mediaInfo)
         val albumBitmap = mediaInfo.albumArt
-        val artworkRequest = if (config.extractCoverTextColor && albumBitmap != null) {
+        val artworkRequest = if (config.extractCoverTextColor) {
             CoverColorHelper.ensureArtworkColors(mediaInfo)
         } else {
             null

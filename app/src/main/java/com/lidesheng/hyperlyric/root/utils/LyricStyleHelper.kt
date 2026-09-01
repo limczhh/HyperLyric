@@ -28,7 +28,7 @@ object LyricStyleHelper {
         prefs: SharedPreferences,
         res: Resources,
         mode: Int,
-        colorSession: CoverColorHelper.ColorSession? = CoverColorHelper.currentSession(),
+        colorSession: CoverColorHelper.ColorSession? = null,
         artworkRequest: CoverColorHelper.ArtworkRequest? = null,
         textColorOverride: Int? = null
     ): LyricViewStyle {

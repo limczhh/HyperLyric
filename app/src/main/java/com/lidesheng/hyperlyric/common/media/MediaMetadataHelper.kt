@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.lidesheng.hyperlyric.common.HyperLogger
+import java.util.concurrent.CopyOnWriteArraySet
 
 /**
  * 媒体元数据辅助类。
@@ -28,8 +29,19 @@ object MediaMetadataHelper {
     @Volatile
     private var activeControllers: List<MediaController> = emptyList()
 
+    private val activeSessionsObservers = CopyOnWriteArraySet<() -> Unit>()
+
     private val activeSessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         activeControllers = controllers.orEmpty()
+        activeSessionsObservers.forEach { observer -> runCatching { observer() } }
+    }
+
+    internal fun addActiveSessionsObserver(observer: () -> Unit) {
+        activeSessionsObservers.add(observer)
+    }
+
+    internal fun removeActiveSessionsObserver(observer: () -> Unit) {
+        activeSessionsObservers.remove(observer)
     }
 
     /** A media snapshot assembled from one controller. */
@@ -134,6 +146,12 @@ object MediaMetadataHelper {
         }
     }
 
+    /** Lightweight state used to pin one exact player session. */
+    internal data class MediaSessionCandidate(
+        val sessionToken: MediaSession.Token,
+        val isPlaying: Boolean
+    )
+
     fun getPlaybackProgress(context: Context, packageName: String): PlaybackProgress {
         if (packageName.isEmpty()) return PlaybackProgress()
         return try {
@@ -164,6 +182,30 @@ object MediaMetadataHelper {
             }
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /** Returns all sessions for a package without guessing from controller list order. */
+    internal fun getSessionCandidates(
+        context: Context,
+        packageName: String
+    ): List<MediaSessionCandidate> {
+        val normalizedPackage = packageName.trim()
+        if (normalizedPackage.isEmpty()) return emptyList()
+        return try {
+            ensureSessionSnapshot(context)
+            refreshSessionSnapshot()
+            val controllers = activeControllers.filter { it.packageName == normalizedPackage }
+            controllers.mapNotNull { controller ->
+                runCatching {
+                    MediaSessionCandidate(
+                        sessionToken = controller.sessionToken,
+                        isPlaying = controller.playbackState?.state == PlaybackState.STATE_PLAYING
+                    )
+                }.getOrNull()
+            }.distinctBy { it.sessionToken }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

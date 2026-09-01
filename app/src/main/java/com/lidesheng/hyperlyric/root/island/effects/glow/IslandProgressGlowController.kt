@@ -263,7 +263,9 @@ internal object IslandProgressGlowController {
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GRADIENT,
             RootConstants.DEFAULT_HOOK_ISLAND_PROGRESS_GRADIENT
         )
-        val colorSession = CoverColorHelper.currentSession(packageName)
+        val colorSession = mediaInfo
+            ?.let { CoverColorHelper.currentSession(it) }
+            ?: CoverColorHelper.currentSession(packageName).takeIf { mediaInfo == null }
             ?: return ProgressColors(
                 intArrayOf(DEFAULT_PROGRESS_COLOR),
                 DEFAULT_TRACK_COLOR
@@ -276,9 +278,7 @@ internal object IslandProgressGlowController {
                     "进度光效颜色回退: reason=no_matching_color_session, package=$packageName"
                 }
             }
-        val artworkRequest = mediaInfo
-            ?.takeIf { it.albumArt != null }
-            ?.let { CoverColorHelper.ensureArtworkColors(it) }
+        val artworkRequest = mediaInfo?.let(CoverColorHelper::ensureArtworkColors)
         val matchingArtworkRequest = artworkRequest?.takeIf {
             it.colorSession.revision == colorSession.revision
         }
