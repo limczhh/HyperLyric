@@ -9,24 +9,29 @@ import java.util.regex.Pattern
 object LyricInfoParser {
 
     private val LRC_TIME_RE = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]")
+    private val ELRC_WORD_TIME_RE = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>")
 
     fun parse(json: String): Song? = parsePayload(json)?.song
 
     fun parsePayload(json: String): LyricInfoPayload? {
         return try {
             val obj = JSONObject(json)
-            val lyricRaw = obj.optString("lyric", "").trim()
-            val format = obj.optString("format", "").trim()
-            val translationFormat = obj.optString("translation", "").trim()
-            if (lyricRaw.isBlank()) return null
+            val lyricRaw = obj.optionalText("lyric")
+            val rawLyric = obj.optionalText("rawLyric")
+            val translationRaw = obj.optionalText("translation")
+            val primaryRaw = lyricRaw ?: return null
 
             val title = obj.optionalText("songName")
             val artist = obj.optionalText("artist")
             val album = obj.optionalText("album")
             val songId = obj.optionalText("songId")
 
-            val resultLines = parseLyricLines(lyricRaw, format, translationFormat)
-                ?: return null
+            val parsedPrimary = if (rawLyric != null) {
+                parseLyricLines(rawLyric, enhanced = true)
+            } else {
+                parseLyricLines(primaryRaw, enhanced = false)
+            } ?: return null
+            val resultLines = attachTranslation(parsedPrimary, translationRaw)
 
             LyricInfoPayload(
                 song = Song(
@@ -48,61 +53,61 @@ object LyricInfoParser {
 
     private fun parseLyricLines(
         lyricRaw: String,
-        format: String,
-        translationFormat: String = ""
-    ): List<RichLyricLine>? {
+        enhanced: Boolean
+    ): List<ParsedLine>? {
         if (lyricRaw.isBlank()) return null
 
-        val hasTranslation = translationFormat.isNotBlank()
         val allLines = lyricRaw.lines().filter { it.isNotBlank() }
 
-        // 提取每行的时间戳和文本
-        val parsedLines = allLines.map { line ->
-            val timeMs = extractTimeMs(line)
-            ParsedLine(timeMs, line)
-        }
-
-        // 按时间戳分组，相同时间戳的第二行为翻译
-        val resultLines = mutableListOf<RichLyricLine>()
-        var i = 0
-        while (i < parsedLines.size) {
-            val current = parsedLines[i]
-            val next = parsedLines.getOrNull(i + 1)
-
-            // 判断下一行是否是翻译（时间戳相同且有翻译格式标识）
-            val isNextTranslation = hasTranslation
-                    && next != null
-                    && next.timeMs == current.timeMs
-                    && current.timeMs >= 0
-
-            val mainLine = parseLine(current.raw, format)
-            if (mainLine != null) {
-                if (isNextTranslation) {
-                    val transText = extractText(next.raw, translationFormat)
-                    if (!transText.isNullOrBlank()) {
-                        resultLines.add(mainLine.copy(translation = transText))
-                    } else {
-                        resultLines.add(mainLine)
-                    }
-                    i += 2 // 跳过翻译行
-                } else {
-                    resultLines.add(mainLine)
-                    i += 1
-                }
-            } else {
-                i += 1
+        val parsedLines = allLines.mapNotNull { line ->
+            parseLine(line, enhanced)?.let { parsedLine ->
+                ParsedLine(extractTimeMs(line), parsedLine)
             }
         }
+        return parsedLines
+            .takeIf { it.isNotEmpty() }
+            ?.also(::completeLineTiming)
+    }
 
-        // 补全 end/duration，修正最后一个词的时间
-        for (idx in resultLines.indices) {
-            val cur = resultLines[idx]
-            val nextBegin = resultLines.getOrNull(idx + 1)?.begin
+    /** Match the independent translation lane to original lines by line timestamp. */
+    private fun attachTranslation(
+        originalLines: List<ParsedLine>,
+        translationRaw: String?
+    ): List<RichLyricLine> {
+        if (translationRaw.isNullOrBlank()) {
+            return originalLines.map { it.line }
+        }
+
+        val translationLines = parseLyricLines(
+            translationRaw,
+            enhanced = ELRC_WORD_TIME_RE.matcher(translationRaw).find()
+        ) ?: return originalLines.map { it.line }
+        val translationByTime = translationLines
+            .groupBy { it.timeMs }
+            .mapValues { (_, lines) -> lines.toMutableList() }
+
+        return originalLines.map { original ->
+            val candidates = translationByTime[original.timeMs]
+            val translation = candidates?.takeIf { it.isNotEmpty() }?.removeAt(0)?.line
+            if (translation == null) {
+                original.line
+            } else {
+                original.line.copy(
+                    translation = translation.text,
+                    translationWords = translation.words
+                )
+            }
+        }
+    }
+
+    private fun completeLineTiming(lines: List<ParsedLine>) {
+        for (idx in lines.indices) {
+            val cur = lines[idx].line
+            val nextBegin = lines.getOrNull(idx + 1)?.line?.begin
             if (cur.end <= cur.begin) {
                 cur.end = nextBegin ?: (cur.begin + 5000)
                 cur.duration = cur.end - cur.begin
             }
-            // 修正最后一个词的 end 为行级 end
             cur.words?.lastOrNull()?.let { lastWord ->
                 if (lastWord.end < cur.end) {
                     lastWord.end = cur.end
@@ -110,36 +115,13 @@ object LyricInfoParser {
                 }
             }
         }
-
-        return resultLines.takeIf { it.isNotEmpty() }
     }
 
     /**
      * 解析单行为 RichLyricLine（ELRC 或 LRC）。
      */
-    private fun parseLine(raw: String, format: String): RichLyricLine? {
-        return when (format) {
-            "elrc" -> parseElrcLine(raw)
-            else -> parseLrcLine(raw)
-        }
-    }
-
-    /**
-     * 提取行文本（去掉时间戳和词级标签）。
-     */
-    private fun extractText(raw: String, format: String): String? {
-        return when (format) {
-            "elrc" -> {
-                val lineRe = Pattern.compile("\\[\\d{2}:\\d{2}\\.\\d{2,3}]\\s*(.*)")
-                val lm = lineRe.matcher(raw.trim())
-                if (!lm.matches()) return null
-                val wordPart = lm.group(1) ?: ""
-                val wordRe = Pattern.compile("<\\d{2}:\\d{2}\\.\\d{2,3}>")
-                wordRe.matcher(wordPart).replaceAll("").trim().takeIf { it.isNotBlank() }
-            }
-            else -> parseLrcLine(raw)?.text
-        }
-    }
+    private fun parseLine(raw: String, enhanced: Boolean): RichLyricLine? =
+        if (enhanced) parseElrcLine(raw) else parseLrcLine(raw)
 
     /**
      * 提取行首时间戳（毫秒），用于翻译匹配。
@@ -227,14 +209,17 @@ object LyricInfoParser {
     fun diagnose(json: String): LyricInfoDiagnosis? {
         return try {
             val obj = JSONObject(json)
+            val rawLyric = obj.optString("rawLyric", "")
+            val lyric = obj.optString("lyric", "")
+            val previewSource = rawLyric.takeIf { it.isNotBlank() } ?: lyric
             LyricInfoDiagnosis(
                 songName = obj.optString("songName", ""),
                 artist = obj.optString("artist", ""),
                 songId = obj.optString("songId", ""),
-                format = obj.optString("format", ""),
-                translationFormat = obj.optString("translation", ""),
-                lyricLength = obj.optString("lyric", "").length,
-                lyricPreview = obj.optString("lyric", "").lines().filter { it.isNotBlank() }.drop(3).take(10)
+                rawLyricLength = rawLyric.length,
+                lyricLength = lyric.length,
+                translationLength = obj.optString("translation", "").length,
+                lyricPreview = previewSource.lines().filter { it.isNotBlank() }.take(10)
             )
         } catch (_: Exception) {
             null
@@ -245,7 +230,7 @@ object LyricInfoParser {
         optString(key, "").trim().takeIf { it.isNotEmpty() }
 }
 
-private data class ParsedLine(val timeMs: Long, val raw: String)
+private data class ParsedLine(val timeMs: Long, val line: RichLyricLine)
 
 data class LyricInfoPayload(
     val song: Song,
@@ -259,8 +244,8 @@ data class LyricInfoDiagnosis(
     val songName: String,
     val artist: String,
     val songId: String,
-    val format: String,
-    val translationFormat: String,
+    val rawLyricLength: Int,
     val lyricLength: Int,
+    val translationLength: Int,
     val lyricPreview: List<String>
 )

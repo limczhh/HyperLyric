@@ -314,9 +314,10 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         HookLogger.d(
             TAG,
             "songName=${diagnosis.songName} | artist=${diagnosis.artist} | " +
-                    "songId=${diagnosis.songId} | format=${diagnosis.format} | " +
-                    "translation=${diagnosis.translationFormat} | " +
+                    "songId=${diagnosis.songId} | " +
+                    "rawLyric=${diagnosis.rawLyricLength}chars | " +
                     "lyric=${diagnosis.lyricLength}chars | " +
+                    "translation=${diagnosis.translationLength}chars | " +
                     diagnosis.lyricPreview.joinToString(" | ")
         )
     }
