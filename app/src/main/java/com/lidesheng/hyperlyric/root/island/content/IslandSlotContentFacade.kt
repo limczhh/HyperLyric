@@ -34,6 +34,10 @@ internal object IslandSlotContentFacade {
         mediaInfo: MediaMetadataHelper.MediaInfo = currentMediaInfo(view.context),
         force: Boolean = false
     ) {
+        IslandLyricViewController.useSharedMarqueeClock(
+            view,
+            mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO
+        )
         IslandSlotStyleAssembler.configureView(
             view = view,
             prefs = prefs,
@@ -82,7 +86,7 @@ internal object IslandSlotContentFacade {
                 onLineCancelled = onLineCancelled
             )
         } else {
-            IslandMetadataContentAssembler.apply(
+            val changed = IslandMetadataContentAssembler.apply(
                 view = view,
                 prefs = prefs,
                 config = config,
@@ -92,6 +96,14 @@ internal object IslandSlotContentFacade {
                 playbackPosition = playbackClock.positionMs,
                 playbackDuration = playbackDuration
             )
+            IslandLyricViewController.applyPlaybackSnapshot(
+                view = view,
+                position = playbackClock.positionMs,
+                playbackSpeed = playbackClock.playbackSpeed,
+                activeTimeMs = playbackClock.activeTimeMs,
+                active = playbackActive
+            )
+            changed
         }
     }
 

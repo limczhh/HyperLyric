@@ -145,7 +145,11 @@ class RichLyricLineView(
         secondary.updatePosition(position, resolvedSpeed)
     }
 
-    internal fun synchronizePosition(position: Long, playbackSpeed: Float = 1f) {
+    internal fun synchronizePosition(
+        position: Long,
+        playbackSpeed: Float = 1f,
+        activeTimeMs: Long = position
+    ) {
         val resolvedSpeed = if (playbackSpeed.isFinite() && playbackSpeed > 0f) {
             playbackSpeed
         } else {
@@ -153,8 +157,8 @@ class RichLyricLineView(
         }
         lastPosition = position
         lastPlaybackSpeed = resolvedSpeed
-        main.synchronizePosition(position, resolvedSpeed)
-        secondary.synchronizePosition(position, resolvedSpeed)
+        main.synchronizePosition(position, resolvedSpeed, activeTimeMs)
+        secondary.synchronizePosition(position, resolvedSpeed, activeTimeMs)
     }
 
     fun setPlaybackActive(active: Boolean) {
@@ -165,6 +169,11 @@ class RichLyricLineView(
     internal fun keepPlaybackClockRunningWhenHidden(enabled: Boolean) {
         main.keepPlaybackClockRunningWhenHidden = enabled
         secondary.keepPlaybackClockRunningWhenHidden = enabled
+    }
+
+    internal fun useSharedMarqueeClock(enabled: Boolean) {
+        main.useSharedMarqueeClock(enabled)
+        secondary.useSharedMarqueeClock(enabled)
     }
 
     fun requestStartMarquee() {

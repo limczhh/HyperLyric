@@ -226,6 +226,7 @@ object BaseIslandRenderer : IslandRenderer {
                 !isSourceCurrent(lyricPackage, lyricVersion, presentationRevision)
             ) return@runOnMain
 
+            val activeTimeMs = LyriconDataBridge.currentPlaybackClock().activeTimeMs
             IslandPresentationCoordinator.snapshotAttachedInjectedHosts(lyricPackage)
                 .forEach { snapshot ->
                     val token = snapshot.host
@@ -256,7 +257,8 @@ object BaseIslandRenderer : IslandRenderer {
                         IslandLyricViewController.synchronizePosition(
                             view,
                             position,
-                            playbackSpeed
+                            playbackSpeed,
+                            activeTimeMs
                         )
                     }
                     IslandContentUpdateCoordinator.updatePlaybackProgressForViews(

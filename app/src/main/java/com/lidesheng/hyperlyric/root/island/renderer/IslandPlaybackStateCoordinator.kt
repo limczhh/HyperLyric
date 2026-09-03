@@ -192,6 +192,7 @@ internal object IslandPlaybackStateCoordinator {
                         token.root,
                         playbackClock.positionMs,
                         playbackClock.playbackSpeed,
+                        playbackClock.activeTimeMs,
                         isPlaying
                     )
                     IslandPresentationCoordinator.refreshInjectedViewIndex(token)
@@ -201,6 +202,7 @@ internal object IslandPlaybackStateCoordinator {
                             view,
                             playbackClock.positionMs,
                             playbackClock.playbackSpeed,
+                            playbackClock.activeTimeMs,
                             isPlaying
                         )
                     }

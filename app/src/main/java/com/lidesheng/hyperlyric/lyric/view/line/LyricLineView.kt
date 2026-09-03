@@ -157,6 +157,8 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private var scrollStarted = false
     private var scrollUnlocked = false
     private var playbackActive = true
+    private var sharedMarqueeClockEnabled = false
+    private var sharedMarqueeActiveTimeMs = 0L
 
     /**
      * Island Real/Fake trees are two presentations of one playback clock. Their hidden tree keeps
@@ -172,6 +174,12 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                 animator.stop()
             }
         }
+
+    internal fun useSharedMarqueeClock(enabled: Boolean) {
+        if (sharedMarqueeClockEnabled == enabled) return
+        sharedMarqueeClockEnabled = enabled
+        if (!enabled) sharedMarqueeActiveTimeMs = 0L
+    }
 
     var isStaticPreview: Boolean = false
         set(value) {
@@ -233,10 +241,14 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
      */
     fun setLyricPreservingScroll(rawLine: LyricLine?, useLineTimeline: Boolean = false) {
         val line = if (rawLine?.text.isNullOrBlank() && !rawLine.isCountdownLine()) null else rawLine
-        val previousModel = _model
         val model = line?.normalize()?.createModel() ?: emptyLyricModel()
         val targetLineTimeline = useLineTimeline && model.isPlainText && !model.isCountdownLine()
         val currentLineTimeline = activeRenderer === lineTimelineRenderer
+
+        if (!sharedMarqueeClockEnabled) {
+            setLyric(rawLine, useLineTimeline)
+            return
+        }
 
         if (targetLineTimeline != currentLineTimeline ||
             (!targetLineTimeline && (!model.isPlainText || activeRenderer !== scrollRenderer))
@@ -260,14 +272,13 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         _model = model
         refreshSizes()
         updateColorsIfReady()
-        scrollRenderer.updateModelPreservingScroll(
-            previousWidth = previousModel.width,
+        scrollRenderer.synchronizeTo(
+            activeTimeMs = sharedMarqueeActiveTimeMs,
             model = _model,
             state = lineState,
             viewWidth = measuredWidth
         )
-        if (playbackActive && scrollUnlocked && _model.width > measuredWidth) {
-            scrollRenderer.resumeIfNeeded()
+        if (playbackActive && scrollUnlocked && scrollRenderer.isPlaying) {
             animator.startIfNeeded()
         }
         requestLayout()
@@ -528,10 +539,16 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     }
 
     /** Applies one canonical media-time sample without carrying local correction error. */
-    internal fun synchronizePosition(posMs: Long, playbackSpeed: Float = 1f) {
+    internal fun synchronizePosition(
+        posMs: Long,
+        playbackSpeed: Float = 1f,
+        activeTimeMs: Long = posMs
+    ) {
         if (isStaticPreview) return
         if (!isWordSync) {
+            sharedMarqueeActiveTimeMs = activeTimeMs.coerceAtLeast(0L)
             if (playbackActive) startScrolling()
+            synchronizeSharedMarquee()
             return
         }
         if (activeRenderer === syncRenderer && syncRenderer.isScrollOnly && !isOverflow) return
@@ -575,10 +592,35 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         if (!isOverflow) return
         post {
             if (!scrollStarted || !playbackActive || isStaticPreview) return@post
-            scrollRenderer.update(_model, lineState, 0, measuredWidth, measuredHeight, 1f)
+            if (sharedMarqueeClockEnabled) {
+                scrollRenderer.synchronizeTo(
+                    activeTimeMs = sharedMarqueeActiveTimeMs,
+                    model = _model,
+                    state = lineState,
+                    viewWidth = measuredWidth
+                )
+            } else {
+                scrollRenderer.update(_model, lineState, 0, measuredWidth, measuredHeight, 1f)
+            }
             animator.stop()
             animator.startIfNeeded()
         }
+    }
+
+    private fun synchronizeSharedMarquee() {
+        if (!sharedMarqueeClockEnabled || !scrollUnlocked || !scrollStarted || !isPlainText) return
+        scrollRenderer.synchronizeTo(
+            activeTimeMs = sharedMarqueeActiveTimeMs,
+            model = _model,
+            state = lineState,
+            viewWidth = measuredWidth
+        )
+        if (playbackActive && scrollRenderer.isPlaying) {
+            animator.startIfNeeded()
+        } else {
+            animator.stop()
+        }
+        if (isShown) invalidate()
     }
 
     private fun canAdvancePlaybackClock(): Boolean {

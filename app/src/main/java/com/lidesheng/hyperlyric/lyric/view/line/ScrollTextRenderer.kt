@@ -49,8 +49,6 @@ internal class ScrollTextRenderer : LineRenderer {
     private var delayRemainingNanos = 0L
     private var currentUnitOffset = 0f
     private var _isAtTail = false
-    private var lastViewWidth = 0
-    private var lastLyricWidth = 0f
     private var cachedBaseline = 0f
     private var cachedViewHeight = -1
 
@@ -60,9 +58,6 @@ internal class ScrollTextRenderer : LineRenderer {
         state: LineState,
         viewWidth: Int
     ): Boolean {
-        lastViewWidth = viewWidth
-        lastLyricWidth = model.width
-
         if (finished) return false
 
         val vw = viewWidth.toFloat()
@@ -200,9 +195,7 @@ internal class ScrollTextRenderer : LineRenderer {
         viewWidth: Int,
         viewHeight: Int
     ) {
-        lastViewWidth = viewWidth
-        lastLyricWidth = model.width
-        startFromBeginning(model, state)
+        startFromBeginning(state)
     }
 
     override fun update(
@@ -213,70 +206,40 @@ internal class ScrollTextRenderer : LineRenderer {
         viewHeight: Int,
         playbackSpeed: Float
     ) {
-        lastViewWidth = viewWidth
-        lastLyricWidth = model.width
-        startFromBeginning(model, state)
+        startFromBeginning(state)
     }
 
-    /**
-     * Updates the text model without restarting an already-running marquee.
-     * Dynamic music-info fields use this path because their text changes while
-     * the marquee itself should keep its current offset and delay.
-     */
-    fun updateModelPreservingScroll(
-        previousWidth: Float,
+    /** Resolves this renderer from the shared island marquee clock instead of local start time. */
+    fun synchronizeTo(
+        activeTimeMs: Long,
         model: LyricModel,
         state: LineState,
         viewWidth: Int
     ) {
-        lastViewWidth = viewWidth
-        val viewWidthFloat = viewWidth.toFloat()
-        val wasOverflow = previousWidth > viewWidthFloat
-        val previousUnit = (previousWidth + ghostSpacing).coerceAtLeast(0f)
-        val progress = if (previousUnit > 0f) {
-            (currentUnitOffset / previousUnit).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-
-        lastLyricWidth = model.width
-        if (model.width <= viewWidthFloat) {
-            state.scrollOffset = 0f
-            state.isScrollFinished = true
-            markFinished(state)
-            return
-        }
-
-        if (!wasOverflow) {
-            isRunning = false
-            isPendingDelay = false
-            finished = false
-            currentRepeat = 0
-            currentUnitOffset = 0f
-            delayRemainingNanos = 0L
-            _isAtTail = false
-        } else {
-            currentUnitOffset = progress * (model.width + ghostSpacing)
-        }
-
-        if (finished) {
-            state.scrollOffset = -currentUnitOffset
-            state.isScrollFinished = true
-            return
-        }
-
-        val unit = model.width + ghostSpacing
-        val newProgress = (currentUnitOffset / unit).coerceIn(0f, 1f)
-        state.scrollOffset = -interpolator.getInterpolation(newProgress) * unit
-        state.isScrollFinished = false
+        val frame = MarqueeTimeline.resolve(
+            elapsedMs = activeTimeMs,
+            lineWidth = model.width,
+            viewWidth = viewWidth,
+            ghostSpacing = ghostSpacing,
+            speedPxPerMs = scrollSpeed,
+            initialDelayMs = initialDelayMs,
+            loopDelayMs = loopDelayMs,
+            repeatCount = repeatCount,
+            stopAtEnd = stopAtEnd,
+            peerLineWidth = peerLineWidth
+        )
+        isRunning = frame.isRunning
+        isPendingDelay = frame.delayRemainingNanos > 0L
+        finished = frame.isFinished
+        currentRepeat = frame.repeat
+        delayRemainingNanos = frame.delayRemainingNanos
+        currentUnitOffset = frame.unitOffset
+        _isAtTail = frame.isAtTail
+        state.scrollOffset = -frame.unitOffset
+        state.isScrollFinished = frame.isFinished
     }
 
-    fun resumeIfNeeded() {
-        if (repeatCount == 0 || finished || isRunning || isPendingDelay) return
-        scheduleDelay(initialDelayMs.toLong())
-    }
-
-    private fun startFromBeginning(model: LyricModel, state: LineState) {
+    private fun startFromBeginning(state: LineState) {
         resetInternal()
         state.reset()
 

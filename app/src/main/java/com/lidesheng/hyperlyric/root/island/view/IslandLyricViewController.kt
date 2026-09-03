@@ -35,10 +35,31 @@ internal object IslandLyricViewController {
         }
     }
 
-    fun synchronizePosition(view: View, position: Long, playbackSpeed: Float = 1f) {
+    fun useSharedMarqueeClock(view: View, enabled: Boolean) {
         when (view) {
-            is RichLyricLineView -> view.synchronizePosition(position, playbackSpeed)
-            is SpaceGateRichLyricLineView -> view.synchronizePosition(position, playbackSpeed)
+            is RichLyricLineView -> view.useSharedMarqueeClock(enabled)
+            is SpaceGateRichLyricLineView -> view.useSharedMarqueeClock(enabled)
+        }
+    }
+
+    fun synchronizePosition(
+        view: View,
+        position: Long,
+        playbackSpeed: Float = 1f,
+        activeTimeMs: Long = position
+    ) {
+        when (view) {
+            is RichLyricLineView -> view.synchronizePosition(
+                position,
+                playbackSpeed,
+                activeTimeMs
+            )
+
+            is SpaceGateRichLyricLineView -> view.synchronizePosition(
+                position,
+                playbackSpeed,
+                activeTimeMs
+            )
         }
     }
 
@@ -46,11 +67,12 @@ internal object IslandLyricViewController {
         view: View,
         position: Long,
         playbackSpeed: Float,
+        activeTimeMs: Long,
         active: Boolean
     ) {
         // Position is anchored before activation/deactivation so every projection starts or
         // freezes from the same canonical media-time sample.
-        synchronizePosition(view, position, playbackSpeed)
+        synchronizePosition(view, position, playbackSpeed, activeTimeMs)
         setPlaybackActive(view, active)
     }
 
@@ -64,10 +86,17 @@ internal object IslandLyricViewController {
         view: View,
         position: Long,
         playbackSpeed: Float,
+        activeTimeMs: Long,
         active: Boolean
     ) {
         visitProjectionViews(view) { projection ->
-            applyPlaybackSnapshot(projection, position, playbackSpeed, active)
+            applyPlaybackSnapshot(
+                projection,
+                position,
+                playbackSpeed,
+                activeTimeMs,
+                active
+            )
         }
     }
 

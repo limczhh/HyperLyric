@@ -50,18 +50,21 @@ object LyriconDataBridge {
      */
     data class PlaybackClockReading(
         val positionMs: Long,
-        val playbackSpeed: Float
+        val playbackSpeed: Float,
+        /** Wall-clock time accumulated only while playback is active. */
+        val activeTimeMs: Long
     )
 
     private data class PlaybackClockSnapshot(
         val positionMs: Long,
         val playbackSpeed: Float,
+        val activeTimeMs: Long,
         val sampledAtUptimeMs: Long,
         val isPlaying: Boolean
     ) {
         fun readAt(uptimeMs: Long): PlaybackClockReading {
             if (!isPlaying) {
-                return PlaybackClockReading(positionMs, playbackSpeed)
+                return PlaybackClockReading(positionMs, playbackSpeed, activeTimeMs)
             }
             val elapsedMs = (uptimeMs - sampledAtUptimeMs).coerceAtLeast(0L)
             val projectedPosition = positionMs.toDouble() +
@@ -70,7 +73,10 @@ object LyriconDataBridge {
                 positionMs = projectedPosition
                     .coerceIn(0.0, Long.MAX_VALUE.toDouble())
                     .toLong(),
-                playbackSpeed = playbackSpeed
+                playbackSpeed = playbackSpeed,
+                activeTimeMs = (activeTimeMs.toDouble() + elapsedMs.toDouble())
+                    .coerceIn(0.0, Long.MAX_VALUE.toDouble())
+                    .toLong()
             )
         }
     }
@@ -79,6 +85,7 @@ object LyriconDataBridge {
     private var playbackClock = PlaybackClockSnapshot(
         positionMs = 0L,
         playbackSpeed = 1f,
+        activeTimeMs = 0L,
         sampledAtUptimeMs = SystemClock.uptimeMillis(),
         isPlaying = false
     )
@@ -113,9 +120,11 @@ object LyriconDataBridge {
     ) {
         synchronized(playbackClockLock) {
             val previous = playbackClock
+            val previousReading = previous.readAt(sampledAtUptimeMs)
             playbackClock = PlaybackClockSnapshot(
                 positionMs = positionMs.coerceAtLeast(0L),
                 playbackSpeed = normalizePlaybackSpeed(playbackSpeed, previous.playbackSpeed),
+                activeTimeMs = previousReading.activeTimeMs,
                 sampledAtUptimeMs = sampledAtUptimeMs,
                 isPlaying = isPlaying
             )
@@ -133,6 +142,7 @@ object LyriconDataBridge {
             playbackClock = PlaybackClockSnapshot(
                 positionMs = reading.positionMs,
                 playbackSpeed = normalizePlaybackSpeed(playbackSpeed, reading.playbackSpeed),
+                activeTimeMs = reading.activeTimeMs,
                 sampledAtUptimeMs = eventUptimeMs,
                 isPlaying = isPlaying
             )
@@ -149,6 +159,7 @@ object LyriconDataBridge {
             playbackClock = PlaybackClockSnapshot(
                 positionMs = positionMs.coerceAtLeast(0L),
                 playbackSpeed = normalizePlaybackSpeed(playbackSpeed, 1f),
+                activeTimeMs = 0L,
                 sampledAtUptimeMs = sampledAtUptimeMs,
                 isPlaying = isPlaying
             )
@@ -440,6 +451,7 @@ object LyriconDataBridge {
             playbackClock = PlaybackClockSnapshot(
                 positionMs = 0L,
                 playbackSpeed = previous.playbackSpeed,
+                activeTimeMs = 0L,
                 sampledAtUptimeMs = sampledAtUptimeMs,
                 isPlaying = previous.isPlaying
             )

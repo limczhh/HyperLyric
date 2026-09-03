@@ -79,7 +79,8 @@ internal object IslandLyricContentAssembler {
                 IslandLyricViewController.synchronizePosition(
                     target,
                     clockAtCommit.positionMs,
-                    clockAtCommit.playbackSpeed
+                    clockAtCommit.playbackSpeed,
+                    clockAtCommit.activeTimeMs
                 )
                 if (config.lyricMarqueeEnabled) {
                     target.post {
@@ -310,6 +311,7 @@ internal object IslandLyricContentAssembler {
             view,
             playbackClock.positionMs,
             playbackClock.playbackSpeed,
+            playbackClock.activeTimeMs,
             playbackActive
         )
     }
