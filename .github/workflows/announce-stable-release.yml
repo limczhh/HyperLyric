@@ -68,7 +68,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --dir release-assets \
             --pattern 'HyperLyric-*.apk' \
-            --pattern 'hyperlyric-*-plugin.zip' \
+            --pattern '*.zip' \
             --clobber
 
           find_one_apk() {
@@ -89,7 +89,7 @@ jobs:
           APK="$(find_one_apk 'HyperLyric-*.apk' HyperLyric)"
           mapfile -t PLUGIN_FILES < <(
             find release-assets -maxdepth 1 -type f \
-              -name 'hyperlyric-*-plugin.zip' \
+              -name '*.zip' \
               -print | sort
           )
           if [[ "${#PLUGIN_FILES[@]}" -eq 0 ]]; then
@@ -141,6 +141,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release-assets/HyperLyric-*.apk
+            release-assets/*.zip
 
       - name: 清理 Release 正文 Clean Release Body
         shell: bash
