@@ -34,9 +34,17 @@ internal object IslandSlotContentFacade {
         mediaInfo: MediaMetadataHelper.MediaInfo = currentMediaInfo(view.context),
         force: Boolean = false
     ) {
+        val usePlainTextLyricClock = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC &&
+                config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
         IslandLyricViewController.useSharedMarqueeClock(
             view,
-            mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO
+            mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO ||
+                    usePlainTextLyricClock,
+            if (usePlainTextLyricClock) {
+                LyriconDataBridge.currentPlainTextMarqueeOriginActiveTimeMs()
+            } else {
+                0L
+            }
         )
         IslandSlotStyleAssembler.configureView(
             view = view,

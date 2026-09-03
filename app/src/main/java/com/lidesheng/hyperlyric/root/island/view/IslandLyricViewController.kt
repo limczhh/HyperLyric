@@ -35,10 +35,17 @@ internal object IslandLyricViewController {
         }
     }
 
-    fun useSharedMarqueeClock(view: View, enabled: Boolean) {
+    fun useSharedMarqueeClock(
+        view: View,
+        enabled: Boolean,
+        originActiveTimeMs: Long = 0L
+    ) {
         when (view) {
-            is RichLyricLineView -> view.useSharedMarqueeClock(enabled)
-            is SpaceGateRichLyricLineView -> view.useSharedMarqueeClock(enabled)
+            is RichLyricLineView -> view.useSharedMarqueeClock(enabled, originActiveTimeMs)
+            is SpaceGateRichLyricLineView -> view.useSharedMarqueeClock(
+                enabled,
+                originActiveTimeMs
+            )
         }
     }
 

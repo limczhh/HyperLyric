@@ -98,6 +98,10 @@ object LyriconDataBridge {
     @Volatile
     var isTextMode: Boolean = false
 
+    /** Active-playback clock origin for the current no-timeline plain-text payload. */
+    @Volatile
+    private var plainTextMarqueeOriginActiveTimeMs: Long = 0L
+
     /**
      * Full-song lyric sources publish this state from [updateSong]. Streaming sources leave it
      * unknown and are considered ready only after a non-empty line or plain-text event arrives.
@@ -170,6 +174,9 @@ object LyriconDataBridge {
         uptimeMs: Long = SystemClock.uptimeMillis()
     ): PlaybackClockReading = playbackClock.readAt(uptimeMs)
 
+    fun currentPlainTextMarqueeOriginActiveTimeMs(): Long =
+        plainTextMarqueeOriginActiveTimeMs
+
     private var timingNavigator: TimingNavigator<TimedLine> = TimingNavigator(emptyArray())
     private var interludeTracker = InterludeTracker(8_000L)
 
@@ -179,6 +186,7 @@ object LyriconDataBridge {
     ) {
         HookLogger.d(TAG, "歌曲变更: ${song?.name}")
         isTextMode = false
+        plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = song?.lyrics?.any(::hasRenderableLine) == true
         currentLyricMediaMetadata = null
         currentSong = song
@@ -205,6 +213,7 @@ object LyriconDataBridge {
     fun refreshSongEvent(): Boolean {
         val song = currentSong ?: return false
         isTextMode = false
+        plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = song.lyrics?.any(::hasRenderableLine) == true
         currentSongName = song.name
         currentLyric = null
@@ -251,6 +260,7 @@ object LyriconDataBridge {
     /** Clear only streaming lyric content after the resolved media identity changes. */
     fun resetLyricContentForMediaChange() {
         isTextMode = false
+        plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
         currentLyric = null
         currentLyricLine = null
@@ -350,6 +360,9 @@ object LyriconDataBridge {
     }
 
     fun updateLyric(text: String?) {
+        if (!isTextMode || currentLyric != text) {
+            plainTextMarqueeOriginActiveTimeMs = currentPlaybackClock().activeTimeMs
+        }
         isTextMode = true
         fullSongLyricsAvailable = null
         currentLyric = text
@@ -367,6 +380,7 @@ object LyriconDataBridge {
 
     fun updateLyricLine(line: IRichLyricLine) {
         isTextMode = false
+        plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
         currentLyricLine = line
         currentNextLyricLine = null
@@ -384,6 +398,7 @@ object LyriconDataBridge {
         resetPlaybackClock()
         currentLyricPackageName = null
         isTextMode = false
+        plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
         timingNavigator = TimingNavigator(emptyArray())
 

@@ -183,9 +183,9 @@ class SpaceGateRichLyricLineView(
         secondary.keepPlaybackClockRunningWhenHidden = enabled
     }
 
-    internal fun useSharedMarqueeClock(enabled: Boolean) {
-        main.useSharedMarqueeClock(enabled)
-        secondary.useSharedMarqueeClock(enabled)
+    internal fun useSharedMarqueeClock(enabled: Boolean, originActiveTimeMs: Long = 0L) {
+        main.useSharedMarqueeClock(enabled, originActiveTimeMs)
+        secondary.useSharedMarqueeClock(enabled, originActiveTimeMs)
     }
 
     fun requestStartMarquee() {

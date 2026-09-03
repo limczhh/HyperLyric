@@ -47,9 +47,20 @@ internal object IslandLyricContentAssembler {
         val translationOnly = TranslationHelper.isTranslationOnly(prefs)
         val targetLineSignature = lineContentSignature(targetLine)
         val signature = "lyric|$targetLineSignature|${config.styleSignature}"
+        val useSharedMarqueeClock = config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
+        val marqueeClockOriginActiveTimeMs = if (useSharedMarqueeClock) {
+            LyriconDataBridge.currentPlainTextMarqueeOriginActiveTimeMs()
+        } else {
+            0L
+        }
         if (!force && IslandSlotContentSignatureCache.get(view) == signature &&
             appliedLineSignature(view) == targetLineSignature
         ) {
+            IslandLyricViewController.useSharedMarqueeClock(
+                view,
+                useSharedMarqueeClock,
+                marqueeClockOriginActiveTimeMs
+            )
             applyPlaybackSnapshot(view, playbackActive, playbackClock)
             return false
         }
@@ -76,6 +87,11 @@ internal object IslandLyricContentAssembler {
                 } else {
                     playbackClock
                 }
+                IslandLyricViewController.useSharedMarqueeClock(
+                    target,
+                    useSharedMarqueeClock,
+                    marqueeClockOriginActiveTimeMs
+                )
                 IslandLyricViewController.synchronizePosition(
                     target,
                     clockAtCommit.positionMs,

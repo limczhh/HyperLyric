@@ -158,6 +158,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private var scrollUnlocked = false
     private var playbackActive = true
     private var sharedMarqueeClockEnabled = false
+    private var sharedMarqueeOriginActiveTimeMs = 0L
     private var sharedMarqueeActiveTimeMs = 0L
 
     /**
@@ -175,10 +176,14 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             }
         }
 
-    internal fun useSharedMarqueeClock(enabled: Boolean) {
-        if (sharedMarqueeClockEnabled == enabled) return
+    internal fun useSharedMarqueeClock(enabled: Boolean, originActiveTimeMs: Long = 0L) {
+        val resolvedOrigin = if (enabled) originActiveTimeMs.coerceAtLeast(0L) else 0L
+        if (sharedMarqueeClockEnabled == enabled &&
+            sharedMarqueeOriginActiveTimeMs == resolvedOrigin
+        ) return
         sharedMarqueeClockEnabled = enabled
-        if (!enabled) sharedMarqueeActiveTimeMs = 0L
+        sharedMarqueeOriginActiveTimeMs = resolvedOrigin
+        sharedMarqueeActiveTimeMs = 0L
     }
 
     var isStaticPreview: Boolean = false
@@ -546,7 +551,9 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     ) {
         if (isStaticPreview) return
         if (!isWordSync) {
-            sharedMarqueeActiveTimeMs = activeTimeMs.coerceAtLeast(0L)
+            sharedMarqueeActiveTimeMs =
+                activeTimeMs.coerceAtLeast(sharedMarqueeOriginActiveTimeMs) -
+                        sharedMarqueeOriginActiveTimeMs
             if (playbackActive) startScrolling()
             synchronizeSharedMarquee()
             return
