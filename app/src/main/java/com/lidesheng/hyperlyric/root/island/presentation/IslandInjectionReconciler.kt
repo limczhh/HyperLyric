@@ -6,6 +6,7 @@ import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.sizing.IslandDynamicWidthCoordinator
 import com.lidesheng.hyperlyric.root.island.structure.IslandSlotStructureInjector
+import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 
 /**
  * The single upper-level entry for Super Island lyric structure, visibility,
@@ -21,12 +22,11 @@ internal object IslandInjectionReconciler {
     sealed interface Target {
         data object RealRoot : Target
         data class RealModule(val moduleType: String?) : Target
-        data object FakeSnapshot : Target
+        data class FakeModule(val moduleType: String?) : Target
     }
 
     enum class StructureMode {
         ENSURE,
-        ENSURE_IF_MISSING,
         RESTORE_EXISTING,
         RESTORE_OR_ENSURE
     }
@@ -34,16 +34,12 @@ internal object IslandInjectionReconciler {
     enum class ContentMode {
         NONE,
         WHEN_LAYOUT_CHANGED,
-        WHEN_RESTORING_EXISTING,
-        ALWAYS,
-        FORCE
+        WHEN_RESTORING_EXISTING
     }
 
     data class ShowOptions(
         val structure: StructureMode,
-        val content: ContentMode,
-        val suppressAnimation: Boolean,
-        val reconfigureExisting: Boolean
+        val content: ContentMode
     )
 
     enum class Outcome {
@@ -73,22 +69,32 @@ internal object IslandInjectionReconciler {
     fun show(
         root: ViewGroup,
         target: Target,
-        options: ShowOptions
+        options: ShowOptions,
+        playbackActive: Boolean
     ): Result {
         val hadInjectedSlots = IslandSlotStructureInjector.hasInjectedLyricText(root)
         val layoutMayHaveChanged = when (target) {
-            Target.RealRoot,
-            Target.FakeSnapshot -> reconcileRootStructure(
+            Target.RealRoot -> reconcileRootStructure(
                 root = root,
                 hadInjectedSlots = hadInjectedSlots,
-                options = options
+                options = options,
+                playbackActive = playbackActive
             )
 
             is Target.RealModule -> reconcileModuleStructure(
                 root = root,
                 moduleType = target.moduleType,
                 hadInjectedSlots = hadInjectedSlots,
-                options = options
+                options = options,
+                playbackActive = playbackActive
+            )
+
+            is Target.FakeModule -> reconcileModuleStructure(
+                root = root,
+                moduleType = target.moduleType,
+                hadInjectedSlots = hadInjectedSlots,
+                options = options,
+                playbackActive = playbackActive
             )
         }
 
@@ -102,7 +108,7 @@ internal object IslandInjectionReconciler {
                     contentWasRefreshed = true
                     IslandLyricContentRefresher.refreshCurrentContent(
                         root,
-                        suppressAnimation = options.suppressAnimation
+                        playbackActive = playbackActive
                     )
                 }
             }
@@ -114,28 +120,11 @@ internal object IslandInjectionReconciler {
                     contentWasRefreshed = true
                     IslandLyricContentRefresher.refreshCurrentContent(
                         root,
-                        force = true,
-                        suppressAnimation = options.suppressAnimation
+                        playbackActive = playbackActive
                     )
                 }
             }
 
-            ContentMode.ALWAYS -> {
-                contentWasRefreshed = true
-                IslandLyricContentRefresher.refreshCurrentContent(
-                    root,
-                    suppressAnimation = options.suppressAnimation
-                )
-            }
-
-            ContentMode.FORCE -> {
-                contentWasRefreshed = true
-                IslandLyricContentRefresher.refreshCurrentContent(
-                    root,
-                    force = true,
-                    suppressAnimation = options.suppressAnimation
-                )
-            }
         }
 
         if (contentWasRefreshed) {
@@ -166,56 +155,13 @@ internal object IslandInjectionReconciler {
         )
     }
 
-    fun prepareFrozenSnapshot(root: ViewGroup, position: Long): Result {
-        return prepareFrozenTransitionHost(
-            root = root,
-            target = Target.FakeSnapshot,
-            position = position
-        )
-    }
-
-    fun prepareFrozenRealHost(root: ViewGroup, position: Long): Result {
-        return prepareFrozenTransitionHost(
-            root = root,
-            target = Target.RealRoot,
-            position = position,
-            content = ContentMode.FORCE
-        )
-    }
-
-    fun restoreFrozenRealHost(root: ViewGroup, position: Long): Result {
-        return prepareFrozenTransitionHost(
-            root = root,
-            target = Target.RealRoot,
-            position = position,
-            content = ContentMode.NONE
-        )
-    }
-
-    private fun prepareFrozenTransitionHost(
-        root: ViewGroup,
-        target: Target,
-        position: Long,
-        content: ContentMode = ContentMode.FORCE
-    ): Result {
-        val result = show(
-            root = root,
-            target = target,
-            options = ShowOptions(
-                structure = StructureMode.RESTORE_OR_ENSURE,
-                content = content,
-                suppressAnimation = true,
-                reconfigureExisting = false
-            )
-        )
-        if (result.injectedSlotsPresent == true) {
-            IslandLyricPlaybackController.freezeInjectedLyricProgress(root, position)
-        }
-        return result
-    }
-
     fun restoreNative(root: ViewGroup, target: Target): Result {
+        // Hidden island projections keep their renderer clock alive by design. Stop the tree and
+        // cancel a delayed content animation before restoring Xiaomi's native children, otherwise
+        // a non-target/recycled holder can continue consuming frames and later commit stale state.
+        IslandLyricViewController.stopRecursively(root)
         val layoutMayHaveChanged = IslandHostFacade.clearInjectedViews(root)
+        IslandViewRegistry.refreshInjectedViews(root)
         val relayoutRequested = target == Target.RealRoot && layoutMayHaveChanged
         if (relayoutRequested) {
             IslandHostFacade.triggerSystemRelayout(root)
@@ -236,26 +182,14 @@ internal object IslandInjectionReconciler {
     private fun reconcileRootStructure(
         root: ViewGroup,
         hadInjectedSlots: Boolean,
-        options: ShowOptions
+        options: ShowOptions,
+        playbackActive: Boolean
     ): Boolean {
         return when (options.structure) {
             StructureMode.ENSURE -> IslandSlotStructureInjector.injectSlots(
                 root,
-                reconfigureExisting = options.reconfigureExisting,
-                suppressAnimation = options.suppressAnimation
+                playbackActive = playbackActive
             )
-
-            StructureMode.ENSURE_IF_MISSING -> {
-                if (IslandSlotStructureInjector.hasAllConfiguredSlots(root)) {
-                    false
-                } else {
-                    IslandSlotStructureInjector.injectSlots(
-                        root,
-                        reconfigureExisting = false,
-                        suppressAnimation = options.suppressAnimation
-                    )
-                }
-            }
 
             StructureMode.RESTORE_EXISTING -> {
                 IslandSlotStructureInjector.restoreExistingSlotsLightweight(root)
@@ -267,8 +201,7 @@ internal object IslandInjectionReconciler {
                 } else {
                     IslandSlotStructureInjector.injectSlots(
                         root,
-                        reconfigureExisting = false,
-                        suppressAnimation = options.suppressAnimation
+                        playbackActive = playbackActive
                     )
                 }
             }
@@ -279,29 +212,17 @@ internal object IslandInjectionReconciler {
         root: ViewGroup,
         moduleType: String?,
         hadInjectedSlots: Boolean,
-        options: ShowOptions
+        options: ShowOptions,
+        playbackActive: Boolean
     ): Boolean {
         return when (options.structure) {
             StructureMode.RESTORE_EXISTING -> {
                 IslandSlotStructureInjector.restoreExistingModuleSlotLightweight(root, moduleType)
             }
 
-            StructureMode.ENSURE_IF_MISSING -> {
-                if (IslandSlotStructureInjector.hasAllConfiguredSlots(root, moduleType)) {
-                    false
-                } else {
-                    IslandSlotStructureInjector.injectSlots(
-                        root,
-                        reconfigureExisting = false,
-                        suppressAnimation = options.suppressAnimation
-                    )
-                }
-            }
-
             StructureMode.ENSURE -> IslandSlotStructureInjector.injectSlots(
                 root,
-                reconfigureExisting = options.reconfigureExisting,
-                suppressAnimation = options.suppressAnimation
+                playbackActive = playbackActive
             )
 
             StructureMode.RESTORE_OR_ENSURE -> {
@@ -310,8 +231,7 @@ internal object IslandInjectionReconciler {
                 } else {
                     IslandSlotStructureInjector.injectSlots(
                         root,
-                        reconfigureExisting = false,
-                        suppressAnimation = options.suppressAnimation
+                        playbackActive = playbackActive
                     )
                 }
             }

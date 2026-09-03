@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root
 
+import android.os.SystemClock
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
@@ -42,6 +43,47 @@ object LyriconDataBridge {
     @Volatile
     var currentPosition: Long = 0L
 
+    /**
+     * Immutable monotonic playback clock shared by every presentation of the current lyric.
+     * [currentPosition] remains the raw source position used for timeline selection; rendering
+     * must use [currentPlaybackClock] so a lifecycle refresh cannot seek back to an old sample.
+     */
+    data class PlaybackClockReading(
+        val positionMs: Long,
+        val playbackSpeed: Float
+    )
+
+    private data class PlaybackClockSnapshot(
+        val positionMs: Long,
+        val playbackSpeed: Float,
+        val sampledAtUptimeMs: Long,
+        val isPlaying: Boolean
+    ) {
+        fun readAt(uptimeMs: Long): PlaybackClockReading {
+            if (!isPlaying) {
+                return PlaybackClockReading(positionMs, playbackSpeed)
+            }
+            val elapsedMs = (uptimeMs - sampledAtUptimeMs).coerceAtLeast(0L)
+            val projectedPosition = positionMs.toDouble() +
+                    elapsedMs.toDouble() * playbackSpeed.toDouble()
+            return PlaybackClockReading(
+                positionMs = projectedPosition
+                    .coerceIn(0.0, Long.MAX_VALUE.toDouble())
+                    .toLong(),
+                playbackSpeed = playbackSpeed
+            )
+        }
+    }
+
+    @Volatile
+    private var playbackClock = PlaybackClockSnapshot(
+        positionMs = 0L,
+        playbackSpeed = 1f,
+        sampledAtUptimeMs = SystemClock.uptimeMillis(),
+        isPlaying = false
+    )
+    private val playbackClockLock = Any()
+
     @Volatile
     var currentLyricPackageName: String? = null
 
@@ -62,6 +104,60 @@ object LyriconDataBridge {
     fun updateLyricPackage(packageName: String?) {
         currentLyricPackageName = packageName
     }
+
+    fun updatePlaybackClock(
+        positionMs: Long,
+        playbackSpeed: Float,
+        isPlaying: Boolean,
+        sampledAtUptimeMs: Long = SystemClock.uptimeMillis()
+    ) {
+        synchronized(playbackClockLock) {
+            val previous = playbackClock
+            playbackClock = PlaybackClockSnapshot(
+                positionMs = positionMs.coerceAtLeast(0L),
+                playbackSpeed = normalizePlaybackSpeed(playbackSpeed, previous.playbackSpeed),
+                sampledAtUptimeMs = sampledAtUptimeMs,
+                isPlaying = isPlaying
+            )
+        }
+    }
+
+    fun updatePlaybackState(
+        isPlaying: Boolean,
+        playbackSpeed: Float,
+        eventUptimeMs: Long = SystemClock.uptimeMillis()
+    ) {
+        synchronized(playbackClockLock) {
+            val previous = playbackClock
+            val reading = previous.readAt(eventUptimeMs)
+            playbackClock = PlaybackClockSnapshot(
+                positionMs = reading.positionMs,
+                playbackSpeed = normalizePlaybackSpeed(playbackSpeed, reading.playbackSpeed),
+                sampledAtUptimeMs = eventUptimeMs,
+                isPlaying = isPlaying
+            )
+        }
+    }
+
+    fun resetPlaybackClock(
+        positionMs: Long = 0L,
+        isPlaying: Boolean = false,
+        playbackSpeed: Float = 1f,
+        sampledAtUptimeMs: Long = SystemClock.uptimeMillis()
+    ) {
+        synchronized(playbackClockLock) {
+            playbackClock = PlaybackClockSnapshot(
+                positionMs = positionMs.coerceAtLeast(0L),
+                playbackSpeed = normalizePlaybackSpeed(playbackSpeed, 1f),
+                sampledAtUptimeMs = sampledAtUptimeMs,
+                isPlaying = isPlaying
+            )
+        }
+    }
+
+    fun currentPlaybackClock(
+        uptimeMs: Long = SystemClock.uptimeMillis()
+    ): PlaybackClockReading = playbackClock.readAt(uptimeMs)
 
     private var timingNavigator: TimingNavigator<TimedLine> = TimingNavigator(emptyArray())
     private var interludeTracker = InterludeTracker(8_000L)
@@ -149,6 +245,7 @@ object LyriconDataBridge {
         currentLyricLine = null
         currentNextLyricLine = null
         currentPosition = 0L
+        resetPlaybackClockPositionPreservingState()
         versionCounter.incrementAndGet()
     }
 
@@ -273,6 +370,7 @@ object LyriconDataBridge {
         currentLyricLine = null
         currentNextLyricLine = null
         currentPosition = 0L
+        resetPlaybackClock()
         currentLyricPackageName = null
         isTextMode = false
         fullSongLyricsAvailable = null
@@ -325,6 +423,26 @@ object LyriconDataBridge {
             RootConstants.PLACEHOLDER_FORMAT_TITLE -> TitleSlot.NAME
             RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN -> TitleSlot.COUNTDOWN
             else -> TitleSlot.NAME_ARTIST
+        }
+    }
+
+    private fun normalizePlaybackSpeed(speed: Float, fallback: Float): Float {
+        return speed.takeIf { it.isFinite() && it in 0.1f..4f }
+            ?: fallback.takeIf { it.isFinite() && it in 0.1f..4f }
+            ?: 1f
+    }
+
+    private fun resetPlaybackClockPositionPreservingState(
+        sampledAtUptimeMs: Long = SystemClock.uptimeMillis()
+    ) {
+        synchronized(playbackClockLock) {
+            val previous = playbackClock
+            playbackClock = PlaybackClockSnapshot(
+                positionMs = 0L,
+                playbackSpeed = previous.playbackSpeed,
+                sampledAtUptimeMs = sampledAtUptimeMs,
+                isPlaying = previous.isPlaying
+            )
         }
     }
 

@@ -23,9 +23,7 @@ internal object IslandLyricContentRefresher {
 
     fun refreshCurrentContent(
         rootView: ViewGroup,
-        includeLyricSlots: Boolean = true,
-        force: Boolean = false,
-        suppressAnimation: Boolean = false
+        playbackActive: Boolean
     ): Boolean {
         val prefs = HookEntry.instance?.prefs ?: run {
             HookLogger.dState(
@@ -42,31 +40,25 @@ internal object IslandLyricContentRefresher {
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(rootView.context, packageName, HookLogger)
 
         var changed = false
-        if (config.leftMode != RootConstants.ISLAND_CONTENT_MODE_NONE &&
-            (includeLyricSlots || config.leftMode != RootConstants.ISLAND_CONTENT_MODE_LYRIC)
-        ) {
+        if (config.leftMode != RootConstants.ISLAND_CONTENT_MODE_NONE) {
             changed = refreshSlotContent(
                 rootView,
                 IslandProbeUtils.LEFT_TEST_VIEW_TAG,
                 config.leftMode,
                 prefs,
                 config,
-                force,
-                suppressAnimation,
+                playbackActive,
                 mediaInfo
             ) || changed
         }
-        if (config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE &&
-            (includeLyricSlots || config.rightMode != RootConstants.ISLAND_CONTENT_MODE_LYRIC)
-        ) {
+        if (config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE) {
             changed = refreshSlotContent(
                 rootView,
                 IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
                 config.rightMode,
                 prefs,
                 config,
-                force,
-                suppressAnimation,
+                playbackActive,
                 mediaInfo
             ) || changed
         }
@@ -81,8 +73,7 @@ internal object IslandLyricContentRefresher {
         mode: Int,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
-        force: Boolean,
-        suppressAnimation: Boolean,
+        playbackActive: Boolean,
         mediaInfo: MediaMetadataHelper.MediaInfo
     ): Boolean {
         val view = rootView.findViewWithTag<android.view.View>(viewTag) ?: run {
@@ -101,8 +92,8 @@ internal object IslandLyricContentRefresher {
             prefs,
             config,
             mode,
-            force = force,
-            suppressAnimation = suppressAnimation,
+            playbackActive = playbackActive,
+            suppressAnimation = true,
             mediaInfo = mediaInfo,
             onLineWillApply = { contentWidthPx ->
                 IslandDynamicWidthCoordinator.prepareLyricWidth(rootView, viewTag, contentWidthPx)

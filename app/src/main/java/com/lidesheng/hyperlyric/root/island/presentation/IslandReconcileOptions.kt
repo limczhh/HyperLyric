@@ -13,37 +13,29 @@ internal object IslandReconcileOptions {
         reason: IslandReconcileReason
     ): IslandInjectionReconciler.ShowOptions {
         return when (reason) {
-            IslandReconcileReason.PRE_SYSTEM_UPDATE,
-            IslandReconcileReason.VISIBILITY_CHANGED ->
+            IslandReconcileReason.PRE_SYSTEM_UPDATE ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.RESTORE_EXISTING,
-                    content = IslandInjectionReconciler.ContentMode.WHEN_LAYOUT_CHANGED,
-                    suppressAnimation = false,
-                    reconfigureExisting = false
-                )
-
-            IslandReconcileReason.FAKE_FINISHED ->
-                IslandInjectionReconciler.ShowOptions(
-                    structure = IslandInjectionReconciler.StructureMode.RESTORE_EXISTING,
-                    content = IslandInjectionReconciler.ContentMode.ALWAYS,
-                    suppressAnimation = false,
-                    reconfigureExisting = false
+                    content = IslandInjectionReconciler.ContentMode.WHEN_LAYOUT_CHANGED
                 )
 
             IslandReconcileReason.SYSTEM_UPDATE_COMPLETE ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.ENSURE,
-                    content = IslandInjectionReconciler.ContentMode.ALWAYS,
-                    suppressAnimation = false,
-                    reconfigureExisting = false
+                    content = IslandInjectionReconciler.ContentMode.WHEN_RESTORING_EXISTING
                 )
 
+            IslandReconcileReason.HOST_ATTACHED ->
+                IslandInjectionReconciler.ShowOptions(
+                    structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
+                    content = IslandInjectionReconciler.ContentMode.WHEN_RESTORING_EXISTING
+                )
+
+            IslandReconcileReason.SETTINGS_CHANGED,
             IslandReconcileReason.STABLE_REFRESH ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.ENSURE,
-                    content = IslandInjectionReconciler.ContentMode.NONE,
-                    suppressAnimation = false,
-                    reconfigureExisting = true
+                    content = IslandInjectionReconciler.ContentMode.NONE
                 )
 
             IslandReconcileReason.LYRIC_SELF_HEAL ->
@@ -52,22 +44,17 @@ internal object IslandReconcileOptions {
                     // the existing wrapper. Tags still exist in that state, so self-heal must
                     // restore visibility instead of treating structure presence as readiness.
                     structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
-                    content = IslandInjectionReconciler.ContentMode.NONE,
-                    suppressAnimation = true,
-                    reconfigureExisting = false
+                    content = IslandInjectionReconciler.ContentMode.NONE
                 )
 
             IslandReconcileReason.PLAYBACK_RESUME ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
-                    content = IslandInjectionReconciler.ContentMode.NONE,
-                    suppressAnimation = true,
-                    reconfigureExisting = false
+                    content = IslandInjectionReconciler.ContentMode.NONE
                 )
 
             IslandReconcileReason.MODULE_FIRST_BIND,
-            IslandReconcileReason.MODULE_UPDATED,
-            IslandReconcileReason.FAKE_SNAPSHOT ->
+            IslandReconcileReason.MODULE_UPDATED ->
                 error("Unsupported real-root reason: $reason")
         }
     }
@@ -79,17 +66,33 @@ internal object IslandReconcileOptions {
             IslandReconcileReason.MODULE_FIRST_BIND ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.ENSURE,
-                    content = IslandInjectionReconciler.ContentMode.WHEN_RESTORING_EXISTING,
-                    suppressAnimation = true,
-                    reconfigureExisting = false
+                    content = IslandInjectionReconciler.ContentMode.WHEN_RESTORING_EXISTING
                 )
 
             IslandReconcileReason.MODULE_UPDATED ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.RESTORE_EXISTING,
-                    content = IslandInjectionReconciler.ContentMode.WHEN_LAYOUT_CHANGED,
-                    suppressAnimation = false,
-                    reconfigureExisting = false
+                    content = IslandInjectionReconciler.ContentMode.WHEN_LAYOUT_CHANGED
+                )
+
+            IslandReconcileReason.HOST_ATTACHED ->
+                IslandInjectionReconciler.ShowOptions(
+                    structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
+                    content = IslandInjectionReconciler.ContentMode.WHEN_RESTORING_EXISTING
+                )
+
+            IslandReconcileReason.SETTINGS_CHANGED,
+            IslandReconcileReason.STABLE_REFRESH ->
+                IslandInjectionReconciler.ShowOptions(
+                    structure = IslandInjectionReconciler.StructureMode.ENSURE,
+                    content = IslandInjectionReconciler.ContentMode.NONE
+                )
+
+            IslandReconcileReason.LYRIC_SELF_HEAL,
+            IslandReconcileReason.PLAYBACK_RESUME ->
+                IslandInjectionReconciler.ShowOptions(
+                    structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
+                    content = IslandInjectionReconciler.ContentMode.NONE
                 )
 
             else -> error("Unsupported module reason: $reason")

@@ -1,7 +1,6 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
 import android.view.ViewGroup
-import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandTextHookerSupport
 import com.lidesheng.hyperlyric.root.island.host.IslandTextHookerSupport.TAG
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
@@ -71,27 +70,6 @@ internal object RealIslandHooker {
                 IslandNativeRefreshCoordinator.onSystemUpdateComplete(contentView)
             }.onFailure { e ->
                 HookLogger.e(TAG, "注入歌词视图失败", e)
-            }
-
-            return result
-        }
-    }
-
-    class LayoutVisibilityHook(
-        private val eventName: String
-    ) : Hooker {
-        override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
-
-            runCatching {
-                val contentView = chain.thisObject as? ViewGroup ?: return@runCatching
-                if (!IslandProbeUtils.isSuperIslandEnabled()) return@runCatching
-                val currentData = IslandProbeUtils.getCurrentIslandData(contentView)
-                val owner = IslandPresentationCoordinator.ownerEvidence(currentData)
-                if (owner !is IslandRenderPolicy.OwnerEvidence.Media) return@runCatching
-                IslandPresentationCoordinator.onRealVisibilityChanged(contentView, owner)
-            }.onFailure { e ->
-                HookLogger.e(TAG, "$eventName 后恢复歌词视图失败", e)
             }
 
             return result

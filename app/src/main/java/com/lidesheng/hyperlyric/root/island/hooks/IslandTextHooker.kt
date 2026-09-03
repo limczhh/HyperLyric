@@ -8,7 +8,8 @@ import io.github.libxposed.api.XposedModule
  * Super Island hook installer.
  *
  * Behavior lives in small hooker groups so the verified real-island, fake-view,
- * adapter/module, and width paths can be reviewed independently.
+ * adapter/module, and width paths can be reviewed independently. The adapter
+ * lifecycle covers both the real and fake module trees.
  */
 internal object IslandTextHooker {
 
@@ -25,8 +26,6 @@ internal object IslandTextHooker {
         "miui.systemui.dynamicisland.anim.DynamicIslandAnimationDelegate"
     private const val EVENT_COORDINATOR_CLASS =
         "miui.systemui.dynamicisland.event.DynamicIslandEventCoordinator"
-    private const val TEMPLATE_BUILDER_CLASS =
-        "miui.systemui.dynamicisland.template.IslandTemplateBuilder"
     private const val ADAPTER_CLASS =
         "miui.systemui.dynamicisland.module.IslandModuleViewHolderAdapter"
 
@@ -46,16 +45,6 @@ internal object IslandTextHooker {
                 module.deoptimize(method)
                 module.hook(method).intercept(RealIslandHooker.UpdateBigIslandViewHook())
             }
-
-            contentViewClass.methods
-                .filter { it.name == "hideIslandLayout" || it.name == "showIslandLayout" }
-                .filter { it.parameterTypes.isEmpty() }
-                .forEach { method ->
-                    module.deoptimize(method)
-                    module.hook(method)
-                        .intercept(RealIslandHooker.LayoutVisibilityHook(method.name))
-                }
-
         }
 
         installFeature("fake view 过渡") {
@@ -77,20 +66,6 @@ internal object IslandTextHooker {
 
         installFeature("应用返回 fake view") {
             val animationDelegateClass = cl.loadClass(ANIMATION_DELEGATE_CLASS)
-            animationDelegateClass.declaredMethods
-                .filter {
-                    it.name == "fakeViewToBigIsland" &&
-                            it.parameterTypes.size == 2 &&
-                            it.parameterTypes[1] == Boolean::class.javaPrimitiveType
-                }
-                .forEach { method ->
-                    method.isAccessible = true
-                    module.deoptimize(method)
-                    module.hook(method).intercept(
-                        FakeIslandTransitionHooker.AppReturnToBigIslandHook()
-                    )
-                }
-
             animationDelegateClass.declaredMethods
                 .filter {
                     it.name == "fakeViewToExpanded" &&
@@ -123,7 +98,7 @@ internal object IslandTextHooker {
 
         }
 
-        installFeature("模块首次绑定") {
+        installFeature("模块首次绑定（真实岛/Fake）") {
             val adapterClass = cl.loadClass(ADAPTER_CLASS)
 
             adapterClass.declaredMethods
@@ -139,15 +114,7 @@ internal object IslandTextHooker {
                 }
         }
 
-        installFeature("模块恢复") {
-            cl.loadClass(TEMPLATE_BUILDER_CLASS).declaredMethods
-                .filter { it.name == "updateModuleView" && it.parameterTypes.size == 3 }
-                .forEach { method ->
-                    method.isAccessible = true
-                    module.deoptimize(method)
-                    module.hook(method).intercept(IslandModuleRestoreHooker.UpdateModuleViewHook())
-                }
-
+        installFeature("模块更新（真实岛/Fake）") {
             cl.loadClass(ADAPTER_CLASS).declaredMethods
                 .filter { it.name == "updateView" && it.parameterTypes.size == 3 }
                 .forEach { method ->

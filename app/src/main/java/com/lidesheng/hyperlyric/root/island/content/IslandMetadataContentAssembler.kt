@@ -6,6 +6,7 @@ import com.lidesheng.hyperlyric.common.MusicInfoLayoutPolicy
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
+import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
@@ -58,7 +59,7 @@ internal object IslandMetadataContentAssembler {
     fun buildConfiguredMusicInfoLines(
         prefs: SharedPreferences,
         mediaInfo: MediaMetadataHelper.MediaInfo,
-        playbackPosition: Long = LyriconDataBridge.currentPosition,
+        playbackPosition: Long = LyriconDataBridge.currentPlaybackClock().positionMs,
         playbackDuration: Long = mediaInfo.duration
     ): ConfiguredMusicInfoLines {
         val songName = resolveSongName(prefs, mediaInfo)
@@ -103,7 +104,7 @@ internal object IslandMetadataContentAssembler {
         mode: Int,
         force: Boolean,
         mediaInfo: MediaMetadataHelper.MediaInfo,
-        playbackPosition: Long = LyriconDataBridge.currentPosition,
+        playbackPosition: Long = LyriconDataBridge.currentPlaybackClock().positionMs,
         playbackDuration: Long = mediaInfo.duration
     ): Boolean {
         val songName = resolveSongName(prefs, mediaInfo)
@@ -188,7 +189,9 @@ internal object IslandMetadataContentAssembler {
             metadataStates[view] = state
         }
 
-        if (!force && IslandSlotContentSignatureCache.get(view) == signature) {
+        if (!force && IslandSlotContentSignatureCache.get(view) == signature &&
+            appliedLine(view) == newLine
+        ) {
             if (previousState?.dynamicSignature != state.dynamicSignature) {
                 applyLine(view, newLine, preserveMarquee = true)
                 applyMarquee(view, marquee)
@@ -465,6 +468,14 @@ internal object IslandMetadataContentAssembler {
             } else {
                 view.line = line
             }
+        }
+    }
+
+    private fun appliedLine(view: View): IRichLyricLine? {
+        return when (view) {
+            is RichLyricLineView -> view.rawLine
+            is SpaceGateRichLyricLineView -> view.rawLine
+            else -> null
         }
     }
 

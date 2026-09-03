@@ -8,6 +8,7 @@ import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
+import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
@@ -20,6 +21,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 internal object IslandSlotContentFacade {
 
     fun invalidate(view: View? = null) {
+        view?.let(IslandLyricViewController::stopRecursively)
         IslandMetadataContentAssembler.invalidate(view)
         IslandSlotStyleAssembler.invalidate(view)
     }
@@ -53,10 +55,11 @@ internal object IslandSlotContentFacade {
         mode: Int,
         lineOverride: IRichLyricLine? = null,
         force: Boolean = false,
-        playbackActive: Boolean = true,
+        playbackActive: Boolean,
         suppressAnimation: Boolean = false,
         mediaInfo: MediaMetadataHelper.MediaInfo = currentMediaInfo(view.context),
-        playbackPosition: Long = LyriconDataBridge.currentPosition,
+        playbackClock: LyriconDataBridge.PlaybackClockReading =
+            LyriconDataBridge.currentPlaybackClock(),
         playbackDuration: Long = mediaInfo.duration,
         onLineWillApply: ((Float) -> Boolean)? = null,
         onLineApplied: (() -> Unit)? = null,
@@ -72,6 +75,7 @@ internal object IslandSlotContentFacade {
                 lineOverride = lineOverride,
                 force = force,
                 playbackActive = playbackActive,
+                playbackClock = playbackClock,
                 suppressAnimation = suppressAnimation,
                 onLineWillApply = onLineWillApply,
                 onLineApplied = onLineApplied,
@@ -85,7 +89,7 @@ internal object IslandSlotContentFacade {
                 mode = mode,
                 force = force,
                 mediaInfo = mediaInfo,
-                playbackPosition = playbackPosition,
+                playbackPosition = playbackClock.positionMs,
                 playbackDuration = playbackDuration
             )
         }
@@ -104,7 +108,7 @@ internal object IslandSlotContentFacade {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         lineOverride: IRichLyricLine?,
-        playbackActive: Boolean = true,
+        playbackActive: Boolean,
         onLineWillApply: ((Float) -> Boolean)? = null,
         onLineApplied: (() -> Unit)? = null,
         onLineCancelled: (() -> Unit)? = null

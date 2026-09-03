@@ -70,7 +70,7 @@ internal object IslandNativeRefreshCoordinator {
             ?: return
 
         var accepted = false
-        IslandPresentationCoordinator.snapshotAttachedHosts(packageName).forEach { token ->
+        IslandPresentationCoordinator.snapshotAttachedRealHosts(packageName).forEach { token ->
             if (!isEligibleHost(token)) return@forEach
 
             val target = resolveTarget(token) ?: return@forEach
@@ -96,9 +96,7 @@ internal object IslandNativeRefreshCoordinator {
     }
 
     private fun isEligibleHost(token: IslandViewRegistry.HostToken): Boolean {
-        if (!IslandPresentationCoordinator.isCurrentHost(token) ||
-            IslandPresentationCoordinator.isHostFrozenForFakeTransition(token)
-        ) {
+        if (!IslandPresentationCoordinator.isCurrentHost(token)) {
             return false
         }
         val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(
@@ -187,7 +185,6 @@ internal object IslandNativeRefreshCoordinator {
         active.settleRunnable?.let(mainHandler::removeCallbacks)
 
         if (!IslandPresentationCoordinator.isCurrentHost(active.token) ||
-            IslandPresentationCoordinator.isHostFrozenForFakeTransition(active.token) ||
             LyriconDataBridge.currentLyricPackageName != active.token.packageName
         ) {
             HookLogger.d(

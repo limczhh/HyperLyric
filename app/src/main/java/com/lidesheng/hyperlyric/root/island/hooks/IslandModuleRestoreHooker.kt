@@ -1,7 +1,6 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
-import com.lidesheng.hyperlyric.root.island.host.IslandTextHookerSupport
 import com.lidesheng.hyperlyric.root.island.host.IslandTextHookerSupport.TAG
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -13,7 +12,8 @@ internal object IslandModuleRestoreHooker {
     /**
      * The first big-island build is asynchronous on newer SystemUI versions.
      * bindData is the first synchronous point after a module holder has been
-     * created, added to the template, initialized, and bound.
+     * created, added to the template, initialized, and bound. The same adapter
+     * lifecycle is used by both the real and fake template trees.
      */
     class AdapterBindDataHook : Hooker {
         override fun intercept(chain: Chain): Any? {
@@ -25,12 +25,16 @@ internal object IslandModuleRestoreHooker {
                 val holderRoot = IslandProbeUtils.getHolderRootView(
                     IslandProbeUtils.getHolder(chain.thisObject, moduleType)
                 ) ?: return@runCatching
-                if (!IslandProbeUtils.isRealBigIslandModuleArea(holderRoot)) return@runCatching
+                val isFake = IslandProbeUtils.isFakeBigIslandModuleArea(holderRoot)
+                if (!isFake && !IslandProbeUtils.isRealBigIslandModuleArea(holderRoot)) {
+                    return@runCatching
+                }
 
                 IslandPresentationCoordinator.onModuleBound(
                     holderRoot = holderRoot,
                     moduleType = moduleType,
-                    owner = IslandPresentationCoordinator.ownerEvidence(data)
+                    owner = IslandPresentationCoordinator.ownerEvidence(data),
+                    isFake = isFake
                 )
             }.onFailure { e ->
                 HookLogger.e(TAG, "adapter.bindData 后准备歌词视图失败", e)
@@ -50,11 +54,15 @@ internal object IslandModuleRestoreHooker {
                 val holderRoot = IslandProbeUtils.getHolderRootView(
                     IslandProbeUtils.getHolder(chain.thisObject, moduleType)
                 ) ?: return@runCatching
-                if (!IslandProbeUtils.isRealBigIslandModuleArea(holderRoot)) return@runCatching
+                val isFake = IslandProbeUtils.isFakeBigIslandModuleArea(holderRoot)
+                if (!isFake && !IslandProbeUtils.isRealBigIslandModuleArea(holderRoot)) {
+                    return@runCatching
+                }
                 IslandPresentationCoordinator.onModuleUpdated(
                     holderRoot = holderRoot,
                     moduleType = moduleType,
-                    owner = IslandPresentationCoordinator.ownerEvidence(data)
+                    owner = IslandPresentationCoordinator.ownerEvidence(data),
+                    isFake = isFake
                 )
             }.onFailure { e ->
                 HookLogger.e(TAG, "adapter.updateView 后恢复歌词视图失败", e)
@@ -64,29 +72,4 @@ internal object IslandModuleRestoreHooker {
         }
     }
 
-    class UpdateModuleViewHook : Hooker {
-        override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
-
-            runCatching {
-                val moduleType = chain.args.getOrNull(0) as? String
-                val data = chain.args.getOrNull(2)
-                val adapter =
-                    IslandTextHookerSupport.findFieldValue(chain.thisObject, "islandAdapter")
-                val holderRoot = IslandProbeUtils.getHolderRootView(
-                    IslandProbeUtils.getHolder(adapter, moduleType)
-                ) ?: return@runCatching
-                if (!IslandProbeUtils.isRealBigIslandModuleArea(holderRoot)) return@runCatching
-                IslandPresentationCoordinator.onModuleUpdated(
-                    holderRoot = holderRoot,
-                    moduleType = moduleType,
-                    owner = IslandPresentationCoordinator.ownerEvidence(data)
-                )
-            }.onFailure { e ->
-                HookLogger.e(TAG, "updateModuleView 后恢复歌词视图失败", e)
-            }
-
-            return result
-        }
-    }
 }

@@ -1,5 +1,7 @@
 package com.lidesheng.hyperlyric.root.island.sizing
 
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
@@ -22,12 +24,14 @@ import java.util.WeakHashMap
  * the SystemUI host to relayout after a wrapper width changes.
  */
 internal object IslandDynamicWidthCoordinator {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val refreshPending = WeakHashMap<ViewGroup, Boolean>()
     private val relayoutPending = WeakHashMap<ViewGroup, Boolean>()
     private val preflightTargets = WeakHashMap<ViewGroup, MutableMap<String, Float>>()
     private val metadataContentWidths = WeakHashMap<ViewGroup, MutableMap<String, Float>>()
 
     fun requestRefresh(rootView: ViewGroup) {
+        val hostToken = IslandViewRegistry.tokenFor(rootView) ?: return
         val shouldPost = synchronized(refreshPending) {
             if (refreshPending[rootView] == true) {
                 false
@@ -38,22 +42,19 @@ internal object IslandDynamicWidthCoordinator {
         }
         if (!shouldPost) return
 
-        val posted = rootView.post {
+        mainHandler.post {
             synchronized(refreshPending) {
                 refreshPending.remove(rootView)
             }
-            if (IslandViewRegistry.tokenFor(rootView) == null) return@post
+            if (!rootView.isAttachedToWindow ||
+                !IslandPresentationCoordinator.isCurrentHost(hostToken)
+            ) return@post
             if (!IslandPresentationCoordinator.isPlaybackActive()) return@post
             val prefs = HookEntry.instance?.prefs ?: return@post
             val config = IslandSlotRuntimeConfig.from(prefs)
             if (!config.geometry.isDynamicWidth) return@post
             if (refreshDynamicSlotWidths(rootView, config)) {
-                scheduleSystemRelayout(rootView)
-            }
-        }
-        if (!posted) {
-            synchronized(refreshPending) {
-                refreshPending.remove(rootView)
+                scheduleSystemRelayout(rootView, hostToken)
             }
         }
     }
@@ -73,7 +74,10 @@ internal object IslandDynamicWidthCoordinator {
             config.modeForTag(viewTag) != RootConstants.ISLAND_CONTENT_MODE_LYRIC
         ) return false
         if (!IslandPresentationCoordinator.isPlaybackActive()) return false
-        if (IslandViewRegistry.tokenFor(rootView) == null) return false
+        val hostToken = IslandViewRegistry.tokenFor(rootView) ?: return false
+        if (!rootView.isAttachedToWindow ||
+            !IslandPresentationCoordinator.isCurrentHost(hostToken)
+        ) return false
 
         val overrides = synchronized(preflightTargets) {
             val rootTargets = preflightTargets.getOrPut(rootView) { hashMapOf() }
@@ -82,7 +86,7 @@ internal object IslandDynamicWidthCoordinator {
         }
         val changed = refreshDynamicSlotWidths(rootView, config, overrides)
         if (changed) {
-            scheduleSystemRelayout(rootView)
+            scheduleSystemRelayout(rootView, hostToken)
         }
         return changed
     }
@@ -253,7 +257,10 @@ internal object IslandDynamicWidthCoordinator {
         return true
     }
 
-    private fun scheduleSystemRelayout(rootView: ViewGroup) {
+    private fun scheduleSystemRelayout(
+        rootView: ViewGroup,
+        hostToken: IslandViewRegistry.HostToken
+    ) {
         val shouldPost = synchronized(relayoutPending) {
             if (relayoutPending[rootView] == true) {
                 false
@@ -264,22 +271,27 @@ internal object IslandDynamicWidthCoordinator {
         }
         if (!shouldPost) return
 
-        val posted = rootView.post {
+        mainHandler.post {
             try {
-                if (IslandViewRegistry.tokenFor(rootView) != null &&
-                    IslandPresentationCoordinator.isPlaybackActive()
-                ) {
-                    IslandHostFacade.triggerSystemRelayout(rootView)
+                if (!rootView.isAttachedToWindow ||
+                    !IslandPresentationCoordinator.isCurrentHost(hostToken)
+                ) return@post
+                when (hostToken.kind) {
+                    IslandViewRegistry.HostKind.REAL -> {
+                        if (!IslandPresentationCoordinator.isPlaybackActive()) return@post
+                        IslandHostFacade.triggerSystemRelayout(rootView)
+                    }
+
+                    IslandViewRegistry.HostKind.FAKE -> {
+                        // Fake is owned by Xiaomi's animation tree. Its local wrapper must be
+                        // measured, but it must not trigger the real window relayout protocol.
+                        rootView.requestLayout()
+                    }
                 }
             } finally {
                 synchronized(relayoutPending) {
                     relayoutPending.remove(rootView)
                 }
-            }
-        }
-        if (!posted) {
-            synchronized(relayoutPending) {
-                relayoutPending.remove(rootView)
             }
         }
     }

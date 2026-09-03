@@ -1,7 +1,6 @@
 package com.lidesheng.hyperlyric.root.island.host
 
 import android.content.SharedPreferences
-import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
@@ -80,18 +79,6 @@ internal object IslandHostFacade {
 
     fun triggerSystemRelayout(rootView: ViewGroup) {
         IslandViewHelper.triggerSystemRelayout(rootView)
-    }
-
-    fun showFrozenSnapshot(rootView: ViewGroup) {
-        rootView.alpha = 1f
-    }
-
-    fun showRealHost(rootView: ViewGroup) {
-        rootView.visibility = View.VISIBLE
-        (IslandTextHookerSupport.callNoArgMethodResult(
-            rootView,
-            "getBackgroundView"
-        ) as? View)?.visibility = View.VISIBLE
     }
 
     fun updateHostGlow(rootView: ViewGroup, prefs: SharedPreferences) {

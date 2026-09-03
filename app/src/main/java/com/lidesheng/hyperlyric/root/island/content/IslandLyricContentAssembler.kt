@@ -16,6 +16,7 @@ import com.lidesheng.hyperlyric.lyric.view.yoyo.animateUpdate
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 
@@ -28,6 +29,7 @@ internal object IslandLyricContentAssembler {
         lineOverride: IRichLyricLine?,
         force: Boolean,
         playbackActive: Boolean,
+        playbackClock: LyriconDataBridge.PlaybackClockReading,
         suppressAnimation: Boolean,
         onLineWillApply: ((Float) -> Boolean)?,
         onLineApplied: (() -> Unit)?,
@@ -43,41 +45,75 @@ internal object IslandLyricContentAssembler {
         val disableAll = TranslationHelper.isTranslationDisabled(prefs) ||
                 nextLinePreviewEnabledForView
         val translationOnly = TranslationHelper.isTranslationOnly(prefs)
-        val signature = "lyric|${lineContentSignature(targetLine)}|${config.styleSignature}"
-        if (!force && IslandSlotContentSignatureCache.get(view) == signature) {
-            applyPlaybackActive(view, playbackActive)
+        val targetLineSignature = lineContentSignature(targetLine)
+        val signature = "lyric|$targetLineSignature|${config.styleSignature}"
+        if (!force && IslandSlotContentSignatureCache.get(view) == signature &&
+            appliedLineSignature(view) == targetLineSignature
+        ) {
+            applyPlaybackSnapshot(view, playbackActive, playbackClock)
             return false
         }
 
+        val suppressContentAnimation = suppressAnimation || nextLinePreviewEnabledForView ||
+                view.parent == null || !view.isAttachedToWindow
+        val shouldAnimate = config.lyricAnimationEnabled && !suppressContentAnimation
         val applyLine: (View) -> Unit = { target ->
+            // A non-animated creation/restoration owns the initial active state. Once a View is
+            // live, playback callbacks remain authoritative; delayed line commits must never
+            // replay a state captured before their animation or width preflight.
+            if (!shouldAnimate) {
+                IslandLyricViewController.setPlaybackActive(target, playbackActive)
+            }
+
+            var lineSubmissionInProgress = true
+            val onCommitted: () -> Unit = {
+                // Dynamic-width preflight and next-line promotion can both defer the real line
+                // commit even when the outer content animation is disabled. Anchor media time
+                // only after the renderer has accepted the new line, otherwise the seek applies
+                // to the old renderer and the new renderer draws one stale frame.
+                val clockAtCommit = if (shouldAnimate || !lineSubmissionInProgress) {
+                    LyriconDataBridge.currentPlaybackClock()
+                } else {
+                    playbackClock
+                }
+                IslandLyricViewController.synchronizePosition(
+                    target,
+                    clockAtCommit.positionMs,
+                    clockAtCommit.playbackSpeed
+                )
+                if (config.lyricMarqueeEnabled) {
+                    target.post {
+                        when (target) {
+                            is RichLyricLineView -> target.requestStartMarquee()
+                            is SpaceGateRichLyricLineView -> target.requestStartMarquee()
+                        }
+                    }
+                }
+                onLineApplied?.invoke()
+            }
             when (target) {
                 is RichLyricLineView -> {
                     target.setLineWithCallbacks(
                         targetLine,
                         onMainLineWillApply = onLineWillApply,
-                        onMainLineApplied = onLineApplied,
+                        onMainLineApplied = onCommitted,
                         onMainLineCancelled = onLineCancelled
                     )
-                    target.setPlaybackActive(playbackActive)
-                    if (config.lyricMarqueeEnabled) target.post { target.requestStartMarquee() }
                 }
 
                 is SpaceGateRichLyricLineView -> {
                     target.setLineWithCallbacks(
                         targetLine,
                         onMainLineWillApply = onLineWillApply,
-                        onMainLineApplied = onLineApplied,
+                        onMainLineApplied = onCommitted,
                         onMainLineCancelled = onLineCancelled
                     )
-                    target.setPlaybackActive(playbackActive)
-                    if (config.lyricMarqueeEnabled) target.post { target.requestStartMarquee() }
                 }
             }
+            lineSubmissionInProgress = false
         }
 
-        val suppressContentAnimation = suppressAnimation || nextLinePreviewEnabledForView ||
-                view.parent == null || !view.isAttachedToWindow
-        if (config.lyricAnimationEnabled && !suppressContentAnimation) {
+        if (shouldAnimate) {
             val preset = YoYoPresets.getById(config.lyricAnimationId) ?: YoYoPresets.Default
             when (view) {
                 is RichLyricLineView -> view.animateUpdate(preset) { applyLine(this) }
@@ -89,7 +125,7 @@ internal object IslandLyricContentAssembler {
         }
         IslandSlotContentSignatureCache.set(view, signature)
         val viewKey = view.tag?.toString() ?: view.javaClass.simpleName
-        val animated = config.lyricAnimationEnabled && !suppressContentAnimation
+        val animated = shouldAnimate
         val linePresent = targetLine != null
         val secondaryPresent = !targetLine?.secondary.isNullOrBlank()
         val translationPresent = !targetLine?.translation.isNullOrBlank()
@@ -123,7 +159,9 @@ internal object IslandLyricContentAssembler {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         lineOverride: IRichLyricLine?,
-        playbackActive: Boolean = true,
+        playbackActive: Boolean,
+        playbackClock: LyriconDataBridge.PlaybackClockReading =
+            LyriconDataBridge.currentPlaybackClock(),
         onLineWillApply: ((Float) -> Boolean)? = null,
         onLineApplied: (() -> Unit)? = null,
         onLineCancelled: (() -> Unit)? = null
@@ -134,6 +172,7 @@ internal object IslandLyricContentAssembler {
         lineOverride = lineOverride,
         force = false,
         playbackActive = playbackActive,
+        playbackClock = playbackClock,
         suppressAnimation = false,
         onLineWillApply = onLineWillApply,
         onLineApplied = onLineApplied,
@@ -262,11 +301,17 @@ internal object IslandLyricContentAssembler {
         return true
     }
 
-    private fun applyPlaybackActive(view: View, playbackActive: Boolean) {
-        when (view) {
-            is RichLyricLineView -> view.setPlaybackActive(playbackActive)
-            is SpaceGateRichLyricLineView -> view.setPlaybackActive(playbackActive)
-        }
+    private fun applyPlaybackSnapshot(
+        view: View,
+        playbackActive: Boolean,
+        playbackClock: LyriconDataBridge.PlaybackClockReading
+    ) {
+        IslandLyricViewController.applyPlaybackSnapshot(
+            view,
+            playbackClock.positionMs,
+            playbackClock.playbackSpeed,
+            playbackActive
+        )
     }
 
     private fun lineContentSignature(line: IRichLyricLine?): Int {
@@ -285,6 +330,15 @@ internal object IslandLyricContentAssembler {
             line.isAlignedRight,
             line.metadata
         ).hashCode()
+    }
+
+    private fun appliedLineSignature(view: View): Int? {
+        val line = when (view) {
+            is RichLyricLineView -> view.rawLine
+            is SpaceGateRichLyricLineView -> view.rawLine
+            else -> return null
+        }
+        return lineContentSignature(line)
     }
 
     private fun IRichLyricLine.withNextLinePreview(nextLine: IRichLyricLine?): IRichLyricLine {

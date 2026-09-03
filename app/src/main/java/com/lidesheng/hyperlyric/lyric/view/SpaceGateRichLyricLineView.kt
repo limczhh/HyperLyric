@@ -17,6 +17,7 @@ import androidx.core.graphics.withScale
 import androidx.core.view.forEach
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.line.SpaceGateLyricLineView
+import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
 
 @SuppressLint("ViewConstructor")
 class SpaceGateRichLyricLineView(
@@ -41,13 +42,9 @@ class SpaceGateRichLyricLineView(
     )
     private var displayLineByLine = false
 
-    private var animationTransition = false
-    private var pendingLine: IRichLyricLine? = null
     private var pendingMainLineWillApply: ((Float) -> Boolean)? = null
     private var pendingMainLineApplied: (() -> Unit)? = null
     private var pendingMainLineCancelled: (() -> Unit)? = null
-    private var pendingPosition: Long? = null
-    private var pendingPlaybackSpeed = 1f
     private var requestMarquee = false
     private var lastPosition: Long = Long.MIN_VALUE
     private var lastPlaybackSpeed = Float.NaN
@@ -101,11 +98,7 @@ class SpaceGateRichLyricLineView(
             lastPlaybackSpeed = Float.NaN
             requestMarquee = false
         }
-        if (animationTransition) {
-            pendingLine = value
-        } else {
-            refreshLines(preserveMarquee = preserveMarquee)
-        }
+        refreshLines(preserveMarquee = preserveMarquee)
     }
 
     init {
@@ -132,32 +125,12 @@ class SpaceGateRichLyricLineView(
         cancelNextLinePromotion()
         line = null
         renderScale = 1.0f
-        animationTransition = false
-        pendingLine = null
-        pendingPosition = null
-        pendingPlaybackSpeed = 1f
         lastPosition = Long.MIN_VALUE
         lastPlaybackSpeed = Float.NaN
         currentMainText = null
         secondaryIsNextLinePreview = false
         alwaysShowSecondary = false
         refreshLines()
-    }
-
-    fun beginAnimationTransition() {
-        cancelNextLinePromotion()
-        animationTransition = true
-    }
-
-    fun endAnimationTransition() {
-        animationTransition = false
-        if (pendingLine != null) {
-            refreshLines()
-            pendingPosition?.let { setPosition(it, pendingPlaybackSpeed) }
-        }
-        pendingLine = null
-        pendingPosition = null
-        pendingPlaybackSpeed = 1f
     }
 
     fun setTransitionConfig(config: String?) {
@@ -167,11 +140,6 @@ class SpaceGateRichLyricLineView(
     fun notifyLineChanged() = refreshLines()
 
     fun seekTo(position: Long) {
-        if (animationTransition) {
-            pendingPosition = position
-            pendingPlaybackSpeed = 1f
-            return
-        }
         main.seekTo(position)
         secondary.seekTo(position)
     }
@@ -182,11 +150,6 @@ class SpaceGateRichLyricLineView(
         } else {
             1f
         }
-        if (animationTransition) {
-            pendingPosition = position
-            pendingPlaybackSpeed = resolvedSpeed
-            return
-        }
         if (lastPosition == position && lastPlaybackSpeed == resolvedSpeed) return
         lastPosition = position
         lastPlaybackSpeed = resolvedSpeed
@@ -194,9 +157,26 @@ class SpaceGateRichLyricLineView(
         secondary.updatePosition(position, resolvedSpeed)
     }
 
+    internal fun synchronizePosition(position: Long, playbackSpeed: Float = 1f) {
+        val resolvedSpeed = if (playbackSpeed.isFinite() && playbackSpeed > 0f) {
+            playbackSpeed
+        } else {
+            1f
+        }
+        lastPosition = position
+        lastPlaybackSpeed = resolvedSpeed
+        main.synchronizePosition(position, resolvedSpeed)
+        secondary.synchronizePosition(position, resolvedSpeed)
+    }
+
     fun setPlaybackActive(active: Boolean) {
         main.setPlaybackActive(active)
         secondary.setPlaybackActive(active)
+    }
+
+    internal fun keepPlaybackClockRunningWhenHidden(enabled: Boolean) {
+        main.keepPlaybackClockRunningWhenHidden = enabled
+        secondary.keepPlaybackClockRunningWhenHidden = enabled
     }
 
     fun requestStartMarquee() {
@@ -307,6 +287,7 @@ class SpaceGateRichLyricLineView(
     }
 
     override fun onDetachedFromWindow() {
+        YoYoAnimation.cancelAnimation(this)
         super.onDetachedFromWindow()
         reset()
     }

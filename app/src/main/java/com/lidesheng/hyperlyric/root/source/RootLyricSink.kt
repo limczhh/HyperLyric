@@ -142,6 +142,12 @@ class RootLyricSink(
             return
         }
 
+        // A different song must never inherit the previous song's extrapolated renderer clock.
+        // The first position callback will replace this zero anchor with the source sample.
+        LyriconDataBridge.resetPlaybackClock(
+            isPlaying = playbackActive,
+            playbackSpeed = currentPlaybackSpeed
+        )
         pendingRepeatedSourceSong = null
         cancelPendingPluginStart()
         invalidatePluginRequest(reason = if (song == null) "song_cleared" else "song_changed")
@@ -447,6 +453,10 @@ class RootLyricSink(
     override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float) {
         playbackActive = isPlaying
         explicitPlaybackSpeed(playbackSpeed)?.let { currentPlaybackSpeed = it }
+        LyriconDataBridge.updatePlaybackState(
+            isPlaying = isPlaying,
+            playbackSpeed = currentPlaybackSpeed
+        )
         if (!isPlaying) cancelPendingPositionDispatch()
         if (isPlaying) {
             handleColorBindingUpdate(
@@ -467,6 +477,12 @@ class RootLyricSink(
         lastReceivedPosition = position
         lastReceivedPositionTimeMs = now
         lastReceivedPlaybackSpeed = resolvedSpeed
+        LyriconDataBridge.updatePlaybackClock(
+            positionMs = position,
+            playbackSpeed = resolvedSpeed,
+            isPlaying = playbackActive,
+            sampledAtUptimeMs = now
+        )
         val lyricChanged = LyriconDataBridge.updatePosition(position)
         if (lyricChanged) {
             renderer.updateLyricLine()
@@ -507,7 +523,8 @@ class RootLyricSink(
         lastDispatchedPosition = sample.position
         lastDispatchedPlaybackSpeed = sample.playbackSpeed
         pendingPosition = null
-        renderer.updatePosition(sample.position, sample.playbackSpeed)
+        val playbackClock = LyriconDataBridge.currentPlaybackClock(now)
+        renderer.updatePosition(playbackClock.positionMs, playbackClock.playbackSpeed)
     }
 
     private fun cancelPendingPositionDispatch() {

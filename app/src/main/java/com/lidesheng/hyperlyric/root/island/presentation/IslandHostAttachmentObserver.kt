@@ -6,10 +6,11 @@ import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import java.util.WeakHashMap
 
 /**
- * Observes real Super Island host attachment without owning presentation policy.
+ * Observes registered Super Island projection attachment without owning presentation policy.
  *
- * The callback is posted after attachment, matching the previous coordinator timing so the host
- * can finish its native attach/layout work before stable reconciliation runs.
+ * Reconciliation runs synchronously from the attach callback. Android has completed the host's
+ * own onAttachedToWindow() at this point but has not drawn the newly attached projection yet, so
+ * current content and media time can be committed without exposing one stale/empty frame.
  */
 internal class IslandHostAttachmentObserver(
     private val currentPresentationRevision: () -> Long,
@@ -26,9 +27,7 @@ internal class IslandHostAttachmentObserver(
                     val attachedRoot = view as? ViewGroup ?: return
                     val token = IslandViewRegistry.markAttached(attachedRoot) ?: return
                     val expectedRevision = currentPresentationRevision()
-                    attachedRoot.post {
-                        onHostAttached(token, expectedRevision)
-                    }
+                    onHostAttached(token, expectedRevision)
                 }
 
                 override fun onViewDetachedFromWindow(view: View) {

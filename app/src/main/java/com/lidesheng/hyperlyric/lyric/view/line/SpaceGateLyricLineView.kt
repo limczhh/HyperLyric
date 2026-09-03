@@ -189,6 +189,18 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
     private var scrollUnlocked = false
     private var playbackActive = true
 
+    /** See [LyricLineView.keepPlaybackClockRunningWhenHidden]. */
+    internal var keepPlaybackClockRunningWhenHidden: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (playbackActive && canAdvancePlaybackClock()) {
+                resumePlaybackAnimation()
+            } else if (!isShown) {
+                animator.stop()
+            }
+        }
+
     var isStaticPreview: Boolean = false
         set(value) {
             if (field == value) return
@@ -604,6 +616,40 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         }
     }
 
+    /** Applies one canonical media-time sample without carrying local correction error. */
+    internal fun synchronizePosition(posMs: Long, playbackSpeed: Float = 1f) {
+        if (isStaticPreview) return
+        if (!isRightSide && spaceGateEnabled) return
+        if (!isWordSync) {
+            if (playbackActive) startScrolling()
+            return
+        }
+        if (activeRenderer === syncRenderer && syncRenderer.isScrollOnly && !isOverflow) return
+        if (activeRenderer === lineTimelineRenderer && !isOverflow) return
+
+        val virtualWidth = getSpaceGateVirtualWidth()
+        activeRenderer.seek(_model, lineState, posMs, virtualWidth, measuredHeight)
+        if (playbackActive) {
+            activeRenderer.update(
+                _model,
+                lineState,
+                posMs,
+                virtualWidth,
+                measuredHeight,
+                playbackSpeed
+            )
+            if (activeRenderer.isPlaying && !activeRenderer.isFinished) {
+                animator.startIfNeeded()
+            }
+        } else {
+            animator.stop()
+        }
+        if (isShown) {
+            invalidate()
+            siblingView?.takeIf { it.isShown }?.invalidate()
+        }
+    }
+
     override fun getLeftFadingEdgeStrength(): Float {
         val vw = getSpaceGateVirtualWidth()
         if (lineWidth <= vw || horizontalFadingEdgeLength <= 0) return 0f
@@ -652,10 +698,17 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        if (isVisible && playbackActive) {
+        if (playbackActive && (isVisible || keepPlaybackClockRunningWhenHidden)) {
             resumePlaybackAnimation()
         } else {
             animator.stop()
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (playbackActive && canAdvancePlaybackClock()) {
+            resumePlaybackAnimation()
         }
     }
 
@@ -671,6 +724,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         lineState.reset()
         if (!isOverflow) return
         post {
+            if (!scrollStarted || !playbackActive || isStaticPreview) return@post
             scrollRenderer.update(
                 _model,
                 lineState,
@@ -682,6 +736,10 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
             animator.stop()
             animator.startIfNeeded()
         }
+    }
+
+    private fun canAdvancePlaybackClock(): Boolean {
+        return isAttachedToWindow && (isShown || keepPlaybackClockRunningWhenHidden)
     }
 
     private fun updateColorsIfReady() {
@@ -749,10 +807,10 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
         fun startIfNeeded() {
             if (!isRightSide && spaceGateEnabled) return // Slave doesn't run frame callback
-            if (playbackActive && !running && isAttachedToWindow && isShown) {
+            if (playbackActive && !running && canAdvancePlaybackClock()) {
                 running = true
                 lastFrameNanos = 0L
-                post { Choreographer.getInstance().postFrameCallback(this) }
+                Choreographer.getInstance().postFrameCallback(this)
             }
         }
 
@@ -763,7 +821,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         }
 
         override fun doFrame(frameTimeNanos: Long) {
-            if (!running || !playbackActive || !isAttachedToWindow || !isShown) {
+            if (!running || !playbackActive || !canAdvancePlaybackClock()) {
                 running = false
                 return
             }
@@ -774,9 +832,9 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
             val renderer = activeRenderer
             val changed = renderer.step(deltaNanos, _model, lineState, virtualWidth)
-            if (changed) {
+            if (changed && isShown) {
                 postInvalidateOnAnimation()
-                siblingView?.postInvalidateOnAnimation()
+                siblingView?.takeIf { it.isShown }?.postInvalidateOnAnimation()
             }
 
             if (running && renderer.isPlaying) {

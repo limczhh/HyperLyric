@@ -14,6 +14,7 @@ import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.sizing.IslandDynamicWidthCoordinator
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
@@ -38,12 +39,15 @@ internal object IslandContentUpdateCoordinator {
         packageName: String,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
-        playbackActive: Boolean
+        playbackActive: Boolean,
+        hostKind: IslandViewRegistry.HostKind
     ) {
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(view.context, packageName, HookLogger)
         prepareSharedCoverPalette(packageName, mediaInfo, prefs)
-        IslandHostFacade.updateHostGlow(view, prefs)
-        IslandHostFacade.updateProgressGlow(view, packageName, mediaInfo, prefs)
+        if (hostKind == IslandViewRegistry.HostKind.REAL) {
+            IslandHostFacade.updateHostGlow(view, prefs)
+            IslandHostFacade.updateProgressGlow(view, packageName, mediaInfo, prefs)
+        }
         val leftChanged = updateSlot(
             view,
             IslandProbeUtils.LEFT_TEST_VIEW_TAG,
@@ -69,7 +73,9 @@ internal object IslandContentUpdateCoordinator {
         ) {
             IslandDynamicWidthCoordinator.requestRefresh(view)
         }
-        IslandMusicWaveColorHooker.refresh()
+        if (hostKind == IslandViewRegistry.HostKind.REAL) {
+            IslandMusicWaveColorHooker.refresh()
+        }
     }
 
     /**
@@ -82,12 +88,15 @@ internal object IslandContentUpdateCoordinator {
         packageName: String,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
-        playbackActive: Boolean
+        playbackActive: Boolean,
+        hostKind: IslandViewRegistry.HostKind
     ) {
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(view.context, packageName, HookLogger)
         prepareSharedCoverPalette(packageName, mediaInfo, prefs)
-        IslandHostFacade.updateHostGlow(view, prefs)
-        IslandHostFacade.updateProgressGlow(view, packageName, mediaInfo, prefs)
+        if (hostKind == IslandViewRegistry.HostKind.REAL) {
+            IslandHostFacade.updateHostGlow(view, prefs)
+            IslandHostFacade.updateProgressGlow(view, packageName, mediaInfo, prefs)
+        }
         val leftChanged = updateMetadataSlot(
             view = view,
             tag = IslandProbeUtils.LEFT_TEST_VIEW_TAG,
@@ -113,7 +122,9 @@ internal object IslandContentUpdateCoordinator {
         ) {
             IslandDynamicWidthCoordinator.requestRefresh(view)
         }
-        IslandMusicWaveColorHooker.refresh()
+        if (hostKind == IslandViewRegistry.HostKind.REAL) {
+            IslandMusicWaveColorHooker.refresh()
+        }
     }
 
     /**
@@ -225,63 +236,49 @@ internal object IslandContentUpdateCoordinator {
             IslandPresentationCoordinator.currentPresentationRevision()
 
         val hosts = IslandPresentationCoordinator.snapshotAttachedHosts(packageName)
-        val frozenHostCount = hosts.count {
-            IslandPresentationCoordinator.isHostFrozenForFakeTransition(it)
-        }
+        val realHostCount = hosts.count { it.kind == IslandViewRegistry.HostKind.REAL }
+        val fakeHostCount = hosts.size - realHostCount
         HookLogger.dState(
             stateId = "IslandContentUpdateCoordinator.activeHosts",
             tag = "IslandContentUpdateCoordinator",
-            state = "hosts|$packageName|${hosts.size}|$frozenHostCount|$expectedLyricVersion|$expectedPresentationRevision"
+            state = "hosts|$packageName|$realHostCount|$fakeHostCount|" +
+                    "$expectedLyricVersion|$expectedPresentationRevision"
         ) {
-            "颜色刷新目标: package=$packageName, attachedHosts=${hosts.size}, " +
-                    "frozenHosts=$frozenHostCount, lyricVersion=$expectedLyricVersion, " +
+            "颜色刷新目标: package=$packageName, realHosts=$realHostCount, " +
+                    "fakeHosts=$fakeHostCount, " +
+                    "lyricVersion=$expectedLyricVersion, " +
                     "presentationRevision=$expectedPresentationRevision"
         }
 
         hosts.forEach { token ->
-            if (IslandPresentationCoordinator.isHostFrozenForFakeTransition(token)) {
-                return@forEach
-            }
-            token.root.post {
-                val skipReason = when {
-                    !IslandPresentationCoordinator.isCurrentHost(token) -> "host_stale"
-                    IslandPresentationCoordinator.isHostFrozenForFakeTransition(token) ->
-                        "fake_transition_frozen"
-
-                    !IslandPresentationCoordinator.isCurrentPresentation(
-                        expectedPresentationRevision
-                    ) -> "presentation_revision_changed"
-
-                    LyriconDataBridge.versionCounter.get() != expectedLyricVersion ->
-                        "lyric_version_changed"
-
-                    LyriconDataBridge.currentLyricPackageName != packageName ->
-                        "lyric_owner_changed"
-
-                    !IslandPresentationCoordinator.shouldRenderInjectedIsland() ->
-                        "presentation_not_target"
-
-                    else -> null
-                }
-                if (skipReason != null) {
-                    HookLogger.dState(
-                        stateId = "IslandContentUpdateCoordinator.colorRefreshSkip",
-                        tag = "IslandContentUpdateCoordinator",
-                        state = skipReason
-                    ) {
-                        "颜色刷新目标失效: reason=$skipReason, package=$packageName"
-                    }
-                    return@post
-                }
-                val prefs = HookEntry.instance?.prefs ?: return@post
-                update(
-                    token.root,
+            if (!IslandPresentationCoordinator.isCurrentHost(token) ||
+                !isColorUpdateCurrent(
                     packageName,
-                    prefs,
-                    IslandSlotRuntimeConfig.from(prefs)
+                    expectedLyricVersion,
+                    expectedPresentationRevision
                 )
-            }
+            ) return@forEach
+            val prefs = HookEntry.instance?.prefs ?: return@forEach
+            update(
+                token.root,
+                packageName,
+                prefs,
+                IslandSlotRuntimeConfig.from(prefs)
+            )
         }
+    }
+
+    private fun isColorUpdateCurrent(
+        packageName: String,
+        expectedLyricVersion: Int,
+        expectedPresentationRevision: Long
+    ): Boolean {
+        return IslandPresentationCoordinator.isCurrentPresentation(
+            expectedPresentationRevision
+        ) &&
+                LyriconDataBridge.versionCounter.get() == expectedLyricVersion &&
+                LyriconDataBridge.currentLyricPackageName == packageName &&
+                IslandPresentationCoordinator.shouldRenderInjectedIsland()
     }
 
     private fun updateLyricSlot(

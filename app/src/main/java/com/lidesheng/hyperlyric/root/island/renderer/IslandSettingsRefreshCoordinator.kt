@@ -7,6 +7,7 @@ import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.hooks.IslandWidthLimitHooker
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
+import com.lidesheng.hyperlyric.root.island.presentation.IslandReconcileReason
 
 /**
  * Coordinates settings changes that affect Xiaomi's media-island layout or native artwork views.
@@ -14,24 +15,47 @@ import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoord
  */
 internal object IslandSettingsRefreshCoordinator {
     fun request() {
-        IslandPresentationCoordinator.invalidatePresentation()
+        val presentationRevision = IslandPresentationCoordinator.invalidatePresentation()
         IslandNativeRefreshCoordinator.request(
-            onComplete = ::refreshHyperLyricContent
+            onComplete = { root ->
+                refreshHyperLyricContent(root, presentationRevision)
+            }
         )
     }
 
-    private fun refreshHyperLyricContent(root: ViewGroup) {
+    private fun refreshHyperLyricContent(
+        root: ViewGroup,
+        presentationRevision: Long
+    ) {
+        if (!IslandPresentationCoordinator.isCurrentPresentation(presentationRevision)) return
         val packageName = LyriconDataBridge.currentLyricPackageName
             ?.takeIf { it.isNotEmpty() }
             ?: return
-        val prefs = HookEntry.instance?.prefs ?: return
         IslandWidthLimitHooker.refresh(root)
-        IslandContentUpdateCoordinator.updateContentForView(
-            view = root,
-            packageName = packageName,
-            prefs = prefs,
-            config = IslandSlotRuntimeConfig.from(prefs),
-            playbackActive = IslandPresentationCoordinator.isPlaybackActive()
-        )
+        val lyricVersion = LyriconDataBridge.versionCounter.get()
+        IslandPresentationCoordinator.snapshotAttachedHosts(packageName).forEach { token ->
+            if (!IslandPresentationCoordinator.isCurrentHost(token) ||
+                !IslandPresentationCoordinator.isCurrentPresentation(presentationRevision) ||
+                LyriconDataBridge.versionCounter.get() != lyricVersion ||
+                LyriconDataBridge.currentLyricPackageName != packageName
+            ) return@forEach
+
+            val result = IslandPresentationCoordinator.reconcileRegisteredHost(
+                token = token,
+                reason = IslandReconcileReason.SETTINGS_CHANGED,
+                expectedPresentationRevision = presentationRevision
+            )
+            if (!result.isTarget) return@forEach
+
+            val prefs = HookEntry.instance?.prefs ?: return@forEach
+            IslandContentUpdateCoordinator.updateContentForView(
+                view = token.root,
+                packageName = packageName,
+                prefs = prefs,
+                config = IslandSlotRuntimeConfig.from(prefs),
+                playbackActive = IslandPresentationCoordinator.isPlaybackActive(),
+                hostKind = token.kind
+            )
+        }
     }
 }

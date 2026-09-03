@@ -158,6 +158,21 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private var scrollUnlocked = false
     private var playbackActive = true
 
+    /**
+     * Island Real/Fake trees are two presentations of one playback clock. Their hidden tree keeps
+     * advancing renderer state so Xiaomi can exchange visibility without a catch-up frame.
+     */
+    internal var keepPlaybackClockRunningWhenHidden: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (playbackActive && canAdvancePlaybackClock()) {
+                resumePlaybackAnimation()
+            } else if (!isShown) {
+                animator.stop()
+            }
+        }
+
     var isStaticPreview: Boolean = false
         set(value) {
             if (field == value) return
@@ -505,10 +520,46 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        if (isVisible && playbackActive) {
+        if (playbackActive && (isVisible || keepPlaybackClockRunningWhenHidden)) {
             resumePlaybackAnimation()
         } else {
             animator.stop()
+        }
+    }
+
+    /** Applies one canonical media-time sample without carrying local correction error. */
+    internal fun synchronizePosition(posMs: Long, playbackSpeed: Float = 1f) {
+        if (isStaticPreview) return
+        if (!isWordSync) {
+            if (playbackActive) startScrolling()
+            return
+        }
+        if (activeRenderer === syncRenderer && syncRenderer.isScrollOnly && !isOverflow) return
+        if (activeRenderer === lineTimelineRenderer && !isOverflow) return
+
+        activeRenderer.seek(_model, lineState, posMs, measuredWidth, measuredHeight)
+        if (playbackActive) {
+            activeRenderer.update(
+                _model,
+                lineState,
+                posMs,
+                measuredWidth,
+                measuredHeight,
+                playbackSpeed
+            )
+            if (activeRenderer.isPlaying && !activeRenderer.isFinished) {
+                animator.startIfNeeded()
+            }
+        } else {
+            animator.stop()
+        }
+        if (isShown) invalidate()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (playbackActive && canAdvancePlaybackClock()) {
+            resumePlaybackAnimation()
         }
     }
 
@@ -523,10 +574,15 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         lineState.reset()
         if (!isOverflow) return
         post {
+            if (!scrollStarted || !playbackActive || isStaticPreview) return@post
             scrollRenderer.update(_model, lineState, 0, measuredWidth, measuredHeight, 1f)
             animator.stop()
             animator.startIfNeeded()
         }
+    }
+
+    private fun canAdvancePlaybackClock(): Boolean {
+        return isAttachedToWindow && (isShown || keepPlaybackClockRunningWhenHidden)
     }
 
     private fun updateColorsIfReady() {
@@ -584,10 +640,10 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         private var lastFrameNanos = 0L
 
         fun startIfNeeded() {
-            if (playbackActive && !running && isAttachedToWindow && isShown) {
+            if (playbackActive && !running && canAdvancePlaybackClock()) {
                 running = true
                 lastFrameNanos = 0L
-                post { Choreographer.getInstance().postFrameCallback(this) }
+                Choreographer.getInstance().postFrameCallback(this)
             }
         }
 
@@ -598,7 +654,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         }
 
         override fun doFrame(frameTimeNanos: Long) {
-            if (!running || !playbackActive || !isAttachedToWindow || !isShown) {
+            if (!running || !playbackActive || !canAdvancePlaybackClock()) {
                 running = false
                 return
             }
@@ -608,7 +664,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
 
             val renderer = activeRenderer
             val changed = renderer.step(deltaNanos, _model, lineState, measuredWidth)
-            if (changed) postInvalidateOnAnimation()
+            if (changed && isShown) postInvalidateOnAnimation()
 
             if (running && renderer.isPlaying) {
                 Choreographer.getInstance().postFrameCallback(this)

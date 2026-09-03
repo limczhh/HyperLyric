@@ -1,25 +1,20 @@
 package com.lidesheng.hyperlyric.root.island.renderer
 
-import android.view.View
-import android.view.ViewGroup
+import android.os.Handler
+import android.os.Looper
 import com.lidesheng.hyperlyric.common.RootConstants
-import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
-import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.presentation.IslandReconcileReason
+import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
-/**
- * Owns pause/resume behavior for injected lyric views.
- *
- * Refreshing content remains the renderer's responsibility. This coordinator only applies the
- * playback policy and keeps the pause-cleared state beside the transitions that consume it.
- */
+/** Applies one playback policy to every registered Real/Fake projection. */
 internal object IslandPlaybackStateCoordinator {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var clearedByPause = false
 
     fun markClearedByPause() {
@@ -31,6 +26,12 @@ internal object IslandPlaybackStateCoordinator {
         onRefreshRequested: () -> Unit,
         onClearRequested: () -> Unit
     ) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                onPlaybackStateChanged(isPlaying, onRefreshRequested, onClearRequested)
+            }
+            return
+        }
         val prefs = HookEntry.instance?.prefs ?: return
         if (!prefs.getBoolean(
                 RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
@@ -58,25 +59,27 @@ internal object IslandPlaybackStateCoordinator {
         )
         val wasClearedByPause = clearedByPause
 
-        if (isPlaying) {
-            if (clearedByPause) {
+        when {
+            isPlaying && clearedByPause -> {
                 clearedByPause = false
                 restoreActiveViewsAfterPause(onRefreshRequested)
-            } else if (stateChanged) {
-                applyPlaybackStateToActiveViews(true)
             }
-        } else if (behavior == 0) {
-            if (!clearedByPause) {
+
+            isPlaying && stateChanged -> applyPlaybackStateToActiveViews(true)
+
+            !isPlaying && behavior == 0 && !clearedByPause -> {
+                applyPlaybackStateToActiveViews(false)
                 clearActiveViewsForPauseInternal()
             }
-        } else if (stateChanged) {
-            applyPlaybackStateToActiveViews(false)
+
+            !isPlaying && stateChanged -> applyPlaybackStateToActiveViews(false)
         }
+
         val action = when {
             isPlaying && wasClearedByPause -> "restore_after_pause"
             isPlaying && stateChanged -> "resume_active_views"
             !isPlaying && behavior == 0 && !wasClearedByPause -> "clear_on_pause"
-            !isPlaying && stateChanged -> "freeze_active_views"
+            !isPlaying && stateChanged -> "pause_active_views"
             else -> "no_change"
         }
         HookLogger.dState(
@@ -90,139 +93,118 @@ internal object IslandPlaybackStateCoordinator {
     }
 
     private fun restoreActiveViewsAfterPause(onRefreshRequested: () -> Unit) {
-        val lyricPkg = LyriconDataBridge.currentLyricPackageName
+        val lyricPackage = LyriconDataBridge.currentLyricPackageName
             ?.takeIf { it.isNotEmpty() }
             ?: return
-        val expectedLyricVersion = LyriconDataBridge.versionCounter.get()
-        val expectedPresentationRevision =
-            IslandPresentationCoordinator.currentPresentationRevision()
-        val activeViews = IslandPresentationCoordinator.snapshotAttachedHosts(lyricPkg)
-        if (activeViews.isEmpty()) {
+        val lyricVersion = LyriconDataBridge.versionCounter.get()
+        val presentationRevision = IslandPresentationCoordinator.currentPresentationRevision()
+        val hosts = IslandPresentationCoordinator.snapshotAttachedHosts(lyricPackage)
+        if (hosts.isEmpty()) {
             HookLogger.dState(
                 stateId = "IslandPlaybackStateCoordinator.restore",
                 tag = "IslandPlaybackStateCoordinator",
                 state = "no_hosts"
             ) {
-                "暂停恢复未找到宿主: reason=no_attached_hosts, package=$lyricPkg"
+                "暂停恢复未找到宿主: reason=no_attached_hosts, package=$lyricPackage"
             }
             onRefreshRequested()
             return
         }
 
-        activeViews.forEach { token ->
-            if (IslandPresentationCoordinator.isHostFrozenForFakeTransition(token)) {
+        hosts.forEach { token ->
+            if (!IslandPresentationCoordinator.shouldRenderInjectedIsland() ||
+                !IslandPresentationCoordinator.isCurrentHost(token) ||
+                !IslandPresentationCoordinator.isCurrentPresentation(presentationRevision) ||
+                LyriconDataBridge.versionCounter.get() != lyricVersion ||
+                LyriconDataBridge.currentLyricPackageName != lyricPackage
+            ) return@forEach
+
+            val result = IslandPresentationCoordinator.reconcileRegisteredHost(
+                token = token,
+                reason = IslandReconcileReason.PLAYBACK_RESUME,
+                expectedPresentationRevision = presentationRevision
+            )
+            if (!result.isTarget) return@forEach
+
+            val currentPrefs = HookEntry.instance?.prefs ?: return@forEach
+            val config = IslandSlotRuntimeConfig.from(currentPrefs)
+            val expectsInjectedView =
+                config.leftMode != RootConstants.ISLAND_CONTENT_MODE_NONE ||
+                        config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE
+            if (expectsInjectedView && result.mutation.injectedSlotsPresent == false) {
+                onRefreshRequested()
                 return@forEach
             }
-            val view = token.root
-            view.post {
-                if (IslandPresentationCoordinator.isHostFrozenForFakeTransition(token) ||
-                    !IslandPresentationCoordinator.shouldRenderInjectedIsland() ||
-                    !IslandPresentationCoordinator.isCurrentPresentation(
-                        expectedPresentationRevision
-                    ) ||
-                    LyriconDataBridge.versionCounter.get() != expectedLyricVersion ||
-                    LyriconDataBridge.currentLyricPackageName != lyricPkg
-                ) {
-                    return@post
-                }
 
-                val result = IslandPresentationCoordinator.reconcileRegisteredHost(
-                    token,
-                    IslandReconcileReason.PLAYBACK_RESUME,
-                    expectedPresentationRevision
-                )
-                if (!result.isTarget) return@post
-                val currentPrefs = HookEntry.instance?.prefs ?: return@post
-                val config = IslandSlotRuntimeConfig.from(currentPrefs)
-                val expectsInjectedView =
-                    config.leftMode != RootConstants.ISLAND_CONTENT_MODE_NONE ||
-                            config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE
-                if (expectsInjectedView && result.mutation.injectedSlotsPresent == false) {
-                    onRefreshRequested()
-                    return@post
-                }
-
-                setPlaybackActiveRecursively(view, true)
-            }
+            IslandContentUpdateCoordinator.updateContentForView(
+                view = token.root,
+                packageName = lyricPackage,
+                prefs = currentPrefs,
+                config = config,
+                playbackActive = true,
+                hostKind = token.kind
+            )
         }
     }
 
     fun clearActiveViewsForPause() {
         if (clearedByPause) return
+        applyPlaybackStateToActiveViews(false)
         clearActiveViewsForPauseInternal()
     }
 
+    fun deactivateAllHosts() {
+        IslandPresentationCoordinator.snapshotAttachedInjectedHosts().forEach { snapshot ->
+            IslandLyricViewController.setPlaybackActiveRecursively(snapshot.host.root, false)
+        }
+    }
+
     private fun clearActiveViewsForPauseInternal() {
-        val lyricPkg = LyriconDataBridge.currentLyricPackageName
-        val expectedPresentationRevision =
-            IslandPresentationCoordinator.currentPresentationRevision()
+        val lyricPackage = LyriconDataBridge.currentLyricPackageName
+        val presentationRevision = IslandPresentationCoordinator.currentPresentationRevision()
         IslandPresentationCoordinator.snapshotAttachedHosts()
-            .filter { token -> lyricPkg == null || token.packageName == lyricPkg }
+            .filter { token -> lyricPackage == null || token.packageName == lyricPackage }
             .forEach { token ->
-                token.root.post {
-                    IslandPresentationCoordinator.clearRegisteredHostIfSuppressed(
-                        token,
-                        expectedPresentationRevision
-                    )
-                }
+                IslandPresentationCoordinator.clearRegisteredHostIfSuppressed(
+                    token,
+                    presentationRevision
+                )
             }
         clearedByPause = true
     }
 
     private fun applyPlaybackStateToActiveViews(isPlaying: Boolean) {
-        val lyricPkg = LyriconDataBridge.currentLyricPackageName
-        val expectedPresentationRevision =
-            IslandPresentationCoordinator.currentPresentationRevision()
-        IslandPresentationCoordinator.snapshotAttachedInjectedHosts(lyricPkg)
+        val lyricPackage = LyriconDataBridge.currentLyricPackageName
+        val presentationRevision = IslandPresentationCoordinator.currentPresentationRevision()
+        val playbackClock = LyriconDataBridge.currentPlaybackClock()
+        IslandPresentationCoordinator.snapshotAttachedInjectedHosts(lyricPackage)
             .forEach { snapshot ->
                 val token = snapshot.host
-                if (IslandPresentationCoordinator.isHostFrozenForFakeTransition(token)) {
-                    return@forEach
-                }
-                val view = token.root
-                val indexedViews = snapshot.injectedViews
-                view.post {
-                    val currentLyricPackage = LyriconDataBridge.currentLyricPackageName
-                    if (!IslandPresentationCoordinator.isCurrentHost(token) ||
-                        IslandPresentationCoordinator.isHostFrozenForFakeTransition(token) ||
-                        !IslandPresentationCoordinator.isCurrentPresentation(
-                            expectedPresentationRevision
-                        ) ||
-                        IslandPresentationCoordinator.isPlaybackActive() != isPlaying ||
-                        (currentLyricPackage != null &&
-                                currentLyricPackage != token.packageName)
-                    ) {
-                        return@post
-                    }
-                    if (indexedViews.isEmpty()) {
-                        setPlaybackActiveRecursively(view, isPlaying)
-                        IslandPresentationCoordinator.refreshInjectedViewIndex(token)
-                    } else {
-                        indexedViews.forEach { injectedView ->
-                            setPlaybackActive(injectedView, isPlaying)
-                        }
+                val currentPackage = LyriconDataBridge.currentLyricPackageName
+                if (!IslandPresentationCoordinator.isCurrentHost(token) ||
+                    !IslandPresentationCoordinator.isCurrentPresentation(presentationRevision) ||
+                    IslandPresentationCoordinator.isPlaybackActive() != isPlaying ||
+                    (currentPackage != null && currentPackage != token.packageName)
+                ) return@forEach
+
+                if (snapshot.injectedViews.isEmpty()) {
+                    IslandLyricViewController.applyPlaybackSnapshotRecursively(
+                        token.root,
+                        playbackClock.positionMs,
+                        playbackClock.playbackSpeed,
+                        isPlaying
+                    )
+                    IslandPresentationCoordinator.refreshInjectedViewIndex(token)
+                } else {
+                    snapshot.injectedViews.forEach { view ->
+                        IslandLyricViewController.applyPlaybackSnapshot(
+                            view,
+                            playbackClock.positionMs,
+                            playbackClock.playbackSpeed,
+                            isPlaying
+                        )
                     }
                 }
             }
-    }
-
-    private fun setPlaybackActive(view: View, isPlaying: Boolean) {
-        when (view) {
-            is RichLyricLineView -> view.setPlaybackActive(isPlaying)
-            is SpaceGateRichLyricLineView -> view.setPlaybackActive(isPlaying)
-        }
-    }
-
-    private fun setPlaybackActiveRecursively(view: View, isPlaying: Boolean) {
-        when (view) {
-            is RichLyricLineView,
-            is SpaceGateRichLyricLineView -> setPlaybackActive(view, isPlaying)
-
-            is ViewGroup -> {
-                for (index in 0 until view.childCount) {
-                    setPlaybackActiveRecursively(view.getChildAt(index), isPlaying)
-                }
-            }
-        }
     }
 }

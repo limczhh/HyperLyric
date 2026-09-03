@@ -84,10 +84,22 @@ internal object IslandProbeUtils {
     }
 
     fun isRealBigIslandModuleArea(rootView: ViewGroup): Boolean {
+        return bigIslandModuleArea(rootView, fake = false)
+    }
+
+    fun isFakeBigIslandModuleArea(rootView: ViewGroup): Boolean {
+        return bigIslandModuleArea(rootView, fake = true)
+    }
+
+    private fun bigIslandModuleArea(rootView: ViewGroup, fake: Boolean): Boolean {
         val areaName = runCatching {
             rootView.resources.getResourceEntryName(rootView.id)
-        }.getOrNull()
-        return areaName == "area_left" || areaName == "area_right"
+        }.getOrNull() ?: return false
+        return if (fake) {
+            areaName == "fake_area_left" || areaName == "fake_area_right"
+        } else {
+            areaName == "area_left" || areaName == "area_right"
+        }
     }
 
     private fun extractExtras(data: Any?): Bundle? {

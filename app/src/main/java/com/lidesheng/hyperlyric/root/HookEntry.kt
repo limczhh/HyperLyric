@@ -400,9 +400,10 @@ class HookEntry : XposedModule() {
                                 val changed = LyriconDataBridge.updatePlaceholderFormat(format)
                                 if (changed) {
                                     BaseIslandRenderer.updateLyricLine()
+                                    val playbackClock = LyriconDataBridge.currentPlaybackClock()
                                     BaseIslandRenderer.updatePosition(
-                                        LyriconDataBridge.currentPosition,
-                                        1f
+                                        playbackClock.positionMs,
+                                        playbackClock.playbackSpeed
                                     )
                                 } else {
                                     HookLogger.d(
@@ -526,13 +527,6 @@ class HookEntry : XposedModule() {
         return when (executable.name) {
             "onCreate" -> AppCreateHooker().takeIf { owner == "android.app.Application" }
             "updateBigIslandView" -> RealIslandHooker.UpdateBigIslandViewHook()
-            "hideIslandLayout", "showIslandLayout" -> RealIslandHooker.LayoutVisibilityHook(
-                executable.name
-            )
-
-            "updateModuleView" -> IslandModuleRestoreHooker.UpdateModuleViewHook()
-                .takeIf { owner.endsWith("IslandTemplateBuilder") }
-
             "bindData" -> IslandModuleRestoreHooker.AdapterBindDataHook()
                 .takeIf { owner.endsWith("IslandModuleViewHolderAdapter") }
 

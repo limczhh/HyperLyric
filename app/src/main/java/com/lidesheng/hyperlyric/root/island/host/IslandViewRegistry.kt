@@ -17,9 +17,16 @@ internal object IslandViewRegistry {
         ATTACHED
     }
 
+    enum class HostKind {
+        REAL,
+        FAKE
+    }
+
     data class HostToken(
         val root: ViewGroup,
         val packageName: String,
+        val kind: HostKind,
+        val moduleType: String?,
         val generation: Long
     )
 
@@ -30,16 +37,41 @@ internal object IslandViewRegistry {
 
     private data class HostRecord(
         var packageName: String,
+        var kind: HostKind,
+        var moduleType: String?,
         var generation: Long,
         var attachState: AttachState
     )
 
-    fun register(view: ViewGroup, packageName: String): HostToken {
+    fun registerReal(view: ViewGroup, packageName: String): HostToken {
+        return register(view, packageName, HostKind.REAL, moduleType = null)
+    }
+
+    fun registerFake(
+        view: ViewGroup,
+        packageName: String,
+        moduleType: String?
+    ): HostToken {
+        return register(view, packageName, HostKind.FAKE, moduleType)
+    }
+
+    private fun register(
+        view: ViewGroup,
+        packageName: String,
+        kind: HostKind,
+        moduleType: String?
+    ): HostToken {
         return synchronized(lock) {
             val existing = activeHosts[view]
-            val record = if (existing == null || existing.packageName != packageName) {
+            val record = if (existing == null ||
+                existing.packageName != packageName ||
+                existing.kind != kind ||
+                existing.moduleType != moduleType
+            ) {
                 HostRecord(
                     packageName = packageName,
+                    kind = kind,
+                    moduleType = moduleType,
                     generation = ++nextGeneration,
                     attachState = if (view.isAttachedToWindow) {
                         AttachState.ATTACHED
@@ -61,12 +93,21 @@ internal object IslandViewRegistry {
         synchronized(lock) {
             val record = activeHosts[token.root] ?: return
             if (record.generation != token.generation ||
-                record.packageName != token.packageName
+                record.packageName != token.packageName ||
+                record.kind != token.kind ||
+                record.moduleType != token.moduleType
             ) {
                 return
             }
             activeHosts.remove(token.root)
             injectedViewsByRoot.remove(token.root)
+        }
+    }
+
+    fun unregister(root: ViewGroup) {
+        synchronized(lock) {
+            activeHosts.remove(root)
+            injectedViewsByRoot.remove(root)
         }
     }
 
@@ -96,7 +137,9 @@ internal object IslandViewRegistry {
         return synchronized(lock) {
             val record = activeHosts[token.root]
             record?.generation == token.generation &&
-                    record.packageName == token.packageName
+                    record.packageName == token.packageName &&
+                    record.kind == token.kind &&
+                    record.moduleType == token.moduleType
         }
     }
 
@@ -116,7 +159,10 @@ internal object IslandViewRegistry {
         }
     }
 
-    fun snapshotAttached(packageName: String? = null): List<HostToken> {
+    fun snapshotAttached(
+        packageName: String? = null,
+        kind: HostKind? = null
+    ): List<HostToken> {
         val result = mutableListOf<HostToken>()
         synchronized(lock) {
             activeHosts.entries.forEach { entry ->
@@ -124,7 +170,9 @@ internal object IslandViewRegistry {
                 val record = entry.value
                 if (viewGroup.isAttachedToWindow) {
                     record.attachState = AttachState.ATTACHED
-                    if (packageName == null || record.packageName == packageName) {
+                    if ((packageName == null || record.packageName == packageName) &&
+                        (kind == null || record.kind == kind)
+                    ) {
                         result += record.toToken(viewGroup)
                     }
                 }
@@ -134,7 +182,8 @@ internal object IslandViewRegistry {
     }
 
     fun snapshotAttachedInjectedViews(
-        packageName: String? = null
+        packageName: String? = null,
+        kind: HostKind? = null
     ): List<InjectedHostToken> {
         val result = mutableListOf<InjectedHostToken>()
         synchronized(lock) {
@@ -146,6 +195,7 @@ internal object IslandViewRegistry {
                 }
                 record.attachState = AttachState.ATTACHED
                 if (packageName != null && record.packageName != packageName) return@forEach
+                if (kind != null && record.kind != kind) return@forEach
 
                 val views = injectedViewsByRoot[root]
                     ?.keys
@@ -164,6 +214,8 @@ internal object IslandViewRegistry {
         return HostToken(
             root = root,
             packageName = packageName,
+            kind = kind,
+            moduleType = moduleType,
             generation = generation
         )
     }
