@@ -484,9 +484,17 @@
   <string name="option_content_music_info">معلومات الموسيقى</string>
   <string name="option_content_lyric">الكلمات</string>
   <string name="format_padding_pair">%1$d,%2$d</string>
+  <string name="title_interaction">التفاعل</string>
+  <string name="title_island_swipe_behavior">سلوك السحب في HyperIsland</string>
+  <string name="option_island_swipe_default">افتراضي</string>
+  <string name="option_island_swipe_track_switch">السحب لليسار للسابق، ولليمين للتالي</string>
   <string name="title_behavior_after_pause">السلوك بعد إيقاف الموسيقى مؤقتًا</string>
   <string name="option_after_pause_default">استعادة الافتراضي</string>
   <string name="option_after_pause_keep">الإبقاء زي ما هو</string>
+  <string name="title_island_long_press_behavior">سلوك الضغط المطوّل في HyperIsland</string>
+  <string name="option_island_long_press_default">افتراضي</string>
+  <string name="option_island_long_press_lyric_share">السحب للمشاركة</string>
+  <string name="option_island_long_press_toggle_playback">تشغيل/إيقاف مؤقت</string>
   <string name="title_glow_cover_color">لون توهّج الغلاف المميّز</string>
   <string name="title_island_progress_glow">شريط تقدّم بتوهّج الحواف</string>
   <string name="title_island_progress_style">نمط مسار التقدّم</string>

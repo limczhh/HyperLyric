@@ -223,6 +223,23 @@ fun SuperIslandSettingsPage() {
             RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK
         )
     }
+    var swipeBehavior by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_SWIPE_BEHAVIOR,
+                RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
+            ).takeIf {
+                it == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT ||
+                        it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH
+            } ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
+        )
+    }
+    val swipeBehaviorValues = remember {
+        listOf(
+            RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT,
+            RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH
+        )
+    }
     var extractGlowColor by remember {
         mutableStateOf(
             prefs.getBoolean(
@@ -367,6 +384,12 @@ fun SuperIslandSettingsPage() {
             R.string.option_island_long_press_default,
             R.string.option_island_long_press_lyric_share,
             R.string.option_island_long_press_toggle_playback
+        )
+    }.map { stringResource(id = it) }
+    val swipeBehaviorOptions = remember {
+        listOf(
+            R.string.option_island_swipe_default,
+            R.string.option_island_swipe_track_switch
         )
     }.map { stringResource(id = it) }
     val audioCoverStyleValues = remember {
@@ -747,6 +770,50 @@ fun SuperIslandSettingsPage() {
                         }
                     }
                 }
+                item(key = "interaction_title") {
+                    SmallTitle(text = stringResource(id = R.string.title_interaction))
+                }
+                item(key = "interaction_behavior") {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column {
+                            OverlayDropdownPreference(
+                                title = stringResource(id = R.string.title_island_swipe_behavior),
+                                items = swipeBehaviorOptions,
+                                selectedIndex = swipeBehaviorValues.indexOf(swipeBehavior)
+                                    .coerceAtLeast(0),
+                                onSelectedIndexChange = { index ->
+                                    val behavior = swipeBehaviorValues.getOrNull(index)
+                                        ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
+                                    swipeBehavior = behavior
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_ISLAND_SWIPE_BEHAVIOR,
+                                        behavior
+                                    )
+                                }
+                            )
+                            OverlayDropdownPreference(
+                                title = stringResource(id = R.string.title_island_long_press_behavior),
+                                items = longPressBehaviorOptions,
+                                selectedIndex = longPressBehaviorValues.indexOf(longPressBehavior)
+                                    .coerceAtLeast(0),
+                                onSelectedIndexChange = { index ->
+                                    val behavior = longPressBehaviorValues.getOrNull(index)
+                                        ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
+                                    longPressBehavior = behavior
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
+                                        behavior
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
                 item(key = "special_features_title") { SmallTitle(text = stringResource(id = R.string.title_special_features)) }
                 item(key = "playback_behavior") {
                     Card(
@@ -765,32 +832,6 @@ fun SuperIslandSettingsPage() {
                                     RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
                                     it
                                 )
-                                }
-                            )
-                        }
-                    }
-                }
-                item(key = "long_press_behavior") {
-                    Card(
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .fillMaxWidth()
-                    ) {
-                        Column {
-                            OverlayDropdownPreference(
-                                title = stringResource(id = R.string.title_island_long_press_behavior),
-                                items = longPressBehaviorOptions,
-                                selectedIndex = longPressBehaviorValues.indexOf(longPressBehavior)
-                                    .coerceAtLeast(0),
-                                onSelectedIndexChange = { index ->
-                                    val behavior = longPressBehaviorValues.getOrNull(index)
-                                        ?: RootConstants.DEFAULT_HOOK_ISLAND_LONG_PRESS_BEHAVIOR
-                                    longPressBehavior = behavior
-                                    saveConfig(
-                                        RootConstants.KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR,
-                                        behavior
-                                    )
                                 }
                             )
                         }

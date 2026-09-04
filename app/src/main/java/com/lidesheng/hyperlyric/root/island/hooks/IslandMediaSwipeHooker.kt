@@ -3,6 +3,8 @@ package com.lidesheng.hyperlyric.root.island.hooks
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -233,6 +235,8 @@ internal object IslandMediaSwipeHooker {
         interactor: Any,
         windowView: Any
     ): Any? {
+        if (!isSwipeTrackSwitchEnabled()) return null
+
         // Keep native media-button, seek-bar, freeform-animation and long-press gestures intact.
         if (readBoolean(interactor, "downInSeekBar") != false ||
             readBoolean(interactor, "downInMedia") != false ||
@@ -250,6 +254,15 @@ internal object IslandMediaSwipeHooker {
         val view = callNoArg(windowView, "getCurrentBigIslandState") ?: return null
         val data = IslandProbeUtils.getCurrentIslandData(view) ?: return null
         return data.takeIf { IslandProbeUtils.extractMediaIslandInfo(it) != null }
+    }
+
+    private fun isSwipeTrackSwitchEnabled(): Boolean {
+        return runCatching {
+            HookEntry.instance?.prefs?.getInt(
+                RootConstants.KEY_HOOK_ISLAND_SWIPE_BEHAVIOR,
+                RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
+            ) == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH
+        }.getOrDefault(false)
     }
 
     private fun resolveTouchSlop(interactor: Any, windowView: Any): Float {
