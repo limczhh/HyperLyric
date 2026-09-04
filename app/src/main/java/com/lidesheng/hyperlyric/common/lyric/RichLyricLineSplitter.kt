@@ -7,6 +7,7 @@ import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 /**
  * Splits one rich lyric line for the separated Super Island mode.
@@ -101,7 +102,8 @@ object RichLyricLineSplitter {
         line: IRichLyricLine,
         primaryPaint: Paint,
         secondaryPaint: Paint,
-        containerWidthSpec: ContainerWidthSpec
+        containerWidthSpec: ContainerWidthSpec,
+        partitionUntimedTimeline: Boolean = false
     ): SplitLineResult {
         val text = line.text
             ?: return SplitLineResult(toRichLyricLine(line), RichLyricLine())
@@ -124,10 +126,15 @@ object RichLyricLineSplitter {
             paint = secondaryPaint,
             containerWidthSpec = containerWidthSpec
         )
+        val timelineSplit = if (partitionUntimedTimeline && line.words.isNullOrEmpty()) {
+            splitUntimedTimeline(line, primary, primaryPaint)
+        } else {
+            null
+        }
 
         val leftLine = RichLyricLine(
             begin = line.begin,
-            end = line.end,
+            end = timelineSplit?.splitTimeMs ?: line.end,
             duration = 0,
             isAlignedRight = false,
             metadata = line.metadata,
@@ -141,8 +148,10 @@ object RichLyricLineSplitter {
         )
 
         val rightLine = RichLyricLine(
-            begin = primary.rightWords?.firstOrNull()?.begin ?: line.begin,
-            end = line.end,
+            begin = timelineSplit?.splitTimeMs
+                ?: primary.rightWords?.firstOrNull()?.begin
+                ?: line.begin,
+            end = timelineSplit?.endTimeMs ?: line.end,
             duration = 0,
             isAlignedRight = false,
             metadata = line.metadata,
@@ -158,11 +167,49 @@ object RichLyricLineSplitter {
         return SplitLineResult(leftLine, rightLine)
     }
 
+    /**
+     * Partitions a line-only timeline at the visual split point. The lyric views can then create
+     * their usual local relative-progress word while retaining one continuous left-to-right
+     * highlight across both separated slots.
+     */
+    private fun splitUntimedTimeline(
+        line: IRichLyricLine,
+        primary: TextParts,
+        paint: Paint
+    ): TimelineSplit? {
+        val leftText = primary.leftText?.takeIf { it.isNotEmpty() } ?: return null
+        val rightText = primary.rightText?.takeIf { it.isNotEmpty() } ?: return null
+        if (line.begin < 0L) return null
+
+        val durationMs = (line.end - line.begin).takeIf { it > 0L }
+            ?: line.duration.takeIf { it > 0L }
+            ?: return null
+        if (durationMs < 2L) return null
+
+        val leftWidth = paint.measureText(leftText).coerceAtLeast(0f)
+        val rightWidth = paint.measureText(rightText).coerceAtLeast(0f)
+        val totalWidth = leftWidth + rightWidth
+        if (!totalWidth.isFinite() || totalWidth <= 0f) return null
+
+        val leftDurationMs = (durationMs.toDouble() * leftWidth / totalWidth)
+            .roundToLong()
+            .coerceIn(1L, durationMs - 1L)
+        return TimelineSplit(
+            splitTimeMs = line.begin + leftDurationMs,
+            endTimeMs = line.begin + durationMs
+        )
+    }
+
     private data class TextParts(
         val leftText: String? = null,
         val rightText: String? = null,
         val leftWords: List<LyricWord>? = null,
         val rightWords: List<LyricWord>? = null
+    )
+
+    private data class TimelineSplit(
+        val splitTimeMs: Long,
+        val endTimeMs: Long
     )
 
     private fun splitText(

@@ -272,7 +272,8 @@ internal object IslandLyricContentAssembler {
             } else {
                 secondaryPaint
             },
-            containerWidthSpec = containerWidthSpec
+            containerWidthSpec = containerWidthSpec,
+            partitionUntimedTimeline = config.syllableRelative
         )
         return if (isLeft) splitResult.left else splitResult.right
     }
