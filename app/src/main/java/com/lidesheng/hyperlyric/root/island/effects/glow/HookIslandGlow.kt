@@ -136,13 +136,14 @@ object HookIslandGlow {
                     return@runCatching null
                 }
             val pkgName = mediaInfoFromIsland.packageName
-            if (pkgName.isEmpty() || !target.isCurrentLyricOwner) {
+            val scope = IslandModificationTargetPolicy.currentScope(sharedPrefs)
+            if (pkgName.isEmpty() || !IslandModificationTargetPolicy.allows(target, scope)) {
                 HookLogger.dState(
                     stateId = "HookIslandGlow.prepare",
                     tag = TAG,
-                    state = "lyric_owner_mismatch|$pkgName"
+                    state = "scope_not_allowed|$scope|$pkgName"
                 ) {
-                    "媒体岛光效颜色未准备: reason=lyric_owner_mismatch, " +
+                    "媒体岛光效颜色未准备: reason=scope_not_allowed, scope=$scope, " +
                             "mediaPackage=$pkgName"
                 }
                 return@runCatching null
@@ -158,7 +159,51 @@ object HookIslandGlow {
                 }
                 return@runCatching null
             }
-            val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(context, pkgName, HookLogger)
+            val mediaInfo = when (scope) {
+                IslandModificationTargetPolicy.Scope.ALL_MEDIA -> {
+                    // Do not merge the current lyric source into an unrelated native media
+                    // island. Pin the read to the token carried by that island when available.
+                    MediaMetadataHelper.getMediaInfo(
+                        context = context,
+                        packageName = pkgName,
+                        logger = HookLogger,
+                        preferredSessionToken = IslandProbeUtils.extractMediaSessionToken(islandData)
+                    )
+                }
+
+                IslandModificationTargetPolicy.Scope.INJECTED_LYRIC ->
+                    CurrentMediaInfoResolver.getMediaInfo(context, pkgName, HookLogger)
+            }
+
+            if (scope == IslandModificationTargetPolicy.Scope.ALL_MEDIA) {
+                val palette = mediaInfo.albumArt
+                    ?.takeUnless { it.isRecycled }
+                    ?.let(CoverColorHelper::extractPalette)
+                val color = palette
+                    ?.second
+                    ?.firstOrNull()
+                    ?: run {
+                        HookLogger.dState(
+                            stateId = "HookIslandGlow.prepare",
+                            tag = TAG,
+                            state = "no_palette|all_media|$pkgName"
+                        ) {
+                            "媒体岛光效颜色未准备: reason=no_native_cover_palette, " +
+                                    "scope=$scope, mediaPackage=$pkgName"
+                        }
+                        return@runCatching null
+                    }
+                val colorString = String.format("#%08X", color)
+                HookLogger.dState(
+                    stateId = "HookIslandGlow.prepare",
+                    tag = TAG,
+                    state = "ready|$scope|$colorString"
+                ) {
+                    "媒体岛光效颜色已准备: color=$colorString, scope=$scope, source=native_cover"
+                }
+                return@runCatching colorString
+            }
+
             val colorSession = CoverColorHelper.currentSession(mediaInfo) ?: run {
                 HookLogger.dState(
                     stateId = "HookIslandGlow.prepare",
@@ -238,7 +283,8 @@ object HookIslandGlow {
 
     fun updateMusicGlow(
         contentView: View?,
-        sharedPrefs: SharedPreferences
+        sharedPrefs: SharedPreferences,
+        forceRefresh: Boolean = false
     ) {
         val enabled = sharedPrefs.getBoolean(
             RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
@@ -254,10 +300,16 @@ object HookIslandGlow {
             }
             clearViewHighlightColor(contentView)
             rememberGlowEnabled(contentView, false)
+            if (forceRefresh) {
+                contentView?.let(::refreshTemplateForCurrentIsland)
+            }
             return
         }
-        if (contentView != null && rememberGlowEnabled(contentView, true) != true) {
-            refreshTemplateForCurrentIsland(contentView)
+        if (contentView != null) {
+            val wasEnabled = rememberGlowEnabled(contentView, true)
+            if (forceRefresh || wasEnabled != true) {
+                refreshTemplateForCurrentIsland(contentView)
+            }
         }
     }
 

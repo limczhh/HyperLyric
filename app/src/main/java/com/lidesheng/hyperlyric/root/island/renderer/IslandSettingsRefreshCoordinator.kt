@@ -5,6 +5,7 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
 import com.lidesheng.hyperlyric.root.island.hooks.IslandWidthLimitHooker
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
@@ -19,6 +20,13 @@ internal object IslandSettingsRefreshCoordinator {
         val presentationRevision = IslandPresentationCoordinator.invalidatePresentation()
         IslandNativeRefreshCoordinator.request(
             onComplete = { root ->
+                HookEntry.instance?.prefs?.let { prefs ->
+                    HookIslandGlow.updateMusicGlow(
+                        contentView = root,
+                        sharedPrefs = prefs,
+                        forceRefresh = true
+                    )
+                }
                 IslandMusicWaveColorHooker.refresh()
                 refreshHyperLyricContentIfNeeded(root, presentationRevision)
             }
