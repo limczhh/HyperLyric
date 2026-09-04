@@ -43,6 +43,7 @@ object SystemUIHookRegistry {
         try {
             IslandTextHooker.hook(module, cl)
             if (!lyricsOnly) {
+                IslandMediaSwipeHooker.hook(module, cl)
                 HookIslandGlow.init(module, cl)
                 IslandProgressGlowHooker.hook(module, cl)
                 IslandMusicWaveColorHooker.hook(module, cl)
