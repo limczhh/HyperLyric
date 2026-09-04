@@ -422,7 +422,14 @@ class HookEntry : XposedModule() {
 
                         RootConstants.KEY_HOOK_ISLAND_ALBUM_COVER_STYLE -> {
                             Handler(Looper.getMainLooper()).post {
+                                IslandAlbumCoverStyleHooker.refresh()
                                 IslandSettingsRefreshCoordinator.request()
+                            }
+                        }
+
+                        RootConstants.KEY_HOOK_ISLAND_MODIFICATION_SCOPE -> {
+                            Handler(Looper.getMainLooper()).post {
+                                IslandAlbumCoverStyleHooker.refresh()
                             }
                         }
 

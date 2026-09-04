@@ -73,8 +73,8 @@ internal object IslandModificationTargetPolicy {
             data == null || IslandProbeUtils.isMediaIsland(data) -> MediaState.PENDING
             else -> MediaState.NOT_MEDIA
         }
-        val hostToken = hostRoot?.let(IslandViewRegistry::tokenFor)
-        val injectionState = hostRoot?.let(::readInjectionState)
+        val hostToken = hostRoot?.let(IslandViewRegistry::tokenForDescendant)
+        val injectionState = hostToken?.root?.let(::readInjectionState)
             ?: InjectionState.UNKNOWN
 
         return TargetSnapshot(

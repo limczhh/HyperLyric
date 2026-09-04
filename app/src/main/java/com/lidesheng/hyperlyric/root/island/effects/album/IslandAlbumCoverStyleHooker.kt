@@ -99,8 +99,17 @@ internal object IslandAlbumCoverStyleHooker {
                 }
             }
             holders.forEach { (holder, data, accessor) ->
-                runCatching { accessor.setFixIconMethod.invoke(holder, data) }
-                    .onFailure { HookLogger.e(TAG, "刷新超级岛封面样式失败", it) }
+                restoringNative.set(true)
+                try {
+                    accessor.setFixIconMethod.invoke(holder, data)
+                } catch (error: Throwable) {
+                    HookLogger.e(TAG, "刷新超级岛封面样式失败", error)
+                    return@forEach
+                } finally {
+                    restoringNative.remove()
+                }
+                runCatching { applyStyle(accessor, holder, data) }
+                    .onFailure { HookLogger.e(TAG, "重新应用超级岛封面样式失败", it) }
             }
         }
     }
@@ -137,17 +146,17 @@ internal object IslandAlbumCoverStyleHooker {
     }
 
     private fun applyStyle(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {
-        if (!IslandModificationTargetPolicy.allows(
+        if (!isMediaAlbum(accessor, holder)) return
+        synchronized(trackedHolders) {
+            trackedHolders[holder] = TrackedHolder(WeakReference(dynamicIslandData), accessor)
+        }
+
+        if (!IslandModificationTargetPolicy.allowsCurrentScope(
                 data = dynamicIslandData,
-                scope = IslandModificationTargetPolicy.Scope.ALL_MEDIA,
                 hostRoot = IslandProbeUtils.getHolderRootView(holder)
             )
         ) {
             return
-        }
-        if (!isMediaAlbum(accessor, holder)) return
-        synchronized(trackedHolders) {
-            trackedHolders[holder] = TrackedHolder(WeakReference(dynamicIslandData), accessor)
         }
 
         val fixIcon = accessor.fixIconField.get(holder) as? ImageView ?: return

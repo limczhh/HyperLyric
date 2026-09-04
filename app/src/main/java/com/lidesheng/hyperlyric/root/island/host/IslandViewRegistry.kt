@@ -149,13 +149,52 @@ internal object IslandViewRegistry {
         }
     }
 
-    fun refreshInjectedViews(root: ViewGroup) {
-        val indexedViews = WeakHashMap<View, Unit>()
-        collectInjectedViews(root, indexedViews)
-        synchronized(lock) {
-            if (activeHosts.containsKey(root)) {
-                injectedViewsByRoot[root] = indexedViews
+    /**
+     * Resolves the host that owns a view or one of its ancestor containers.
+     *
+     * Real module callbacks receive an area_left/area_right subtree, while the
+     * Real host is registered at the outer content root. Fake module callbacks
+     * still resolve to their exact registered module root first.
+     */
+    fun tokenForDescendant(view: View?): HostToken? {
+        return synchronized(lock) {
+            var current = view
+            while (current != null) {
+                val group = current as? ViewGroup
+                if (group != null) {
+                    activeHosts[group]?.let { return@synchronized it.toToken(group) }
+                }
+                current = current.parent as? View
             }
+            null
+        }
+    }
+
+    /**
+     * Rebuilds the injection index for the registered host containing [view].
+     *
+     * A Real module area is not a second Real host, so refreshing the area
+     * directly would not update the outer Real host's index.
+     */
+    fun refreshInjectedViewsFor(view: View?): HostToken? {
+        val token = tokenForDescendant(view) ?: return null
+        refreshInjectedViews(token)
+        return token
+    }
+
+    fun refreshInjectedViews(token: HostToken) {
+        val indexedViews = WeakHashMap<View, Unit>()
+        collectInjectedViews(token.root, indexedViews)
+        synchronized(lock) {
+            val record = activeHosts[token.root] ?: return
+            if (record.generation != token.generation ||
+                record.packageName != token.packageName ||
+                record.kind != token.kind ||
+                record.moduleType != token.moduleType
+            ) {
+                return
+            }
+            injectedViewsByRoot[token.root] = indexedViews
         }
     }
 

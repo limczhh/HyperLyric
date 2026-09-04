@@ -130,7 +130,7 @@ internal object IslandInjectionReconciler {
         if (contentWasRefreshed) {
             IslandSlotStructureInjector.linkViews(root)
         }
-        IslandViewRegistry.refreshInjectedViews(root)
+        IslandViewRegistry.refreshInjectedViewsFor(root)
         val injectedSlotsPresent = IslandSlotStructureInjector.hasInjectedLyricText(root)
         if (target == Target.RealRoot && layoutMayHaveChanged) {
             // Restoring an existing hidden wrapper changes when its lyric view can be measured.
@@ -161,7 +161,7 @@ internal object IslandInjectionReconciler {
         // a non-target/recycled holder can continue consuming frames and later commit stale state.
         IslandLyricViewController.stopRecursively(root)
         val layoutMayHaveChanged = IslandHostFacade.clearInjectedViews(root)
-        IslandViewRegistry.refreshInjectedViews(root)
+        IslandViewRegistry.refreshInjectedViewsFor(root)
         val relayoutRequested = target == Target.RealRoot && layoutMayHaveChanged
         if (relayoutRequested) {
             IslandHostFacade.triggerSystemRelayout(root)

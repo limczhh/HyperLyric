@@ -4,8 +4,10 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
+import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /**
@@ -117,6 +119,7 @@ internal object IslandPresentationCoordinator {
             owner = owner,
             reason = IslandReconcileReason.SYSTEM_UPDATE_COMPLETE
         )
+        refreshAlbumCoverAfterInjection(result)
         return result
     }
 
@@ -126,13 +129,15 @@ internal object IslandPresentationCoordinator {
         owner: IslandRenderPolicy.OwnerEvidence,
         isFake: Boolean
     ): ReconcileResult {
-        return reconcileModule(
+        val result = reconcileModule(
             holderRoot = holderRoot,
             moduleType = moduleType,
             owner = owner,
             reason = IslandReconcileReason.MODULE_FIRST_BIND,
             isFake = isFake
         )
+        refreshAlbumCoverAfterInjection(result)
+        return result
     }
 
     fun onModuleUpdated(
@@ -141,13 +146,15 @@ internal object IslandPresentationCoordinator {
         owner: IslandRenderPolicy.OwnerEvidence,
         isFake: Boolean
     ): ReconcileResult {
-        return reconcileModule(
+        val result = reconcileModule(
             holderRoot = holderRoot,
             moduleType = moduleType,
             owner = owner,
             reason = IslandReconcileReason.MODULE_UPDATED,
             isFake = isFake
         )
+        refreshAlbumCoverAfterInjection(result)
+        return result
     }
 
     fun reconcileRegisteredHost(
@@ -162,7 +169,7 @@ internal object IslandPresentationCoordinator {
             return ReconcileResult.noOp(IslandRenderPolicy.Decision.PENDING)
         }
         val owner = IslandRenderPolicy.OwnerEvidence.Media(token.packageName)
-        return when (token.kind) {
+        val result = when (token.kind) {
             IslandViewRegistry.HostKind.REAL -> reconcileRealRoot(
                 root = token.root,
                 owner = owner,
@@ -177,6 +184,8 @@ internal object IslandPresentationCoordinator {
                 isFake = true
             )
         }
+        refreshAlbumCoverAfterInjection(result)
+        return result
     }
 
     fun clearRegisteredHostIfSuppressed(
@@ -239,7 +248,7 @@ internal object IslandPresentationCoordinator {
 
     fun refreshInjectedViewIndex(token: IslandViewRegistry.HostToken) {
         if (IslandViewRegistry.isCurrent(token)) {
-            IslandViewRegistry.refreshInjectedViews(token.root)
+            IslandViewRegistry.refreshInjectedViews(token)
         }
     }
 
@@ -380,6 +389,16 @@ internal object IslandPresentationCoordinator {
         owner: IslandRenderPolicy.OwnerEvidence
     ): IslandRenderPolicy.Decision {
         return decisionEvaluator.evaluate(owner)
+    }
+
+    private fun refreshAlbumCoverAfterInjection(result: ReconcileResult) {
+        if (!result.isTarget ||
+            IslandModificationTargetPolicy.currentScope() !=
+            IslandModificationTargetPolicy.Scope.INJECTED_LYRIC
+        ) {
+            return
+        }
+        IslandAlbumCoverStyleHooker.refresh()
     }
 
     private fun targetFor(token: IslandViewRegistry.HostToken): IslandInjectionReconciler.Target {
