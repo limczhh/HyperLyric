@@ -430,11 +430,13 @@ class HookEntry : XposedModule() {
                         RootConstants.KEY_HOOK_ISLAND_MODIFICATION_SCOPE -> {
                             Handler(Looper.getMainLooper()).post {
                                 IslandAlbumCoverStyleHooker.refresh()
+                                IslandMusicWaveColorHooker.refresh()
                             }
                         }
 
                         RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE -> {
                             Handler(Looper.getMainLooper()).post {
+                                IslandMusicWaveColorHooker.refresh()
                                 IslandSettingsRefreshCoordinator.request()
                             }
                         }
@@ -481,6 +483,7 @@ class HookEntry : XposedModule() {
     private fun updateSystemUiEnhancements(enabled: Boolean) {
         if (enabled) {
             sourceManager?.start()
+            IslandMusicWaveColorHooker.refresh()
             IslandSettingsRefreshCoordinator.request()
         } else {
             sourceManager?.stop()

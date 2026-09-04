@@ -233,6 +233,38 @@ object CoverColorHelper {
         return current
     }
 
+    /**
+     * Extracts the same background-adapted palette used by the source-owned artwork cache.
+     * This does not create or advance a color session and is therefore suitable for native media
+     * surfaces that provide their current artwork directly.
+     */
+    internal fun extractPalette(bitmap: Bitmap): Pair<IntArray, IntArray>? {
+        if (bitmap.isRecycled) return null
+        val readableBitmap = if (bitmap.config == Bitmap.Config.HARDWARE) {
+            bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: run {
+                HookLogger.dState(
+                    stateId = "CoverColorHelper.extract",
+                    tag = TAG,
+                    state = "hardware_copy_failed"
+                ) {
+                    "封面调色板提取跳过: reason=hardware_bitmap_copy_failed"
+                }
+                return null
+            }
+        } else {
+            bitmap
+        }
+        val result = try {
+            ColorExtractor.extractThemePalette(readableBitmap, MAX_PALETTE_COLORS)
+        } finally {
+            if (readableBitmap !== bitmap) readableBitmap.recycle()
+        }
+        return Pair(
+            result.onWhiteBackground.toIntArray(),
+            result.onBlackBackground.toIntArray()
+        )
+    }
+
     private fun invalidateArtworkIfOwned(
         mediaInfo: MediaMetadataHelper.MediaInfo,
         reason: String
@@ -293,29 +325,7 @@ object CoverColorHelper {
             return cachedColors.forGradient(useGradient)
         }
 
-        val readableBitmap = if (bitmap.config == Bitmap.Config.HARDWARE) {
-            bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: run {
-                HookLogger.dState(
-                    stateId = "CoverColorHelper.extract",
-                    tag = TAG,
-                    state = "hardware_copy_failed"
-                ) {
-                    "封面调色板提取跳过: reason=hardware_bitmap_copy_failed"
-                }
-                return null
-            }
-        } else {
-            bitmap
-        }
-        val result = try {
-            ColorExtractor.extractThemePalette(readableBitmap, MAX_PALETTE_COLORS)
-        } finally {
-            if (readableBitmap !== bitmap) readableBitmap.recycle()
-        }
-        val extractedColors = Pair(
-            result.onWhiteBackground.toIntArray(),
-            result.onBlackBackground.toIntArray()
-        )
+        val extractedColors = extractPalette(bitmap) ?: return null
         val colors = synchronized(this) {
             if (!isCurrentArtworkLocked(request)) return@synchronized null
             val latest = keyedCache[request.cacheKey]

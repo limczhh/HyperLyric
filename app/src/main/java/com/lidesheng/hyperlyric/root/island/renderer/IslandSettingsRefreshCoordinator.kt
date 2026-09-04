@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
+import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.hooks.IslandWidthLimitHooker
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
@@ -18,12 +19,13 @@ internal object IslandSettingsRefreshCoordinator {
         val presentationRevision = IslandPresentationCoordinator.invalidatePresentation()
         IslandNativeRefreshCoordinator.request(
             onComplete = { root ->
-                refreshHyperLyricContent(root, presentationRevision)
+                IslandMusicWaveColorHooker.refresh()
+                refreshHyperLyricContentIfNeeded(root, presentationRevision)
             }
         )
     }
 
-    private fun refreshHyperLyricContent(
+    private fun refreshHyperLyricContentIfNeeded(
         root: ViewGroup,
         presentationRevision: Long
     ) {

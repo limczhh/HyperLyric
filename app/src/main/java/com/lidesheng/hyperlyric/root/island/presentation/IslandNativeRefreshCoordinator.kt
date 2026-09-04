@@ -3,7 +3,6 @@ package com.lidesheng.hyperlyric.root.island.presentation
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
-import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandTextHookerSupport
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
@@ -65,12 +64,8 @@ internal object IslandNativeRefreshCoordinator {
         val request = pendingRequest ?: return
         pendingRequest = null
 
-        val packageName = LyriconDataBridge.currentLyricPackageName
-            ?.takeIf { it.isNotEmpty() }
-            ?: return
-
         var accepted = false
-        IslandPresentationCoordinator.snapshotAttachedRealHosts(packageName).forEach { token ->
+        IslandPresentationCoordinator.snapshotAttachedRealHosts().forEach { token ->
             if (!isEligibleHost(token)) return@forEach
 
             val target = resolveTarget(token) ?: return@forEach
@@ -102,8 +97,7 @@ internal object IslandNativeRefreshCoordinator {
         val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(
             IslandProbeUtils.getCurrentIslandData(token.root)
         ) ?: return false
-        return mediaInfo.packageName == token.packageName &&
-                IslandPresentationCoordinator.isCurrentLyricOwner(mediaInfo)
+        return mediaInfo.packageName == token.packageName
     }
 
     private fun resolveTarget(token: IslandViewRegistry.HostToken): NativeTarget? {
@@ -185,7 +179,7 @@ internal object IslandNativeRefreshCoordinator {
         active.settleRunnable?.let(mainHandler::removeCallbacks)
 
         if (!IslandPresentationCoordinator.isCurrentHost(active.token) ||
-            LyriconDataBridge.currentLyricPackageName != active.token.packageName
+            !isCurrentMediaHost(active.token)
         ) {
             HookLogger.d(
                 TAG,
@@ -215,6 +209,13 @@ internal object IslandNativeRefreshCoordinator {
         } else {
             mainHandler.post(block)
         }
+    }
+
+    private fun isCurrentMediaHost(token: IslandViewRegistry.HostToken): Boolean {
+        val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(
+            IslandProbeUtils.getCurrentIslandData(token.root)
+        ) ?: return false
+        return mediaInfo.packageName == token.packageName
     }
 
     private data class RefreshRequest(

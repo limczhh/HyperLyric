@@ -5,6 +5,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
+import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
@@ -399,6 +400,7 @@ internal object IslandPresentationCoordinator {
             return
         }
         IslandAlbumCoverStyleHooker.refresh()
+        IslandMusicWaveColorHooker.refresh()
     }
 
     private fun targetFor(token: IslandViewRegistry.HostToken): IslandInjectionReconciler.Target {
