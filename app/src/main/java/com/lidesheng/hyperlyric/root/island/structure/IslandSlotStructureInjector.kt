@@ -57,6 +57,7 @@ internal object IslandSlotStructureInjector {
         } else {
             changed = removeInjectedSlot(
                 rootView,
+                IslandProbeUtils.LEFT_PARENT_NAME,
                 IslandProbeUtils.LEFT_TEST_WRAPPER_TAG
             ) || changed
         }
@@ -73,6 +74,7 @@ internal object IslandSlotStructureInjector {
         } else {
             changed = removeInjectedSlot(
                 rootView,
+                IslandProbeUtils.RIGHT_PARENT_NAME,
                 IslandProbeUtils.RIGHT_TEST_WRAPPER_TAG
             ) || changed
         }
@@ -86,12 +88,18 @@ internal object IslandSlotStructureInjector {
         return changed
     }
 
-    private fun removeInjectedSlot(rootView: ViewGroup, wrapperTag: String): Boolean {
-        val wrapper = rootView.findViewWithTag<View>(wrapperTag) ?: return false
-        val parent = wrapper.parent as? ViewGroup ?: return false
+    private fun removeInjectedSlot(
+        rootView: ViewGroup,
+        parentName: String,
+        wrapperTag: String
+    ): Boolean {
+        var changed = IslandViewHelper.restoreInjectedContainerWidths(rootView, parentName)
+        val wrapper = rootView.findViewWithTag<View>(wrapperTag) ?: return changed
+        val parent = wrapper.parent as? ViewGroup ?: return changed
         parent.removeView(wrapper)
         IslandSlotContentFacade.invalidate(wrapper)
-        return true
+        changed = true
+        return changed
     }
 
     fun restoreExistingSlotsLightweight(rootView: ViewGroup): Boolean {
@@ -103,14 +111,16 @@ internal object IslandSlotStructureInjector {
             changed = restoreExistingSlotLightweight(
                 rootView,
                 IslandProbeUtils.LEFT_PARENT_NAME,
-                IslandProbeUtils.LEFT_TEST_VIEW_TAG
+                IslandProbeUtils.LEFT_TEST_VIEW_TAG,
+                config
             ) || changed
         }
         if (config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE) {
             changed = restoreExistingSlotLightweight(
                 rootView,
                 IslandProbeUtils.RIGHT_PARENT_NAME,
-                IslandProbeUtils.RIGHT_TEST_VIEW_TAG
+                IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
+                config
             ) || changed
         }
         IslandHostFacade.applyHostSettings(rootView, prefs)
@@ -127,7 +137,9 @@ internal object IslandSlotStructureInjector {
         ) {
             changed = restoreExistingSlotByTagLightweight(
                 rootView,
-                IslandProbeUtils.LEFT_TEST_VIEW_TAG
+                IslandProbeUtils.LEFT_PARENT_NAME,
+                IslandProbeUtils.LEFT_TEST_VIEW_TAG,
+                config
             ) || changed
         }
         if (config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE &&
@@ -135,20 +147,26 @@ internal object IslandSlotStructureInjector {
         ) {
             changed = restoreExistingSlotByTagLightweight(
                 rootView,
-                IslandProbeUtils.RIGHT_TEST_VIEW_TAG
+                IslandProbeUtils.RIGHT_PARENT_NAME,
+                IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
+                config
             ) || changed
         }
         if (!changed && moduleType != null && !moduleType.endsWith("_1") && !moduleType.endsWith("_2")) {
             if (config.leftMode != RootConstants.ISLAND_CONTENT_MODE_NONE) {
                 changed = restoreExistingSlotByTagLightweight(
                     rootView,
-                    IslandProbeUtils.LEFT_TEST_VIEW_TAG
+                    IslandProbeUtils.LEFT_PARENT_NAME,
+                    IslandProbeUtils.LEFT_TEST_VIEW_TAG,
+                    config
                 ) || changed
             }
             if (config.rightMode != RootConstants.ISLAND_CONTENT_MODE_NONE) {
                 changed = restoreExistingSlotByTagLightweight(
                     rootView,
-                    IslandProbeUtils.RIGHT_TEST_VIEW_TAG
+                    IslandProbeUtils.RIGHT_PARENT_NAME,
+                    IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
+                    config
                 ) || changed
             }
         }
@@ -206,7 +224,14 @@ internal object IslandSlotStructureInjector {
         }
         if (existingWrapper != null) {
             existingWrapper.keepVisible = true
-            var changed = updateWrapper(existingWrapper, widthPx, config, parentName)
+            var changed = updateFakeDynamicWidthChain(
+                rootView,
+                parent,
+                container,
+                existingWrapper,
+                config
+            )
+            changed = updateWrapper(existingWrapper, widthPx, config, parentName) || changed
             val targetView = existingWrapper.findViewWithTag<View>(viewTag)
 
             if (targetView == null) {
@@ -252,6 +277,7 @@ internal object IslandSlotStructureInjector {
             maxWidthPx = widthPx
             keepVisible = true
         }
+        updateFakeDynamicWidthChain(rootView, parent, container, wrapperView, config)
         updateWrapper(wrapperView, widthPx, config, parentName)
         wrapperView.addView(
             createLyricView(rootView, viewTag, config, mode, playbackActive),
@@ -261,7 +287,7 @@ internal object IslandSlotStructureInjector {
         container.addView(
             wrapperView,
             FrameLayout.LayoutParams(
-                wrapperLayoutWidth(config),
+                wrapperLayoutWidth(config, wrapperView.fillExactParentWidth),
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -286,7 +312,8 @@ internal object IslandSlotStructureInjector {
     private fun restoreExistingSlotLightweight(
         rootView: ViewGroup,
         parentName: String,
-        viewTag: String
+        viewTag: String,
+        config: IslandSlotRuntimeConfig
     ): Boolean {
         val parent =
             IslandViewHelper.findViewByName(rootView, parentName) as? ViewGroup ?: return false
@@ -298,7 +325,7 @@ internal object IslandSlotStructureInjector {
             ?: return false
         val targetView = wrapper.findViewWithTag<View>(viewTag) ?: return false
 
-        var changed = false
+        var changed = updateFakeDynamicWidthChain(rootView, parent, container, wrapper, config)
         wrapper.keepVisible = true
         if (container.visibility != View.VISIBLE) {
             IslandViewHelper.showForInjection(container)
@@ -316,13 +343,20 @@ internal object IslandSlotStructureInjector {
         return changed
     }
 
-    private fun restoreExistingSlotByTagLightweight(rootView: ViewGroup, viewTag: String): Boolean {
+    private fun restoreExistingSlotByTagLightweight(
+        rootView: ViewGroup,
+        parentName: String,
+        viewTag: String,
+        config: IslandSlotRuntimeConfig
+    ): Boolean {
         val wrapper = rootView.findViewWithTag<View>("${viewTag}_WRAPPER") as? MaxWidthFrameLayout
             ?: return false
         val targetView = wrapper.findViewWithTag<View>(viewTag) ?: return false
         val container = wrapper.parent as? ViewGroup ?: return false
+        val parent = IslandViewHelper.findViewByName(rootView, parentName) as? ViewGroup
+            ?: return false
 
-        var changed = false
+        var changed = updateFakeDynamicWidthChain(rootView, parent, container, wrapper, config)
         wrapper.keepVisible = true
         if (container.visibility != View.VISIBLE) {
             IslandViewHelper.showForInjection(container)
@@ -371,7 +405,7 @@ internal object IslandSlotStructureInjector {
             changed = true
         }
         val layoutParams = wrapper.layoutParams
-        val expectedWidth = wrapperLayoutWidth(config)
+        val expectedWidth = wrapperLayoutWidth(config, wrapper.fillExactParentWidth)
         if (layoutParams != null && (layoutParams.width != expectedWidth || layoutParams.height != FrameLayout.LayoutParams.MATCH_PARENT)) {
             layoutParams.width = expectedWidth
             layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT
@@ -434,11 +468,43 @@ internal object IslandSlotStructureInjector {
         return wasZeroWidth
     }
 
-    private fun wrapperLayoutWidth(config: IslandSlotRuntimeConfig): Int {
-        return if (config.isSplitMode) {
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        } else {
+    private fun updateFakeDynamicWidthChain(
+        rootView: ViewGroup,
+        parent: ViewGroup,
+        container: ViewGroup,
+        wrapper: MaxWidthFrameLayout,
+        config: IslandSlotRuntimeConfig
+    ): Boolean {
+        val fillParentWidth = config.geometry.isDynamicWidth &&
+                IslandProbeUtils.isFakeBigIslandModuleArea(rootView)
+        var changed = IslandViewHelper.setFillParentWidthForInjection(parent, fillParentWidth)
+        changed = IslandViewHelper.setFillParentWidthForInjection(container, fillParentWidth) || changed
+
+        if (wrapper.fillExactParentWidth != fillParentWidth) {
+            wrapper.fillExactParentWidth = fillParentWidth
+            changed = true
+        }
+
+        val layoutParams = wrapper.layoutParams
+        val expectedWidth = wrapperLayoutWidth(config, fillParentWidth)
+        if (layoutParams != null && layoutParams.width != expectedWidth) {
+            layoutParams.width = expectedWidth
+            wrapper.layoutParams = layoutParams
+            changed = true
+        }
+
+        if (changed) wrapper.requestLayout()
+        return changed
+    }
+
+    private fun wrapperLayoutWidth(
+        config: IslandSlotRuntimeConfig,
+        fillExactParentWidth: Boolean
+    ): Int {
+        return if (fillExactParentWidth || !config.isSplitMode) {
             FrameLayout.LayoutParams.MATCH_PARENT
+        } else {
+            FrameLayout.LayoutParams.WRAP_CONTENT
         }
     }
 

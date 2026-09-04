@@ -15,6 +15,15 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
     var maxWidthPx: Int = -1
 
     /**
+     * Fill an exact parent width instead of shrinking back to [maxWidthPx].
+     *
+     * Fake dynamic-island areas already receive the final width calculated from the real tree.
+     * Their injected content must consume that width during the final layout pass, while AT_MOST
+     * pre-measure passes still use the regular content-based maximum-width behavior.
+     */
+    var fillExactParentWidth: Boolean = false
+
+    /**
      * Used only by injected Super Island test blocks.
      */
     var keepVisible: Boolean = false
@@ -28,6 +37,11 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (fillExactParentWidth && MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            return
+        }
+
         val givenWidth = MeasureSpec.getSize(widthMeasureSpec)
         val newWidth =
             if (maxWidthPx > 0 && (givenWidth == 0 || givenWidth > maxWidthPx)) maxWidthPx else givenWidth

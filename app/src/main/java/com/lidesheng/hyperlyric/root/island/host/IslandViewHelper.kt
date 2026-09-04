@@ -16,6 +16,7 @@ object IslandViewHelper {
 
     private val SYSTEMUI_PKG_NAMES = arrayOf("miui.systemui.plugin", "com.android.systemui")
     private val originalMargins = WeakHashMap<View, MarginSnapshot>()
+    private val originalLayoutWidths = WeakHashMap<View, Int>()
     private val originalVisibilities = WeakHashMap<View, Int>()
     private val isRelayouting = ThreadLocal.withInitial { false }
 
@@ -129,6 +130,8 @@ object IslandViewHelper {
         )
         restoreTextContainerMargins(rootView, "island_container_module_image_text_1")
         restoreTextContainerMargins(rootView, "island_container_module_image_text_2")
+        restoreInjectedContainerWidths(rootView, IslandProbeUtils.LEFT_PARENT_NAME)
+        restoreInjectedContainerWidths(rootView, IslandProbeUtils.RIGHT_PARENT_NAME)
         showOriginalTexts(rootView, "island_container_module_image_text_1")
         showOriginalTexts(rootView, "island_container_module_image_text_2")
 
@@ -153,6 +156,39 @@ object IslandViewHelper {
         }
     }
 
+    /**
+     * Makes one native host layer consume its parent width while an injected Fake dynamic slot is
+     * active. The original width is retained per View so native layout can be restored exactly.
+     */
+    fun setFillParentWidthForInjection(view: View, fillParent: Boolean): Boolean {
+        val layoutParams = view.layoutParams ?: return false
+        val targetWidth = if (fillParent) {
+            synchronized(originalLayoutWidths) {
+                originalLayoutWidths.getOrPut(view) { layoutParams.width }
+            }
+            ViewGroup.LayoutParams.MATCH_PARENT
+        } else {
+            synchronized(originalLayoutWidths) {
+                originalLayoutWidths.remove(view)
+            } ?: return false
+        }
+
+        if (layoutParams.width == targetWidth) return false
+        layoutParams.width = targetWidth
+        view.layoutParams = layoutParams
+        return true
+    }
+
+    fun restoreInjectedContainerWidths(rootView: ViewGroup, parentName: String): Boolean {
+        val parent = findViewByName(rootView, parentName) as? ViewGroup ?: return false
+        var changed = setFillParentWidthForInjection(parent, fillParent = false)
+        val textContainer = findViewByName(parent, IslandProbeUtils.TEXT_CONTAINER_NAME)
+        if (textContainer != null) {
+            changed = setFillParentWidthForInjection(textContainer, fillParent = false) || changed
+        }
+        return changed
+    }
+
     private fun hideInjectedSlot(rootView: ViewGroup, wrapperTag: String, targetTag: String): Int {
         if (rootView.findViewWithTag<View>(wrapperTag) != null) {
             return hideInjectedView(rootView, wrapperTag)
@@ -169,6 +205,7 @@ object IslandViewHelper {
         }
         val changed = view.visibility != View.GONE || wrapper?.keepVisible == true
         wrapper?.keepVisible = false
+        wrapper?.fillExactParentWidth = false
         view.visibility = View.GONE
         return if (changed) 1 else 0
     }
@@ -292,9 +329,15 @@ object IslandViewHelper {
             val parent = findViewByName(rootView, parentName) as? ViewGroup ?: continue
             val icon = findViewByName(parent, "island_container_module_icon")
             val text = findViewByName(parent, IslandProbeUtils.TEXT_CONTAINER_NAME)
+            if (hasRememberedLayoutWidth(parent)) return true
             if (icon != null && hasRememberedVisibility(icon)) return true
             if (text != null) {
-                if (hasRememberedVisibility(text) || hasRememberedMargin(text)) return true
+                if (hasRememberedVisibility(text) ||
+                    hasRememberedMargin(text) ||
+                    hasRememberedLayoutWidth(text)
+                ) {
+                    return true
+                }
                 if (text is ViewGroup) {
                     for (index in 0 until text.childCount) {
                         if (hasRememberedVisibility(text.getChildAt(index))) return true
@@ -314,6 +357,12 @@ object IslandViewHelper {
     private fun hasRememberedMargin(view: View): Boolean {
         return synchronized(originalMargins) {
             originalMargins.containsKey(view)
+        }
+    }
+
+    private fun hasRememberedLayoutWidth(view: View): Boolean {
+        return synchronized(originalLayoutWidths) {
+            originalLayoutWidths.containsKey(view)
         }
     }
 
