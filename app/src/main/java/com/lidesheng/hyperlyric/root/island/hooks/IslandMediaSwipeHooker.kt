@@ -206,7 +206,12 @@ internal object IslandMediaSwipeHooker {
             val absDx = abs(dx)
             val context = (gesture.windowView as? View)?.context ?: return
             val controller = IslandPlaybackControllerResolver.resolveForSwipe(context, gesture.targetData)
-            val isNext = dx < 0f
+            val swipeBehavior = readSwipeBehavior()
+            if (swipeBehavior == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT) return
+            val isNext = when (swipeBehavior) {
+                RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED -> dx > 0f
+                else -> dx < 0f
+            }
             val skipped = if (controller != null) {
                 runCatching {
                     if (isNext) {
@@ -235,7 +240,7 @@ internal object IslandMediaSwipeHooker {
         interactor: Any,
         windowView: Any
     ): Any? {
-        if (!isSwipeTrackSwitchEnabled()) return null
+        if (readSwipeBehavior() == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT) return null
 
         // Keep native media-button, seek-bar, freeform-animation and long-press gestures intact.
         if (readBoolean(interactor, "downInSeekBar") != false ||
@@ -256,13 +261,17 @@ internal object IslandMediaSwipeHooker {
         return data.takeIf { IslandProbeUtils.extractMediaIslandInfo(it) != null }
     }
 
-    private fun isSwipeTrackSwitchEnabled(): Boolean {
+    private fun readSwipeBehavior(): Int {
         return runCatching {
             HookEntry.instance?.prefs?.getInt(
                 RootConstants.KEY_HOOK_ISLAND_SWIPE_BEHAVIOR,
                 RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
-            ) == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH
-        }.getOrDefault(false)
+            ) ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
+        }.getOrDefault(RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR).takeIf {
+            it == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT ||
+                    it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH ||
+                    it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED
+        } ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
     }
 
     private fun resolveTouchSlop(interactor: Any, windowView: Any): Float {

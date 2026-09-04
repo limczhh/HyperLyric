@@ -509,6 +509,7 @@
     <string name="title_island_swipe_behavior">超级岛滑动行为</string>
     <string name="option_island_swipe_default">默认</string>
     <string name="option_island_swipe_track_switch">左滑上一首、右滑下一首</string>
+    <string name="option_island_swipe_track_switch_reversed">左滑下一首、右滑上一首</string>
     <string name="title_behavior_after_pause">暂停音乐后行为</string>
     <string name="option_after_pause_default">恢复默认</string>
     <string name="option_after_pause_keep">保持不变</string>

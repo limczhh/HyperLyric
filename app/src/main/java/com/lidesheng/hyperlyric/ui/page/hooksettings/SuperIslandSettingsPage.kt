@@ -230,14 +230,16 @@ fun SuperIslandSettingsPage() {
                 RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
             ).takeIf {
                 it == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT ||
-                        it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH
+                        it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH ||
+                        it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED
             } ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
         )
     }
     val swipeBehaviorValues = remember {
         listOf(
             RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT,
-            RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH
+            RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH,
+            RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED
         )
     }
     var extractGlowColor by remember {
@@ -389,7 +391,8 @@ fun SuperIslandSettingsPage() {
     val swipeBehaviorOptions = remember {
         listOf(
             R.string.option_island_swipe_default,
-            R.string.option_island_swipe_track_switch
+            R.string.option_island_swipe_track_switch,
+            R.string.option_island_swipe_track_switch_reversed
         )
     }.map { stringResource(id = it) }
     val audioCoverStyleValues = remember {
