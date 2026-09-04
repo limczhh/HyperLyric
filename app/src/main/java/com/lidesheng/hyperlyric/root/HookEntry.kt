@@ -431,6 +431,7 @@ class HookEntry : XposedModule() {
                             Handler(Looper.getMainLooper()).post {
                                 IslandAlbumCoverStyleHooker.refresh()
                                 IslandMusicWaveColorHooker.refresh()
+                                IslandSettingsRefreshCoordinator.request()
                             }
                         }
 
