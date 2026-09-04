@@ -3,9 +3,11 @@ package com.lidesheng.hyperlyric.root.island.hooks
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -289,7 +291,15 @@ internal object IslandMediaSwipeHooker {
             val dx = gesture.finalDx
             val absDx = abs(dx)
             val context = (gesture.windowView as? View)?.context ?: return
-            val controller = IslandPlaybackControllerResolver.resolveForSwipe(context, gesture.targetData)
+            val currentBigIsland = callNoArg(
+                gesture.windowView,
+                "getCurrentBigIslandState"
+            )
+            val controller = IslandPlaybackControllerResolver.resolveForSwipe(
+                context = context,
+                data = gesture.targetData,
+                hostRoot = currentBigIsland as? ViewGroup
+            )
             val swipeBehavior = readSwipeBehavior()
             if (swipeBehavior == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT) return
             val isNext = when (swipeBehavior) {
@@ -342,7 +352,12 @@ internal object IslandMediaSwipeHooker {
 
         val view = callNoArg(windowView, "getCurrentBigIslandState") ?: return null
         val data = IslandProbeUtils.getCurrentIslandData(view) ?: return null
-        return data.takeIf { IslandProbeUtils.extractMediaIslandInfo(it) != null }
+        return data.takeIf {
+            IslandModificationTargetPolicy.allowsCurrentScope(
+                data = it,
+                hostRoot = view as? ViewGroup
+            )
+        }
     }
 
     private fun readSwipeBehavior(): Int {

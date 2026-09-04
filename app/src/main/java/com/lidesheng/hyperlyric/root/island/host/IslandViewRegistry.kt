@@ -159,6 +159,21 @@ internal object IslandViewRegistry {
         }
     }
 
+    /**
+     * Returns physical lyric injection evidence for a registered host.
+     *
+     * A null result means that this host is not registered yet or has not completed an injection
+     * index refresh. It must not be treated as an empty injection result by target policies.
+     */
+    fun hasAttachedInjectedViews(root: ViewGroup): Boolean? {
+        return synchronized(lock) {
+            if (!activeHosts.containsKey(root)) return@synchronized null
+            if (!root.isAttachedToWindow) return@synchronized false
+            val indexedViews = injectedViewsByRoot[root] ?: return@synchronized null
+            indexedViews.keys.any { it.isAttachedToWindow }
+        }
+    }
+
     fun snapshotAttached(
         packageName: String? = null,
         kind: HostKind? = null

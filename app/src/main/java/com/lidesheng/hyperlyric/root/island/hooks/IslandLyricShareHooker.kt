@@ -7,10 +7,11 @@ import android.graphics.drawable.Icon
 import android.media.session.MediaController
 import android.media.session.PlaybackState
 import android.view.View
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
-import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -64,8 +65,12 @@ internal object IslandLyricShareHooker {
             if (behavior == RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_DEFAULT) {
                 return chain.proceed()
             }
+            val systemUiView = view as? View ?: return chain.proceed()
             val shouldHandle = runCatching {
-                IslandPresentationCoordinator.isCurrentLyricLongPressTarget(data)
+                IslandModificationTargetPolicy.allowsCurrentScope(
+                    data = data,
+                    hostRoot = systemUiView as? ViewGroup
+                )
             }.onFailure { error ->
                 HookLogger.w(TAG, "判断超级岛长按目标失败，保留原生行为", error)
             }.getOrDefault(false)
@@ -73,22 +78,35 @@ internal object IslandLyricShareHooker {
                 return chain.proceed()
             }
 
-            val systemUiView = view as? View ?: return chain.proceed()
+            val targetPackageName = IslandModificationTargetPolicy
+                .resolve(data, systemUiView as? ViewGroup)
+                .mediaInfo
+                ?.packageName
             return when (behavior) {
                 RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE ->
-                    handleDragShare(chain, systemUiView)
+                    handleDragShare(chain, systemUiView, targetPackageName)
 
                 RootConstants.ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK ->
-                    handlePlaybackToggle(chain, systemUiView, data)
+                    handlePlaybackToggle(
+                        chain,
+                        systemUiView,
+                        data,
+                        systemUiView as? ViewGroup
+                    )
 
                 else -> chain.proceed()
             }
         }
 
-        private fun handleDragShare(chain: Chain, systemUiView: View): Any? {
+        private fun handleDragShare(
+            chain: Chain,
+            systemUiView: View,
+            targetPackageName: String?
+        ): Any? {
             val payload = IslandLyricSharePayloadBuilder.build(
                 view = systemUiView,
-                prefs = HookEntry.instance?.prefs ?: return chain.proceed()
+                prefs = HookEntry.instance?.prefs ?: return chain.proceed(),
+                targetPackageName = targetPackageName
             )
                 ?: return chain.proceed()
             val replacement = runCatching {
@@ -119,7 +137,8 @@ internal object IslandLyricShareHooker {
         private fun handlePlaybackToggle(
             chain: Chain,
             systemUiView: View,
-            data: Any?
+            data: Any?,
+            hostRoot: ViewGroup?
         ): Any? {
             // Keep Xiaomi's own state/lock-screen/Control Center guards. If the host shape is
             // not the verified collapsed island, its original long-press path remains intact.
@@ -128,7 +147,11 @@ internal object IslandLyricShareHooker {
             }
 
             val controller = runCatching {
-                IslandPlaybackControllerResolver.resolve(systemUiView.context, data)
+                IslandPlaybackControllerResolver.resolve(
+                    context = systemUiView.context,
+                    data = data,
+                    hostRoot = hostRoot
+                )
             }.onFailure { error ->
                 HookLogger.w(TAG, "解析当前超级岛媒体会话失败，保留原生行为", error)
             }.getOrNull() ?: return chain.proceed()

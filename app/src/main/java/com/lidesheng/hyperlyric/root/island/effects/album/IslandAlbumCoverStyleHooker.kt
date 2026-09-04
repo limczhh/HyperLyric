@@ -11,6 +11,8 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
+import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -135,6 +137,14 @@ internal object IslandAlbumCoverStyleHooker {
     }
 
     private fun applyStyle(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {
+        if (!IslandModificationTargetPolicy.allows(
+                data = dynamicIslandData,
+                scope = IslandModificationTargetPolicy.Scope.ALL_MEDIA,
+                hostRoot = IslandProbeUtils.getHolderRootView(holder)
+            )
+        ) {
+            return
+        }
         if (!isMediaAlbum(accessor, holder)) return
         synchronized(trackedHolders) {
             trackedHolders[holder] = TrackedHolder(WeakReference(dynamicIslandData), accessor)

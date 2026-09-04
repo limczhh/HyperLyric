@@ -8,8 +8,7 @@ import android.view.View
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
-import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
-import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -416,10 +415,12 @@ internal object IslandMusicWaveColorHooker {
             val result = chain.proceed()
             runCatching {
                 val holder = chain.thisObject ?: return@runCatching
-                val lyricPackageName = holder
-                    .let { dataField?.get(it) }
-                    ?.let(IslandProbeUtils::extractMediaIslandInfo)
-                    ?.takeIf(IslandPresentationCoordinator::isCurrentLyricOwner)
+                val target = dataField
+                    ?.get(holder)
+                    ?.let(IslandModificationTargetPolicy::resolve)
+                val lyricPackageName = target
+                    ?.takeIf { it.isCurrentLyricOwner }
+                    ?.mediaInfo
                     ?.packageName
 
                 val sharedPrefs = prefs ?: return@runCatching
@@ -459,8 +460,8 @@ internal object IslandMusicWaveColorHooker {
                 val sharedPrefs = prefs
                 val isCurrentLyricHolder = dataField
                     ?.get(holder)
-                    ?.let(IslandProbeUtils::extractMediaIslandInfo)
-                    ?.let(IslandPresentationCoordinator::isCurrentLyricOwner) == true
+                    ?.let(IslandModificationTargetPolicy::resolve)
+                    ?.isCurrentLyricOwner == true
                 if (!isCurrentLyricHolder) return@runCatching
                 trackHolder(holder, lottieView)
                 if (sharedPrefs != null && isEnabled(sharedPrefs)) {

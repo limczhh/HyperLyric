@@ -104,6 +104,17 @@ fun SuperIslandSettingsPage() {
             SuperIslandContentStylePolicy.readMusicWaveStyle(prefs)
         )
     }
+    var islandModificationScope by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_MODIFICATION_SCOPE,
+                RootConstants.DEFAULT_HOOK_ISLAND_MODIFICATION_SCOPE
+            ).takeIf {
+                it == RootConstants.ISLAND_MODIFICATION_SCOPE_ALL_MEDIA ||
+                        it == RootConstants.ISLAND_MODIFICATION_SCOPE_INJECTED_LYRIC
+            } ?: RootConstants.DEFAULT_HOOK_ISLAND_MODIFICATION_SCOPE
+        )
+    }
     var disableWidthLimit by remember {
         mutableStateOf(
             prefs.getBoolean(
@@ -475,6 +486,12 @@ fun SuperIslandSettingsPage() {
             R.string.option_island_progress_bottom_bidirectional
         )
     }.map { stringResource(id = it) }
+    val islandModificationScopeOptions = remember {
+        listOf(
+            R.string.option_island_modification_scope_all_media,
+            R.string.option_island_modification_scope_injected_lyric
+        )
+    }.map { stringResource(id = it) }
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
@@ -554,6 +571,33 @@ fun SuperIslandSettingsPage() {
                 ),
                 contentPadding = contentPadding,
             ) {
+                item(key = "modification_scope") {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        OverlayDropdownPreference(
+                            title = stringResource(id = R.string.title_island_modification_scope),
+                            items = islandModificationScopeOptions,
+                            selectedIndex = islandModificationScope,
+                            onSelectedIndexChange = { index ->
+                                val scope = when (index) {
+                                    RootConstants.ISLAND_MODIFICATION_SCOPE_INJECTED_LYRIC ->
+                                        RootConstants.ISLAND_MODIFICATION_SCOPE_INJECTED_LYRIC
+
+                                    else -> RootConstants.ISLAND_MODIFICATION_SCOPE_ALL_MEDIA
+                                }
+                                islandModificationScope = scope
+                                saveConfig(
+                                    RootConstants.KEY_HOOK_ISLAND_MODIFICATION_SCOPE,
+                                    scope
+                                )
+                            }
+                        )
+                    }
+                }
                 item(key = "layout_title") { SmallTitle(text = stringResource(id = R.string.title_layout)) }
                 item(key = "layout_content") {
                     Card(

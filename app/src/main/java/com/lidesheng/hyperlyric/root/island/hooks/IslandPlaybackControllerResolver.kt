@@ -5,8 +5,10 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.MediaSessionManager
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 
 /**
  * Resolves the MediaController represented by the visible Super Island.
@@ -15,20 +17,27 @@ import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
  * token is stronger than a package-name lookup. When the notification does not expose a token,
  * a source token or a unique media-id match may still prove the controller. A package with
  * several unresolved sessions is deliberately rejected instead of controlling an arbitrary one.
- */
+    */
 internal object IslandPlaybackControllerResolver {
 
-    fun resolve(context: Context, data: Any?): MediaController? {
-        val islandInfo = IslandProbeUtils.extractMediaIslandInfo(data) ?: return null
-        val lyricPackageName = LyriconDataBridge.currentLyricPackageName
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
-            ?: return null
-        if (islandInfo.packageName != lyricPackageName) return null
+    fun resolve(
+        context: Context,
+        data: Any?,
+        hostRoot: ViewGroup? = null
+    ): MediaController? {
+        val target = IslandModificationTargetPolicy.resolve(data, hostRoot)
+        val islandInfo = target.mediaInfo ?: return null
+        if (!IslandModificationTargetPolicy.allowsCurrentScope(target)) return null
 
         val sourceMetadata = LyriconDataBridge.currentLyricMediaMetadata?.normalized()
-        if (sourceMetadata?.packageName?.let { it != islandInfo.packageName } == true) {
+        val currentScope = IslandModificationTargetPolicy.currentScope()
+        if (currentScope == IslandModificationTargetPolicy.Scope.INJECTED_LYRIC &&
+            sourceMetadata?.packageName?.let { it != islandInfo.packageName } == true
+        ) {
             return null
+        }
+        val matchingSourceMetadata = sourceMetadata?.takeIf {
+            it.packageName == islandInfo.packageName
         }
 
         val statusBarNotification = IslandProbeUtils.extractStatusBarNotification(data)
@@ -37,7 +46,7 @@ internal object IslandPlaybackControllerResolver {
         }
 
         val notificationToken = IslandProbeUtils.extractMediaSessionToken(data)
-        val sourceToken = sourceMetadata?.sessionToken
+        val sourceToken = matchingSourceMetadata?.sessionToken
         if (notificationToken != null && sourceToken != null && notificationToken != sourceToken) {
             return null
         }
@@ -55,11 +64,11 @@ internal object IslandPlaybackControllerResolver {
         if (preferredToken != null) {
             return controllers.firstOrNull { controller ->
                 controller.sessionToken == preferredToken &&
-                        matchesSourceMedia(controller, sourceMetadata)
+                        matchesSourceMedia(controller, matchingSourceMetadata)
             }
         }
 
-        val sourceMediaId = sourceMetadata?.mediaId
+        val sourceMediaId = matchingSourceMetadata?.mediaId
         if (sourceMediaId != null) {
             return controllers.singleOrNull { controller ->
                 controllerMediaId(controller) == sourceMediaId
@@ -75,9 +84,15 @@ internal object IslandPlaybackControllerResolver {
      * The visible island's notification owns the session identity. The lyric bridge may be
      * temporarily cleared or still contain the previous media id while the player is publishing a
      * new track, so those source fields must not be hard gates for a same-session skip command.
-     */
-    fun resolveForSwipe(context: Context, data: Any?): MediaController? {
-        val islandInfo = IslandProbeUtils.extractMediaIslandInfo(data) ?: return null
+    */
+    fun resolveForSwipe(
+        context: Context,
+        data: Any?,
+        hostRoot: ViewGroup? = null
+    ): MediaController? {
+        val target = IslandModificationTargetPolicy.resolve(data, hostRoot)
+        val islandInfo = target.mediaInfo ?: return null
+        if (!IslandModificationTargetPolicy.allowsCurrentScope(target)) return null
         val statusBarNotification = IslandProbeUtils.extractStatusBarNotification(data)
         if (statusBarNotification?.packageName?.let { it != islandInfo.packageName } == true) {
             return null

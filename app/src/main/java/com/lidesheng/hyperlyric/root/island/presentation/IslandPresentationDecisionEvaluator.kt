@@ -4,6 +4,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 
 /**
  * Builds the policy input from the current root-side presentation state.
@@ -16,23 +17,26 @@ internal class IslandPresentationDecisionEvaluator(
     private val presentationState: IslandPresentationState
 ) {
     fun ownerEvidence(data: Any?): IslandRenderPolicy.OwnerEvidence {
-        if (data == null) return IslandRenderPolicy.OwnerEvidence.Pending
-        val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(data)
-        if (mediaInfo != null) {
-            return IslandRenderPolicy.OwnerEvidence.Media(mediaInfo.packageName)
-        }
-        return if (IslandProbeUtils.isMediaIsland(data)) {
-            IslandRenderPolicy.OwnerEvidence.Pending
-        } else {
-            IslandRenderPolicy.OwnerEvidence.NotMedia
+        val target = IslandModificationTargetPolicy.resolve(data)
+        return when (target.mediaState) {
+            IslandModificationTargetPolicy.MediaState.MEDIA -> {
+                IslandRenderPolicy.OwnerEvidence.Media(
+                    target.mediaInfo?.packageName.orEmpty()
+                )
+            }
+
+            IslandModificationTargetPolicy.MediaState.PENDING -> {
+                IslandRenderPolicy.OwnerEvidence.Pending
+            }
+
+            IslandModificationTargetPolicy.MediaState.NOT_MEDIA -> {
+                IslandRenderPolicy.OwnerEvidence.NotMedia
+            }
         }
     }
 
     fun isCurrentLyricOwner(mediaInfo: IslandProbeUtils.MediaIslandInfo): Boolean {
-        val lyricPackageName = LyriconDataBridge.currentLyricPackageName
-            ?.takeIf(String::isNotEmpty)
-            ?: return false
-        return mediaInfo.packageName == lyricPackageName
+        return IslandModificationTargetPolicy.isCurrentLyricOwner(mediaInfo)
     }
 
     /**
@@ -42,9 +46,7 @@ internal class IslandPresentationDecisionEvaluator(
      */
     fun isCurrentLyricLongPressTarget(data: Any?): Boolean {
         if (!IslandProbeUtils.isSuperIslandEnabled()) return false
-        if (!LyriconDataBridge.hasLyricsForPresentation()) return false
-        val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(data) ?: return false
-        return isCurrentLyricOwner(mediaInfo)
+        return IslandModificationTargetPolicy.isCurrentLyricPresentationTarget(data)
     }
 
     fun shouldRenderInjectedIsland(): Boolean {

@@ -3,12 +3,13 @@ package com.lidesheng.hyperlyric.root.island.effects.glow
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.view.View
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.HookEntry
-import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -119,7 +120,11 @@ object HookIslandGlow {
                 return@runCatching null
             }
 
-            val mediaInfoFromIsland = IslandProbeUtils.extractMediaIslandInfo(islandData)
+            val target = IslandModificationTargetPolicy.resolve(
+                data = islandData,
+                hostRoot = view as? ViewGroup
+            )
+            val mediaInfoFromIsland = target.mediaInfo
                 ?: run {
                     HookLogger.dState(
                         stateId = "HookIslandGlow.prepare",
@@ -131,15 +136,14 @@ object HookIslandGlow {
                     return@runCatching null
                 }
             val pkgName = mediaInfoFromIsland.packageName
-            val lyricPkg = LyriconDataBridge.currentLyricPackageName
-            if (pkgName.isEmpty() || lyricPkg.isNullOrEmpty() || pkgName != lyricPkg) {
+            if (pkgName.isEmpty() || !target.isCurrentLyricOwner) {
                 HookLogger.dState(
                     stateId = "HookIslandGlow.prepare",
                     tag = TAG,
-                    state = "lyric_owner_mismatch|$pkgName|${lyricPkg.orEmpty()}"
+                    state = "lyric_owner_mismatch|$pkgName"
                 ) {
                     "媒体岛光效颜色未准备: reason=lyric_owner_mismatch, " +
-                            "mediaPackage=$pkgName, lyricPackage=${lyricPkg ?: "<none>"}"
+                            "mediaPackage=$pkgName"
                 }
                 return@runCatching null
             }

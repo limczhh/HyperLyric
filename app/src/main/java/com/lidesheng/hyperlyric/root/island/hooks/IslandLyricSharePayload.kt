@@ -17,9 +17,17 @@ internal data class IslandLyricSharePayload(
 
 internal object IslandLyricSharePayloadBuilder {
 
-    fun build(view: View, prefs: SharedPreferences): IslandLyricSharePayload? {
-        val packageName = LyriconDataBridge.currentLyricPackageName
-            ?.takeIf(String::isNotBlank)
+    fun build(
+        view: View,
+        prefs: SharedPreferences,
+        targetPackageName: String? = null
+    ): IslandLyricSharePayload? {
+        val packageName = targetPackageName
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: LyriconDataBridge.currentLyricPackageName
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
             ?: return null
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(
             context = view.context,
@@ -30,11 +38,10 @@ internal object IslandLyricSharePayloadBuilder {
             prefs = prefs,
             mediaInfo = mediaInfo
         )
-        val currentLyric = currentLyricText() ?: return null
         val shareFields = listOfNotNull(
             lines.firstLine.takeIf(String::isNotBlank),
             lines.secondLine.takeIf(String::isNotBlank),
-            formatField("当前歌词", currentLyric)
+            currentLyricText()?.let { formatField("当前歌词", it) }
         )
         if (shareFields.isEmpty()) return null
 
