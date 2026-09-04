@@ -546,10 +546,21 @@ internal object IslandSlotStructureInjector {
     }
 
     fun linkViews(rootView: ViewGroup) {
+        // Real-root reconciliation sees both slots in one subtree, while module callbacks receive
+        // one area_* / fake_area_* at a time. Xiaomi's templates place those two areas under the
+        // same direct parent, so pair split gradients within that template instead of letting each
+        // Fake area restart the gradient independently.
+        val pairRoot = if (IslandProbeUtils.isRealBigIslandModuleArea(rootView) ||
+            IslandProbeUtils.isFakeBigIslandModuleArea(rootView)
+        ) {
+            rootView.parent as? ViewGroup ?: rootView
+        } else {
+            rootView
+        }
         val leftView =
-            rootView.findViewWithTag<View>(IslandProbeUtils.LEFT_TEST_VIEW_TAG) as? SpaceGateRichLyricLineView
+            pairRoot.findViewWithTag<View>(IslandProbeUtils.LEFT_TEST_VIEW_TAG) as? SpaceGateRichLyricLineView
         val rightView =
-            rootView.findViewWithTag<View>(IslandProbeUtils.RIGHT_TEST_VIEW_TAG) as? SpaceGateRichLyricLineView
+            pairRoot.findViewWithTag<View>(IslandProbeUtils.RIGHT_TEST_VIEW_TAG) as? SpaceGateRichLyricLineView
 
         leftView?.setSplitGradientConfig(isRightSide = false, sibling = rightView)
         rightView?.setSplitGradientConfig(isRightSide = true, sibling = leftView)
