@@ -34,6 +34,7 @@ import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -241,6 +242,26 @@ fun SuperIslandSettingsPage() {
             RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH,
             RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED
         )
+    }
+    var swipeThresholdDp by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+                RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+            ).coerceIn(
+                RootConstants.MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+                RootConstants.MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+            )
+        )
+    }
+    val swipeThresholdKeyPoints = remember {
+        listOf(
+            RootConstants.MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+            75,
+            100,
+            125,
+            RootConstants.MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+        ).map(Int::toFloat)
     }
     var extractGlowColor by remember {
         mutableStateOf(
@@ -799,6 +820,50 @@ fun SuperIslandSettingsPage() {
                                     )
                                 }
                             )
+                            AnimatedVisibility(
+                                visible = swipeBehavior != RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT
+                            ) {
+                                BasicComponent(
+                                    title = stringResource(id = R.string.title_island_swipe_threshold),
+                                    summary = stringResource(id = R.string.summary_island_swipe_threshold),
+                                    endActions = {
+                                        Text(
+                                            text = "${swipeThresholdDp}dp",
+                                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                        )
+                                    },
+                                    bottomAction = {
+                                        Slider(
+                                            value = swipeThresholdDp.toFloat(),
+                                            onValueChange = {
+                                                swipeThresholdDp = (it / RootConstants.STEP_HOOK_ISLAND_SWIPE_THRESHOLD_DP)
+                                                    .roundToInt()
+                                                    .times(RootConstants.STEP_HOOK_ISLAND_SWIPE_THRESHOLD_DP)
+                                                    .coerceIn(
+                                                        RootConstants.MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+                                                        RootConstants.MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+                                                    )
+                                            },
+                                            valueRange = RootConstants.MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP.toFloat()..
+                                                    RootConstants.MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP.toFloat(),
+                                            steps = ((RootConstants.MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP -
+                                                    RootConstants.MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP) /
+                                                    RootConstants.STEP_HOOK_ISLAND_SWIPE_THRESHOLD_DP) - 1,
+                                            onValueChangeFinished = {
+                                                saveConfig(
+                                                    RootConstants.KEY_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+                                                    swipeThresholdDp
+                                                )
+                                            },
+                                            showKeyPoints = true,
+                                            keyPoints = swipeThresholdKeyPoints,
+                                            magnetThreshold = 0f,
+                                            hapticEffect = SliderDefaults.SliderHapticEffect.Step
+                                        )
+                                    }
+                                )
+                            }
                             OverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_island_long_press_behavior),
                                 items = longPressBehaviorOptions,

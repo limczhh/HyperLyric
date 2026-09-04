@@ -489,6 +489,8 @@
   <string name="option_island_swipe_default">افتراضي</string>
   <string name="option_island_swipe_track_switch">السحب لليسار للسابق، ولليمين للتالي</string>
   <string name="option_island_swipe_track_switch_reversed">السحب لليسار للتالي، ولليمين للسابق</string>
+  <string name="title_island_swipe_threshold">عتبة السحب في HyperIsland</string>
+  <string name="summary_island_swipe_threshold">يؤدي السحب لمسافة تتجاوز العتبة إلى استعادة السلوك الأصلي</string>
   <string name="title_behavior_after_pause">السلوك بعد إيقاف الموسيقى مؤقتًا</string>
   <string name="option_after_pause_default">استعادة الافتراضي</string>
   <string name="option_after_pause_keep">الإبقاء زي ما هو</string>

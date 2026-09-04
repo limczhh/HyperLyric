@@ -485,6 +485,8 @@
     <string name="option_island_swipe_default">Default</string>
     <string name="option_island_swipe_track_switch">Left swipe previous, right swipe next</string>
     <string name="option_island_swipe_track_switch_reversed">Left swipe next, right swipe previous</string>
+    <string name="title_island_swipe_threshold">Super Island swipe threshold</string>
+    <string name="summary_island_swipe_threshold">Swiping a distance greater than the threshold restores native behavior</string>
     <string name="title_behavior_after_pause">Behavior after music paused</string>
     <string name="option_after_pause_default">Restore default</string>
     <string name="option_after_pause_keep">Keep unchanged</string>

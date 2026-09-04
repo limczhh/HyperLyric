@@ -10,10 +10,14 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
+import java.lang.ref.WeakReference
 import java.lang.reflect.Field
+import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.util.WeakHashMap
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Adds previous/next track gestures to the currently visible media island.
@@ -31,11 +35,23 @@ internal object IslandMediaSwipeHooker {
 
     private const val TOUCH_INTERACTOR_CLASS =
         "miui.systemui.dynamicisland.touch.domain.interactor.DynamicIslandTouchInteractor"
+    private const val TOUCH_CONSTANTS_REPOSITORY_CLASS =
+        "miui.systemui.dynamicisland.touch.data.repository.DynamicIslandTouchConstantsRepository"
     private val gestures = WeakHashMap<Any, GestureState>()
+    private val overriddenThresholdFlows = WeakHashMap<Any, Any>()
+    private val activeSwipeThresholdOverride = ThreadLocal<Int>()
+
+    @Volatile
+    private var nativeThresholdOverrideInstalled = false
 
     fun hook(module: XposedModule, cl: ClassLoader) {
         try {
             val touchInteractorClass = cl.loadClass(TOUCH_INTERACTOR_CLASS)
+
+            nativeThresholdOverrideInstalled = hookNativeSwipeThreshold(
+                module = module,
+                classLoader = touchInteractorClass.classLoader ?: cl
+            )
 
             val onInterceptTouchEvent = touchInteractorClass.declaredMethods.firstOrNull {
                 it.name == "onInterceptTouchEvent" &&
@@ -60,13 +76,61 @@ internal object IslandMediaSwipeHooker {
             module.hook(onInterceptTouchEvent).intercept(InterceptTouchHook())
             module.hook(onTouchEvent).intercept(TouchEventHook())
 
-            HookLogger.i(TAG, "媒体超级岛横滑切歌 Hook 已初始化")
+            HookLogger.i(
+                TAG,
+                "媒体超级岛横滑切歌 Hook 已初始化: nativeThresholdOverride=$nativeThresholdOverrideInstalled"
+            )
         } catch (e: ClassNotFoundException) {
             HookLogger.w(TAG, "未找到媒体超级岛横滑依赖，跳过切歌 Hook: reason=${e.message}")
         } catch (e: NoSuchMethodException) {
             HookLogger.w(TAG, "未找到媒体超级岛横滑方法，跳过切歌 Hook: reason=${e.message}")
         } catch (e: Exception) {
             HookLogger.e(TAG, "安装媒体超级岛横滑切歌 Hook 失败", e)
+        }
+    }
+
+    private fun hookNativeSwipeThreshold(
+        module: XposedModule,
+        classLoader: ClassLoader
+    ): Boolean {
+        return try {
+            val repositoryClass = classLoader.loadClass(TOUCH_CONSTANTS_REPOSITORY_CLASS)
+            val getSwipeThreshold = repositoryClass.declaredMethods.firstOrNull {
+                it.name == "getSwipeThreshold" &&
+                        it.parameterTypes.isEmpty() &&
+                        it.returnType.isInterface
+            } ?: throw NoSuchMethodException(
+                "$TOUCH_CONSTANTS_REPOSITORY_CLASS.getSwipeThreshold"
+            )
+
+            getSwipeThreshold.isAccessible = true
+            module.deoptimize(getSwipeThreshold)
+            module.hook(getSwipeThreshold).intercept(
+                SwipeThresholdHook(getSwipeThreshold.returnType)
+            )
+            true
+        } catch (e: ClassNotFoundException) {
+            HookLogger.w(TAG, "未找到原生超级岛滑动阈值仓库，使用原生阈值: reason=${e.message}")
+            false
+        } catch (e: NoSuchMethodException) {
+            HookLogger.w(TAG, "未找到原生超级岛滑动阈值方法，使用原生阈值: reason=${e.message}")
+            false
+        } catch (e: Exception) {
+            HookLogger.w(TAG, "覆盖原生超级岛滑动阈值失败，使用原生阈值", e)
+            false
+        }
+    }
+
+    private class SwipeThresholdHook(
+        private val returnType: Class<*>
+    ) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val original = chain.proceed() ?: return null
+            val overridePx = activeSwipeThresholdOverride.get() ?: return original
+            return createThresholdFlowOverride(
+                original = original,
+                returnType = returnType
+            ) ?: original
         }
     }
 
@@ -102,6 +166,10 @@ internal object IslandMediaSwipeHooker {
                 GestureTracker.markUp(interactor, event.getX(), event.getY())
             }
 
+            val previousThresholdOverride = activeSwipeThresholdOverride.get()
+            GestureTracker.nativeThresholdOverride(interactor)?.let {
+                activeSwipeThresholdOverride.set(it)
+            }
             return try {
                 val result = chain.proceed()
                 if (action == MotionEvent.ACTION_UP) {
@@ -109,6 +177,11 @@ internal object IslandMediaSwipeHooker {
                 }
                 result
             } finally {
+                if (previousThresholdOverride == null) {
+                    activeSwipeThresholdOverride.remove()
+                } else {
+                    activeSwipeThresholdOverride.set(previousThresholdOverride)
+                }
                 if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                     GestureTracker.clear(interactor)
                 }
@@ -163,6 +236,13 @@ internal object IslandMediaSwipeHooker {
             }
         }
 
+        fun nativeThresholdOverride(interactor: Any): Int? {
+            synchronized(gestures) {
+                val threshold = gestures[interactor]?.nativeSwipeThreshold ?: return null
+                return threshold.takeIf { it.isFinite() && it > 0f }?.roundToInt()
+            }
+        }
+
         fun clear(interactor: Any) {
             synchronized(gestures) {
                 gestures.remove(interactor)
@@ -194,7 +274,11 @@ internal object IslandMediaSwipeHooker {
             windowView = windowView,
             targetData = targetData,
             nativeTouchSlop = resolveTouchSlop(interactor, windowView),
-            nativeSwipeThreshold = resolveSwipeThreshold(interactor, windowView),
+            nativeSwipeThreshold = if (nativeThresholdOverrideInstalled) {
+                resolveConfiguredSwipeThreshold(windowView)
+            } else {
+                resolveSwipeThreshold(interactor, windowView)
+            },
             downX = downX,
             downY = downY
         )
@@ -296,6 +380,84 @@ internal object IslandMediaSwipeHooker {
             ?.takeIf { it.isFinite() && it > 0f }
             ?: 1f
         return FALLBACK_SWIPE_THRESHOLD_DP * density
+    }
+
+    private fun resolveConfiguredSwipeThreshold(windowView: Any): Float {
+        val thresholdDp = runCatching {
+            HookEntry.instance?.prefs?.getInt(
+                RootConstants.KEY_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+                RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+            ) ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+        }.getOrDefault(RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_THRESHOLD_DP).coerceIn(
+            RootConstants.MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP,
+            RootConstants.MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP
+        )
+        val density = (windowView as? View)?.resources?.displayMetrics?.density
+            ?.takeIf { it.isFinite() && it > 0f }
+            ?: 1f
+        return thresholdDp * density
+    }
+
+    private fun createThresholdFlowOverride(
+        original: Any,
+        returnType: Class<*>
+    ): Any? {
+        if (!returnType.isInterface) return null
+
+        return runCatching {
+            synchronized(overriddenThresholdFlows) {
+                val cached = overriddenThresholdFlows[original]
+                if (cached != null) {
+                    cached
+                } else {
+                    val originalReference = WeakReference(original)
+                    val handler = InvocationHandler { _, method, args ->
+                        val overrideValue = if (
+                            method.name == "getValue" && method.parameterTypes.isEmpty()
+                        ) {
+                            activeSwipeThresholdOverride.get()
+                        } else {
+                            null
+                        }
+                        if (overrideValue != null) {
+                            overrideValue
+                        } else {
+                            val target = originalReference.get()
+                            if (target == null) {
+                                defaultValue(method.returnType)
+                            } else {
+                                runCatching {
+                                    method.invoke(target, *(args ?: emptyArray()))
+                                }.getOrElse { defaultValue(method.returnType) }
+                            }
+                        }
+                    }
+                    val proxy = Proxy.newProxyInstance(
+                        returnType.classLoader ?: original.javaClass.classLoader,
+                        arrayOf(returnType),
+                        handler
+                    )
+                    overriddenThresholdFlows[original] = proxy
+                    proxy
+                }
+            }
+        }.onFailure {
+            HookLogger.w(TAG, "创建原生滑动阈值 Flow 代理失败，保留原生阈值", it)
+        }.getOrNull()
+    }
+
+    private fun defaultValue(type: Class<*>): Any? {
+        return when (type) {
+            Boolean::class.javaPrimitiveType -> false
+            Byte::class.javaPrimitiveType -> 0.toByte()
+            Short::class.javaPrimitiveType -> 0.toShort()
+            Int::class.javaPrimitiveType -> 0
+            Long::class.javaPrimitiveType -> 0L
+            Float::class.javaPrimitiveType -> 0f
+            Double::class.javaPrimitiveType -> 0.0
+            Char::class.javaPrimitiveType -> '\u0000'
+            else -> null
+        }
     }
 
     private fun readBoolean(receiver: Any, fieldName: String): Boolean? {

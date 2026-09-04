@@ -34,6 +34,7 @@ object RootConstants {
     const val KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE = "key_hook_island_behavior_after_pause"
     const val KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR = "key_hook_island_long_press_behavior"
     const val KEY_HOOK_ISLAND_SWIPE_BEHAVIOR = "key_hook_island_swipe_behavior"
+    const val KEY_HOOK_ISLAND_SWIPE_THRESHOLD_DP = "key_hook_island_swipe_threshold_dp"
     const val KEY_HOOK_NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE =
         "key_hook_notification_media_ambient_flow_mode"
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_ENABLED =
@@ -271,6 +272,10 @@ object RootConstants {
     const val ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH = 1
     const val ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED = 2
     const val DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR = ISLAND_SWIPE_BEHAVIOR_DEFAULT
+    const val MIN_HOOK_ISLAND_SWIPE_THRESHOLD_DP = 50
+    const val MAX_HOOK_ISLAND_SWIPE_THRESHOLD_DP = 150
+    const val STEP_HOOK_ISLAND_SWIPE_THRESHOLD_DP = 5
+    const val DEFAULT_HOOK_ISLAND_SWIPE_THRESHOLD_DP = 50
     const val NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED = 0
     const val NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DYNAMIC = 1
     const val NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_COVER_COLOR = 2
