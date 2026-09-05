@@ -31,17 +31,21 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.media.aod.AlwaysOnDisplayPa
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.island.IslandExpandedMediaCardPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.notification.NotificationCenterMediaCardPage
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
+import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 
 @Composable
 fun AppNavigation(startRoute: Route) {
     val backStack = rememberNavBackStack<Route>(startRoute)
     val navigator = remember { Navigator(backStack) }
+    val systemCornerRadius = rememberNavSystemCornerRadius()
 
     CompositionLocalProvider(LocalNavigator provides navigator) {
         NavDisplay(
             backStack = backStack,
-            onBack = { navigator.pop() }
+            onBack = { navigator.pop() },
+            effects = NavDisplayEffects(cornerClipRadius = systemCornerRadius)
         ) {
             entry<Route.Setup> {
                 SetupPage(onNavigateToMain = {
