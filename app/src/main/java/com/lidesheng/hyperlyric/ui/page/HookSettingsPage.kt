@@ -72,13 +72,36 @@ fun HookSettingsPage() {
             ) ?: "lyricon"
         )
     }
+    var islandWidthMode by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_WIDTH_MODE,
+                RootConstants.DEFAULT_HOOK_ISLAND_WIDTH_MODE
+            ).coerceIn(
+                RootConstants.ISLAND_WIDTH_MODE_FIXED,
+                RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
+            )
+        )
+    }
     DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
-            if (key == RootConstants.KEY_HOOK_LYRIC_SOURCE) {
-                lyricSource = sharedPreferences.getString(
-                    RootConstants.KEY_HOOK_LYRIC_SOURCE,
-                    RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
-                ) ?: RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
+            when (key) {
+                RootConstants.KEY_HOOK_LYRIC_SOURCE -> {
+                    lyricSource = sharedPreferences.getString(
+                        RootConstants.KEY_HOOK_LYRIC_SOURCE,
+                        RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
+                    ) ?: RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
+                }
+
+                RootConstants.KEY_HOOK_ISLAND_WIDTH_MODE -> {
+                    islandWidthMode = sharedPreferences.getInt(
+                        RootConstants.KEY_HOOK_ISLAND_WIDTH_MODE,
+                        RootConstants.DEFAULT_HOOK_ISLAND_WIDTH_MODE
+                    ).coerceIn(
+                        RootConstants.ISLAND_WIDTH_MODE_FIXED,
+                        RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
+                    )
+                }
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -91,12 +114,13 @@ fun HookSettingsPage() {
         "lyricinfo" -> stringResource(R.string.lyric_source_lyricinfo)
         else -> stringResource(R.string.lyric_source_lyricon)
     }
-    val widthModeLabel = if (prefs.getInt(
-            RootConstants.KEY_HOOK_ISLAND_WIDTH_MODE,
-            RootConstants.DEFAULT_HOOK_ISLAND_WIDTH_MODE
-        ) == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
-    ) stringResource(R.string.option_super_island_width_dynamic)
-    else stringResource(R.string.option_super_island_width_fixed)
+    val widthModeLabel = if (
+        islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
+    ) {
+        stringResource(R.string.option_super_island_width_dynamic)
+    } else {
+        stringResource(R.string.option_super_island_width_fixed)
+    }
     var hookEnabled by remember {
         mutableStateOf(
             prefs.getBoolean(

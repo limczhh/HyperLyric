@@ -452,7 +452,6 @@
   <string name="content_layout_field_elapsed">الوقت المنقضي</string>
   <string name="content_layout_field_remaining">الوقت المتبقي</string>
   <string name="content_layout_field_progress_percent">نسبة تقدّم التشغيل</string>
-  <string name="title_super_island_width_mode">وضع عرض HyperIsland</string>
   <string name="option_super_island_width_fixed">عرض ثابت</string>
   <string name="option_super_island_width_dynamic">عرض ديناميكي</string>
   <string name="title_split_lyric">كلمات منفصلة</string>
@@ -460,6 +459,8 @@
   <string name="option_dynamic_width_basis_all">مدمج</string>
   <string name="option_dynamic_width_basis_lyric_only">الكلمات فقط</string>
   <string name="title_super_island_width">عرض HyperIsland</string>
+  <string name="summary_super_island_width_fixed">العرض الحالي: %1$d</string>
+  <string name="summary_super_island_width_dynamic">العرض الحالي: %1$d - %2$d</string>
   <string name="title_super_island_disable_width_limit">إزالة الحد الأقصى لطول HyperIsland</string>
   <string name="label_content_width_range">النطاق: %1$d ~ %2$d</string>
   <string name="title_left_padding">حشو المحتوى الأيسر</string>

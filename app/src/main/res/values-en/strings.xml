@@ -448,7 +448,6 @@
     <string name="content_layout_field_elapsed">Elapsed Time</string>
     <string name="content_layout_field_remaining">Remaining Time</string>
     <string name="content_layout_field_progress_percent">Playback Progress</string>
-    <string name="title_super_island_width_mode">Super Island Width Mode</string>
     <string name="option_super_island_width_fixed">Fixed width</string>
     <string name="option_super_island_width_dynamic">Dynamic width</string>
     <string name="title_split_lyric">Split lyrics</string>
@@ -456,6 +455,8 @@
     <string name="option_dynamic_width_basis_all">Combined</string>
     <string name="option_dynamic_width_basis_lyric_only">Lyrics only</string>
     <string name="title_super_island_width">Super Island Width</string>
+    <string name="summary_super_island_width_fixed">Current width: %1$d</string>
+    <string name="summary_super_island_width_dynamic">Current width: %1$d - %2$d</string>
     <string name="title_super_island_disable_width_limit">Remove Super Island maximum length limit</string>
     <string name="label_content_width_range">Range: %1$d ~ %2$d</string>
     <string name="title_left_padding">Left Content Padding</string>

@@ -473,7 +473,6 @@
     <string name="content_layout_field_elapsed">已播放时间</string>
     <string name="content_layout_field_remaining">剩余时间</string>
     <string name="content_layout_field_progress_percent">播放进度</string>
-    <string name="title_super_island_width_mode">超级岛长度模式</string>
     <string name="option_super_island_width_fixed">固定长度</string>
     <string name="option_super_island_width_dynamic">动态长度</string>
     <string name="title_split_lyric">分离歌词</string>
@@ -481,6 +480,8 @@
     <string name="option_dynamic_width_basis_all">综合判断</string>
     <string name="option_dynamic_width_basis_lyric_only">仅歌词</string>
     <string name="title_super_island_width">超级岛长度</string>
+    <string name="summary_super_island_width_fixed">当前长度：%1$d</string>
+    <string name="summary_super_island_width_dynamic">当前长度：%1$d - %2$d</string>
     <string name="title_super_island_disable_width_limit">解除超级岛最大长度限制</string>
     <string name="label_content_width_range">范围：%1$d ~ %2$d</string>
     <string name="title_left_padding">左侧内容内边距</string>

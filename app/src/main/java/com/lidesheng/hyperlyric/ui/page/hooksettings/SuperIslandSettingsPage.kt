@@ -27,14 +27,13 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.common.SuperIslandWidthPolicy
 import com.lidesheng.hyperlyric.common.UIConstants
-import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.component.PaddingInputDialog
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -312,7 +311,6 @@ fun SuperIslandSettingsPage() {
 
     var showLeftPaddingDialog by remember { mutableStateOf(false) }
     var showRightPaddingDialog by remember { mutableStateOf(false) }
-    var showIslandWidthDialog by remember { mutableStateOf(false) }
 
     fun saveConfig(key: String, value: Any) {
         prefs.edit {
@@ -517,20 +515,6 @@ fun SuperIslandSettingsPage() {
         }
     ) { innerPadding ->
         val lazyListState = rememberLazyListState()
-        NumberInputDialog(
-            show = showIslandWidthDialog,
-            title = stringResource(id = R.string.title_super_island_width),
-            label = stringResource(
-                id = R.string.label_content_width_range,
-                islandWidthMin,
-                islandWidthMax
-            ),
-            initialValue = islandWidth,
-            min = islandWidthMin,
-            max = islandWidthMax,
-            onDismiss = { showIslandWidthDialog = false },
-            onConfirm = { commitIslandWidth(it) }
-        )
         PaddingInputDialog(
             show = showLeftPaddingDialog,
             title = stringResource(id = R.string.title_left_padding),
@@ -600,6 +584,20 @@ fun SuperIslandSettingsPage() {
                 }
                 item(key = "layout_title") { SmallTitle(text = stringResource(id = R.string.title_layout)) }
                 item(key = "layout_content") {
+                    val islandWidthSummary = if (
+                        islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
+                    ) {
+                        stringResource(
+                            id = R.string.summary_super_island_width_dynamic,
+                            dynamicWidthRange.start.roundToInt(),
+                            dynamicWidthRange.endInclusive.roundToInt(),
+                        )
+                    } else {
+                        stringResource(
+                            id = R.string.summary_super_island_width_fixed,
+                            islandWidth,
+                        )
+                    }
                     Card(
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
@@ -608,42 +606,13 @@ fun SuperIslandSettingsPage() {
                     ) {
                         Column {
                             OverlayDropdownPreference(
-                                title = stringResource(id = R.string.title_super_island_width_mode),
+                                title = stringResource(id = R.string.title_super_island_width),
+                                summary = islandWidthSummary,
                                 items = islandWidthModeOptions,
                                 selectedIndex = islandWidthMode,
                                 onSelectedIndexChange = {
                                     islandWidthMode = it
                                     saveConfig(RootConstants.KEY_HOOK_ISLAND_WIDTH_MODE, it)
-                                }
-                            )
-                            AnimatedVisibility(
-                                visible = islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
-                            ) {
-                                OverlayDropdownPreference(
-                                    title = stringResource(id = R.string.title_dynamic_width_basis),
-                                    items = dynamicWidthBasisOptions,
-                                    selectedIndex = dynamicWidthBasis,
-                                    onSelectedIndexChange = {
-                                        dynamicWidthBasis = it
-                                        saveConfig(
-                                            RootConstants.KEY_HOOK_ISLAND_DYNAMIC_WIDTH_BASIS,
-                                            it
-                                        )
-                                    }
-                                )
-                            }
-                            ArrowPreference(
-                                title = stringResource(id = R.string.title_super_island_width),
-                                endActions = {
-                                    Text(
-                                        if (islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC) {
-                                            "${dynamicWidthRange.start.roundToInt()}~${dynamicWidthRange.endInclusive.roundToInt()}"
-                                        } else {
-                                            "$islandWidth"
-                                        },
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                    )
                                 },
                                 bottomAction = {
                                     if (islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC) {
@@ -684,36 +653,38 @@ fun SuperIslandSettingsPage() {
                                             hapticEffect = SliderDefaults.SliderHapticEffect.Step
                                         )
                                     }
-                                },
-                                onClick = {
-                                    if (islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_FIXED) {
-                                        showIslandWidthDialog = true
+                                }
+                            )
+                            AnimatedVisibility(
+                                visible = islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
+                            ) {
+                                OverlayDropdownPreference(
+                                    title = stringResource(id = R.string.title_dynamic_width_basis),
+                                    items = dynamicWidthBasisOptions,
+                                    selectedIndex = dynamicWidthBasis,
+                                    onSelectedIndexChange = {
+                                        dynamicWidthBasis = it
+                                        saveConfig(
+                                            RootConstants.KEY_HOOK_ISLAND_DYNAMIC_WIDTH_BASIS,
+                                            it
+                                        )
                                     }
+                                )
+                            }
+                            SwitchPreference(
+                                title = stringResource(id = R.string.title_super_island_disable_width_limit),
+                                checked = disableWidthLimit,
+                                onCheckedChange = { enabled ->
+                                    disableWidthLimit = enabled
+                                    clampIslandWidthIfNeeded(audioCover, audioRhythm)
+                                    clampDynamicWidthRangeIfNeeded(audioCover, audioRhythm)
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT,
+                                        enabled
+                                    )
                                 }
                             )
                         }
-                    }
-                }
-                item(key = "disable_width_limit") {
-                    Card(
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .fillMaxWidth()
-                    ) {
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_super_island_disable_width_limit),
-                            checked = disableWidthLimit,
-                            onCheckedChange = { enabled ->
-                                disableWidthLimit = enabled
-                                clampIslandWidthIfNeeded(audioCover, audioRhythm)
-                                clampDynamicWidthRangeIfNeeded(audioCover, audioRhythm)
-                                saveConfig(
-                                    RootConstants.KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT,
-                                    enabled
-                                )
-                            }
-                        )
                     }
                 }
                 item(key = "padding_content") {
