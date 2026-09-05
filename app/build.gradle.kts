@@ -16,8 +16,6 @@ android {
         versionCode = 1938
         versionName = "7.4"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
         ndk {
             abiFilters.add("arm64-v8a")
         }
@@ -103,7 +101,6 @@ dependencies {
 
     // --- 调试工具 ---
     debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     // --- 网络与序列化 (在线歌词) ---
     implementation(libs.kotlinx.serialization.json)
@@ -117,7 +114,6 @@ dependencies {
     implementation(libs.daimajia.animations) { artifact { type = "aar" } }
     implementation(libs.daimajia.easing) { artifact { type = "aar" } }
 
-    testImplementation("junit:junit:4.13.2")
 }
 
 apply(from = "fetch_contributors.gradle")

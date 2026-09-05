@@ -16,7 +16,7 @@ internal data class PluginProcessingRequestKey(
     val processorSetFingerprint: String = "",
 )
 
-/** Small deterministic last-request guard used by the root sink and local unit tests. */
+/** Small deterministic last-request guard used by the root lyric sink. */
 internal class PluginProcessingRequestTracker {
     private var lastStarted: PluginProcessingRequestKey? = null
 
