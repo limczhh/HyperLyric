@@ -4,20 +4,30 @@ import java.time.LocalDate
 import java.time.MonthDay
 
 object QuotesData {
-    private const val MAO_ZEDONG_DEATH_YEAR = 1976
-    private val maoZedongRemembranceDay = MonthDay.of(9, 9)
-    private val remembranceQuoteTemplates = listOf(
+    private const val TEACHER_MAO_DEATH_YEAR = 1976
+    private const val TEACHER_MAO_BIRTH_YEAR = 1893
+    private val teacherMaoRemembranceDay = MonthDay.of(9, 9)
+    private val teacherMaoBirthday = MonthDay.of(12, 26)
+    private val teacherMaoRemembranceQuoteTemplates = listOf(
         "深切缅怀伟大的无产阶级革命导师毛泽东同志逝世%s周年",
         "沉痛悼念伟大的领袖和导师毛泽东主席逝世%s周年",
     )
+    private val teacherMaoBirthdayQuoteTemplates = listOf(
+        "纪念伟大领袖毛泽东主席诞辰%s周年",
+        "纪念伟大导师毛泽东同志诞辰%s周年",
+    )
 
     fun quoteFor(date: LocalDate): String? {
-        if (MonthDay.from(date) != maoZedongRemembranceDay) return null
+        val (baseYear, quoteTemplates) = when (MonthDay.from(date)) {
+            teacherMaoRemembranceDay -> TEACHER_MAO_DEATH_YEAR to teacherMaoRemembranceQuoteTemplates
+            teacherMaoBirthday -> TEACHER_MAO_BIRTH_YEAR to teacherMaoBirthdayQuoteTemplates
+            else -> return null
+        }
 
-        val anniversary = date.year - MAO_ZEDONG_DEATH_YEAR
+        val anniversary = date.year - baseYear
         if (anniversary <= 0) return null
 
-        return remembranceQuoteTemplates.random().format(anniversary.toChineseNumber())
+        return quoteTemplates.random().format(anniversary.toChineseNumber())
     }
 
     val list = listOf(
