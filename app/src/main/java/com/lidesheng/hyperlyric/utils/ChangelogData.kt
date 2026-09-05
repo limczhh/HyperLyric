@@ -10,6 +10,19 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "7.5-1939",
+                title = "优化了一些体验",
+                summary = "- 新增超级岛修改范围（边缘光效进度条不受该选项控制）\n" +
+                        "- 新增超级岛滑动行为\n" +
+                        "- 优化超级岛歌词过渡动画\n" +
+                        "- 优化模拟逐字歌词在分离歌词下的表现\n" +
+                        "- 优化超级岛设置页面，合并超级岛长度模式和长度进度条\n" +
+                        "- 优化应用内页面过渡圆角效果\n" +
+                        "- 优化超级岛歌词插件的使用体验\n" +
+                        "- 更新主页诗词卡片内容\n" +
+                        "- 更改 lyricinfo 歌词源解析方法"
+            ),
+            ChangelogItem(
                 version = "7.4-1938",
                 title = "修复了一些错误",
                 summary = "- 新增隐藏歌名别名功能\n" +

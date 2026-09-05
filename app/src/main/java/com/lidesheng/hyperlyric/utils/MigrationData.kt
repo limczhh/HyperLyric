@@ -14,6 +14,16 @@ data class MigrationNote(
 object MigrationData {
     val notes = listOf(
         MigrationNote(
+            versionCode = 1939,
+            items = listOf(
+                MigrationItem(
+                    text = "温馨提示",
+                    summary = "使用 lyricinfo 歌词源的用户需要下载 v6 版本以继续正常使用",
+                    url = "https://github.com/limczhh/LyricInfo/releases/tag/v6"
+                )
+            )
+        ),
+        MigrationNote(
             versionCode = 1937,
             items = listOf(
                 MigrationItem(
