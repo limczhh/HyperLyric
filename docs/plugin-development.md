@@ -60,7 +60,7 @@
 
 插件设置写在 Manifest 的 Settings Schema 中，由宿主生成设置页面。不要在插件里自己依赖 Compose、Miuix 或创建 Android 页面。API Key 等敏感值要声明 `backup: false`。
 
-设置、存储、缓存和日志的写法见[Plugin API 与配置参考](plugins/api.md)。需要缓存管理时，在 Manifest 使用 `cacheScopes` 声明 `id`、插件自定义的 `title` 和可选 `summary`，再以相同 `id` 注册 `PluginCacheExtension`。宿主以 `title` 生成入口与页面标题，`summary` 只是可选元数据，不保证显示。插件自己维护缓存索引、entryId 映射与条目展示元数据；宿主只通过带 requestId 和一次性 response token 的跨进程请求调用列表与清理，由 SystemUI 向 App 受控 Provider 回传有界结果，绝不解析插件缓存 JSON。缓存正文、API Key 和完整翻译不能放入 `PluginCacheEntry`。
+设置、存储、缓存和日志的写法见[Plugin API 与配置参考](plugins/api.md)。需要缓存管理时，在 Manifest 使用 `cacheScopes` 声明 `id`、插件自定义的 `title` 和可选 `summary`，再以相同 `id` 注册 `PluginCacheExtension`。未声明 `cacheScopes` 的插件不会创建缓存状态；已声明但尚未写入正文时也不会创建缓存文件。宿主以 `title` 生成入口与页面标题，`summary` 只是可选元数据，不保证显示。插件自己维护缓存索引、entryId 映射与条目展示元数据；宿主只通过带 requestId 和一次性 response token 的跨进程请求调用列表与清理，由 SystemUI 向 App 受控 Provider 回传有界结果，绝不解析插件缓存 JSON。缓存正文、API Key 和完整翻译不能放入 `PluginCacheEntry`。
 
 ### 5. 打包并验证
 

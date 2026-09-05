@@ -84,6 +84,19 @@ class TranslationCacheTest {
     }
 
     @Test
+    fun cacheBodyIsReadableWithoutMetadataIndex() {
+        val cacheStore = FakePluginCache()
+        val key = "a".repeat(64)
+        cacheStore.values["cache.entry.v3.$key"] =
+            "[{\"index\":0,\"trans\":\"direct hit\"}]"
+
+        val lookup = TranslationCache(cacheStore, NO_OP_LOGGER).get(key)
+
+        assertEquals("direct hit", lookup?.items?.single()?.trans)
+        assertFalse(cacheStore.values.containsKey("cache.index.v3"))
+    }
+
+    @Test
     fun cacheKeyExcludesApiKeyButIncludesResultInputs() {
         val song = song()
         val base = config()
@@ -188,6 +201,7 @@ class TranslationCacheTest {
         val cache = TranslationCache(cacheStore, NO_OP_LOGGER)
 
         assertTrue(cache.listEntries().isEmpty())
+        assertFalse(cacheStore.values.containsKey("cache.index.v3"))
         cache.put("c".repeat(64), listOf(TranslationItem(0, "translated")), song())
 
         assertEquals(1, cache.listEntries().size)

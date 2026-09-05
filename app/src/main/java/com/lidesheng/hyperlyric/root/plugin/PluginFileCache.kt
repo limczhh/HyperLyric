@@ -44,10 +44,14 @@ internal class FilePluginCache(
             logger.warn(message)
             throw IllegalArgumentException(message)
         }
+        if (value.isEmpty()) {
+            remove(key)
+            return
+        }
         synchronized(lock) {
             check(writeFileValue(key, value)) { "无法写入插件缓存: key=$key" }
-            check(legacyPreferences.edit().remove(key).commit()) {
-                "无法移除旧版插件缓存: key=$key"
+            if (legacyPreferences.all.containsKey(key)) {
+                legacyPreferences.edit().remove(key).apply()
             }
         }
     }
@@ -82,7 +86,7 @@ internal class FilePluginCache(
         if (!isValidKey(key)) return false
         return synchronized(lock) {
             val file = fileForKey(key)
-            hasReadableFile(file) || legacyPreferences.contains(key)
+            hasReadableFile(file) || hasLegacyValue(key)
         }
     }
 
@@ -92,8 +96,10 @@ internal class FilePluginCache(
             val file = fileForKey(key)
             deleteFileIfPresent(file)
             deleteFileIfPresent(File(file.path + ".bak"))
-            check(legacyPreferences.edit().remove(key).commit()) {
-                "无法删除旧版插件缓存: key=$key"
+            if (legacyPreferences.all.containsKey(key)) {
+                check(legacyPreferences.edit().remove(key).commit()) {
+                    "无法删除旧版插件缓存: key=$key"
+                }
             }
         }
     }
@@ -103,8 +109,10 @@ internal class FilePluginCache(
             directory.listFiles()?.forEach { file ->
                 if (file.isFile) deleteFileIfPresent(file)
             }
-            check(legacyPreferences.edit().clear().commit()) {
-                "无法清空旧版插件缓存"
+            if (legacyPreferences.all.isNotEmpty()) {
+                check(legacyPreferences.edit().clear().commit()) {
+                    "无法清空旧版插件缓存"
+                }
             }
         }
     }
@@ -121,6 +129,12 @@ internal class FilePluginCache(
                 input.bufferedReader(Charsets.UTF_8).use { reader -> reader.readText() }
             }
         }
+            .map { value ->
+                value.takeIf(String::isNotEmpty) ?: run {
+                    removeFile(file)
+                    null
+                }
+            }
             .onFailure {
                 logger.warn("读取缓存文件失败: key=$key", it)
                 removeFile(file)
@@ -133,11 +147,15 @@ internal class FilePluginCache(
         val backup = File(file.path + ".bak")
         if (!file.isFile && !backup.isFile) return false
         return runCatching {
-            AtomicFile(file).openRead().use { isWithinLimit(file.length()) }
+            AtomicFile(file).openRead().use {
+                file.length() > 0L && isWithinLimit(file.length())
+            }
         }.onFailure { error ->
             logger.warn("检查缓存文件失败: file=${file.name}", error)
             removeFile(file)
-        }.getOrDefault(false)
+        }.getOrDefault(false).also { readable ->
+            if (!readable) removeFile(file)
+        }
     }
 
     private fun migrateLegacyValue(key: String): String? {
@@ -145,6 +163,10 @@ internal class FilePluginCache(
             .onFailure { logger.warn("读取旧缓存失败: key=$key", it) }
             .getOrNull()
             ?: return null
+        if (legacy.isEmpty()) {
+            legacyPreferences.edit().remove(key).apply()
+            return null
+        }
         if (!isWithinLimit(legacy.toByteArray(Charsets.UTF_8))) {
             legacyPreferences.edit().remove(key).apply()
             return null
@@ -154,6 +176,12 @@ internal class FilePluginCache(
         }
         return legacy
     }
+
+    private fun hasLegacyValue(key: String): Boolean = runCatching {
+        legacyPreferences.getString(key, null)?.isNotEmpty() == true
+    }.onFailure { error ->
+        logger.warn("检查旧缓存失败: key=$key", error)
+    }.getOrDefault(false)
 
     private fun writeFileValue(key: String, value: String): Boolean {
         val bytes = value.toByteArray(Charsets.UTF_8)

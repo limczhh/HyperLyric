@@ -19,6 +19,7 @@ internal class RuntimePluginContext(
     override val pluginId: String,
     application: Application,
     preferences: SharedPreferences,
+    cacheDeclared: Boolean,
 ) : PluginContext {
     private val extensionLock = Any()
     private val extensions = mutableListOf<HyperLyricExtension>()
@@ -26,14 +27,18 @@ internal class RuntimePluginContext(
     override val hostApiVersion: Int = HYPERLYRIC_PLUGIN_API_VERSION
     override val config: PluginConfig = SharedPreferencesPluginConfig(preferences)
     override val logger: PluginLogger = RuntimePluginLogger(pluginId)
-    override val cache: PluginCache = FilePluginCache(
-        directory = PluginCacheFileLayout.directory(application, pluginId),
-        legacyPreferences = application.getSharedPreferences(
-            PluginConstants.cachePreferences(pluginId),
-            Context.MODE_PRIVATE
-        ),
-        logger = logger.withTag("PluginCache")
-    )
+    override val cache: PluginCache = if (cacheDeclared) {
+        FilePluginCache(
+            directory = PluginCacheFileLayout.directory(application, pluginId),
+            legacyPreferences = application.getSharedPreferences(
+                PluginConstants.cachePreferences(pluginId),
+                Context.MODE_PRIVATE
+            ),
+            logger = logger.withTag("PluginCache")
+        )
+    } else {
+        NoOpPluginCache
+    }
     override val storage: PluginStorage = SharedPreferencesPluginStorage(
         application.getSharedPreferences(
             PluginConstants.storagePreferences(pluginId),
@@ -54,6 +59,23 @@ internal class RuntimePluginContext(
     fun registeredExtensions(): List<HyperLyricExtension> = synchronized(extensionLock) {
         extensions.toList()
     }
+}
+
+/** A plugin without manifest cache scopes must not create or observe cache state. */
+private object NoOpPluginCache : PluginCache {
+    override fun getString(key: String): String? = null
+
+    override fun putString(key: String, value: String) = Unit
+
+    override fun getBytes(key: String): ByteArray? = null
+
+    override fun putBytes(key: String, value: ByteArray) = Unit
+
+    override fun contains(key: String): Boolean = false
+
+    override fun remove(key: String) = Unit
+
+    override fun clear() = Unit
 }
 
 private class SharedPreferencesPluginConfig(

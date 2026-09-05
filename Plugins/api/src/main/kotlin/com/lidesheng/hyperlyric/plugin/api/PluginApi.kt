@@ -57,7 +57,10 @@ public interface PluginContext {
     public val hostApiVersion: Int
     public val config: PluginConfig
     public val logger: PluginLogger
-    /** Host-owned persistent cache; the plugin controls keys and serialization only. */
+    /**
+     * Host-owned persistent cache; the plugin controls keys and serialization only.
+     * If the manifest declares no cache scope, the host supplies a no-op cache.
+     */
     public val cache: PluginCache
     public val storage: PluginStorage
 

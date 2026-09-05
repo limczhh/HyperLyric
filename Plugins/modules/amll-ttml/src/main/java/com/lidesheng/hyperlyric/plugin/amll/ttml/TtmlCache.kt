@@ -99,24 +99,24 @@ internal class TtmlCache(
             .digest(semanticKey.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { byte -> "%02x".format(byte) }
 
+    /** The body is authoritative for lookup; the index is only an optional listing aid. */
     fun get(semanticKey: String): CacheLookup? = synchronized(lock) {
         val physicalKey = physicalKeyOf(semanticKey)
         memory[physicalKey]?.let { return@synchronized CacheLookup(it, fromMemory = true) }
-
-        val index = readIndexLocked()
-        if (index.none { it.key == physicalKey }) return@synchronized null
 
         val raw = runCatching { storage.getString(entryKey(physicalKey)) }.getOrElse {
             logger.warn("读取缓存失败: key=${shortKey(semanticKey)}", it)
             return@synchronized null
         } ?: run {
-            // 索引命中但条目缺失：损坏条目，自愈删除
-            removeEntryLocked(index, physicalKey)
+            return@synchronized null
+        }
+
+        if (raw.isEmpty()) {
+            runCatching { storage.remove(entryKey(physicalKey)) }
             return@synchronized null
         }
 
         memory[physicalKey] = raw
-        touchIndexLocked(index, physicalKey)
         CacheLookup(raw, fromMemory = false)
     }
 
@@ -229,16 +229,6 @@ internal class TtmlCache(
         removeEntryLocked(readIndexLocked(), physicalKey)
     }
 
-    /** get 持久层命中后把记录移到索引头部（LRU 顺序），元数据保持不变 */
-    private fun touchIndexLocked(index: List<CacheRecord>, key: String) {
-        val record = index.firstOrNull { it.key == key } ?: return
-        val updated = index.toMutableList().apply {
-            removeAll { it.key == key }
-            add(0, record)
-        }
-        writeIndexLocked(updated)
-    }
-
     private fun readIndexLocked(): List<CacheRecord> {
         migrateLegacyIndexLocked()
         val raw = runCatching { storage.getString(INDEX_KEY) }.getOrElse {
@@ -255,8 +245,8 @@ internal class TtmlCache(
                 }
             }.distinctBy { it.key }.take(MAX_ENTRIES)
         }.getOrElse {
-            // 索引损坏：清空重建（条目成为孤儿，LRU 淘汰/自愈路径最终清理）
-            logger.warn("缓存索引损坏，重建索引", it)
+            // 索引损坏：只删除索引；正文仍可按物理 key 命中，列表暂时为空。
+            logger.warn("缓存索引损坏，已删除并按空列表处理", it)
             runCatching { storage.remove(INDEX_KEY) }
             emptyList()
         }
@@ -286,7 +276,9 @@ internal class TtmlCache(
             return
         }
         val now = System.currentTimeMillis()
-        val records = keys.map { key ->
+        val records = keys.filter { key ->
+            runCatching { storage.contains(entryKey(key)) }.getOrDefault(false)
+        }.map { key ->
             CacheRecord(
                 key = key,
                 title = "已缓存歌词",
@@ -295,7 +287,9 @@ internal class TtmlCache(
                 sizeBytes = null
             )
         }
-        runCatching { storage.putString(INDEX_KEY, encodeIndex(records)) }
+        if (records.isNotEmpty()) {
+            runCatching { storage.putString(INDEX_KEY, encodeIndex(records)) }
+        }
         runCatching { storage.remove(LEGACY_INDEX_KEY) }
     }
 

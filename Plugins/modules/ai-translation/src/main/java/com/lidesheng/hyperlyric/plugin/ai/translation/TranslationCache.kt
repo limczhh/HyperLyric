@@ -37,22 +37,20 @@ internal class TranslationCache(
 
     fun currentGeneration(): Long = synchronized(lock) { generation }
 
+    /** The body is authoritative for lookup; the index is only an optional listing aid. */
     fun get(key: String): CacheLookup? = synchronized(lock) {
         memory[key]?.let { return@synchronized CacheLookup(it, fromMemory = true) }
 
-        val index = readIndexLocked()
-        if (index.none { it.key == key }) return@synchronized null
         val raw = runCatching { storage.getString(entryKey(key)) }.getOrElse {
-            logger.error("查询翻译缓存失败", it)
+            logger.warn("读取翻译缓存失败", it)
             return@synchronized null
         } ?: run {
-            removeEntryLocked(index, key)
             return@synchronized null
         }
         val items = decode(raw)
         if (items.isNullOrEmpty()) {
-            logger.error("查询翻译缓存失败")
-            removeEntryLocked(index, key)
+            logger.warn("翻译缓存内容损坏，已删除: key=$key")
+            runCatching { storage.remove(entryKey(key)) }
             return@synchronized null
         }
 
@@ -74,7 +72,7 @@ internal class TranslationCache(
             }
             val encoded = encode(items)
             runCatching { storage.putString(entryKey(key), encoded) }.onFailure {
-                logger.error("写入翻译缓存失败", it)
+                logger.warn("写入翻译缓存失败", it)
                 return
             }
             memory[key] = items
@@ -94,7 +92,7 @@ internal class TranslationCache(
                     val removed = removeAt(lastIndex)
                     memory.remove(removed.key)
                     runCatching { storage.remove(entryKey(removed.key)) }.onFailure {
-                        logger.error("删除翻译缓存失败", it)
+                        logger.warn("删除翻译缓存失败", it)
                     }
                 }
             }
@@ -148,7 +146,7 @@ internal class TranslationCache(
 
     private fun readIndexLocked(): List<CacheRecord> {
         val raw = runCatching { storage.getString(INDEX_KEY) }.getOrElse {
-            logger.error("查询翻译缓存索引失败", it)
+            logger.warn("读取翻译缓存索引失败", it)
             return emptyList()
         } ?: return emptyList()
         return runCatching {
@@ -161,8 +159,8 @@ internal class TranslationCache(
                 }
             }.distinctBy { it.key }.take(MAX_ENTRIES)
         }.getOrElse { error ->
-            logger.warn("翻译缓存索引损坏，已安全重建", error)
-            rebuildIndexLocked()
+            logger.warn("翻译缓存索引损坏，已删除并按空列表处理", error)
+            runCatching { storage.remove(INDEX_KEY) }
             emptyList()
         }
     }
@@ -187,23 +185,17 @@ internal class TranslationCache(
             storage.remove(entryKey(key))
             true
         }.onFailure { error ->
-            logger.error("删除翻译缓存失败", error)
+            logger.warn("删除翻译缓存失败", error)
         }.getOrDefault(false)
         val indexWritten = if (updated.size != index.size) writeIndexLocked(updated) else true
         return entryRemoved && indexWritten
-    }
-
-    private fun rebuildIndexLocked() {
-        runCatching { storage.putString(INDEX_KEY, encodeIndex(emptyList())) }.onFailure {
-            logger.error("重建翻译缓存索引失败", it)
-        }
     }
 
     private fun writeIndexLocked(index: List<CacheRecord>): Boolean = runCatching {
         storage.putString(INDEX_KEY, encodeIndex(index))
         true
     }.onFailure { error ->
-        logger.error("写入翻译缓存索引失败", error)
+        logger.warn("写入翻译缓存索引失败", error)
     }.getOrDefault(false)
 
     private fun encode(items: List<TranslationItem>): String = JSONArray().apply {

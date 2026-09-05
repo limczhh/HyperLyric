@@ -68,11 +68,14 @@ internal class PluginCacheCoordinator(
                 if (marker.getString(LAST_CACHE_CLEAR_TOKEN_KEY, null) == token) {
                     return@runCatching
                 }
-                val cleared = application.getSharedPreferences(
+                val legacyPreferences = application.getSharedPreferences(
                     PluginConstants.cachePreferences(pluginId),
                     Context.MODE_PRIVATE
-                ).edit().clear().commit()
-                check(cleared) { "cache clear commit returned false" }
+                )
+                if (legacyPreferences.all.isNotEmpty()) {
+                    val cleared = legacyPreferences.edit().clear().commit()
+                    check(cleared) { "cache clear commit returned false" }
+                }
                 cancelActiveProcessing()
                 clearLoadedPluginCache(pluginId)
                 clearPluginCacheFiles(pluginId)

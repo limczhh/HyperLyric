@@ -519,7 +519,12 @@ class PluginRuntime(
         val plugin = entryClass.getDeclaredConstructor().apply { isAccessible = true }
             .newInstance() as HyperLyricPlugin
         val preferences = module.getRemotePreferences(PluginConstants.configGroup(pluginId))
-        val context = RuntimePluginContext(pluginId, application, preferences)
+        val context = RuntimePluginContext(
+            pluginId = pluginId,
+            application = application,
+            preferences = preferences,
+            cacheDeclared = archive.manifest.cacheScopes.isNotEmpty()
+        )
 
         try {
             plugin.onLoad(context)
