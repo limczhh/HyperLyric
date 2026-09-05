@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
@@ -90,15 +91,17 @@ class PluginRuntime(
     @Volatile
     private var enabledPluginIds: Set<String> = emptySet()
     private val enabledPluginReconcilePending = AtomicBoolean(false)
+    @Volatile
+    private var processingSetChangedListener: (() -> Unit)? = null
 
     private val registryListener = SharedPreferences.OnSharedPreferenceChangeListener { preferences, key ->
         if (key == PluginConstants.REMOTE_ENABLED_IDS_KEY) {
-            // A global toggle is a boundary for the next song, not a cancellation signal for the
-            // current request. Keep this callback limited to the lightweight processor gate;
-            // lifecycle cleanup is deferred until the next processSong call.
             val updatedEnabledIds = readEnabledPluginIds(preferences)
+            if (updatedEnabledIds == enabledPluginIds) return@OnSharedPreferenceChangeListener
             enabledPluginIds = updatedEnabledIds
             enabledPluginReconcilePending.set(true)
+            cancelActiveProcessing()
+            processingSetChangedListener?.invoke()
         }
         if (key == PluginConstants.REMOTE_CACHE_CLEAR_TOKENS_KEY) {
             cacheCoordinator.consumePendingCacheClears(registryPreferences)
@@ -108,7 +111,11 @@ class PluginRuntime(
         }
     }
 
-    fun loadEnabledPlugins() {
+    fun setProcessingSetChangedListener(listener: (() -> Unit)?) {
+        processingSetChangedListener = listener
+    }
+
+    fun loadInstalledPlugins() {
         if (closed.get()) return
 
         val registry = runCatching {
@@ -128,10 +135,18 @@ class PluginRuntime(
         enabledPluginIds = enabledIds
         enabledPluginReconcilePending.set(false)
         registry.registerOnSharedPreferenceChangeListener(registryListener)
-        if (enabledIds.isEmpty()) {
+
+        val installedFiles = pluginFileEntries(registry.all).toMutableMap()
+        // Keep compatibility with older registries that only published enabled IDs and the
+        // deterministic legacy file name. New registries publish one file.<pluginId> entry for
+        // every installed plugin, regardless of its enabled state.
+        enabledIds.forEach { pluginId ->
+            installedFiles.putIfAbsent(pluginId, resolvePluginFileName(registry, pluginId))
+        }
+        if (installedFiles.isEmpty()) {
             rebuildExtensionRegistries()
             cacheCoordinator.consumePendingCacheOperations(registry)
-            HookLogger.d(TAG, "没有启用的 HyperLyric 插件")
+            HookLogger.d(TAG, "没有已安装的 HyperLyric 插件")
             return
         }
 
@@ -140,15 +155,20 @@ class PluginRuntime(
             return
         }
 
-        enabledIds.sorted().forEach { pluginId ->
-            val fileName = resolvePluginFileName(registry, pluginId)
+        installedFiles.toSortedMap().forEach { (pluginId, fileName) ->
             if (fileName !in remoteFiles) {
                 HookLogger.w(TAG, "插件文件不存在: id=$pluginId, file=$fileName")
                 return@forEach
             }
             synchronized(pluginLoadLock) {
                 if (loadedPlugins.any { it.manifest.id == pluginId }) return@synchronized
-                runCatching { loadPlugin(pluginId, fileName, enableProcessing = true) }
+                runCatching {
+                    loadPlugin(
+                        pluginId = pluginId,
+                        fileName = fileName,
+                        enableProcessing = pluginId in enabledIds
+                    )
+                }
                     .onFailure { error ->
                         HookLogger.w(TAG, "插件加载失败: id=$pluginId", error)
                     }
@@ -159,7 +179,7 @@ class PluginRuntime(
         cacheCoordinator.consumePendingCacheOperations(registry)
         HookLogger.i(
             TAG,
-            "插件 Runtime 初始化完成: enabled=${enabledIds.size}, " +
+            "插件 Runtime 初始化完成: installed=${installedFiles.size}, enabled=${enabledIds.size}, " +
                 "loaded=${loadedPlugins.size}, processors=${extensionRegistry.processorCount()}, " +
                     "cacheExtensions=${extensionRegistry.cacheExtensionCount()}"
         )
@@ -178,22 +198,10 @@ class PluginRuntime(
             .getOrElse { emptySet() }
         enabledPluginIds = currentEnabledIds
 
-        val disabledIds = synchronized(pluginLoadLock) {
+        synchronized(pluginLoadLock) {
             loadedPlugins
                 .filter { it.processingEnabled && it.manifest.id !in currentEnabledIds }
-                .mapTo(linkedSetOf()) { it.manifest.id }
-        }
-        if (disabledIds.isNotEmpty()) {
-            removeDisabledProcessors(disabledIds)
-            synchronized(pluginLoadLock) {
-                val pluginsToUnload = loadedPlugins.filter { loaded ->
-                    loaded.processingEnabled &&
-                            loaded.manifest.id in disabledIds &&
-                            loaded.manifest.id !in enabledPluginIds
-                }
-                loadedPlugins.removeAll(pluginsToUnload.toSet())
-                pluginsToUnload.asReversed().forEach(::unloadLoadedPlugin)
-            }
+                .forEach(::disableLoadedPlugin)
         }
 
         if (closed.get() || currentEnabledIds.isEmpty()) {
@@ -236,10 +244,6 @@ class PluginRuntime(
         rebuildExtensionRegistries()
     }
 
-    private fun removeDisabledProcessors(disabledIds: Set<String>) {
-        extensionRegistry.removeDisabledProcessors(disabledIds)
-    }
-
     private fun rebuildExtensionRegistries() {
         val loaded = synchronized(pluginLoadLock) { loadedPlugins.toList() }
         extensionRegistry.rebuild(loaded, enabledPluginIds)
@@ -262,22 +266,19 @@ class PluginRuntime(
         if (closed.get()) return
         val currentGeneration = generation.incrementAndGet()
         activeJob?.cancel()
-        if (enabledPluginReconcilePending.compareAndSet(true, false)) {
-            // The previous request has already reached its normal next-song cancellation point.
-            // Cleanup can now run asynchronously without interrupting the new request.
-            registryPreferences?.let { registry ->
-                scope.launch { reconcileEnabledPlugins(registry) }
-            }
-        }
-        val currentProcessors = extensionRegistry.processingSnapshot(enabledPluginIds)
-        if (currentProcessors.isEmpty()) {
-            runCatching { onResult(null) }.onFailure { error ->
-                HookLogger.w(TAG, "插件结果回调失败", error)
-            }
-            return
-        }
 
         activeJob = scope.launch {
+            reconcilePendingEnabledPlugins()
+            if (!isActive || currentGeneration != generation.get()) return@launch
+
+            val currentProcessors = extensionRegistry.processingSnapshot(enabledPluginIds)
+            if (currentProcessors.isEmpty()) {
+                runCatching { onResult(null) }.onFailure { error ->
+                    HookLogger.w(TAG, "插件结果回调失败", error)
+                }
+                return@launch
+            }
+
             var current = song
             val changedFields = linkedSetOf<PluginSongField>()
             val changedLyricFields = linkedSetOf<PluginLyricField>()
@@ -350,6 +351,14 @@ class PluginRuntime(
         }
     }
 
+    private suspend fun reconcilePendingEnabledPlugins() {
+        val registry = registryPreferences ?: return
+        while (enabledPluginReconcilePending.compareAndSet(true, false)) {
+            reconcileEnabledPlugins(registry)
+            if (!currentCoroutineContext().isActive || closed.get()) return
+        }
+    }
+
     fun cancelActiveProcessing() {
         generation.incrementAndGet()
         activeJob?.cancel()
@@ -366,6 +375,7 @@ class PluginRuntime(
         }
         extensionRegistry.clear()
         cacheCoordinator.close()
+        processingSetChangedListener = null
         registryPreferences?.let { preferences ->
             runCatching { preferences.unregisterOnSharedPreferenceChangeListener(registryListener) }
         }
@@ -439,8 +449,8 @@ class PluginRuntime(
     }
 
     /**
-     * A disabled plugin does not run lyric processors, but its declared cache remains user-owned
-     * data. Load it only when the App asks to manage that cache, without invoking [onEnable].
+     * A disabled plugin normally remains loaded from SystemUI startup. This fallback is for a
+     * plugin whose startup load failed or for a registry written by an older host.
      */
     private fun findOrLoadPluginForCache(pluginId: String): LoadedPlugin? =
         synchronized(pluginLoadLock) {
@@ -472,6 +482,17 @@ class PluginRuntime(
         ?.getString(PluginConstants.remoteFileKey(pluginId), null)
         ?.takeIf(String::isNotBlank)
         ?: PluginRemoteFileNames.forId(pluginId)
+
+    private fun disableLoadedPlugin(loaded: LoadedPlugin) {
+        if (!loaded.processingEnabled) return
+        loaded.processingEnabled = false
+        loaded.listener?.let { listener ->
+            runCatching {
+                loaded.preferences.unregisterOnSharedPreferenceChangeListener(listener)
+            }
+        }
+        loaded.listener = null
+    }
 
     private fun cacheOperationFailure(
         request: PluginCacheOperationRequest,
@@ -526,7 +547,7 @@ class PluginRuntime(
         }
         HookLogger.i(
             TAG,
-            "插件已${if (enableProcessing) "启用" else "为缓存管理加载"}: " +
+            "插件已${if (enableProcessing) "启用" else "加载（未启用）"}: " +
                     "id=$pluginId, version=${archive.manifest.version}, " +
                     "extensions=${context.registeredExtensions().size}"
         )
@@ -564,8 +585,7 @@ class PluginRuntime(
             loaded.processingEnabled = true
             registerConfigListener(loaded)
         } catch (error: Throwable) {
-            loadedPlugins.remove(loaded)
-            unloadLoadedPlugin(loaded)
+            disableLoadedPlugin(loaded)
             throw error
         }
     }

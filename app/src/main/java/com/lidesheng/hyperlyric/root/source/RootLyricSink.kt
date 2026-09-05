@@ -107,6 +107,13 @@ class RootLyricSink(
 
     init {
         MediaMetadataHelper.addActiveSessionsObserver(activeSessionsObserver)
+        pluginRuntime?.setProcessingSetChangedListener {
+            mainHandler.post {
+                if (closed) return@post
+                invalidatePluginRequest(reason = "processing_set_changed")
+                schedulePluginProcessing()
+            }
+        }
     }
 
     override fun onSongChanged(song: Song?) {
@@ -615,6 +622,7 @@ class RootLyricSink(
 
     override fun close() {
         closed = true
+        pluginRuntime?.setProcessingSetChangedListener(null)
         MediaMetadataHelper.removeActiveSessionsObserver(activeSessionsObserver)
         mainHandler.removeCallbacks(sessionBindingRefreshRunnable)
         cancelArtworkColorRefresh()

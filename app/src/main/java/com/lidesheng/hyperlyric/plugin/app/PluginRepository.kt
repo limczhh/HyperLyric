@@ -169,8 +169,9 @@ class PluginRepository(private val context: Context) {
         val installed = listInstalled().firstOrNull { it.manifest.id == pluginId }
             ?: throw IllegalArgumentException("插件未安装: $pluginId")
         val service = requireService()
-        // The registry is the host-side load and execution gate. Keep the activation setting in
-        // sync as a plugin-level defense so the plugin can also stop work at its own boundary.
+        // The remote file map controls what SystemUI can load; this registry only gates whether
+        // an already loaded plugin participates in lyric processing. Keep the activation setting
+        // in sync as a plugin-level defense so the plugin can also stop work at its own boundary.
         val ids = registry.getStringSet(
             PluginConstants.REMOTE_ENABLED_IDS_KEY,
             emptySet()

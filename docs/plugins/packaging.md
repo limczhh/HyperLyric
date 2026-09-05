@@ -96,7 +96,7 @@ Release ZIP：
 .\gradlew.bat :plugins:my-plugin:packagePlugin --max-workers=2
 ```
 
-在 HyperLyric 的插件管理中安装 ZIP，完成配置并启用。安装、卸载或代码升级后重启 SystemUI；启用/禁用和普通配置修改会实时同步，不需要重启。
+在 HyperLyric 的插件管理中安装 ZIP，完成配置并启用。安装、卸载或代码升级后重启 SystemUI；重启时所有已安装插件都会加载，启用/禁用和普通配置修改会实时同步，不需要重启。
 
 ## 验证清单
 

@@ -7,6 +7,7 @@ public const val HYPERLYRIC_PLUGIN_API_VERSION: Int = 1
 public interface HyperLyricPlugin {
     public fun onLoad(context: PluginContext)
 
+    /** Called when the host allows this loaded plugin to participate in processing. */
     public fun onEnable() {}
 
     public fun onConfigChanged(config: PluginConfig) {}

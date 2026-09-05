@@ -316,7 +316,7 @@ class HookEntry : XposedModule() {
 
             val renderer = BaseIslandRenderer
             pluginRuntime = runCatching {
-                PluginRuntime(this, app).also { it.loadEnabledPlugins() }
+                PluginRuntime(this, app).also { it.loadInstalledPlugins() }
             }.onFailure { error ->
                 HookLogger.w(TAG, "插件 Runtime 初始化失败，继续使用原有歌词链路", error)
             }.getOrNull()

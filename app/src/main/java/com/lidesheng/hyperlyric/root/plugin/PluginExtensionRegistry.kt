@@ -59,11 +59,6 @@ internal class PluginExtensionRegistry {
             "${registered.pluginId}:${registered.extension.id}:${registered.extension.stage.name}"
         }
 
-    fun removeDisabledProcessors(disabledIds: Set<String>) {
-        if (disabledIds.isEmpty()) return
-        processors = processors.filter { it.pluginId !in disabledIds }
-    }
-
     fun findCacheExtension(pluginId: String, scopeId: String): PluginCacheExtension? =
         cacheExtensions.firstOrNull {
             it.pluginId == pluginId && it.extension.id == scopeId
