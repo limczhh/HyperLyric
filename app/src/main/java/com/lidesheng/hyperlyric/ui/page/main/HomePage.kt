@@ -22,6 +22,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun HomePage(
     outerPadding: PaddingValues,
     quote: String,
+    isDateSpecificQuote: Boolean,
     onQuoteClick: () -> Unit,
     onQuoteLongPress: () -> Unit,
     onSuperIslandConfigClick: () -> Unit,
@@ -69,6 +70,7 @@ fun HomePage(
             ) {
                 homePageSections(
                     quote = quote,
+                    isDateSpecificQuote = isDateSpecificQuote,
                     onQuoteClick = onQuoteClick,
                     onQuoteLongPress = onQuoteLongPress,
                     onSuperIslandConfigClick = onSuperIslandConfigClick,

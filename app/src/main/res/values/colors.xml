@@ -2,6 +2,8 @@
 <resources>
     <color name="app_window_background">#FFF7F7F7</color>
     <color name="app_icon_red">#FFE60012</color>
+    <color name="quote_special_card_red">#FFFFA8B0</color>
+    <color name="quote_special_text_red">@color/app_icon_red</color>
     <color name="ic_launcher_background">@color/app_icon_red</color>
     <color name="ic_launcher_foreground">#FFFFFFFF</color>
 </resources>

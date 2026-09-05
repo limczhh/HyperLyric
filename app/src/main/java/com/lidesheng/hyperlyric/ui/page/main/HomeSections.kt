@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lidesheng.hyperlyric.R
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -18,6 +20,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.homePageSections(
     quote: String,
+    isDateSpecificQuote: Boolean,
     onQuoteClick: () -> Unit,
     onQuoteLongPress: () -> Unit,
     onSuperIslandConfigClick: () -> Unit,
@@ -33,14 +36,26 @@ fun LazyListScope.homePageSections(
             modifier = Modifier
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth(),
+            colors = if (isDateSpecificQuote) {
+                CardDefaults.defaultColors(
+                    color = colorResource(R.color.quote_special_card_red),
+                    contentColor = colorResource(R.color.quote_special_text_red),
+                )
+            } else {
+                CardDefaults.defaultColors()
+            },
             onClick = onQuoteClick,
             onLongPress = onQuoteLongPress,
         ) {
             Text(
                 text = quote,
                 fontSize = 13.sp,
-                lineHeight = 18.sp,
-                color = MiuixTheme.colorScheme.onSurface,
+                lineHeight = 20.sp,
+                color = if (isDateSpecificQuote) {
+                    colorResource(R.color.quote_special_text_red)
+                } else {
+                    MiuixTheme.colorScheme.onSurface
+                },
                 modifier = Modifier.padding(16.dp)
             )
         }

@@ -424,6 +424,7 @@ fun MainPage() {
                     HomePage(
                         outerPadding = innerPadding,
                         quote = dateSpecificQuote ?: randomQuote,
+                        isDateSpecificQuote = dateSpecificQuote != null,
                         onQuoteClick = { randomQuote = QuotesData.list.random() },
                         onQuoteLongPress = { navigator.navigate(Route.Poetry) },
                         onSuperIslandConfigClick = { navigator.navigate(Route.HookSettings) },
