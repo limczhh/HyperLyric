@@ -1,6 +1,25 @@
 package com.lidesheng.hyperlyric.ui.utils
 
+import java.time.LocalDate
+import java.time.MonthDay
+
 object QuotesData {
+    private const val MAO_ZEDONG_DEATH_YEAR = 1976
+    private val maoZedongRemembranceDay = MonthDay.of(9, 9)
+    private val remembranceQuoteTemplates = listOf(
+        "深切缅怀伟大的无产阶级革命导师毛泽东同志逝世%s周年",
+        "沉痛悼念伟大的领袖和导师毛泽东主席逝世%s周年",
+    )
+
+    fun quoteFor(date: LocalDate): String? {
+        if (MonthDay.from(date) != maoZedongRemembranceDay) return null
+
+        val anniversary = date.year - MAO_ZEDONG_DEATH_YEAR
+        if (anniversary <= 0) return null
+
+        return remembranceQuoteTemplates.random().format(anniversary.toChineseNumber())
+    }
+
     val list = listOf(
         "怅寥廓，问苍茫大地，谁主沉浮？",
         "恰同学少年，风华正茂；书生意气，挥斥方遒。指点江山，激扬文字，粪土当年万户侯。曾记否，到中流击水，浪遏飞舟？",
@@ -88,4 +107,30 @@ object QuotesData {
         "对抗是矛盾斗争的一种形式，而不是矛盾斗争的一切形式。",
         "下定决心，不怕牺牲，排除万难，去争取胜利。"
     )
+
+    private fun Int.toChineseNumber(): String {
+        if (this !in 1 until 10000) return toString()
+
+        val digits = "零一二三四五六七八九"
+        val units = arrayOf("千", "百", "十", "")
+        val divisors = intArrayOf(1000, 100, 10, 1)
+
+        return buildString {
+            var started = false
+            var zeroPending = false
+            for (index in divisors.indices) {
+                val digit = (this@toChineseNumber / divisors[index]) % 10
+                if (digit == 0) {
+                    if (started) zeroPending = true
+                    continue
+                }
+
+                if (zeroPending) append('零')
+                if (!(index == 2 && digit == 1 && !started)) append(digits[digit])
+                append(units[index])
+                started = true
+                zeroPending = false
+            }
+        }
+    }
 }

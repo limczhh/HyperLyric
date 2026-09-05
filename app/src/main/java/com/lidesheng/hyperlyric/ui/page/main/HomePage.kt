@@ -21,7 +21,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HomePage(
     outerPadding: PaddingValues,
-    randomQuote: String,
+    quote: String,
     onQuoteClick: () -> Unit,
     onQuoteLongPress: () -> Unit,
     onSuperIslandConfigClick: () -> Unit,
@@ -68,7 +68,7 @@ fun HomePage(
                 contentPadding = contentPadding,
             ) {
                 homePageSections(
-                    randomQuote = randomQuote,
+                    quote = quote,
                     onQuoteClick = onQuoteClick,
                     onQuoteLongPress = onQuoteLongPress,
                     onSuperIslandConfigClick = onSuperIslandConfigClick,

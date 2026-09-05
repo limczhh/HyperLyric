@@ -90,6 +90,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.time.LocalDate
 
 @Composable
 fun MainPage() {
@@ -107,6 +108,7 @@ fun MainPage() {
 
     // --- quote ---
     var randomQuote by rememberSaveable { mutableStateOf(QuotesData.list.random()) }
+    val dateSpecificQuote = remember { QuotesData.quoteFor(LocalDate.now()) }
 
     // --- toast messages ---
     val msgNoRoot = stringResource(R.string.toast_no_root)
@@ -421,7 +423,7 @@ fun MainPage() {
                 if (page == 0) {
                     HomePage(
                         outerPadding = innerPadding,
-                        randomQuote = randomQuote,
+                        quote = dateSpecificQuote ?: randomQuote,
                         onQuoteClick = { randomQuote = QuotesData.list.random() },
                         onQuoteLongPress = { navigator.navigate(Route.Poetry) },
                         onSuperIslandConfigClick = { navigator.navigate(Route.HookSettings) },

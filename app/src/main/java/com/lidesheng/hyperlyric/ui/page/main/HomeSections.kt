@@ -17,7 +17,7 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.homePageSections(
-    randomQuote: String,
+    quote: String,
     onQuoteClick: () -> Unit,
     onQuoteLongPress: () -> Unit,
     onSuperIslandConfigClick: () -> Unit,
@@ -37,7 +37,7 @@ fun LazyListScope.homePageSections(
             onLongPress = onQuoteLongPress,
         ) {
             Text(
-                text = randomQuote,
+                text = quote,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
                 color = MiuixTheme.colorScheme.onSurface,
