@@ -153,6 +153,18 @@ public data class PluginCacheEntry(
     val summary: String? = null,
     val sizeBytes: Long? = null,
     val updatedAtEpochMs: Long? = null,
+    /**
+     * Optional human-readable detail lines (label/value) for the host cache-management detail
+     * page. Labels must already be localized by the plugin; the value is display-only text.
+     * An empty list means "no details available" and is fully backward compatible.
+     */
+    val details: List<PluginCacheDetail> = emptyList(),
+)
+
+/** One display-only detail line for [PluginCacheEntry.details]; values are never cache bodies. */
+public data class PluginCacheDetail(
+    val label: String,
+    val value: String,
 )
 
 /** Stable read-only media and lyric snapshot passed across the plugin boundary. */
@@ -320,6 +332,12 @@ public data class PluginSettingSpec(
     val backup: Boolean = true,
     /** Optional host UI group; settings with the same group share one settings surface. */
     val group: String? = null,
+    /**
+     * Optional external link for [PluginSettingType.ACTION] settings; only http/https URIs are
+     * rendered as clickable by the host. Other types ignore this field. Action settings never
+     * persist a value, so this is a static manifest property.
+     */
+    val uri: String? = null,
 )
 
 public data class PluginSettingsSchema(
