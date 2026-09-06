@@ -7,11 +7,13 @@ import java.io.StringReader
 import java.util.Locale
 
 /**
- * 从 TTML 头部 <head><metadata> 提取 amll:meta 与 ttm:agent，映射为可读 label 的
- * 键值对，供缓存管理详情页展示（映射参考 amll.dev TTMLMetadata 结构，spec 表 1）。
+ * 从 TTML 提取元数据与能力标记，映射为可读 label 的键值对，供缓存管理详情页展示
+ * （映射参考 amll.dev TTMLMetadata 结构，spec 表 1）。
  *
- * - 仅读取 head 区域元数据（遇到 </head> 或 <body> 停止），不解析正文行；
- * - 组内保持出现顺序、多值去重保序合并；
+ * - head 区域 amll:meta / ttm:agent 与 body 区域行内 ttm:agent、x-translation 均参与提取：
+ *   meta 组内保持出现顺序、多值去重保序合并（同字段多值换行显示）；
+ *   对唱歌词 = 正文行实际使用的不同 ttm:agent ≥ 2；翻译 = 行内 x-translation span
+ *   或 head iTunesMetadata 块级 translation，两者信息齐备后提前停止扫描；
  * - 未知 amll:meta 键以原始 key 兜底（rawProperties 语义）；
  * - 任何解析异常返回空列表，绝不抛出；
  * - 输出条目与值做防御截断（label ≤32、value ≤120，对齐宿主 sanitize 预算）。
@@ -42,8 +44,8 @@ internal object TtmlMetadataExtractor {
      * @param ttml TTML 原文
      * @param useZhLabels 详情 label 语言（true=中文 / false=英文）；默认跟随设备语言，
      * label 在缓存写入时随设备语言固化
-     * @return 按固定顺序（歌曲名→歌手→专辑→ISRC→平台 ID→歌词作者→演唱者→其他键）排列的
-     * 详情行；无元数据/解析失败返回空列表
+     * @return 按固定顺序（歌曲名→歌手→专辑→ISRC→平台 ID→歌词作者→对唱歌词→翻译→其他键）
+     * 排列的详情行；无元数据/解析失败返回空列表
      */
     fun extract(
         ttml: String,
@@ -61,7 +63,10 @@ internal object TtmlMetadataExtractor {
 
         // 组内去重保序：LinkedHashSet
         val groups = LinkedHashMap<String, LinkedHashSet<String>>()
-        val agents = LinkedHashSet<String>()
+        // 正文行实际使用的 ttm:agent（对唱判定依据：不同演唱者 ≥ 2 才有左右分侧效果）
+        val bodyAgents = LinkedHashSet<String>()
+        // 翻译标记：行内 x-translation span 或 head iTunesMetadata 块级 translation
+        var hasTranslation = false
 
         while (true) {
             when (parser.next()) {
@@ -74,44 +79,59 @@ internal object TtmlMetadataExtractor {
                         }
                     }
 
-                    "agent" -> attrValue(parser, "id")?.let { agents.add(it) }
+                    // head iTunesMetadata 块级翻译（body 中无此本地名）
+                    "translation" -> hasTranslation = true
 
-                    // head 结束，进入正文：正文行只有 ttm:agent 属性，不再有 meta/agent 元素
-                    "body" -> break
+                    // 正文行携带的演唱者（p 仅出现在 body）
+                    "p" -> attrValue(parser, "agent")?.let { bodyAgents.add(it) }
+
+                    // 行内翻译 span（head transliteration 的 span 无 role，不会误判）
+                    "span" -> if (!hasTranslation &&
+                        attrValue(parser, "role") == "x-translation"
+                    ) {
+                        hasTranslation = true
+                    }
                 }
 
-                XmlPullParser.END_TAG -> if (parser.name == "head") break
                 XmlPullParser.END_DOCUMENT -> break
             }
+            // 对唱与翻译信息齐备即可停止扫描（meta 全部位于 head，已收集完成）
+            if (hasTranslation && bodyAgents.size >= 2) break
         }
 
-        if (groups.isEmpty() && agents.isEmpty()) return emptyList()
-        return buildDetails(groups, agents, useZhLabels)
+        if (groups.isEmpty() && bodyAgents.size < 2 && !hasTranslation) return emptyList()
+        return buildDetails(groups, bodyAgents.size >= 2, hasTranslation, useZhLabels)
     }
 
     private fun buildDetails(
         groups: Map<String, LinkedHashSet<String>>,
-        agents: Set<String>,
+        hasDuet: Boolean,
+        hasTranslation: Boolean,
         useZhLabels: Boolean,
     ): List<PluginCacheDetail> {
         val details = mutableListOf<PluginCacheDetail>()
 
         fun label(zh: String, en: String): String = if (useZhLabels) zh else en
 
-        fun slashGroup(key: String): String? =
-            groups[key]?.joinToString(" / ")?.takeIf { it.isNotEmpty() }
+        fun flagValue(present: Boolean): String =
+            if (useZhLabels) {
+                if (present) "有" else "无"
+            } else {
+                if (present) "Yes" else "No"
+            }
 
         fun newlineGroup(key: String): String? =
             groups[key]?.joinToString("\n")?.takeIf { it.isNotEmpty() }
 
-        // 组间固定顺序：歌曲名 → 歌手 → 专辑 → ISRC → 平台 ID（ncm→apple→spotify→qq）
-        slashGroup("musicName")?.let {
+        // 组间固定顺序：歌曲名 → 歌手 → 专辑 → ISRC → 平台 ID（ncm→apple→spotify→qq），
+        // 同字段多值逐行显示
+        newlineGroup("musicName")?.let {
             details.add(PluginCacheDetail(label("歌曲名", "Song Name"), it))
         }
-        slashGroup("artists")?.let {
+        newlineGroup("artists")?.let {
             details.add(PluginCacheDetail(label("歌手", "Artist"), it))
         }
-        slashGroup("album")?.let {
+        newlineGroup("album")?.let {
             details.add(PluginCacheDetail(label("专辑", "Album"), it))
         }
         newlineGroup("isrc")?.let {
@@ -130,29 +150,29 @@ internal object TtmlMetadataExtractor {
             details.add(PluginCacheDetail(label("QQ 音乐 ID", "QQ Music ID"), it))
         }
 
-        // 歌词作者：ttmlAuthorGithubLogin(用户名) + ttmlAuthorGithub(数字 ID) 合并为
-        // "用户名 (ID)"；仅出现一项时按存在项展示，两项皆缺不出该行
-        val authorLogin = groups["ttmlAuthorGithubLogin"]?.firstOrNull()
-        val authorGithubId = groups["ttmlAuthorGithub"]?.firstOrNull()
-        when {
-            authorLogin != null && authorGithubId != null ->
-                details.add(
-                    PluginCacheDetail(label("歌词作者", "Author"), "$authorLogin ($authorGithubId)")
-                )
+        // 歌词作者：单作者合并为 "用户名 (ID)"；多作者逐行显示用户名（login 与数字 ID
+        // 是两组独立多值键、无法可靠配对，仅单作者时合并）；login 缺失时用数字 ID 兜底
+        val authorLogins = groups["ttmlAuthorGithubLogin"].orEmpty().toList()
+        val authorGithubIds = groups["ttmlAuthorGithub"].orEmpty().toList()
+        val authorValue = when {
+            authorLogins.size == 1 && authorGithubIds.size == 1 ->
+                "${authorLogins[0]} (${authorGithubIds[0]})"
 
-            authorLogin != null ->
-                details.add(PluginCacheDetail(label("歌词作者", "Author"), authorLogin))
-
-            authorGithubId != null ->
-                details.add(PluginCacheDetail(label("歌词作者", "Author"), authorGithubId))
+            authorLogins.isNotEmpty() -> authorLogins.joinToString("\n")
+            authorGithubIds.isNotEmpty() -> authorGithubIds.joinToString("\n")
+            else -> null
+        }
+        authorValue?.let {
+            details.add(PluginCacheDetail(label("歌词作者", "Author"), it))
         }
 
-        // 演唱者：收集全部 agent id
-        if (agents.isNotEmpty()) {
-            details.add(
-                PluginCacheDetail(label("演唱者（Agent）", "Agent"), agents.joinToString(" / "))
-            )
-        }
+        // 对唱歌词 / 翻译：有能力标记即输出（有/无二值），便于快速识别缓存歌词能力
+        details.add(
+            PluginCacheDetail(label("对唱歌词", "Duet Lyrics"), flagValue(hasDuet))
+        )
+        details.add(
+            PluginCacheDetail(label("翻译", "Translation"), flagValue(hasTranslation))
+        )
 
         // 其他未知 amll:meta 键：按首次出现顺序，label 即原始 key，同键换行合并
         groups.filterKeys { it !in KNOWN_KEYS }.forEach { (key, values) ->

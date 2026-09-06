@@ -54,6 +54,7 @@ class TtmlMetadataExtractorTest {
           </head>
           <body>
             <p begin="0.500" end="2.000" ttm:agent="v1">test</p>
+            <p begin="2.000" end="3.000" ttm:agent="v2">line2<span ttm:role="x-translation" xml:lang="zh-CN">测试</span></p>
           </body>
         </tt>
     """.trimIndent()
@@ -62,14 +63,14 @@ class TtmlMetadataExtractorTest {
     fun fullSampleExtractsAllGroupsInFixedOrder() {
         val details = TtmlMetadataExtractor.extract(sampleTtml, useZhLabels = true)
 
-        assertEquals(10, details.size)
+        assertEquals(11, details.size)
         assertEquals("歌曲名", details[0].label)
-        assertEquals("No Dazzle, No Break / 《崩坏：星穹铁道》乱破角色PV曲 / 不乱不破 / 不亂不破", details[0].value)
+        assertEquals("No Dazzle, No Break\n《崩坏：星穹铁道》乱破角色PV曲\n不乱不破\n不亂不破", details[0].value)
         assertEquals("歌手", details[1].label)
-        assertEquals("HOYO-MiX / Reol(れをる)", details[1].value)
+        assertEquals("HOYO-MiX\nReol(れをる)", details[1].value)
         assertEquals("专辑", details[2].label)
         assertEquals(
-            "No Dazzle, No Break / 不乱不破 / 不亂不破 / 乱破 / Honkai: Star Rail / 崩坏：星穹铁道 / 角色PV主题曲",
+            "No Dazzle, No Break\n不乱不破\n不亂不破\n乱破\nHonkai: Star Rail\n崩坏：星穹铁道\n角色PV主题曲",
             details[2].value
         )
         assertEquals("ISRC", details[3].label)
@@ -85,8 +86,11 @@ class TtmlMetadataExtractorTest {
         // 作者合并：用户名 (数字 ID)
         assertEquals("歌词作者", details[8].label)
         assertEquals("ITManCHINA (50987405)", details[8].value)
-        assertEquals("演唱者（Agent）", details[9].label)
-        assertEquals("v1 / v2", details[9].value)
+        // 正文 v1/v2 交替 → 对唱"有"；行内 x-translation → 翻译"有"
+        assertEquals("对唱歌词", details[9].label)
+        assertEquals("有", details[9].value)
+        assertEquals("翻译", details[10].label)
+        assertEquals("有", details[10].value)
     }
 
     @Test
@@ -98,7 +102,10 @@ class TtmlMetadataExtractorTest {
         assertEquals("Album", details[2].label)
         assertEquals("NCM ID", details[4].label)
         assertEquals("Author", details[8].label)
-        assertEquals("Agent", details[9].label)
+        assertEquals("Duet Lyrics", details[9].label)
+        assertEquals("Yes", details[9].value)
+        assertEquals("Translation", details[10].label)
+        assertEquals("Yes", details[10].value)
     }
 
     @Test
@@ -118,7 +125,8 @@ class TtmlMetadataExtractorTest {
 
         val details = TtmlMetadataExtractor.extract(ttml, useZhLabels = true)
 
-        assertEquals(listOf("Same / Other"), details.map { it.value })
+        // 同字段多值换行显示（去重保序）；无对唱/翻译信息时能力标记输出"无"
+        assertEquals(listOf("Same\nOther", "无", "无"), details.map { it.value })
     }
 
     @Test
@@ -162,11 +170,16 @@ class TtmlMetadataExtractorTest {
 
         val details = TtmlMetadataExtractor.extract(ttml, useZhLabels = true)
 
-        assertEquals(2, details.size)
-        assertEquals("customField", details[0].label)
-        assertEquals("v1\nv2", details[0].value)
-        assertEquals("another", details[1].label)
-        assertEquals("only", details[1].value)
+        // 未知键在对唱/翻译能力标记之后，按首次出现顺序输出
+        assertEquals(4, details.size)
+        assertEquals("对唱歌词", details[0].label)
+        assertEquals("无", details[0].value)
+        assertEquals("翻译", details[1].label)
+        assertEquals("无", details[1].value)
+        assertEquals("customField", details[2].label)
+        assertEquals("v1\nv2", details[2].value)
+        assertEquals("another", details[3].label)
+        assertEquals("only", details[3].value)
     }
 
     @Test
@@ -188,8 +201,63 @@ class TtmlMetadataExtractorTest {
             </tt>
         """.trimIndent()
 
-        assertEquals("Solo", TtmlMetadataExtractor.extract(loginOnly, useZhLabels = true).single().value)
-        assertEquals("42", TtmlMetadataExtractor.extract(idOnly, useZhLabels = true).single().value)
+        // 仅 login / 仅数字 ID 时按存在项展示；对唱/翻译"无"行跟在其后
+        val loginDetails = TtmlMetadataExtractor.extract(loginOnly, useZhLabels = true)
+        assertEquals("歌词作者", loginDetails[0].label)
+        assertEquals("Solo", loginDetails[0].value)
+        val idDetails = TtmlMetadataExtractor.extract(idOnly, useZhLabels = true)
+        assertEquals("歌词作者", idDetails[0].label)
+        assertEquals("42", idDetails[0].value)
+    }
+
+    /** 多歌词作者（歌词示例2：3 组 login + 3 组数字 ID）逐行显示用户名 */
+    @Test
+    fun multipleAuthorsAreListedOnePerLine() {
+        val ttml = """
+            <tt xmlns:amll="http://www.example.com/amll">
+              <head><metadata>
+                <amll:meta key="ttmlAuthorGithub" value="111688524"/>
+                <amll:meta key="ttmlAuthorGithub" value="50987405"/>
+                <amll:meta key="ttmlAuthorGithub" value="73021142"/>
+                <amll:meta key="ttmlAuthorGithubLogin" value="ITManCHINA"/>
+                <amll:meta key="ttmlAuthorGithubLogin" value="NuanRMxi"/>
+                <amll:meta key="ttmlAuthorGithubLogin" value="cybaka520"/>
+              </metadata></head>
+              <body/>
+            </tt>
+        """.trimIndent()
+
+        val details = TtmlMetadataExtractor.extract(ttml, useZhLabels = true)
+
+        assertEquals("歌词作者", details[0].label)
+        assertEquals("ITManCHINA\nNuanRMxi\ncybaka520", details[0].value)
+    }
+
+    /** head 定义双 agent 但正文仅使用单个 agent：无交替 → 对唱"无" */
+    @Test
+    fun singleBodyAgentIsNotDuetEvenWithAgentDefinitions() {
+        val ttml = """
+            <tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata"
+                xmlns:amll="http://www.example.com/amll">
+              <head><metadata>
+                <ttm:agent type="person" xml:id="v1"/>
+                <ttm:agent type="other" xml:id="v2"/>
+                <amll:meta key="musicName" value="Solo Song"/>
+              </metadata></head>
+              <body>
+                <p begin="0.5" end="1.5" ttm:agent="v1">line 1</p>
+                <p begin="1.5" end="2.5" ttm:agent="v1">line 2</p>
+              </body>
+            </tt>
+        """.trimIndent()
+
+        val details = TtmlMetadataExtractor.extract(ttml, useZhLabels = true)
+
+        assertEquals("Solo Song", details[0].value)
+        assertEquals("对唱歌词", details[1].label)
+        assertEquals("无", details[1].value)
+        assertEquals("翻译", details[2].label)
+        assertEquals("无", details[2].value)
     }
 
     @Test
@@ -206,7 +274,7 @@ class TtmlMetadataExtractorTest {
 
         val details = TtmlMetadataExtractor.extract(ttml, useZhLabels = true)
 
-        assertEquals(120, details.single().value.length)
-        assertEquals("歌曲名", details.single().label)
+        assertEquals(120, details.first().value.length)
+        assertEquals("歌曲名", details.first().label)
     }
 }

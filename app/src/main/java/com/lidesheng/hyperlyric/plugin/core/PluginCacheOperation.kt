@@ -61,8 +61,8 @@ internal object PluginCacheOperationCodec {
     const val MAX_TITLE_LENGTH = 160
     const val MAX_SUMMARY_LENGTH = 320
 
-    /** 单条目详情行数预算；超限在 sanitize 中截断 */
-    const val MAX_DETAILS_PER_ENTRY = 10
+    /** 单条目详情行数预算；超限在 sanitize 中截断（AMLL 全字段 TTML 含对唱/翻译标记可达 12 行） */
+    const val MAX_DETAILS_PER_ENTRY = 12
     const val MAX_DETAIL_LABEL_LENGTH = 32
     const val MAX_DETAIL_VALUE_LENGTH = 120
     const val REQUEST_TTL_MS = 2 * 60 * 1000L
