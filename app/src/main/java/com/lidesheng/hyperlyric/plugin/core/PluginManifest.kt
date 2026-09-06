@@ -130,6 +130,7 @@ object PluginManifestCodec {
                 settingJson.put("backup", false)
             }
             setting.group?.takeIf { it.isNotBlank() }?.let { settingJson.put("group", it) }
+            setting.uri?.takeIf { it.isNotBlank() }?.let { settingJson.put("uri", it) }
             setting.defaultValue?.let { settingJson.put("default", encodeDefault(setting.type, it)) }
             if (setting.options.isNotEmpty()) {
                 settingJson.put(
@@ -292,7 +293,8 @@ object PluginManifestCodec {
                         ) ?: throw IllegalArgumentException("Unsupported setting input type"),
                         conflictsWith = decodeStringArray(item.optJSONArray("conflictsWith")),
                         backup = item.optBoolean("backup", true),
-                        group = item.optionalString("group")?.takeIf { it.isNotBlank() }
+                        group = item.optionalString("group")?.takeIf { it.isNotBlank() },
+                        uri = item.optionalString("uri")?.takeIf { it.isNotBlank() }
                     )
                 )
             }
