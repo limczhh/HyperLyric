@@ -200,7 +200,14 @@ internal class AmllTtmlProcessor(
                 "平台探测命中: platform=${platform.name}, " +
                         "id=${item.id}, size=${ttml.toByteArray().size}B"
             )
-            cache.put(exactKey, ttml, title, artist, generation)
+            cache.put(
+                exactKey,
+                ttml,
+                title,
+                artist,
+                generation,
+                details = TtmlMetadataExtractor.extract(ttml)
+            )
             cache.putResolve(songId, platform.name)
             return TtmlFetch(ttml, fromCache = false)
         }
@@ -249,7 +256,8 @@ internal class AmllTtmlProcessor(
             searchKey, ttml,
             title = fullItem.musicNames?.firstOrNull() ?: title,
             artist = fullItem.artistNames?.joinToString(" / ") ?: artist,
-            expectedGeneration = generation
+            expectedGeneration = generation,
+            details = TtmlMetadataExtractor.extract(ttml)
         )
         return TtmlFetch(ttml, fromCache = false)
     }

@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.plugin.amll.ttml
 
 import com.lidesheng.hyperlyric.plugin.api.PluginCache
+import com.lidesheng.hyperlyric.plugin.api.PluginCacheDetail
 import com.lidesheng.hyperlyric.plugin.api.PluginCacheEntry
 import com.lidesheng.hyperlyric.plugin.api.PluginLogger
 import org.json.JSONArray
@@ -16,9 +17,10 @@ import java.util.Collections
  *   256 字符 key 上限（title/artist 可能超长）；
  * - 内存 LRU + 持久索引（JSON，最近使用在前），容量 200 条，LRU 淘汰含存储删除；
  *   缓存管理（PluginCacheExtension）最多列出 100 条；
- * - 索引格式 v2：记录 title/artist/size/updatedAt 展示元数据（缓存正文与
- *   API Key 绝不跨 PluginCacheEntry 边界）；旧 v1 纯物理 key 数组索引在首次
- *   读取时懒迁移为 v2（已缓存条目保留，无元数据条目以兜底标题展示）；
+ * - 索引格式 v2：记录 title/artist/size/updatedAt 展示元数据与可选 details 详情行
+ *   （缓存正文与 API Key 绝不跨 PluginCacheEntry 边界）；旧索引（无 details）
+ *   与 v1 纯物理 key 数组索引均容错读取，v1 在首次读取时懒迁移为 v2
+ *   （已缓存条目保留，无元数据条目以兜底标题展示）；
  * - schema 版本进语义 key（v1），解析逻辑升级时递增即可整体失效；
  * - 永不过期（AMLL 官方承诺 id 检索结果永久不变，对齐 main 分支语义）；
  *   未命中不缓存（负缓存会导致 AMLL 库新增条目后永远搜不到）；
@@ -126,6 +128,7 @@ internal class TtmlCache(
         title: String?,
         artist: String?,
         expectedGeneration: Long = currentGeneration(),
+        details: List<PluginCacheDetail> = emptyList(),
     ) {
         if (ttml.isEmpty()) return
         val bytes = ttml.toByteArray(StandardCharsets.UTF_8)
@@ -150,7 +153,8 @@ internal class TtmlCache(
                 title = title?.takeIf { it.isNotBlank() } ?: "未知歌曲",
                 artist = artist?.takeIf { it.isNotBlank() },
                 updatedAtEpochMs = System.currentTimeMillis(),
-                sizeBytes = bytes.size.toLong()
+                sizeBytes = bytes.size.toLong(),
+                details = details
             )
             val updated = readIndexLocked().toMutableList().apply {
                 removeAll { it.key == physicalKey }
@@ -194,7 +198,8 @@ internal class TtmlCache(
                     title = record.title,
                     summary = record.artist,
                     sizeBytes = record.sizeBytes,
-                    updatedAtEpochMs = record.updatedAtEpochMs
+                    updatedAtEpochMs = record.updatedAtEpochMs,
+                    details = record.details
                 )
             }
             .toList()
@@ -302,8 +307,22 @@ internal class TtmlCache(
             artist = json.optString("artist", "").trim().takeIf { it.isNotBlank() },
             updatedAtEpochMs = json.optLong("updatedAtEpochMs", 0L).takeIf { it > 0L }
                 ?: return null,
-            sizeBytes = json.optLong("sizeBytes", -1L).takeIf { it >= 0L }
+            sizeBytes = json.optLong("sizeBytes", -1L).takeIf { it >= 0L },
+            details = decodeDetails(json.optJSONArray("details"))
         )
+    }
+
+    /** 索引 details 数组容错解析：缺失/损坏回空列表，label 空白的条目跳过 */
+    private fun decodeDetails(array: JSONArray?): List<PluginCacheDetail> {
+        if (array == null) return emptyList()
+        return buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val label = item.optString("label", "").trim().takeIf { it.isNotBlank() }
+                    ?: continue
+                add(PluginCacheDetail(label, item.optString("value", "")))
+            }
+        }
     }
 
     private fun removeEntryLocked(index: List<CacheRecord>, key: String): Boolean {
@@ -337,6 +356,20 @@ internal class TtmlCache(
                         .also { item ->
                             record.artist?.let { item.put("artist", it) }
                             record.sizeBytes?.let { item.put("sizeBytes", it) }
+                            record.details.takeIf { it.isNotEmpty() }?.let { details ->
+                                item.put(
+                                    "details",
+                                    JSONArray().apply {
+                                        details.forEach { detail ->
+                                            put(
+                                                JSONObject()
+                                                    .put("label", detail.label)
+                                                    .put("value", detail.value)
+                                            )
+                                        }
+                                    }
+                                )
+                            }
                         }
                 )
             }
@@ -350,5 +383,6 @@ internal class TtmlCache(
         val artist: String?,
         val updatedAtEpochMs: Long,
         val sizeBytes: Long?,
+        val details: List<PluginCacheDetail> = emptyList(),
     )
 }
