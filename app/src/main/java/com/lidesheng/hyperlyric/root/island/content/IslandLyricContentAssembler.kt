@@ -132,9 +132,20 @@ internal object IslandLyricContentAssembler {
 
         if (shouldAnimate) {
             val preset = YoYoPresets.getById(config.lyricAnimationId) ?: YoYoPresets.Default
+            // 动画速率以百分比调节时长倍率：75 表示时长 x0.75，200 表示时长 x2
+            val speedRate = config.lyricAnimationSpeedRate
+            val scaledPreset = if (speedRate == RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE) {
+                preset
+            } else {
+                preset.first.copy(
+                    duration = (preset.first.duration * speedRate / 100).coerceAtLeast(1L)
+                ) to preset.second.copy(
+                    duration = (preset.second.duration * speedRate / 100).coerceAtLeast(1L)
+                )
+            }
             when (view) {
-                is RichLyricLineView -> view.animateUpdate(preset) { applyLine(this) }
-                is SpaceGateRichLyricLineView -> view.animateUpdate(preset) { applyLine(this) }
+                is RichLyricLineView -> view.animateUpdate(scaledPreset) { applyLine(this) }
+                is SpaceGateRichLyricLineView -> view.animateUpdate(scaledPreset) { applyLine(this) }
                 else -> applyLine(view)
             }
         } else {
