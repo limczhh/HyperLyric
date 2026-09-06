@@ -24,6 +24,22 @@ sealed interface Route : NavKey {
     data class PluginCache(val pluginId: String, val scopeId: String) : Route
 
     @Serializable
+    data class PluginCacheDetail(
+        val pluginId: String,
+        val scopeId: String,
+        val entryId: String,
+        val title: String,
+        val summary: String? = null,
+        val sizeBytes: Long? = null,
+        val updatedAtEpochMs: Long? = null,
+        val details: List<CacheDetailLine> = emptyList(),
+    ) : Route
+
+    /** 宿主侧详情页导航用的可序列化行；由列表页把插件 API 的 PluginCacheDetail 映射而来 */
+    @Serializable
+    data class CacheDetailLine(val label: String, val value: String)
+
+    @Serializable
     data object HookSettings : Route
 
     @Serializable

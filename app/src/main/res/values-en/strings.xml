@@ -686,4 +686,6 @@
     <string name="plugin_cache_root_result">Root found %1$d private cache files. They are inspection-only; load SystemUI to manage entries.</string>
     <string name="plugin_cache_root_file">Cache file #%1$d</string>
     <string name="plugin_cache_root_legacy_file">Legacy cache preference file #%1$d</string>
+    <string name="title_plugin_cache_detail">Lyric Details</string>
+    <string name="plugin_cache_detail_empty">No details available</string>
 </resources>
