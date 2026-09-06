@@ -3,6 +3,7 @@
 package com.lidesheng.hyperlyric.ui.page.plugin
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -787,11 +788,21 @@ private fun PluginSettingsContent(
             }
 
             PluginSettingType.ACTION -> {
+                // 链接按钮始终可点（不受插件启用开关门控）；无 uri 或非 http(s) 维持禁用
+                val link = setting.uri?.takeIf { uri ->
+                    (android.net.Uri.parse(uri).scheme ?: "").lowercase() in setOf("http", "https")
+                }
                 ArrowPreference(
                     title = title,
                     summary = setting.localizedSummary(context),
-                    enabled = false,
-                    onClick = {}
+                    enabled = link != null,
+                    onClick = {
+                        link?.let {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(it))
+                            )
+                        }
+                    }
                 )
             }
         }
