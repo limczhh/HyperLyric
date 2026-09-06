@@ -1,11 +1,11 @@
 package com.lidesheng.hyperlyric.plugin.amll.ttml
 
-import android.util.Xml
 import com.lidesheng.hyperlyric.plugin.api.PluginLyricLine
 import com.lidesheng.hyperlyric.plugin.api.PluginLogger
 import com.lidesheng.hyperlyric.plugin.api.PluginMetadata
 import com.lidesheng.hyperlyric.plugin.api.PluginWord
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
 import java.util.Locale
 
@@ -16,7 +16,9 @@ import java.util.Locale
  * 支持：
  * - `<p>` 行级 begin/end 与 `<span>` 逐字 begin/end
  * - span 之间的空白文本节点保留为单词分隔符（英文歌词），含换行的格式化空白忽略
- * - `ttm:agent` 对唱标记 → metadata["amll:agent"]（渲染层不区分，仅元数据保留）
+ * - `ttm:agent` 对唱标记 → metadata["amll:agent"] 元数据保留；head `<ttm:agent>`
+ *   定义按 AMLL 官方对唱状态机计算行级 isAlignedRight（见 [applyDuetAlignment]，
+ *   duetEnabled 关闭时恒 false）
  * - `ttm:role="x-bg"` 背景人声 → secondary/secondaryWords（优先级高于翻译/罗马音）；
  *   内部嵌套的无 role 逐字 span 递归解析为 secondaryWords（供副行逐字表演），
  *   嵌套的翻译/罗马音丢弃；内部无逐字 span 但外层自带时间轴时回退为整段词；
@@ -50,11 +52,19 @@ internal class TtmlParser(private val logger: PluginLogger) {
         private const val TAG_ITUNES_TRANSLATION = "translation"
         private const val TAG_ITUNES_TEXT = "text"
 
+        /** head 元数据内的演唱者定义元素本地名（ttm:agent，规范仅定义于 head，正文无此名） */
+        private const val TAG_AGENT = "agent"
+
         private const val ROLE_BG = "x-bg"
         private const val ROLE_TRANSLATION = "x-translation"
         private const val ROLE_ROMAN = "x-roman"
 
         const val METADATA_KEY_AGENT = "amll:agent"
+
+        /** 官方默认 agent（amll-converter.ts Values.AgentDefault）：行无 ttm:agent 时视同该演唱者 */
+        private const val DEFAULT_AGENT_ID = "v1"
+        private const val AGENT_TYPE_GROUP = "group"
+        private const val AGENT_TYPE_OTHER = "other"
 
         /** 间奏提示的最小行间隔（main 分支常量，v1 未使用，见类注释） */
         @Suppress("unused")
@@ -197,15 +207,18 @@ internal class TtmlParser(private val logger: PluginLogger) {
      * @param ttml TTML 原文
      * @param preferredLang 首选翻译语言（BCP 47 标签，如 zh-CN），用于从多语言候选中挑选翻译；
      * 默认取系统语言
+     * @param duetEnabled 对唱表演开关：开启时按 AMLL 官方对唱状态机输出 isAlignedRight，
+     * 关闭时恒 false（与无对唱信息的行为一致）
      * @return 解析成功返回按时间顺序、通过宿主校验规整的行列表；
      * 解析失败/无段落/无有效行/规模超限返回 null（调用方走未命中回落）
      */
     fun parse(
         ttml: String,
-        preferredLang: String? = Locale.getDefault().toLanguageTag()
+        preferredLang: String? = Locale.getDefault().toLanguageTag(),
+        duetEnabled: Boolean = true
     ): List<PluginLyricLine>? {
         return try {
-            val parser = Xml.newPullParser()
+            val parser = XmlPullParserFactory.newInstance().newPullParser()
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
             parser.setInput(StringReader(ttml))
             val doc = parseDocument(parser)
@@ -218,8 +231,9 @@ internal class TtmlParser(private val logger: PluginLogger) {
                 logger.debug("TTML 解析为空: 无有效行")
                 return null
             }
-            logStats(lines)
-            lines
+            val aligned = if (duetEnabled) applyDuetAlignment(lines, doc.agentTypes) else lines
+            logStats(aligned)
+            aligned
         } catch (e: Exception) {
             logger.debug("TTML 解析异常: type=${e.javaClass.simpleName}")
             null
@@ -228,10 +242,15 @@ internal class TtmlParser(private val logger: PluginLogger) {
 
     // ==================== 文档遍历 ====================
 
-    /** 文档级解析结果：正文行 + head iTunesMetadata 块级翻译（itunes:key → 各语言候选） */
+    /**
+     * 文档级解析结果：正文行 + head iTunesMetadata 块级翻译（itunes:key → 各语言候选）
+     * + head ttm:agent 定义（xml:id → type）
+     */
     private class ParsedDocument(
         val paragraphs: MutableList<ParsedParagraph> = mutableListOf(),
-        val itunesTranslations: MutableMap<String, MutableList<TranslationCandidate>> = mutableMapOf()
+        val itunesTranslations: MutableMap<String, MutableList<TranslationCandidate>> = mutableMapOf(),
+        /** head 中 <ttm:agent xml:id type> 的映射；type 缺失为 null */
+        val agentTypes: MutableMap<String, String?> = mutableMapOf()
     )
 
     private fun parseDocument(parser: XmlPullParser): ParsedDocument {
@@ -244,6 +263,14 @@ internal class TtmlParser(private val logger: PluginLogger) {
                     // head 内 iTunesMetadata/translations 块级翻译（body 中无此标签名）
                     TAG_ITUNES_TRANSLATION ->
                         parseItunesTranslationBlock(parser, doc.itunesTranslations)
+                    // head 元数据内的演唱者定义（ttm:agent，正文 body 中无此本地名）
+                    TAG_AGENT -> {
+                        val id = attrValue(parser, "id")
+                        if (!id.isNullOrEmpty()) {
+                            doc.agentTypes[id] = attrValue(parser, "type")
+                        }
+                        skipCurrentElement(parser)
+                    }
                 }
             }
             eventType = parser.next()
@@ -590,6 +617,44 @@ internal class TtmlParser(private val logger: PluginLogger) {
             translationWords = pickedTranslation?.words?.takeIf { it.isNotEmpty() },
             roma = if (hasBg) null else paragraph.romaText?.trim()?.takeIf { it.isNotBlank() }
         )
+    }
+
+    // ==================== 对唱左右对齐 ====================
+
+    /**
+     * 按 AMLL 官方对唱交替规则（amll-converter.ts toAmllLyrics Duet Logic）计算每行 isAlignedRight：
+     * - group 型恒非对唱且不参与交替计算；
+     * - 首个非 group 行：type == "other" 则右侧起，否则左侧起；
+     * - 此后与上一非 group 演唱者不同则逐行翻转，相同则保持；
+     * - 行无 ttm:agent 时按默认演唱者 "v1" 参与计算。
+     *
+     * 在 [regularizeLines] 已按 begin 排序的输出上运行（逐行按时间顺序交替）。
+     */
+    private fun applyDuetAlignment(
+        lines: List<PluginLyricLine>,
+        agentTypes: Map<String, String?>
+    ): List<PluginLyricLine> {
+        var lastPersonAgentId: String? = null
+        var lastPersonIsDuet = false
+        return lines.map { line ->
+            val agentId = line.metadata?.values?.get(METADATA_KEY_AGENT) ?: DEFAULT_AGENT_ID
+            val type = agentTypes[agentId]
+            val isDuet = if (type == AGENT_TYPE_GROUP) {
+                // 合唱行不参与交替，也不更新上一演唱者状态
+                false
+            } else if (lastPersonAgentId == null) {
+                lastPersonAgentId = agentId
+                lastPersonIsDuet = type == AGENT_TYPE_OTHER
+                lastPersonIsDuet
+            } else if (lastPersonAgentId == agentId) {
+                lastPersonIsDuet
+            } else {
+                lastPersonAgentId = agentId
+                lastPersonIsDuet = !lastPersonIsDuet
+                lastPersonIsDuet
+            }
+            if (isDuet) line.copy(isAlignedRight = true) else line
+        }
     }
 
     // ==================== 防御性时间轴规整（宿主校验适配） ====================

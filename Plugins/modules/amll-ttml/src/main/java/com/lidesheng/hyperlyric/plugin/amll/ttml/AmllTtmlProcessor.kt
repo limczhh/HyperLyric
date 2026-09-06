@@ -108,7 +108,7 @@ internal class AmllTtmlProcessor(
         ) {
             val probeTtml = probePlatforms(songId, title, artist, sourcePackageName, budget)
             if (probeTtml != null) {
-                return buildResult(song, probeTtml.ttml, probeTtml.fromCache)
+                return buildResult(song, probeTtml.ttml, probeTtml.fromCache, config.duetPerformance)
             }
         }
 
@@ -118,7 +118,7 @@ internal class AmllTtmlProcessor(
             return null
         }
         val searchTtml = searchFallback(title, artist, album, budget) ?: return null
-        return buildResult(song, searchTtml.ttml, searchTtml.fromCache)
+        return buildResult(song, searchTtml.ttml, searchTtml.fromCache, config.duetPerformance)
     }
 
     /**
@@ -263,12 +263,17 @@ internal class AmllTtmlProcessor(
     }
 
     /**
-     * 解析 TTML 并构造 REPLACE 结果：仅替换 lyrics，name/artist 等保留主歌词源值
+     * 解析 TTML 并构造 REPLACE 结果：仅替换歌词，name/artist 等保留主歌词源值
      * （对齐 main 分支 buildSong 语义）。解析失败/无有效行/终检不通过均返回 null
      * （视为未命中回落原歌词，防止空歌词或非法歌词替换掉原本可用的平台歌词）。
      */
-    private fun buildResult(song: PluginSong, ttml: String, fromCache: Boolean): PluginSongResult? {
-        val lines = parser.parse(ttml)
+    private fun buildResult(
+        song: PluginSong,
+        ttml: String,
+        fromCache: Boolean,
+        duetEnabled: Boolean
+    ): PluginSongResult? {
+        val lines = parser.parse(ttml, duetEnabled = duetEnabled)
         if (lines == null) {
             logger.debug("解析失败: fromCache=$fromCache")
             return null
