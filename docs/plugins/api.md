@@ -171,3 +171,5 @@ API Key 等不应进入备份的值必须声明 `backup: false`：
 ```
 
 入口在 `onLoad` 中以相同 ID 注册 `PluginCacheExtension`。`listEntries()` 最多应返回最近的 100 条 `PluginCacheEntry`，只包含展示所需的元数据；`entryId` 对 Core/App 是不透明值。插件负责 entryId 与真实 cache key 的映射、索引、删除和全部清理，`clearAll()`/`clearEntry()` 只能影响 `PluginCache`，不能清除配置或 `PluginStorage`。App 通过 RemotePreferences 发送带 requestId 和一次性 response token 的请求；SystemUI Runtime 执行扩展后，将有界结果回传给 App 的受控 Provider，因为目标进程的 RemotePreferences 视图只读。所有已安装插件都会在 SystemUI 启动时调用 `onLoad`，禁用插件不会调用 `onEnable` 或启用歌词处理器；因此 `onLoad` 只能创建状态和注册扩展，播放相关或主动任务必须放在 `onEnable`。插件不会直接创建 Compose/Miuix 页面，也不应在清理后主动重跑当前歌曲。
+
+`PluginCacheEntry` 可携带可选 `details: List<PluginCacheDetail>`（每项为 `label`/`value` 键值对，label 必须已由插件本地化、value 为纯展示文本）。宿主在缓存管理页为携带 `details` 的条目提供独立详情页：展示全部详情行（多值换行显示）、承载单条删除（顶栏删除图标 + 确认对话框）；无 `details` 的旧条目显示占位「无详细信息」。「清除全部」仍在列表页顶栏。详情行受宿主预算限制（单条 12 行、label 32 字符、value 120 字符，超限截断）。

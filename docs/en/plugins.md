@@ -12,8 +12,15 @@ Plugin processing runs in the background, so the original lyrics are shown first
 
 Plugins are installed, configured, and enabled from the plugin manager. Configuration changes normally take effect from the next song; the current song is not rerun automatically. Restart the system interface (SystemUI) after installing, removing, or updating plugin code. Ordinary configuration changes do not require a restart.
 
+## Cache management
+
+Plugin cache can be viewed and cleared from the plugin manager. Tap a cache entry to open its dedicated detail page, which shows the readable metadata the plugin wrote. The delete icon in the top bar removes a single entry, while "Clear all" remains in the list-page top bar. Older entries without detail metadata show a placeholder.
+
+Action items with an external link in the plugin settings page render as clickable links that open in the browser, regardless of the plugin enablement state.
+
 ## Current plugins
 
+- **AMLL TTML Word-Level Lyrics**: fetches high-quality word-level lyrics (background vocals/translation/romanization) from the AMLL TTML database, with duet left/right alignment, cache detail viewing, and a configurable lyrics API base URL.
 - **OpenAI Lyric Translation**: generates lyric translations through an OpenAI-compatible API, with options such as target language and model.
 - **Demo Lyric Plugin**: used for development and testing; it normally does not need to be installed.
 
