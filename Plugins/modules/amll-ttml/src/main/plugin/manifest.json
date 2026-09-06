@@ -17,12 +17,12 @@
     {
       "id": "ttml",
       "title": "AMLL 歌词缓存",
-      "summary": "清理已缓存的 AMLL TTML 歌词",
+      "summary": "查看已缓存的 AMLL TTML 歌词",
       "titleLocales": {
         "en": "AMLL Lyrics Cache"
       },
       "summaryLocales": {
-        "en": "Clear cached AMLL TTML lyrics"
+        "en": "View cached AMLL TTML lyrics"
       }
     }
   ],
@@ -60,9 +60,9 @@
       "titleLocales": {
         "en": "Lyrics API Base URL"
       },
-      "summary": "如果你不知道这个是什么，请不要修改。",
+      "summary": "AMLL TTML 词库的 API 服务地址，默认为官方地址，可填写自建镜像加速访问；如果你不知道这个是什么，请不要修改。",
       "summaryLocales": {
-        "en": "If you don't know what this is, please don't change it."
+        "en": "Base URL of the AMLL TTML lyrics API. Defaults to the official endpoint; a self-hosted mirror can be used instead. If you don't know what this is, please don't change it."
       },
       "default": "https://api.amll.dev/",
       "valuePresentation": "summary",
