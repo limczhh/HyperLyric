@@ -136,6 +136,7 @@ private fun PluginCachePageContent(
     val clearAllText = stringResource(R.string.title_plugin_cache_clear_all)
     val clearAllSuccess = stringResource(R.string.toast_plugin_cache_cleared)
     val clearAllConfirm = stringResource(R.string.dialog_plugin_cache_clear_all_summary)
+    val deleteSuccess = stringResource(R.string.toast_plugin_cache_entry_cleared)
     val rootQueryText = stringResource(R.string.plugin_cache_root_query)
     val rootUnavailableText = stringResource(R.string.plugin_cache_root_unavailable)
     val rootResultTemplate = stringResource(R.string.plugin_cache_root_result)
@@ -248,12 +249,26 @@ private fun PluginCachePageContent(
         }
     }
 
+    // 本页在详情页之下保持组合（miuix 可见窗口 opaqueDepth=1），LaunchedEffect 的 key
+    // 不变不会自动重跑；version 是删除后刷新的唯一触发信号。首见 version 记录后，
+    // 变化即代表详情页删除成功返回，刷新同时显示成功提示
+    var seenEntriesVersion by remember(plugin.manifest.id, cacheScope.id) {
+        mutableStateOf(PluginCacheEntriesVersion.version)
+    }
     LaunchedEffect(
         plugin.manifest.id,
         cacheScope.id,
         PluginCacheEntriesVersion.version
     ) {
+        val deletedSinceLastLoad = PluginCacheEntriesVersion.version != seenEntriesVersion
+        seenEntriesVersion = PluginCacheEntriesVersion.version
         loadEntries()
+        if (deletedSinceLastLoad) {
+            snackbarHostState.showSnackbar(
+                deleteSuccess,
+                duration = SnackbarDuration.Custom(2500L)
+            )
+        }
     }
 
     if (showClearAllDialog) {

@@ -65,7 +65,6 @@ fun PluginCacheDetailPage(route: Route.PluginCacheDetail) {
     val waitingText = stringResource(R.string.plugin_cache_waiting)
     val unavailableText = stringResource(R.string.plugin_cache_unavailable)
     val deleteText = stringResource(R.string.title_plugin_cache_clear_entry)
-    val deleteSuccess = stringResource(R.string.toast_plugin_cache_entry_cleared)
     val deleteConfirm = stringResource(R.string.dialog_plugin_cache_clear_entry_summary)
     val emptyDetailText = stringResource(R.string.plugin_cache_detail_empty)
     var requestInFlight by remember { mutableStateOf(false) }
@@ -98,13 +97,10 @@ fun PluginCacheDetailPage(route: Route.PluginCacheDetail) {
             when (outcome) {
                 is PluginCacheOperationOutcome.Completed -> {
                     if (outcome.response.success) {
-                        // 列表页据此刷新（进程内信号），随后返回
+                        // 列表页据此刷新（进程内信号），成功提示也由列表页显示：
+                        // 本页 pop 后组合随转场结束销毁，页面内 snackbar 无法存活
                         PluginCacheEntriesVersion.version++
                         navigator.pop()
-                        snackbarHostState.showSnackbar(
-                            deleteSuccess,
-                            duration = SnackbarDuration.Custom(2500L)
-                        )
                     } else {
                         snackbarHostState.showSnackbar(
                             describeFailure(outcome.response.errorCode),
