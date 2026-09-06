@@ -9,7 +9,7 @@
     "en": "Fetch high-quality word-level lyrics (background vocals/translation/roma) from the AMLL TTML database; falls back to the current lyric source on miss"
   },
   "author": "WindDrift",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "apiVersion": 1,
   "entry": "com.lidesheng.hyperlyric.plugin.amll.ttml.AmllTtmlPlugin",
   "activationSettingKey": "enabled",
@@ -52,6 +52,39 @@
         "en": "Try the song ID against NCM/QQ/Apple/Spotify exact endpoints with title/artist verification; disable to use metadata search only"
       },
       "default": true
+    },
+    {
+      "type": "text",
+      "key": "api_base_url",
+      "title": "歌词 API 地址",
+      "titleLocales": {
+        "en": "Lyrics API Base URL"
+      },
+      "summary": "如果你不知道这个是什么，请不要修改。",
+      "summaryLocales": {
+        "en": "If you don't know what this is, please don't change it."
+      },
+      "default": "https://api.amll.dev/",
+      "valuePresentation": "summary",
+      "inputType": "uri"
+    },
+    {
+      "type": "action",
+      "key": "ttml_ready_playlist",
+      "title": "AMLL TTML Ready 歌单",
+      "titleLocales": {
+        "en": "AMLL TTML Ready Playlist"
+      },
+      "uri": "https://music.163.com/m/playlist?id=13303023713"
+    },
+    {
+      "type": "action",
+      "key": "ttml_db_contribute",
+      "title": "想要为歌词库做出贡献？",
+      "titleLocales": {
+        "en": "Want to contribute to the lyrics DB?"
+      },
+      "uri": "https://github.com/amll-dev/amll-ttml-db"
     }
   ]
 }
