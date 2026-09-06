@@ -10,6 +10,8 @@ internal data class AmllTtmlConfig(
     val platformProbe: Boolean,
     /** 歌词 API 基础地址；空/空白回退默认值。保存时宿主不做格式校验 */
     val apiBaseUrl: String,
+    /** 对唱表演开关（默认开启）：对唱行右对齐，并在超级岛动态宽度模式下锁定岛宽 */
+    val duetPerformance: Boolean,
 ) {
     companion object {
         /** 默认歌词 API 基础地址（与 v1.1.0 硬编码行为一致） */
@@ -22,6 +24,7 @@ internal data class AmllTtmlConfig(
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
                 ?: DEFAULT_API_BASE_URL,
+            duetPerformance = config.getBoolean("duet_performance", true),
         )
     }
 }

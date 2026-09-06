@@ -69,6 +69,19 @@
       "inputType": "uri"
     },
     {
+      "type": "switch",
+      "key": "duet_performance",
+      "title": "启用对唱表演",
+      "titleLocales": {
+        "en": "Enable Duet Performance"
+      },
+      "summary": "开启后，对唱歌曲的歌词会左右分侧对齐显示，并在超级岛动态宽度模式下自动锁定岛宽为用户设定最大值",
+      "summaryLocales": {
+        "en": "When enabled, duet lyrics are aligned to left/right sides, and the Super Island width is locked to the user-set maximum in dynamic width mode"
+      },
+      "default": true
+    },
+    {
       "type": "action",
       "key": "ttml_ready_playlist",
       "title": "AMLL TTML Ready 歌单",
