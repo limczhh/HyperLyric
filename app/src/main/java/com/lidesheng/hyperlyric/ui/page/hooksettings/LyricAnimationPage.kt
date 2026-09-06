@@ -1,4 +1,4 @@
-﻿package com.lidesheng.hyperlyric.ui.page.hooksettings
+package com.lidesheng.hyperlyric.ui.page.hooksettings
 
 import android.content.Context
 import androidx.compose.foundation.layout.Box
@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoPresets
+import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
@@ -34,10 +36,12 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -122,6 +126,60 @@ fun LyricAnimationPage() {
 }
 
 private fun LazyListScope.animationPageSections() {
+    item(key = "anim_speed") {
+        val context = LocalContext.current
+        val prefs =
+            remember { context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) }
+
+        var animSpeedRate by remember {
+            mutableIntStateOf(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
+                    RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+                ).coerceIn(
+                    RootConstants.MIN_HOOK_ANIM_SPEED_RATE,
+                    RootConstants.MAX_HOOK_ANIM_SPEED_RATE
+                )
+            )
+        }
+        var showAnimSpeedDialog by remember { mutableStateOf(false) }
+
+        NumberInputDialog(
+            show = showAnimSpeedDialog,
+            title = stringResource(id = R.string.title_anim_speed),
+            label = stringResource(id = R.string.label_anim_speed_range),
+            initialValue = animSpeedRate,
+            min = RootConstants.MIN_HOOK_ANIM_SPEED_RATE,
+            max = RootConstants.MAX_HOOK_ANIM_SPEED_RATE,
+            onDismiss = { showAnimSpeedDialog = false },
+            onConfirm = { value ->
+                animSpeedRate = value
+                prefs.edit {
+                    putInt(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, value)
+                }
+                PrefsBridge.putInt(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, value)
+            }
+        )
+
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            ArrowPreference(
+                title = stringResource(id = R.string.title_anim_speed),
+                endActions = {
+                    Text(
+                        stringResource(id = R.string.format_percent, animSpeedRate),
+                        fontSize = MiuixTheme.textStyles.body2.fontSize,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                    )
+                },
+                onClick = { showAnimSpeedDialog = true }
+            )
+        }
+    }
     item(key = "animation_options") {
         val context = LocalContext.current
         val prefs =
