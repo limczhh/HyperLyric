@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.plugin.core
 
+import com.lidesheng.hyperlyric.plugin.api.PluginCacheDetail
 import com.lidesheng.hyperlyric.plugin.api.PluginCacheEntry
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,6 +60,11 @@ internal object PluginCacheOperationCodec {
     const val MAX_ID_LENGTH = 256
     const val MAX_TITLE_LENGTH = 160
     const val MAX_SUMMARY_LENGTH = 320
+
+    /** 单条目详情行数预算；超限在 sanitize 中截断 */
+    const val MAX_DETAILS_PER_ENTRY = 10
+    const val MAX_DETAIL_LABEL_LENGTH = 32
+    const val MAX_DETAIL_VALUE_LENGTH = 120
     const val REQUEST_TTL_MS = 2 * 60 * 1000L
     const val RESPONSE_TTL_MS = 5 * 60 * 1000L
 
@@ -127,6 +133,20 @@ internal object PluginCacheOperationCodec {
                                 entry.summary?.let { item.put("summary", it) }
                                 entry.sizeBytes?.let { item.put("sizeBytes", it) }
                                 entry.updatedAtEpochMs?.let { item.put("updatedAtEpochMs", it) }
+                                if (entry.details.isNotEmpty()) {
+                                    item.put(
+                                        "details",
+                                        JSONArray().apply {
+                                            entry.details.forEach { detail ->
+                                                put(
+                                                    JSONObject()
+                                                        .put("label", detail.label)
+                                                        .put("value", detail.value)
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
                             }
                     )
                 }
@@ -164,11 +184,22 @@ internal object PluginCacheOperationCodec {
                     title = title,
                     summary = entry.summary?.takeIf { it.isNotBlank() }?.take(MAX_SUMMARY_LENGTH),
                     sizeBytes = entry.sizeBytes?.takeIf { it >= 0L },
-                    updatedAtEpochMs = entry.updatedAtEpochMs?.takeIf { it > 0L }
+                    updatedAtEpochMs = entry.updatedAtEpochMs?.takeIf { it > 0L },
+                    details = sanitizeDetails(entry.details)
                 )
             )
         }
     }
+
+    /** 详情截断归一：条数/label/value 分别对齐预算；裁剪后 label 为空的整条丢弃 */
+    private fun sanitizeDetails(details: List<PluginCacheDetail>): List<PluginCacheDetail> =
+        buildList {
+            details.asSequence().take(MAX_DETAILS_PER_ENTRY).forEach { detail ->
+                val label = detail.label.take(MAX_DETAIL_LABEL_LENGTH)
+                    .takeIf { it.isNotBlank() } ?: return@forEach
+                add(PluginCacheDetail(label, detail.value.take(MAX_DETAIL_VALUE_LENGTH)))
+            }
+        }
 
     fun isRequestExpired(request: PluginCacheOperationRequest, nowEpochMs: Long): Boolean =
         request.createdAtEpochMs <= 0L || nowEpochMs - request.createdAtEpochMs > REQUEST_TTL_MS
@@ -234,11 +265,25 @@ internal object PluginCacheOperationCodec {
                         title = title,
                         summary = item.optionalString("summary"),
                         sizeBytes = item.optLong("sizeBytes", -1L).takeIf { it >= 0L },
-                        updatedAtEpochMs = item.optLong("updatedAtEpochMs", 0L).takeIf { it > 0L }
+                        updatedAtEpochMs = item.optLong("updatedAtEpochMs", 0L).takeIf { it > 0L },
+                        details = decodeDetails(item.optJSONArray("details"))
                     )
                 )
             }
         }.let(::sanitizeEntries)
+    }
+
+    /** 详情数组容错解析：缺失/损坏回空列表，label/value 任一缺失即丢弃该条 */
+    private fun decodeDetails(array: JSONArray?): List<PluginCacheDetail> {
+        if (array == null) return emptyList()
+        return buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val label = item.optionalString("label")?.takeIf { it.isNotBlank() } ?: continue
+                val value = item.optionalString("value")?.takeIf { it.isNotBlank() } ?: continue
+                add(PluginCacheDetail(label, value))
+            }
+        }
     }
 
     private fun requireRequestSize(value: String) {
