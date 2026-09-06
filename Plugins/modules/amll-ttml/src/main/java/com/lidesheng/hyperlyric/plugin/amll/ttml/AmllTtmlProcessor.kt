@@ -78,6 +78,8 @@ internal class AmllTtmlProcessor(
             logger.debug("跳过处理: 插件已禁用, song=${song.name}")
             return null
         }
+        // 配置修改即时生效（无需重启）：每次处理前同步 API 基础地址
+        client.updateBaseUrl(config.apiBaseUrl)
 
         val budget = ProcessingBudget(BUDGET_MS)
         val mediaInfo = processingContext.mediaInfo
