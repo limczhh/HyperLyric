@@ -180,6 +180,7 @@ object RootConstants {
     // ================= ANIMATION & MARQUEE KEYS =================
     const val KEY_HOOK_ANIM_ENABLE = "key_hook_anim_enable"
     const val KEY_HOOK_ANIM_ID = "key_hook_anim_id"
+    const val KEY_HOOK_ANIM_SPEED_RATE = "key_hook_anim_speed_rate"
     const val KEY_HOOK_MARQUEE_MODE = "key_hook_marquee_mode"
     const val KEY_HOOK_MARQUEE_SPEED = "key_hook_marquee_speed"
     const val KEY_HOOK_MARQUEE_DELAY = "key_hook_marquee_delay"
@@ -442,6 +443,9 @@ object RootConstants {
     const val DEFAULT_HOOK_ISLAND_MUSIC_WAVE_STYLE = ISLAND_MUSIC_WAVE_STYLE_DEFAULT
     const val DEFAULT_HOOK_ANIM_ENABLE = false
     const val DEFAULT_HOOK_ANIM_ID = "default"
+    const val DEFAULT_HOOK_ANIM_SPEED_RATE = 100
+    const val MIN_HOOK_ANIM_SPEED_RATE = 50
+    const val MAX_HOOK_ANIM_SPEED_RATE = 200
     const val DEFAULT_HOOK_MARQUEE_MODE = false
     const val DEFAULT_HOOK_MARQUEE_SPEED = 30
     const val DEFAULT_HOOK_MARQUEE_DELAY = 1500
