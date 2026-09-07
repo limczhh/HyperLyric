@@ -189,6 +189,8 @@
     <string name="option_island_media_ambient_flow_disabled">Disabled</string>
     <string name="title_lyrics">Media Info</string>
     <string name="title_lyric_anim">Lyric Animation</string>
+    <string name="title_anim_speed">Animation Speed</string>
+    <string name="label_anim_speed_range">Range: 50 ~ 200</string>
     <string name="title_lyric_provider">Lyric Provider</string>
     <string name="title_lyric_delay">Lyric time offset</string>
     <string name="summary_lyric_delay">Positive values show lyrics later, negative values earlier</string>

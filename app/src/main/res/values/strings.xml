@@ -213,6 +213,8 @@
     <string name="option_island_media_ambient_flow_disabled">禁用</string>
     <string name="title_lyrics">音乐信息</string>
     <string name="title_lyric_anim">歌词切换动画</string>
+    <string name="title_anim_speed">动画速率</string>
+    <string name="label_anim_speed_range">范围：50 ~ 200</string>
     <string name="title_lyric_provider">歌词提供器</string>
     <string name="title_lyric_delay">歌词时间偏移</string>
     <string name="summary_lyric_delay">正数延后显示，负数提前显示</string>

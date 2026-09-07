@@ -190,6 +190,13 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_ANIM_ID,
                 RootConstants.DEFAULT_HOOK_ANIM_ID
             ) ?: RootConstants.DEFAULT_HOOK_ANIM_ID,
+            lyricAnimationSpeedRate = prefs.getInt(
+                RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
+                RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+            ).coerceIn(
+                RootConstants.MIN_HOOK_ANIM_SPEED_RATE,
+                RootConstants.MAX_HOOK_ANIM_SPEED_RATE
+            ),
             lyricMarqueeEnabled = prefs.getBoolean(
                 RootConstants.KEY_HOOK_MARQUEE_MODE,
                 RootConstants.DEFAULT_HOOK_MARQUEE_MODE
@@ -299,7 +306,7 @@ internal object IslandSlotRuntimeConfigReader {
             "rhythm=${config.geometry.showRhythm}",
             "pause=${config.pauseBehavior}",
             "text=${config.textSizeSp}/${config.textSizeRatio}/${config.fontWeight}/${config.fontItalic}",
-            "animation=${config.lyricAnimationEnabled}:${config.lyricAnimationId}",
+            "animation=${config.lyricAnimationEnabled}:${config.lyricAnimationId}:${config.lyricAnimationSpeedRate}",
             "marquee=${config.lyricMarqueeEnabled}:${config.lyricMarqueeSpeed}",
             "metadataMarquee=${config.metadataMarqueeEnabled}:${config.metadataMarqueeSpeed}",
             "translation=${config.disableTranslation}/${config.translationOnly}/${config.swapTranslation}",
