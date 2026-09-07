@@ -691,4 +691,6 @@
     <string name="plugin_cache_root_result">已通过 Root 查询到 %1$d 个私有缓存文件；仅供检查，需 SystemUI 加载后才能管理条目</string>
     <string name="plugin_cache_root_file">缓存文件 #%1$d</string>
     <string name="plugin_cache_root_legacy_file">旧版缓存偏好文件 #%1$d</string>
+    <string name="title_plugin_cache_detail">歌词详情</string>
+    <string name="plugin_cache_detail_empty">无详细信息</string>
 </resources>

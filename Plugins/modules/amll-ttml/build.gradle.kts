@@ -12,8 +12,8 @@ android {
         applicationId = "com.lidesheng.hyperlyric.plugin.amll.ttml.build"
         minSdk = 33
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
@@ -46,6 +46,15 @@ dependencies {
 
     // 网络（HttpURLConnection）、JSON（org.json）、XML（XmlPullParser）均为 Android 平台 API，
     // 本插件除 Kotlin stdlib 外零新增运行时依赖。
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation(project(":plugins:api"))
+    testImplementation("org.jetbrains.kotlin:kotlin-stdlib:" + libs.versions.kotlin.get())
+    testImplementation("org.json:json:20240303")
+    // JVM 单测中提供真实的 XmlPullParser 实现（android.jar 桩类被用户依赖覆盖）；
+    // 仅作用于测试类路径，不进入插件 ZIP
+    testImplementation("xmlpull:xmlpull:1.1.3.1")
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
 }
 
 val debugApk = layout.buildDirectory.file("outputs/apk/debug/${project.name}-debug.apk")

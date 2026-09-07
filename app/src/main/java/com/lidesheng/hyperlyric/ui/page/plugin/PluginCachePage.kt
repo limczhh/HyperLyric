@@ -35,6 +35,7 @@ import com.lidesheng.hyperlyric.plugin.app.PluginRepository
 import com.lidesheng.hyperlyric.plugin.core.PluginCacheScope
 import com.lidesheng.hyperlyric.root.utils.ShellUtils
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
+import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
@@ -63,8 +64,6 @@ import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
-import java.text.DateFormat
-import java.util.Date
 
 @Composable
 fun PluginCachePage(pluginId: String, scopeId: String) {
@@ -135,11 +134,9 @@ private fun PluginCachePageContent(
     val unavailableText = stringResource(R.string.plugin_cache_unavailable)
     val retryText = stringResource(R.string.plugin_cache_retry)
     val clearAllText = stringResource(R.string.title_plugin_cache_clear_all)
-    val deleteText = stringResource(R.string.title_plugin_cache_clear_entry)
     val clearAllSuccess = stringResource(R.string.toast_plugin_cache_cleared)
-    val deleteSuccess = stringResource(R.string.toast_plugin_cache_entry_cleared)
     val clearAllConfirm = stringResource(R.string.dialog_plugin_cache_clear_all_summary)
-    val clearEntryConfirm = stringResource(R.string.dialog_plugin_cache_clear_entry_summary)
+    val deleteSuccess = stringResource(R.string.toast_plugin_cache_entry_cleared)
     val rootQueryText = stringResource(R.string.plugin_cache_root_query)
     val rootUnavailableText = stringResource(R.string.plugin_cache_root_unavailable)
     val rootResultTemplate = stringResource(R.string.plugin_cache_root_result)
@@ -150,7 +147,6 @@ private fun PluginCachePageContent(
     }
     var requestInFlight by remember { mutableStateOf(false) }
     var showClearAllDialog by remember { mutableStateOf(false) }
-    var pendingEntry by remember { mutableStateOf<PluginCacheEntry?>(null) }
 
     fun describeFailure(reason: String?): String = when (reason) {
         "plugin_not_loaded" -> unavailableText
@@ -231,46 +227,6 @@ private fun PluginCachePageContent(
         }
     }
 
-    fun runClearEntry(entry: PluginCacheEntry) {
-        pendingEntry = null
-        if (requestInFlight) return
-        requestInFlight = true
-        scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                repository.clearPluginCacheEntry(plugin.manifest.id, cacheScope.id, entry.id)
-            }
-            requestInFlight = false
-            when (outcome) {
-                is PluginCacheOperationOutcome.Completed -> {
-                    if (outcome.response.success) {
-                        val remaining = (state as? PluginCachePageState.Entries)
-                            ?.entries
-                            ?.filterNot { it.id == entry.id }
-                            .orEmpty()
-                        state = remaining.takeIf { it.isNotEmpty() }
-                            ?.let(PluginCachePageState::Entries)
-                            ?: PluginCachePageState.Empty
-                        snackbarHostState.showSnackbar(
-                            deleteSuccess,
-                            duration = SnackbarDuration.Custom(2500L)
-                        )
-                    } else {
-                        publishFailure(outcome.response.errorCode)
-                    }
-                }
-
-                is PluginCacheOperationOutcome.Waiting -> {
-                    state = PluginCachePageState.Waiting(
-                        message = describeFailure(outcome.reason),
-                        canInspectWithRoot = outcome.reason in ROOT_QUERY_REASONS
-                    )
-                }
-
-                is PluginCacheOperationOutcome.Rejected -> publishFailure(outcome.reason)
-            }
-        }
-    }
-
     fun queryFilesWithRoot() {
         if (requestInFlight) return
         requestInFlight = true
@@ -293,8 +249,26 @@ private fun PluginCachePageContent(
         }
     }
 
-    LaunchedEffect(plugin.manifest.id, cacheScope.id) {
+    // 本页在详情页之下保持组合（miuix 可见窗口 opaqueDepth=1），LaunchedEffect 的 key
+    // 不变不会自动重跑；version 是删除后刷新的唯一触发信号。首见 version 记录后，
+    // 变化即代表详情页删除成功返回，刷新同时显示成功提示
+    var seenEntriesVersion by remember(plugin.manifest.id, cacheScope.id) {
+        mutableStateOf(PluginCacheEntriesVersion.version)
+    }
+    LaunchedEffect(
+        plugin.manifest.id,
+        cacheScope.id,
+        PluginCacheEntriesVersion.version
+    ) {
+        val deletedSinceLastLoad = PluginCacheEntriesVersion.version != seenEntriesVersion
+        seenEntriesVersion = PluginCacheEntriesVersion.version
         loadEntries()
+        if (deletedSinceLastLoad) {
+            snackbarHostState.showSnackbar(
+                deleteSuccess,
+                duration = SnackbarDuration.Custom(2500L)
+            )
+        }
     }
 
     if (showClearAllDialog) {
@@ -309,21 +283,6 @@ private fun PluginCachePageContent(
                 cancelText = stringResource(R.string.cancel),
                 onConfirm = ::runClearAll,
                 onDismiss = { showClearAllDialog = false }
-            )
-        }
-    }
-    pendingEntry?.let { entry ->
-        WindowDialog(
-            title = deleteText,
-            show = true,
-            onDismissRequest = { pendingEntry = null }
-        ) {
-            CacheConfirmContent(
-                message = "$clearEntryConfirm\n${entry.title}",
-                confirmText = stringResource(R.string.confirm),
-                cancelText = stringResource(R.string.cancel),
-                onConfirm = { runClearEntry(entry) },
-                onDismiss = { pendingEntry = null }
             )
         }
     }
@@ -415,9 +374,28 @@ private fun PluginCachePageContent(
                                 current.entries.forEach { entry ->
                                     ArrowPreference(
                                         title = entry.title,
-                                        summary = entry.summary ?: formatCacheEntryMeta(entry),
+                                        summary = entry.summary
+                                            ?: formatCacheEntryMeta(
+                                                entry.sizeBytes,
+                                                entry.updatedAtEpochMs
+                                            ),
                                         enabled = !requestInFlight,
-                                        onClick = { pendingEntry = entry }
+                                        onClick = {
+                                            navigator.navigate(
+                                                Route.PluginCacheDetail(
+                                                    pluginId = plugin.manifest.id,
+                                                    scopeId = cacheScope.id,
+                                                    entryId = entry.id,
+                                                    title = entry.title,
+                                                    summary = entry.summary,
+                                                    sizeBytes = entry.sizeBytes,
+                                                    updatedAtEpochMs = entry.updatedAtEpochMs,
+                                                    details = entry.details.map {
+                                                        Route.CacheDetailLine(it.label, it.value)
+                                                    }
+                                                )
+                                            )
+                                        }
                                     )
                                 }
                             }
@@ -488,7 +466,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.cacheStatusItem(
 }
 
 @Composable
-private fun CacheConfirmContent(
+internal fun CacheConfirmContent(
     message: String,
     confirmText: String,
     cancelText: String,
@@ -519,21 +497,6 @@ private fun CacheConfirmContent(
     }
 }
 
-private fun formatCacheEntryMeta(entry: PluginCacheEntry): String? {
-    val parts = buildList {
-        entry.sizeBytes?.let { add("${it / 1024} KB") }
-        entry.updatedAtEpochMs?.let { updatedAt ->
-            add(
-                DateFormat.getDateTimeInstance(
-                    DateFormat.SHORT,
-                    DateFormat.SHORT
-                ).format(Date(updatedAt))
-            )
-        }
-    }
-    return parts.joinToString(" · ").takeIf { it.isNotBlank() }
-}
-
 private sealed interface PluginCachePageState {
     data object Loading : PluginCachePageState
     data object Empty : PluginCachePageState
@@ -552,3 +515,8 @@ private val ROOT_QUERY_REASONS = setOf(
     "request_write_failed",
     "request_interrupted"
 )
+
+/** 详情页删除缓存条目后递增，缓存列表页据此刷新（宿主进程内信号，不跨进程） */
+internal object PluginCacheEntriesVersion {
+    var version by mutableStateOf(0)
+}

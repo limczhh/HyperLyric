@@ -40,6 +40,7 @@ HyperLyric displays line-synced, word-synced, and separated lyrics in Xiaomi Hyp
 - Each side of HyperIsland can show lyrics, music information, or nothing.
 - Music information can combine the title, artist, album, total duration, elapsed time, remaining time, and playback progress. Both lines and the field separator are configurable.
 - HyperIsland width can stay fixed or change with its content. Left and right padding are adjustable, and lyrics can be centered or right-aligned.
+- Duet width lock: when playing left/right-aligned duet lyrics, dynamic width mode automatically locks to the user-set maximum width and resumes content-based sizing on song change.
 - The cover art can use the default style, the app icon, or be hidden. Rhythm colors can use the default color, cover color, or cover gradient.
 - Edge glow, perimeter progress, and gradient progress can use cover colors, with adjustable start points and directions.
 - You can choose whether HyperIsland stays visible or collapses after pausing playback or changing tracks.

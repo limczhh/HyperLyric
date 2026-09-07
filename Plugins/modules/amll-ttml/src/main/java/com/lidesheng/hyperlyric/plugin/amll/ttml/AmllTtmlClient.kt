@@ -36,10 +36,12 @@ internal class ProcessingBudget(private val budgetMs: Long) {
  * （main 提交 938560a/3934f16，需 ProGuard 保留泛型签名）在此天然规避：
  * HttpURLConnection 为平台 API，无反射调用链。
  */
-internal class AmllTtmlClient(private val logger: PluginLogger) {
+internal class AmllTtmlClient(
+    private val logger: PluginLogger,
+    baseUrl: String = AmllTtmlConfig.DEFAULT_API_BASE_URL,
+) {
 
     companion object {
-        private const val BASE_URL = "https://api.amll.dev/"
         private const val GET_PATH = "v1/lyrics/get"
         private const val SEARCH_PATH = "v1/lyrics/search"
 
@@ -49,6 +51,21 @@ internal class AmllTtmlClient(private val logger: PluginLogger) {
         private const val RETRY_BACKOFF_MULTIPLIER = 2L
         private const val MAX_RETRIES = 2
         private const val HTTP_TOO_MANY_REQUESTS = 429
+    }
+
+    /**
+     * 可配置基础地址（末尾不带斜杠存储，buildUrl 负责拼接）。
+     * processor 每次处理前从配置同步，配置修改即时生效无需重启；
+     * 构造参数仅作初值。默认值与 v1.1.0 硬编码行为一致。
+     */
+    @Volatile
+    var baseUrl: String = baseUrl.trimEnd('/')
+        private set
+
+    /** 处理前同步基础地址；空/空白不覆盖（保持上次有效值） */
+    fun updateBaseUrl(baseUrl: String) {
+        val normalized = baseUrl.trim().trimEnd('/')
+        if (normalized.isNotEmpty()) this.baseUrl = normalized
     }
 
     /**
@@ -218,6 +235,6 @@ internal class AmllTtmlClient(private val logger: PluginLogger) {
         val query = params.joinToString("&") { (key, value) ->
             "$key=${URLEncoder.encode(value, "UTF-8")}"
         }
-        return "$BASE_URL$path?$query"
+        return "$baseUrl/$path?$query"
     }
 }

@@ -78,6 +78,8 @@ internal class AmllTtmlProcessor(
             logger.debug("跳过处理: 插件已禁用, song=${song.name}")
             return null
         }
+        // 配置修改即时生效（无需重启）：每次处理前同步 API 基础地址
+        client.updateBaseUrl(config.apiBaseUrl)
 
         val budget = ProcessingBudget(BUDGET_MS)
         val mediaInfo = processingContext.mediaInfo
@@ -106,7 +108,7 @@ internal class AmllTtmlProcessor(
         ) {
             val probeTtml = probePlatforms(songId, title, artist, sourcePackageName, budget)
             if (probeTtml != null) {
-                return buildResult(song, probeTtml.ttml, probeTtml.fromCache)
+                return buildResult(song, probeTtml.ttml, probeTtml.fromCache, config.duetPerformance)
             }
         }
 
@@ -116,7 +118,7 @@ internal class AmllTtmlProcessor(
             return null
         }
         val searchTtml = searchFallback(title, artist, album, budget) ?: return null
-        return buildResult(song, searchTtml.ttml, searchTtml.fromCache)
+        return buildResult(song, searchTtml.ttml, searchTtml.fromCache, config.duetPerformance)
     }
 
     /**
@@ -198,7 +200,14 @@ internal class AmllTtmlProcessor(
                 "平台探测命中: platform=${platform.name}, " +
                         "id=${item.id}, size=${ttml.toByteArray().size}B"
             )
-            cache.put(exactKey, ttml, title, artist, generation)
+            cache.put(
+                exactKey,
+                ttml,
+                title,
+                artist,
+                generation,
+                details = TtmlMetadataExtractor.extract(ttml)
+            )
             cache.putResolve(songId, platform.name)
             return TtmlFetch(ttml, fromCache = false)
         }
@@ -247,18 +256,24 @@ internal class AmllTtmlProcessor(
             searchKey, ttml,
             title = fullItem.musicNames?.firstOrNull() ?: title,
             artist = fullItem.artistNames?.joinToString(" / ") ?: artist,
-            expectedGeneration = generation
+            expectedGeneration = generation,
+            details = TtmlMetadataExtractor.extract(ttml)
         )
         return TtmlFetch(ttml, fromCache = false)
     }
 
     /**
-     * 解析 TTML 并构造 REPLACE 结果：仅替换 lyrics，name/artist 等保留主歌词源值
+     * 解析 TTML 并构造 REPLACE 结果：仅替换歌词，name/artist 等保留主歌词源值
      * （对齐 main 分支 buildSong 语义）。解析失败/无有效行/终检不通过均返回 null
      * （视为未命中回落原歌词，防止空歌词或非法歌词替换掉原本可用的平台歌词）。
      */
-    private fun buildResult(song: PluginSong, ttml: String, fromCache: Boolean): PluginSongResult? {
-        val lines = parser.parse(ttml)
+    private fun buildResult(
+        song: PluginSong,
+        ttml: String,
+        fromCache: Boolean,
+        duetEnabled: Boolean
+    ): PluginSongResult? {
+        val lines = parser.parse(ttml, duetEnabled = duetEnabled)
         if (lines == null) {
             logger.debug("解析失败: fromCache=$fromCache")
             return null
