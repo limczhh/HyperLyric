@@ -10,6 +10,16 @@ object LyricInfoParser {
 
     private val LRC_TIME_RE = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]")
     private val ELRC_WORD_TIME_RE = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>")
+    private val TRANSLATION_KEYS = listOf(
+        "translation",
+        "translationLyric",
+        "translatedLyric",
+        "translateLyric",
+        "transLyric",
+        "lyricTranslation",
+        "translationLrc",
+        "transLrc"
+    )
 
     fun parse(json: String): Song? = parsePayload(json)?.song
 
@@ -18,7 +28,7 @@ object LyricInfoParser {
             val obj = JSONObject(json)
             val lyricRaw = obj.optionalText("lyric")
             val rawLyric = obj.optionalText("rawLyric")
-            val translationRaw = obj.optionalText("translation")
+            val translationRaw = obj.translationText()
             val romaRaw = obj.optionalText("roma")
             val primaryRaw = lyricRaw ?: return null
 
@@ -235,7 +245,7 @@ object LyricInfoParser {
                 songId = obj.optString("songId", ""),
                 rawLyricLength = rawLyric.length,
                 lyricLength = lyric.length,
-                translationLength = obj.optString("translation", "").length,
+                translationLength = obj.translationText()?.length ?: 0,
                 romaLength = obj.optString("roma", "").length,
                 lyricPreview = previewSource.lines().filter { it.isNotBlank() }.take(10)
             )
@@ -246,6 +256,11 @@ object LyricInfoParser {
 
     private fun JSONObject.optionalText(key: String): String? =
         optString(key, "").trim().takeIf { it.isNotEmpty() }
+
+    private fun JSONObject.translationText(): String? = TRANSLATION_KEYS
+        .asSequence()
+        .mapNotNull { key -> optionalText(key) }
+        .firstOrNull { LRC_TIME_RE.matcher(it).find() }
 }
 
 private data class ParsedLine(val timeMs: Long, val line: RichLyricLine)
