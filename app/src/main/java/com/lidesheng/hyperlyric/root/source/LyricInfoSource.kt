@@ -318,6 +318,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                     "rawLyric=${diagnosis.rawLyricLength}chars | " +
                     "lyric=${diagnosis.lyricLength}chars | " +
                     "translation=${diagnosis.translationLength}chars | " +
+                    "roma=${diagnosis.romaLength}chars | " +
                     diagnosis.lyricPreview.joinToString(" | ")
         )
     }

@@ -198,12 +198,13 @@ object RootConstants {
     const val KEY_HOOK_SYLLABLE_HIGHLIGHT = "key_hook_syllable_highlight"
     const val KEY_HOOK_SYLLABLE_LINE_DISPLAY = "key_hook_syllable_line_display"
 
-    // ================= TRANSLATION KEYS =================
-    const val KEY_HOOK_DISABLE_TRANSLATION = "key_hook_disable_translation"
-    const val KEY_HOOK_TRANSLATION_ONLY = "key_hook_translation_only"
-    const val KEY_HOOK_SWAP_TRANSLATION = "key_hook_swap_translation"
-    const val KEY_HOOK_NEXT_LYRIC_LINE = "key_hook_next_lyric_line"
-    const val KEY_HOOK_AUTO_SWITCH_TRANSLATION = "key_hook_auto_switch_translation"
+    // ================= LYRIC CONTENT KEYS =================
+    const val KEY_HOOK_ONLY_SECONDARY = "key_hook_only_secondary"
+    const val KEY_HOOK_SWAP_SECONDARY = "key_hook_swap_secondary"
+    const val KEY_HOOK_LYRIC_SHOW_TRANSLATION = "key_hook_lyric_show_translation"
+    const val KEY_HOOK_LYRIC_SHOW_ROMA = "key_hook_lyric_show_roma"
+    const val KEY_HOOK_LYRIC_SHOW_NEXT_LINE = "key_hook_lyric_show_next_line"
+    const val KEY_HOOK_LYRIC_SECONDARY_ORDER = "key_hook_lyric_secondary_order"
 
     // ================= COLOR KEYS =================
     const val KEY_HOOK_TEXT_COLOR_STYLE = "key_hook_text_color_style"
@@ -466,11 +467,12 @@ object RootConstants {
     const val DEFAULT_HOOK_SYLLABLE_HIGHLIGHT = false
     const val DEFAULT_HOOK_SYLLABLE_LINE_DISPLAY = false
 
-    const val DEFAULT_HOOK_DISABLE_TRANSLATION = false
-    const val DEFAULT_HOOK_TRANSLATION_ONLY = false
-    const val DEFAULT_HOOK_SWAP_TRANSLATION = false
-    const val DEFAULT_HOOK_NEXT_LYRIC_LINE = false
-    const val DEFAULT_HOOK_AUTO_SWITCH_TRANSLATION = false
+    const val DEFAULT_HOOK_ONLY_SECONDARY = false
+    const val DEFAULT_HOOK_SWAP_SECONDARY = false
+    const val DEFAULT_HOOK_LYRIC_SHOW_TRANSLATION = true
+    const val DEFAULT_HOOK_LYRIC_SHOW_ROMA = true
+    const val DEFAULT_HOOK_LYRIC_SHOW_NEXT_LINE = false
+    const val DEFAULT_HOOK_LYRIC_SECONDARY_ORDER = "translation,roma,next_line"
     const val TEXT_COLOR_STYLE_DEFAULT = 0
     const val TEXT_COLOR_STYLE_COVER_COLOR = 1
     const val TEXT_COLOR_STYLE_COVER_GRADIENT = 2

@@ -47,9 +47,9 @@ object LyricStyleHelper {
             res.displayMetrics
         )
 
-        // Style 层永远允许 secondary 显示；翻译开关通过 view.displayTranslation/displayRoma
-        // 控制 assembler 选什么内容，无内容时 assembler 返回 alwaysShow=false → secondary GONE
-        val showSecondary = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC ||
+        // 内容类型、可见性和优先级由 LyricContentDisplayPolicy 解析后交给 View；无内容时
+        // assembler 返回 alwaysShow=false → secondary GONE。
+        val secondarySlotVisible = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC ||
                 mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO
 
         val isLyricMode = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
@@ -192,8 +192,8 @@ object LyricStyleHelper {
                 relativeHighlight = syllableSettings.relativeHighlight,
             ),
             secondary = TextLook(
-                color = if (showSecondary) primaryColors else intArrayOf(Color.TRANSPARENT),
-                size = if (showSecondary) primarySizePx * textSizeRatio else 0f,
+                color = if (secondarySlotVisible) primaryColors else intArrayOf(Color.TRANSPARENT),
+                size = if (secondarySlotVisible) primarySizePx * textSizeRatio else 0f,
                 typeface = font.typeface,
                 fontVariationSettings = font.variationSettings,
             ),

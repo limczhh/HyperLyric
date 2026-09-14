@@ -11,7 +11,6 @@ import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHook
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.utils.LyricStyleHelper
-import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 import java.util.WeakHashMap
 
 internal object IslandSlotStyleAssembler {
@@ -34,11 +33,9 @@ internal object IslandSlotStyleAssembler {
         config: IslandSlotRuntimeConfig,
         mode: Int,
         mediaInfo: MediaMetadataHelper.MediaInfo,
-        nextLinePreviewEnabled: Boolean,
         force: Boolean
     ) {
-        val disableAll = TranslationHelper.isTranslationDisabled(prefs) || nextLinePreviewEnabled
-        val translationOnly = TranslationHelper.isTranslationOnly(prefs)
+        val lyricContentDisplay = config.lyricContentDisplay
         val colorSession = CoverColorHelper.currentSession(mediaInfo)
         val albumBitmap = mediaInfo.albumArt
         val artworkRequest = if (config.extractCoverTextColor) {
@@ -95,8 +92,9 @@ internal object IslandSlotStyleAssembler {
         when (view) {
             is RichLyricLineView -> {
                 if (styleChanged) {
-                    view.displayTranslation = !disableAll
-                    view.displayRoma = !disableAll && !translationOnly
+                    view.displayTranslation = lyricContentDisplay.showTranslation
+                    view.displayRoma = lyricContentDisplay.showRoma
+                    view.secondaryContentOrder = lyricContentDisplay.order
                     view.setStyle(style)
                     dispatch = "set_style"
                 } else {
@@ -111,8 +109,9 @@ internal object IslandSlotStyleAssembler {
 
             is SpaceGateRichLyricLineView -> {
                 if (styleChanged) {
-                    view.displayTranslation = !disableAll
-                    view.displayRoma = !disableAll && !translationOnly
+                    view.displayTranslation = lyricContentDisplay.showTranslation
+                    view.displayRoma = lyricContentDisplay.showRoma
+                    view.secondaryContentOrder = lyricContentDisplay.order
                     view.setStyle(
                         style,
                         isLeftSplitSide = config.isLeftTag(view.tag as? String ?: "")

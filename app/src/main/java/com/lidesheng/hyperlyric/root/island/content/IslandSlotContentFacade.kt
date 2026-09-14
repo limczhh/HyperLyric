@@ -52,10 +52,6 @@ internal object IslandSlotContentFacade {
             config = config,
             mode = mode,
             mediaInfo = mediaInfo,
-            nextLinePreviewEnabled = IslandLyricContentAssembler.isNextLinePreviewEnabled(
-                prefs,
-                config
-            ),
             force = force
         )
     }

@@ -207,14 +207,13 @@ class SuperLyricSource : LyricSource {
                         )
                         currentSink.onLyricLine(richLine)
                         startPositionPolling(publisher)
+                    } else if (data.hasTranslation() || data.hasSecondary()) {
+                        // Keep all structured lanes when SuperLyric has no usable line timing.
+                        // The plain-text sink can represent only the original and one translated
+                        // line, so sending this as text would silently discard secondary content.
+                        currentSink.onLyricLine(convertToRichLyricLine(lyric, data))
                     } else {
-                        val text = buildString {
-                            append(lyric.text)
-                            if (data.hasTranslation()) {
-                                data.translation?.text?.let { append("\n").append(it) }
-                            }
-                        }
-                        currentSink.onPlainText(text)
+                        currentSink.onPlainText(lyric.text)
                     }
                 } else {
                     val richLine = convertToRichLyricLine(lyric, data)
@@ -245,15 +244,13 @@ class SuperLyricSource : LyricSource {
             }
         } else null
 
-        val secondaryText = if (data.hasSecondary()) data.secondary?.text else null
-        val secondaryWords = if (data.hasSecondary()) {
-            data.secondary?.words?.map { word ->
-                LyricWord(
-                    begin = word.startTime,
-                    end = word.endTime,
-                    text = word.word
-                )
-            }
+        // SuperLyric calls this lane "secondary", but the unified model exposes it as
+        // romanization. RichLyricLine has no romaWords field, so retain word-only payloads by
+        // joining their text rather than leaving the Roma lane empty.
+        val romaText = if (data.hasSecondary()) {
+            data.secondary?.text?.takeIf { it.isNotBlank() }
+                ?: data.secondary?.words?.joinToString("") { it.word }
+                    ?.takeIf { it.isNotBlank() }
         } else null
 
         return RichLyricLine(
@@ -263,8 +260,7 @@ class SuperLyricSource : LyricSource {
             words = words,
             translation = translationText,
             translationWords = translationWords,
-            secondary = secondaryText,
-            secondaryWords = secondaryWords
+            roma = romaText
         )
     }
 

@@ -19,6 +19,7 @@ object LyricInfoParser {
             val lyricRaw = obj.optionalText("lyric")
             val rawLyric = obj.optionalText("rawLyric")
             val translationRaw = obj.optionalText("translation")
+            val romaRaw = obj.optionalText("roma")
             val primaryRaw = lyricRaw ?: return null
 
             val title = obj.optionalText("songName")
@@ -31,7 +32,11 @@ object LyricInfoParser {
             } else {
                 parseLyricLines(primaryRaw, enhanced = false)
             } ?: return null
-            val resultLines = attachTranslation(parsedPrimary, translationRaw)
+            val resultLines = attachLanes(
+                originalLines = parsedPrimary,
+                translationRaw = translationRaw,
+                romaRaw = romaRaw
+            )
 
             LyricInfoPayload(
                 song = Song(
@@ -69,35 +74,47 @@ object LyricInfoParser {
             ?.also(::completeLineTiming)
     }
 
-    /** Match the independent translation lane to original lines by line timestamp. */
-    private fun attachTranslation(
+    /** Match independent translation and roma lanes to original lines by line timestamp. */
+    private fun attachLanes(
         originalLines: List<ParsedLine>,
-        translationRaw: String?
+        translationRaw: String?,
+        romaRaw: String?
     ): List<RichLyricLine> {
-        if (translationRaw.isNullOrBlank()) {
-            return originalLines.map { it.line }
-        }
-
-        val translationLines = parseLyricLines(
-            translationRaw,
-            enhanced = ELRC_WORD_TIME_RE.matcher(translationRaw).find()
-        ) ?: return originalLines.map { it.line }
-        val translationByTime = translationLines
-            .groupBy { it.timeMs }
-            .mapValues { (_, lines) -> lines.toMutableList() }
+        val translationByTime = parseIndependentLane(translationRaw)
+        val romaByTime = parseIndependentLane(romaRaw)
 
         return originalLines.map { original ->
-            val candidates = translationByTime[original.timeMs]
-            val translation = candidates?.takeIf { it.isNotEmpty() }?.removeAt(0)?.line
-            if (translation == null) {
-                original.line
-            } else {
-                original.line.copy(
+            var result = original.line
+            takeLaneLine(translationByTime, original.timeMs)?.let { translation ->
+                result = result.copy(
                     translation = translation.text,
                     translationWords = translation.words
                 )
             }
+            takeLaneLine(romaByTime, original.timeMs)?.let { roma ->
+                result = result.copy(roma = roma.text)
+            }
+            result
         }
+    }
+
+    private fun parseIndependentLane(raw: String?): Map<Long, MutableList<ParsedLine>> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        val lines = parseLyricLines(
+            raw,
+            enhanced = ELRC_WORD_TIME_RE.matcher(raw).find()
+        ) ?: return emptyMap()
+        return lines
+            .groupBy { it.timeMs }
+            .mapValues { (_, groupedLines) -> groupedLines.toMutableList() }
+    }
+
+    private fun takeLaneLine(
+        laneByTime: Map<Long, MutableList<ParsedLine>>,
+        timeMs: Long
+    ): RichLyricLine? {
+        val candidates = laneByTime[timeMs] ?: return null
+        return candidates.takeIf { it.isNotEmpty() }?.removeAt(0)?.line
     }
 
     private fun completeLineTiming(lines: List<ParsedLine>) {
@@ -219,6 +236,7 @@ object LyricInfoParser {
                 rawLyricLength = rawLyric.length,
                 lyricLength = lyric.length,
                 translationLength = obj.optString("translation", "").length,
+                romaLength = obj.optString("roma", "").length,
                 lyricPreview = previewSource.lines().filter { it.isNotBlank() }.take(10)
             )
         } catch (_: Exception) {
@@ -247,5 +265,6 @@ data class LyricInfoDiagnosis(
     val rawLyricLength: Int,
     val lyricLength: Int,
     val translationLength: Int,
+    val romaLength: Int,
     val lyricPreview: List<String>
 )

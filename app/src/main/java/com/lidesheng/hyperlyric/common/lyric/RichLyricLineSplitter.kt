@@ -126,6 +126,12 @@ object RichLyricLineSplitter {
             paint = secondaryPaint,
             containerWidthSpec = containerWidthSpec
         )
+        val roma = splitText(
+            text = line.roma,
+            words = null,
+            paint = secondaryPaint,
+            containerWidthSpec = containerWidthSpec
+        )
         val timelineSplit = if (partitionUntimedTimeline && line.words.isNullOrEmpty()) {
             splitUntimedTimeline(line, primary, primaryPaint)
         } else {
@@ -144,7 +150,7 @@ object RichLyricLineSplitter {
             secondaryWords = secondary.leftWords,
             translation = translation.leftText,
             translationWords = translation.leftWords,
-            roma = null
+            roma = roma.leftText
         )
 
         val rightLine = RichLyricLine(
@@ -161,7 +167,7 @@ object RichLyricLineSplitter {
             secondaryWords = secondary.rightWords,
             translation = translation.rightText,
             translationWords = translation.rightWords,
-            roma = null
+            roma = roma.rightText
         )
 
         return SplitLineResult(leftLine, rightLine)

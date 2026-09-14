@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.island.config
 
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
+import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplaySettings
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.sizing.IslandSlotGeometryConfig
 
@@ -38,11 +39,9 @@ internal data class IslandSlotRuntimeConfig(
     val syllableRelative: Boolean,
     val syllableHighlight: Boolean,
     val syllableLineDisplay: Boolean,
-    val disableTranslation: Boolean,
-    val translationOnly: Boolean,
-    val swapTranslation: Boolean,
-    val nextLyricLine: Boolean,
-    val autoSwitchTranslation: Boolean,
+    val onlySecondary: Boolean,
+    val swapSecondary: Boolean,
+    val lyricContentDisplay: LyricContentDisplaySettings,
     val textColorStyle: Int,
     val customFontPath: String,
     val narrowLatinFont: Boolean,
@@ -93,11 +92,12 @@ internal data class IslandSlotRuntimeConfig(
         syllableRelative,
         syllableHighlight,
         syllableLineDisplay,
-        disableTranslation,
-        translationOnly,
-        swapTranslation,
-        nextLyricLine,
-        autoSwitchTranslation,
+        onlySecondary,
+        swapSecondary,
+        lyricContentDisplay.showTranslation,
+        lyricContentDisplay.showRoma,
+        lyricContentDisplay.showNextLyric,
+        lyricContentDisplay.order,
         customFontPath,
         narrowLatinFont,
         wordMotionEnabled,

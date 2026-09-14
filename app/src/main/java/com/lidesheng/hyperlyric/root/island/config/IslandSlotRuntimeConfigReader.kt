@@ -6,6 +6,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.common.SuperIslandWidthPolicy
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
+import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
 import com.lidesheng.hyperlyric.root.island.sizing.IslandSlotGeometryConfig
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
@@ -18,6 +19,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 internal object IslandSlotRuntimeConfigReader {
     fun read(prefs: SharedPreferences): IslandSlotRuntimeConfig {
         val syllableSettings = SyllablePreferencePolicy.read(prefs)
+        val lyricContentDisplay = LyricContentDisplayPolicy.read(prefs)
         val activeMode = prefs.getInt(
             RootConstants.KEY_HOOK_LYRIC_MODE,
             RootConstants.DEFAULT_HOOK_LYRIC_MODE
@@ -243,26 +245,15 @@ internal object IslandSlotRuntimeConfigReader {
             syllableRelative = syllableSettings.relativeProgress,
             syllableHighlight = syllableSettings.relativeHighlight,
             syllableLineDisplay = syllableSettings.lineDisplay,
-            disableTranslation = prefs.getBoolean(
-                RootConstants.KEY_HOOK_DISABLE_TRANSLATION,
-                RootConstants.DEFAULT_HOOK_DISABLE_TRANSLATION
+            onlySecondary = prefs.getBoolean(
+                RootConstants.KEY_HOOK_ONLY_SECONDARY,
+                RootConstants.DEFAULT_HOOK_ONLY_SECONDARY
             ),
-            translationOnly = prefs.getBoolean(
-                RootConstants.KEY_HOOK_TRANSLATION_ONLY,
-                RootConstants.DEFAULT_HOOK_TRANSLATION_ONLY
+            swapSecondary = prefs.getBoolean(
+                RootConstants.KEY_HOOK_SWAP_SECONDARY,
+                RootConstants.DEFAULT_HOOK_SWAP_SECONDARY
             ),
-            swapTranslation = prefs.getBoolean(
-                RootConstants.KEY_HOOK_SWAP_TRANSLATION,
-                RootConstants.DEFAULT_HOOK_SWAP_TRANSLATION
-            ),
-            nextLyricLine = prefs.getBoolean(
-                RootConstants.KEY_HOOK_NEXT_LYRIC_LINE,
-                RootConstants.DEFAULT_HOOK_NEXT_LYRIC_LINE
-            ),
-            autoSwitchTranslation = prefs.getBoolean(
-                RootConstants.KEY_HOOK_AUTO_SWITCH_TRANSLATION,
-                RootConstants.DEFAULT_HOOK_AUTO_SWITCH_TRANSLATION
-            ),
+            lyricContentDisplay = lyricContentDisplay,
             textColorStyle = LyricTextColorStylePolicy.read(prefs),
             customFontPath = prefs.getString(RootConstants.KEY_HOOK_CUSTOM_FONT_PATH, null)
                 .orEmpty(),
@@ -308,9 +299,14 @@ internal object IslandSlotRuntimeConfigReader {
             "animation=${config.lyricAnimationEnabled}:${config.lyricAnimationId}:${config.lyricAnimationSpeedRate}",
             "marquee=${config.lyricMarqueeEnabled}:${config.lyricMarqueeSpeed}",
             "metadataMarquee=${config.metadataMarqueeEnabled}:${config.metadataMarqueeSpeed}",
-            "translation=${config.disableTranslation}/${config.translationOnly}/${config.swapTranslation}",
+            "secondaryTransform=${config.onlySecondary}/${config.swapSecondary}",
+            "lyricContent=${config.lyricContentDisplay.showTranslation}/" +
+                    "${config.lyricContentDisplay.showRoma}/" +
+                    "${config.lyricContentDisplay.showNextLyric}/" +
+                    config.lyricContentDisplay.order.joinToString(",") {
+                        it.preferenceValue
+                    },
             "syllable=${config.syllableLineDisplay}/${config.syllableRelative}/${config.syllableHighlight}",
-            "next=${config.nextLyricLine}/${config.autoSwitchTranslation}",
             "color=${config.textColorStyle}",
             "font=${config.customFontPath.isNotBlank()}/${config.narrowLatinFont}",
             "wordMotion=${config.wordMotionEnabled}"
