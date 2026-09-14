@@ -204,7 +204,7 @@
   <string name="title_lyrics">معلومات الوسائط</string>
   <string name="title_lyric_anim">حركة الكلمات</string>
   <string name="title_anim_speed">سرعة الحركة</string>
-  <string name="label_anim_speed_range">النطاق: 50 ~ 200</string>
+  <string name="format_anim_speed">%1$s×</string>
   <string name="title_lyric_provider">مزوّد الكلمات</string>
   <string name="title_lyric_delay">إزاحة توقيت الكلمات</string>
   <string name="summary_lyric_delay">القيم الموجبة تعرض الكلمات متأخرة، والسالبة تعرضها مبكرة</string>

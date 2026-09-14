@@ -444,8 +444,12 @@ object RootConstants {
     const val DEFAULT_HOOK_ANIM_ENABLE = false
     const val DEFAULT_HOOK_ANIM_ID = "default"
     const val DEFAULT_HOOK_ANIM_SPEED_RATE = 100
-    const val MIN_HOOK_ANIM_SPEED_RATE = 50
-    const val MAX_HOOK_ANIM_SPEED_RATE = 200
+    val HOOK_ANIM_SPEED_RATES = listOf(75, 100, 125, 150, 175, 200, 300)
+
+    fun normalizeHookAnimSpeedRate(value: Int): Int {
+        return value.takeIf { it in HOOK_ANIM_SPEED_RATES } ?: DEFAULT_HOOK_ANIM_SPEED_RATE
+    }
+
     const val DEFAULT_HOOK_MARQUEE_MODE = false
     const val DEFAULT_HOOK_MARQUEE_SPEED = 30
     const val DEFAULT_HOOK_MARQUEE_DELAY = 1500

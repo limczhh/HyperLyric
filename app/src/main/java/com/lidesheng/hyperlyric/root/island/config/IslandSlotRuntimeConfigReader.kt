@@ -190,12 +190,11 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_ANIM_ID,
                 RootConstants.DEFAULT_HOOK_ANIM_ID
             ) ?: RootConstants.DEFAULT_HOOK_ANIM_ID,
-            lyricAnimationSpeedRate = prefs.getInt(
-                RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
-                RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
-            ).coerceIn(
-                RootConstants.MIN_HOOK_ANIM_SPEED_RATE,
-                RootConstants.MAX_HOOK_ANIM_SPEED_RATE
+            lyricAnimationSpeedRate = RootConstants.normalizeHookAnimSpeedRate(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
+                    RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+                )
             ),
             lyricMarqueeEnabled = prefs.getBoolean(
                 RootConstants.KEY_HOOK_MARQUEE_MODE,

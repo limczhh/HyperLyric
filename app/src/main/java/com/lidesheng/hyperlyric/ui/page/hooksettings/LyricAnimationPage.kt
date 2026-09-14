@@ -26,7 +26,6 @@ import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoPresets
-import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
@@ -36,12 +35,11 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -73,6 +71,17 @@ private val animLabelResMap = mapOf(
     "rotate_out_rotate_in" to R.string.option_anim_rotate,
     "zoom_out_zoom_in" to R.string.option_anim_zoom,
 )
+
+private fun animationSpeedLabel(rate: Int): String = when (rate) {
+    75 -> "0.75"
+    100 -> "1"
+    125 -> "1.25"
+    150 -> "1.5"
+    175 -> "1.75"
+    200 -> "2"
+    300 -> "3"
+    else -> rate.toString()
+}
 
 @Composable
 fun LyricAnimationPage() {
@@ -133,33 +142,20 @@ private fun LazyListScope.animationPageSections() {
 
         var animSpeedRate by remember {
             mutableIntStateOf(
-                prefs.getInt(
-                    RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
-                    RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
-                ).coerceIn(
-                    RootConstants.MIN_HOOK_ANIM_SPEED_RATE,
-                    RootConstants.MAX_HOOK_ANIM_SPEED_RATE
+                RootConstants.normalizeHookAnimSpeedRate(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
+                        RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+                    )
                 )
             )
         }
-        var showAnimSpeedDialog by remember { mutableStateOf(false) }
-
-        NumberInputDialog(
-            show = showAnimSpeedDialog,
-            title = stringResource(id = R.string.title_anim_speed),
-            label = stringResource(id = R.string.label_anim_speed_range),
-            initialValue = animSpeedRate,
-            min = RootConstants.MIN_HOOK_ANIM_SPEED_RATE,
-            max = RootConstants.MAX_HOOK_ANIM_SPEED_RATE,
-            onDismiss = { showAnimSpeedDialog = false },
-            onConfirm = { value ->
-                animSpeedRate = value
-                prefs.edit {
-                    putInt(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, value)
-                }
-                PrefsBridge.putInt(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, value)
-            }
-        )
+        val animSpeedOptions = RootConstants.HOOK_ANIM_SPEED_RATES.map { rate ->
+            stringResource(
+                id = R.string.format_anim_speed,
+                animationSpeedLabel(rate)
+            )
+        }
 
         Card(
             modifier = Modifier
@@ -167,16 +163,19 @@ private fun LazyListScope.animationPageSections() {
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            ArrowPreference(
+            OverlayDropdownPreference(
                 title = stringResource(id = R.string.title_anim_speed),
-                endActions = {
-                    Text(
-                        stringResource(id = R.string.format_percent, animSpeedRate),
-                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                    )
-                },
-                onClick = { showAnimSpeedDialog = true }
+                items = animSpeedOptions,
+                selectedIndex = RootConstants.HOOK_ANIM_SPEED_RATES.indexOf(animSpeedRate),
+                onSelectedIndexChange = { index ->
+                    RootConstants.HOOK_ANIM_SPEED_RATES.getOrNull(index)?.let { value ->
+                        animSpeedRate = value
+                        prefs.edit {
+                            putInt(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, value)
+                        }
+                        PrefsBridge.putInt(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, value)
+                    }
+                }
             )
         }
     }
