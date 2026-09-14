@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookConfigSaver
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookPrefs
@@ -16,91 +17,72 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookP
 fun LyricTranslationPage() {
     val prefs = rememberHookPrefs()
     val saveConfig = rememberHookConfigSaver(prefs)
+    var lyricContentDisplay by remember(prefs) {
+        mutableStateOf(LyricContentDisplayPolicy.read(prefs))
+    }
+    var showLyricContentSheet by remember { mutableStateOf(false) }
 
-    val lyricSource by remember {
-        mutableStateOf(
-            prefs.getString(
-                RootConstants.KEY_HOOK_LYRIC_SOURCE,
-                RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
-            ) ?: "lyricon"
-        )
-    }
-    var disableTranslation by remember {
+    var onlySecondary by remember {
         mutableStateOf(
             prefs.getBoolean(
-                RootConstants.KEY_HOOK_DISABLE_TRANSLATION,
-                RootConstants.DEFAULT_HOOK_DISABLE_TRANSLATION
+                RootConstants.KEY_HOOK_ONLY_SECONDARY,
+                RootConstants.DEFAULT_HOOK_ONLY_SECONDARY
             )
         )
     }
-    var translationOnly by remember {
+    var swapSecondary by remember {
         mutableStateOf(
             prefs.getBoolean(
-                RootConstants.KEY_HOOK_TRANSLATION_ONLY,
-                RootConstants.DEFAULT_HOOK_TRANSLATION_ONLY
+                RootConstants.KEY_HOOK_SWAP_SECONDARY,
+                RootConstants.DEFAULT_HOOK_SWAP_SECONDARY
             )
         )
     }
-    var swapTranslation by remember {
-        mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_SWAP_TRANSLATION,
-                RootConstants.DEFAULT_HOOK_SWAP_TRANSLATION
+    LyricContentDisplayBottomSheet(
+        show = showLyricContentSheet,
+        currentSettings = lyricContentDisplay,
+        onDismiss = { showLyricContentSheet = false },
+        onConfirm = { settings ->
+            lyricContentDisplay = settings
+            saveConfig(
+                RootConstants.KEY_HOOK_LYRIC_SHOW_TRANSLATION,
+                settings.showTranslation
             )
-        )
-    }
-    var nextLyricLine by remember {
-        mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_NEXT_LYRIC_LINE,
-                RootConstants.DEFAULT_HOOK_NEXT_LYRIC_LINE
+            saveConfig(RootConstants.KEY_HOOK_LYRIC_SHOW_ROMA, settings.showRoma)
+            saveConfig(
+                RootConstants.KEY_HOOK_LYRIC_SHOW_NEXT_LINE,
+                settings.showNextLyric
             )
-        )
-    }
-    var autoSwitchTranslation by remember {
-        mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_AUTO_SWITCH_TRANSLATION,
-                RootConstants.DEFAULT_HOOK_AUTO_SWITCH_TRANSLATION
+            saveConfig(
+                RootConstants.KEY_HOOK_LYRIC_SECONDARY_ORDER,
+                LyricContentDisplayPolicy.encodeOrder(settings.order)
             )
-        )
-    }
+        }
+    )
+
     XposedLyricSettingPage(title = stringResource(id = R.string.title_double_line_content)) {
         translationSections(
-            lyricSource = lyricSource,
-            disableTranslation = disableTranslation,
-            onDisableTranslationChange = {
-                disableTranslation = it
-                saveConfig(RootConstants.KEY_HOOK_DISABLE_TRANSLATION, it)
-            },
-            translationOnly = translationOnly,
-            onTranslationOnlyChange = {
-                translationOnly = it
-                saveConfig(RootConstants.KEY_HOOK_TRANSLATION_ONLY, it)
-                if (it && swapTranslation) {
-                    swapTranslation = false
-                    saveConfig(RootConstants.KEY_HOOK_SWAP_TRANSLATION, false)
+            lyricContentDisplay = lyricContentDisplay,
+            onEditLyricContent = { showLyricContentSheet = true },
+            lyricContentSheetVisible = showLyricContentSheet,
+            onlySecondary = onlySecondary,
+            onOnlySecondaryChange = {
+                onlySecondary = it
+                saveConfig(RootConstants.KEY_HOOK_ONLY_SECONDARY, it)
+                if (it && swapSecondary) {
+                    swapSecondary = false
+                    saveConfig(RootConstants.KEY_HOOK_SWAP_SECONDARY, false)
                 }
             },
-            swapTranslation = swapTranslation,
-            onSwapTranslationChange = {
-                swapTranslation = it
-                saveConfig(RootConstants.KEY_HOOK_SWAP_TRANSLATION, it)
-                if (it && translationOnly) {
-                    translationOnly = false
-                    saveConfig(RootConstants.KEY_HOOK_TRANSLATION_ONLY, false)
+            swapSecondary = swapSecondary,
+            onSwapSecondaryChange = {
+                swapSecondary = it
+                saveConfig(RootConstants.KEY_HOOK_SWAP_SECONDARY, it)
+                if (it && onlySecondary) {
+                    onlySecondary = false
+                    saveConfig(RootConstants.KEY_HOOK_ONLY_SECONDARY, false)
                 }
-            },
-            nextLyricLine = nextLyricLine,
-            onNextLyricLineChange = {
-                nextLyricLine = it
-                saveConfig(RootConstants.KEY_HOOK_NEXT_LYRIC_LINE, it)
-            },
-            autoSwitchTranslation = autoSwitchTranslation,
-            onAutoSwitchTranslationChange = {
-                autoSwitchTranslation = it
-                saveConfig(RootConstants.KEY_HOOK_AUTO_SWITCH_TRANSLATION, it)
-            },
+            }
         )
     }
 }
