@@ -3,10 +3,7 @@
     <string name="app_description">为小米 HyperOS 3 带来超级岛歌词</string>
     <string name="label_lyric_listener_service">获取媒体信息权限</string>
     <string name="label_lyric_enable_service">HyperLyric媒体信息监听</string>
-    <string name="provider_release_home">https://github.com/proify/LyricProvider/releases</string>
 
-    <string name="add">添加</string>
-    <string name="github">GitHub</string>
     <string name="unknown">未知</string>
     <string name="search">搜索</string>
 
@@ -23,10 +20,8 @@
     <string name="title_basic_features">基础功能</string>
     <string name="title_super_island_lyrics">小米超级岛歌词</string>
     <string name="summary_super_island_lyrics">仅支持已安装LSPosed v2.0的HyperOS 3设备</string>
-    <string name="title_super_island_config">小米超级岛歌词自定义配置</string>
     <string name="title_dynamic_island_lyrics">通知型灵动岛歌词</string>
     <string name="summary_dynamic_island_lyrics">利用通知实现灵动岛歌词效果，适用于无root设备</string>
-    <string name="title_dynamic_island_config">通知型灵动岛歌词自定义配置</string>
     <string name="title_special_features">特殊功能</string>
     <string name="title_restart_ui">重启系统界面</string>
     <string name="title_remove_focus_whitelist">移除焦点通知白名单</string>
@@ -41,19 +36,14 @@
     <string name="title_permission_listener">获取歌词信息权限</string>
     <string name="toast_open_settings_failed">无法打开通知使用权设置</string>
     <string name="toast_xposed_module_not_active">模块未启用，请启用并重启模块</string>
-    <string name="prompt_feature_disabled_open_switch">此功能未启用，请打开右侧开关并再次点击此项进入设置</string>
-    <string name="title_system_info">系统信息</string>
     <string name="info_device_model">设备型号</string>
     <string name="info_os_version">系统版本</string>
     <string name="info_android_version">Android版本</string>
     <string name="title_help">使用帮助</string>
     <string name="title_changelog">更新日志</string>
-    <string name="title_developer">开发者</string>
-    <string name="dev_name">李得胜</string>
     <string name="title_project">项目地址</string>
     <string name="title_contributors">贡献者</string>
     <string name="title_licenses">引用</string>
-    <string name="title_acknowledgments">致谢</string>
     <string name="summary_acknowledgments">感谢@FrancOS 和@于逸风 的帮助，以及一些没列出的项目</string>
     <string name="summary_contributors">感谢以下贡献者为 HyperLyric 的开发提供的帮助（排名不分先后）</string>
 
@@ -102,9 +92,6 @@
     <string name="title_view_logs">查看日志</string>
 
     <!-- ———————————————————————— HookSettingsPage ———————————————————————— -->
-    <string name="lyric_mode_verbatim">逐字歌词</string>
-    <string name="lyric_mode_separated">分离歌词</string>
-    <string name="title_lyric_mode">歌词模式</string>
     <string name="title_enable">启用</string>
     <string name="title_lyric_source">歌词源</string>
     <string name="lyric_source_lyricon">Lyricon</string>
@@ -112,7 +99,6 @@
     <string name="lyric_source_lyricinfo">LyricInfo</string>
     <string name="title_custom_config">自定义配置</string>
     <string name="title_super_island">超级岛</string>
-    <string name="subtitle_super_island">暂停或切换音乐后生效</string>
     <string name="title_media_cards">媒体卡片</string>
     <string name="title_notification_center">通知中心</string>
     <string name="title_always_on_display">息屏显示</string>
@@ -124,7 +110,6 @@
     <string name="option_notification_media_card_switcher_multi">多卡片视图</string>
     <string name="title_notification_media_card_switcher_max_count">卡片显示数量上限</string>
     <string name="label_notification_media_card_switcher_max_count">范围：2 ~ 6</string>
-    <string name="title_notification_center_media_card">通知中心媒体卡片</string>
     <string name="title_notification_media_layout_style">卡片布局样式</string>
     <string name="prompt_media_layout_style">自定义卡片布局样式可能与相关元素或布局等设置的改动不兼容甚至冲突，请谨慎更改并测试。暂不处理相关问题</string>
     <string name="option_notification_media_layout_system">系统默认</string>
@@ -133,30 +118,6 @@
     <string name="option_notification_media_layout_oneui">One UI 风格</string>
     <string name="option_notification_media_layout_miui">MIUI 风格</string>
     <string name="option_notification_media_layout_pixelos">PixelOS 风格</string>
-    <string name="title_media_card_layout_debug">布局参数调试</string>
-    <string name="summary_media_card_layout_debug">修改后重启系统界面生效</string>
-    <string name="title_media_card_layout_debug_ios">iOS 风格 · 超级岛展开态</string>
-    <string name="summary_media_card_layout_debug_unsupported">当前布局样式暂未提供调试参数</string>
-    <string name="title_media_card_debug_value">数值</string>
-    <string name="title_media_card_debug_cover_size">封面大小</string>
-    <string name="title_media_card_debug_cover_top">封面顶部边距</string>
-    <string name="title_media_card_debug_cover_start">封面左侧边距</string>
-    <string name="title_media_card_debug_title_top">歌名顶部边距</string>
-    <string name="title_media_card_debug_info_start_gap">音乐信息与封面间距</string>
-    <string name="title_media_card_debug_artist_gap">歌名与歌手间距</string>
-    <string name="title_media_card_debug_music_wave_size">MusicWave 大小</string>
-    <string name="title_media_card_debug_music_wave_top">MusicWave 顶部边距</string>
-    <string name="title_media_card_debug_music_wave_end">MusicWave 右侧边距</string>
-    <string name="title_media_card_debug_progress_top_gap">进度条顶部间距</string>
-    <string name="title_media_card_debug_progress_height">进度条容器高度</string>
-    <string name="title_media_card_debug_progress_time_gap">进度条与时间间距</string>
-    <string name="title_media_card_debug_time_outer_margin">时间外侧边距</string>
-    <string name="title_media_card_debug_action_width">动作按钮槽位宽度</string>
-    <string name="title_media_card_debug_action_height">动作按钮槽位高度</string>
-    <string name="title_media_card_debug_action_bottom">动作按钮底部边距</string>
-    <string name="title_media_card_debug_action_outer_margin">动作按钮外侧边距</string>
-    <string name="title_media_card_debug_action_scale">动作按钮缩放</string>
-    <string name="title_media_card_debug_device_switch_scale">设备切换按钮缩放</string>
     <string name="title_media_card_background_theme">卡片背景颜色</string>
     <string name="option_media_card_theme_follow_system">跟随系统</string>
     <string name="option_media_card_theme_follow_system_default">跟随系统（默认）</string>
@@ -206,12 +167,10 @@
     <string name="option_media_action_order_custom_right">自定义按钮在最右侧</string>
     <string name="option_media_action_order_play_left">播放按钮在最左侧</string>
     <string name="title_notification_media_background_auto_invert">亮色封面自动反色</string>
-    <string name="title_island_expanded_media_card">超级岛展开态媒体卡片</string>
     <string name="title_island_media_ambient_flow_mode">卡片动态流光</string>
     <string name="option_island_media_ambient_flow_default">动态流光（默认）</string>
     <string name="option_island_media_ambient_flow_cover_color">动态流光（封面色）</string>
     <string name="option_island_media_ambient_flow_disabled">禁用</string>
-    <string name="title_lyrics">音乐信息</string>
     <string name="title_lyric_anim">歌词切换动画</string>
     <string name="title_anim_speed">动画速度</string>
     <string name="format_anim_speed">%1$sx</string>
@@ -276,14 +235,10 @@
     <string name="title_battery_optimization">忽略电池优化</string>
     <string name="toast_battery_ignored">已忽略电池优化</string>
     <string name="toast_battery_failed">无法打开电池优化设置</string>
-    <string name="title_online_lyric">获取在线歌词</string>
-    <string name="summary_online_lyric">实验性功能，谨慎启用\n开启后可关闭音乐软件车载蓝牙功能</string>
-    <string name="format_songs_count">%1$d 首</string>
     <string name="title_add_whitelist">添加白名单应用</string>
     <string name="title_added_apps">已添加的应用</string>
     <string name="delete">删除</string>
     <string name="title_no_whitelist">暂无白名单应用</string>
-    <string name="summary_no_whitelist">点击右下角按钮添加并启用</string>
 
     <!-- ———————————————————————— LyricAnimationPage ———————————————————————— -->
     <string name="option_anim_none">无动画</string>
@@ -348,7 +303,6 @@
     <string name="label_marquee_loop_range">ms 范围：0 ~ 10000</string>
     <string name="title_text_size_ratio">多行模式下文字大小比例</string>
     <string name="label_text_size_ratio_range">范围：10 ~ 100</string>
-    <string name="title_bold">粗体</string>
     <string name="title_italic">斜体</string>
     <string name="title_narrow_latin_font">英数窄字体</string>
     <string name="title_gradient_progress">羽化进度样式</string>
@@ -365,10 +319,8 @@
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
     <string name="title_double_line_content">双行歌词</string>
-    <string name="summary_double_line_content">翻译、罗马音、下一句歌词等内容</string>
     <string name="title_translation">翻译</string>
     <string name="title_roma">罗马音</string>
-    <string name="title_secondary_lyric">副歌词</string>
     <string name="title_only_secondary_lyric">仅显示副行歌词</string>
     <string name="title_swap_secondary_lyric">原词和副行歌词对调位置</string>
     <string name="label_custom_font_path">填写字体文件的完整路径</string>
@@ -455,7 +407,6 @@
     <string name="summary_hide_title_alias">移除歌名中括号内的别名，可能会误删信息，请谨慎开启</string>
     <string name="title_content_layout_first_line">第一行</string>
     <string name="title_content_layout_second_line">第二行</string>
-    <string name="summary_content_layout_select_fields">选择要显示的音乐信息字段</string>
     <string name="summary_content_layout_empty_line">未选择字段</string>
     <string name="title_content_layout_separator">字段连接符</string>
     <string name="summary_content_layout_separator">选择多个字段之间的拼接方式</string>
@@ -483,7 +434,6 @@
     <string name="summary_super_island_width_fixed">当前长度：%1$d</string>
     <string name="summary_super_island_width_dynamic">当前长度：%1$d - %2$d</string>
     <string name="title_super_island_disable_width_limit">解除超级岛最大长度限制</string>
-    <string name="label_content_width_range">范围：%1$d ~ %2$d</string>
     <string name="title_left_padding">左侧内容内边距</string>
     <string name="title_right_padding">右侧内容内边距</string>
     <string name="label_left_padding">左边距</string>
@@ -536,20 +486,15 @@
     <string name="option_island_progress_bottom_bidirectional">下方起点（左右双向）</string>
 
     <!-- ———————————————————————— Shared ———————————————————————— -->
-    <string name="filter">筛选</string>
     <string name="more">更多</string>
     <string name="all">全部</string>
-    <string name="refresh">刷新</string>
     <string name="close">关闭</string>
-    <string name="copy">复制</string>
     <string name="copied">已复制到剪贴板</string>
 
     <!-- Help Page -->
     <string name="title_help_usage_tips">使用提示</string>
     <string name="title_help_config_steps">配置流程</string>
     <string name="title_help_warm_tips">温馨提示</string>
-    <string name="summary_help_bug_notice">目前版本存在bug，如果不适配你的机型或系统版本，可用通知型灵动岛歌词代替，还请谅解</string>
-    <string name="summary_help_super_island_steps">1、前往 github 下载对应 lyricon 歌词提供器\n2、在 lsposed 中启用 HyperLyric 和歌词提供器\n3、打开 HyperLyric 主页的小米超级岛歌词开关\n4、重启系统界面和音乐软件</string>
     <string name="summary_help_dynamic_island_hint">读取音乐软件输出的 MediaSession 元数据，并通过实时通知或小米焦点通知显示歌词</string>
     <string name="summary_help_focus_whitelist_hint">焦点通知可能受到系统白名单限制，可使用 HyperLyric 提供的白名单解除功能</string>
     <string name="summary_help_dynamic_island_steps">1、在 HyperLyric 应用内启用通知型灵动岛歌词\n2、授予通知监听和发送通知权限，并将音乐软件加入歌词白名单\n3、让音乐软件输出歌词元数据；“车载蓝牙歌词”只是部分软件提供元数据的方式，不一定需要开启或连接蓝牙设备\n4、如果 HyperLyric 被限制后台运行，请授予自启动或后台运行权限</string>
@@ -577,12 +522,8 @@
     <string name="unknown_time">未知时间</string>
 
     <!-- Lyric Settings Page -->
-    <string name="tab_basic">基础功能</string>
-    <string name="tab_advanced">高级功能</string>
 
     <!-- Main Page & General Content Descriptions -->
-    <string name="content_description_avatar">头像</string>
-    <string name="content_description_go">前往</string>
     <string name="version_unknown">v 未知</string>
 
     <!-- ———————————————————————— LogPage ———————————————————————— -->
@@ -602,7 +543,6 @@
     <string name="module_logs_level">日志等级</string>
     <string name="no_logs_found">暂无日志</string>
     <string name="no_root_permission">应用未获取root权限，无法获取lsposed日志</string>
-    <string name="title_log_detail">日志详情</string>
     <string name="export_success">导出成功</string>
     <string name="format_export_failed">导出失败: %1$s</string>
     <string name="tag_lsposed">LSPosed</string>
@@ -655,21 +595,15 @@
 
     <!-- Plugin Runtime -->
     <string name="title_plugins">插件</string>
-    <string name="summary_plugins">管理 HyperLyric 的 ZIP 扩展</string>
-    <string name="title_plugin_manager">插件管理</string>
     <string name="title_install_plugin">安装 ZIP 插件</string>
-    <string name="title_plugin_settings">插件设置</string>
     <string name="title_uninstall_plugin">卸载插件</string>
     <string name="plugin_status_enabled">已启用</string>
     <string name="plugin_status_disabled">已禁用</string>
-    <string name="summary_plugin_restart_system_ui">安装、卸载、启用或禁用后需要重启系统界面</string>
-    <string name="summary_plugin_version">版本 %1$s</string>
     <string name="summary_plugin_no_settings">此插件没有可配置项</string>
     <string name="summary_plugin_empty">尚未安装插件</string>
     <string name="dialog_uninstall_plugin_title">卸载插件？</string>
     <string name="dialog_uninstall_plugin_summary">将删除插件 ZIP 和配置；运行时数据管理将在后续版本提供。</string>
     <string name="toast_plugin_install_success">插件安装成功，重启系统界面后生效</string>
-    <string name="toast_plugin_uninstall_success">插件已卸载</string>
     <string name="toast_plugin_operation_failed">插件操作失败：%1$s</string>
     <string name="toast_plugin_requires_xposed">请先启用 HyperLyric Xposed 模块</string>
     <string name="title_plugin_cache">缓存管理</string>
