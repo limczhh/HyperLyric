@@ -190,7 +190,7 @@
     <string name="title_lyrics">Media Info</string>
     <string name="title_lyric_anim">Lyric Animation</string>
     <string name="title_anim_speed">Animation Speed</string>
-    <string name="format_anim_speed">%1$s×</string>
+    <string name="format_anim_speed">%1$sx</string>
     <string name="title_lyric_provider">Lyric Provider</string>
     <string name="title_lyric_delay">Lyric time offset</string>
     <string name="summary_lyric_delay">Positive values show lyrics later, negative values earlier</string>

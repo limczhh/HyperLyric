@@ -214,7 +214,7 @@
     <string name="title_lyrics">音乐信息</string>
     <string name="title_lyric_anim">歌词切换动画</string>
     <string name="title_anim_speed">动画速度</string>
-    <string name="format_anim_speed">%1$s×</string>
+    <string name="format_anim_speed">%1$sx</string>
     <string name="title_lyric_provider">歌词提供器</string>
     <string name="title_lyric_delay">歌词时间偏移</string>
     <string name="summary_lyric_delay">正数延后显示，负数提前显示</string>
