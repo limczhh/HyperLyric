@@ -4,7 +4,12 @@ import android.content.SharedPreferences
 import android.text.TextPaint
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
+import com.lidesheng.hyperlyric.common.lyric.METADATA_RESOLVED_SECONDARY_CONTENT
 import com.lidesheng.hyperlyric.common.lyric.RichLyricLineSplitter
+import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
+import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContentTransformer
+import com.lidesheng.hyperlyric.common.lyric.preferredContentFor
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
@@ -18,7 +23,6 @@ import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import com.lidesheng.hyperlyric.root.utils.HookLogger
-import com.lidesheng.hyperlyric.root.utils.TranslationHelper
 
 internal object IslandLyricContentAssembler {
 
@@ -41,10 +45,10 @@ internal object IslandLyricContentAssembler {
             config = config,
             isLeft = view.tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG
         )
-        val nextLinePreviewEnabledForView = isNextLinePreviewEnabled(prefs, config)
-        val disableAll = TranslationHelper.isTranslationDisabled(prefs) ||
-                nextLinePreviewEnabledForView
-        val translationOnly = TranslationHelper.isTranslationOnly(prefs)
+        val nextLinePreviewEnabledForView =
+            targetLine?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
+        val allSecondaryContentDisabled = !config.lyricContentDisplay.hasEnabledContent()
+        val onlySecondary = config.onlySecondary
         val targetLineSignature = lineContentSignature(targetLine)
         val signature = "lyric|$targetLineSignature|${config.styleSignature}"
         val useSharedMarqueeClock = config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
@@ -156,12 +160,14 @@ internal object IslandLyricContentAssembler {
         val linePresent = targetLine != null
         val secondaryPresent = !targetLine?.secondary.isNullOrBlank()
         val translationPresent = !targetLine?.translation.isNullOrBlank()
+        val romaPresent = !targetLine?.roma.isNullOrBlank()
         val debugState = listOf(
             linePresent,
             secondaryPresent,
             translationPresent,
-            disableAll,
-            translationOnly,
+            romaPresent,
+            allSecondaryContentDisabled,
+            onlySecondary,
             nextLinePreviewEnabledForView,
             animated,
             view.isAttachedToWindow
@@ -173,7 +179,9 @@ internal object IslandLyricContentAssembler {
         ) {
             "歌词内容状态已提交: tag=$viewKey, linePresent=$linePresent, " +
                     "secondaryPresent=$secondaryPresent, translationPresent=$translationPresent, " +
-                    "translationOnly=$translationOnly, disableAll=$disableAll, " +
+                    "romaPresent=$romaPresent, " +
+                    "onlySecondary=$onlySecondary, allSecondaryContentDisabled=" +
+                    "$allSecondaryContentDisabled, " +
                     "nextLinePreview=$nextLinePreviewEnabledForView, " +
                     "animationEnabled=${config.lyricAnimationEnabled}, animated=$animated, " +
                     "attached=${view.isAttachedToWindow}"
@@ -296,41 +304,39 @@ internal object IslandLyricContentAssembler {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig? = null
     ): IRichLyricLine? {
-        var rawLine = LyriconDataBridge.currentLyricLine
+        val rawLine = LyriconDataBridge.currentLyricLine
             ?: return null
 
-        if (config != null && isNextLinePreviewEnabled(prefs, config, rawLine)) {
-            return rawLine.withNextLinePreview(LyriconDataBridge.currentNextLyricLine)
-        }
-
-        if (TranslationHelper.isTranslationOnly(prefs)) {
-            rawLine = TranslationHelper.applyTranslationOnly(rawLine)
-        } else if (TranslationHelper.isSwapTranslation(prefs)) {
-            rawLine = TranslationHelper.swapTranslation(rawLine)
-        }
-        return rawLine
-    }
-
-    internal fun isNextLinePreviewEnabled(
-        prefs: SharedPreferences,
-        config: IslandSlotRuntimeConfig,
-        currentLine: IRichLyricLine? = LyriconDataBridge.currentLyricLine
-    ): Boolean {
-        if (!config.nextLyricLine) return false
-        if (LyriconDataBridge.isTextMode) return false
-        val source = prefs.getString(
-            RootConstants.KEY_HOOK_LYRIC_SOURCE,
-            RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
+        val displaySettings = config?.lyricContentDisplay ?: LyricContentDisplayPolicy.read(prefs)
+        val nextLine = LyriconDataBridge.currentNextLyricLine
+        val selectedContent = displaySettings.preferredContentFor(
+            line = rawLine,
+            nextLine = nextLine,
+            songLines = LyriconDataBridge.currentSong?.lyrics
         )
-        if (source != "lyricon" && source != "lyricinfo") return false
-
-        if (config.autoSwitchTranslation) {
-            val hasSongTranslation =
-                LyriconDataBridge.currentSong?.lyrics?.any { !it.translation.isNullOrBlank() } == true
-            val hasLineTranslation = !currentLine?.translation.isNullOrBlank()
-            if (hasSongTranslation || hasLineTranslation) return false
+        if (selectedContent == LyricSecondaryContent.NEXT_LINE) {
+            return rawLine.withNextLinePreview(nextLine)
         }
-        return true
+
+        val onlySecondary = config?.onlySecondary ?: prefs.getBoolean(
+            RootConstants.KEY_HOOK_ONLY_SECONDARY,
+            RootConstants.DEFAULT_HOOK_ONLY_SECONDARY
+        )
+        val swapSecondary = config?.swapSecondary ?: prefs.getBoolean(
+            RootConstants.KEY_HOOK_SWAP_SECONDARY,
+            RootConstants.DEFAULT_HOOK_SWAP_SECONDARY
+        )
+        val resolvedLine = selectedContent
+            ?.takeUnless { it == LyricSecondaryContent.NEXT_LINE }
+            ?.let { rawLine.withResolvedSecondaryContent(it) }
+            ?: rawLine
+        return LyricSecondaryContentTransformer.apply(
+            line = resolvedLine,
+            settings = displaySettings,
+            onlySecondary = onlySecondary,
+            swapSecondary = swapSecondary,
+            songLines = LyriconDataBridge.currentSong?.lyrics
+        )
     }
 
     private fun applyPlaybackSnapshot(
@@ -376,6 +382,8 @@ internal object IslandLyricContentAssembler {
 
     private fun IRichLyricLine.withNextLinePreview(nextLine: IRichLyricLine?): IRichLyricLine {
         val nextText = nextLine?.text?.takeIf { it.isNotBlank() }
+            ?: nextLine?.words?.joinToString("") { it.text.orEmpty() }
+                ?.takeIf { it.isNotBlank() }
         return RichLyricLine(
             begin = begin,
             end = end,
@@ -392,6 +400,31 @@ internal object IslandLyricContentAssembler {
             translation = null,
             translationWords = null,
             roma = null
+        )
+    }
+
+    private fun IRichLyricLine.withResolvedSecondaryContent(
+        content: LyricSecondaryContent
+    ): IRichLyricLine {
+        val metadata = lyricMetadataOf(
+            *(metadata?.entries?.filter {
+                it.key != METADATA_RESOLVED_SECONDARY_CONTENT
+            }?.map { it.key to it.value } ?: emptyList()).toTypedArray(),
+            METADATA_RESOLVED_SECONDARY_CONTENT to content.preferenceValue
+        )
+        return RichLyricLine(
+            begin = begin,
+            end = end,
+            duration = duration,
+            isAlignedRight = isAlignedRight,
+            metadata = metadata,
+            text = text,
+            words = words,
+            secondary = secondary,
+            secondaryWords = secondaryWords,
+            translation = translation,
+            translationWords = translationWords,
+            roma = roma
         )
     }
 }

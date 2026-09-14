@@ -8,6 +8,13 @@ package com.lidesheng.hyperlyric.lyric.view
 
 import com.lidesheng.hyperlyric.lyric.model.LyricLine
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
+import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
+import com.lidesheng.hyperlyric.common.lyric.METADATA_RESOLVED_SECONDARY_CONTENT
+import com.lidesheng.hyperlyric.common.lyric.METADATA_SWAPPED_ORIGINAL
+import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
+import com.lidesheng.hyperlyric.common.lyric.hasContent
+import com.lidesheng.hyperlyric.common.lyric.textOf
+import com.lidesheng.hyperlyric.common.lyric.wordsOf
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
 
@@ -19,17 +26,21 @@ internal class LyricLineAssembler(
     private var enableRelativeProgress: Boolean = false,
     private var enableRelativeHighlight: Boolean = false,
     private var displayLineByLine: Boolean = false,
+    private var secondaryContentOrder: List<LyricSecondaryContent> =
+        LyricSecondaryContent.DEFAULT_ORDER,
 ) {
     private val wordBuilder = RelativeWordBuilder()
 
     fun updateFlags(displayTranslation: Boolean, displayRoma: Boolean,
                     enableRelativeProgress: Boolean, enableRelativeHighlight: Boolean,
-                    displayLineByLine: Boolean) {
+                    displayLineByLine: Boolean,
+                    secondaryContentOrder: List<LyricSecondaryContent>) {
         this.displayTranslation = displayTranslation
         this.displayRoma = displayRoma
         this.enableRelativeProgress = enableRelativeProgress
         this.enableRelativeHighlight = enableRelativeHighlight
         this.displayLineByLine = displayLineByLine
+        this.secondaryContentOrder = LyricContentDisplayPolicy.normalizeOrder(secondaryContentOrder)
     }
 
     data class MainResult(
@@ -83,66 +94,82 @@ internal class LyricLineAssembler(
         var hasOriginalWords = false
         var lineTimelineGenerated = false
         val isNextLinePreview = source.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
+        val isSwappedOriginal = source.metadata?.getBoolean(METADATA_SWAPPED_ORIGINAL) == true
         val line = LyricLine().apply {
             begin = source.begin; end = source.end; duration = source.duration
             isAlignedRight = source.isAlignedRight
 
-            when {
-                !source.secondary.isNullOrBlank() || !source.secondaryWords.isNullOrEmpty() -> {
-                    val secondaryText = textForLine(source.secondary, source.secondaryWords)
-                    text = source.secondary
-                    if (isNextLinePreview) {
-                        // 下一句只是预览文本，不能继承当前行时间轴或生成相对时间轴。
-                        words = emptyList()
-                        metadata = lyricMetadataOf(METADATA_NEXT_LINE_PREVIEW to "true")
-                    } else {
-                        val useLineTimeline = shouldUseLineTimeline(
-                            source, source.secondaryWords, secondaryText
-                        )
-                        val builtWords = if (useLineTimeline) {
-                            emptyList()
-                        } else {
-                            wordBuilder.build(source, source.secondary, source.secondaryWords)
-                        }
-                        words = builtWords
-                        lineTimelineGenerated = useLineTimeline
-                        generated = !useLineTimeline && words !== source.secondaryWords
-                        hasOriginalWords = !useLineTimeline && !source.secondaryWords.isNullOrEmpty()
-                        if (useLineTimeline) text = secondaryText
-                    }
+            // Next-line preview and the original lyric moved by the swap option are explicit
+            // secondary-row content. They must not be filtered by the generic content selection.
+            val hasSourceSecondary = !source.secondary.isNullOrBlank() ||
+                    !source.secondaryWords.isNullOrEmpty()
+            val hasExplicitSecondary = isNextLinePreview || isSwappedOriginal || hasSourceSecondary
+            val resolvedContent = source.metadata
+                ?.getString(METADATA_RESOLVED_SECONDARY_CONTENT)
+                ?.let(LyricSecondaryContent::fromPreferenceValue)
+                ?.takeUnless { it == LyricSecondaryContent.NEXT_LINE }
+            val selectedContent = if (hasExplicitSecondary) {
+                null
+            } else if (resolvedContent != null) {
+                // The content type was resolved at song level. It intentionally remains selected
+                // even when this particular line has no value in that lane, so lower-priority
+                // content cannot make the second row change meaning mid-song.
+                resolvedContent
+            } else {
+                secondaryContentOrder.firstOrNull { content ->
+                    when (content) {
+                        LyricSecondaryContent.TRANSLATION -> displayTranslation
+                        LyricSecondaryContent.ROMA -> displayRoma
+                        LyricSecondaryContent.NEXT_LINE -> false
+                    } && content.hasContent(source)
                 }
-                displayTranslation && (!source.translation.isNullOrBlank()
-                        || !source.translationWords.isNullOrEmpty()) -> {
-                    val translationText = textForLine(source.translation, source.translationWords)
-                    text = source.translation
+            }
+            val selectedText = if (hasExplicitSecondary) {
+                source.secondary
+            } else {
+                selectedContent?.textOf(source)
+            }
+            val selectedWords = if (hasExplicitSecondary) {
+                source.secondaryWords
+            } else {
+                selectedContent?.wordsOf(source)
+            }
+            val hasSelectedContent = if (hasExplicitSecondary) {
+                !selectedText.isNullOrBlank() || !selectedWords.isNullOrEmpty()
+            } else {
+                selectedContent != null
+            }
+            if (hasSelectedContent) {
+                val selectedTextForLine = textForLine(selectedText, selectedWords)
+                text = selectedText
+                if (isNextLinePreview) {
+                    // 下一句只是预览文本，不能继承当前行时间轴或生成相对时间轴。
+                    words = emptyList()
+                    metadata = lyricMetadataOf(METADATA_NEXT_LINE_PREVIEW to "true")
+                } else {
                     val useLineTimeline = shouldUseLineTimeline(
-                        source, source.translationWords, translationText
+                        source,
+                        selectedWords,
+                        selectedTextForLine
                     )
                     val builtWords = if (useLineTimeline) {
                         emptyList()
                     } else {
-                        wordBuilder.build(source, source.translation, source.translationWords)
+                        wordBuilder.build(source, selectedText, selectedWords)
                     }
                     words = builtWords
-                    metadata = lyricMetadataOf("translation" to "true")
-                    lineTimelineGenerated = useLineTimeline
-                    generated = !useLineTimeline && words !== source.translationWords
-                    hasOriginalWords = !useLineTimeline && !source.translationWords.isNullOrEmpty()
-                    if (useLineTimeline) text = translationText
-                }
-                displayRoma -> {
-                    val romaText = source.roma
-                    text = romaText
-                    val useLineTimeline = shouldUseLineTimeline(source, null, romaText)
-                    val builtWords = if (useLineTimeline) {
-                        emptyList()
-                    } else {
-                        wordBuilder.build(source, romaText, null)
+                    metadata = when {
+                        isSwappedOriginal -> null
+                        selectedContent == LyricSecondaryContent.TRANSLATION ->
+                            lyricMetadataOf("translation" to "true")
+                        selectedContent == LyricSecondaryContent.ROMA ->
+                            lyricMetadataOf("roma" to "true")
+                        else -> null
                     }
-                    words = builtWords
-                    metadata = lyricMetadataOf("roma" to "true")
                     lineTimelineGenerated = useLineTimeline
-                    generated = !lineTimelineGenerated
+                    generated = !useLineTimeline && words !== selectedWords
+                    hasOriginalWords = !useLineTimeline && !selectedWords.isNullOrEmpty()
+                    if (useLineTimeline) text = selectedTextForLine
                 }
             }
         }

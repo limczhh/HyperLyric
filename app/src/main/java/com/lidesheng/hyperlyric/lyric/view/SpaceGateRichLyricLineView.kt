@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import androidx.core.graphics.withScale
 import androidx.core.view.forEach
+import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.line.SpaceGateLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
@@ -25,7 +26,8 @@ class SpaceGateRichLyricLineView(
     var displayTranslation: Boolean = true,
     var enableRelativeProgress: Boolean = false,
     var enableRelativeProgressHighlight: Boolean = false,
-    var displayRoma: Boolean = true
+    var displayRoma: Boolean = true,
+    var secondaryContentOrder: List<LyricSecondaryContent> = LyricSecondaryContent.DEFAULT_ORDER
 ) : LinearLayout(context), UpdatableColor {
 
     val main = SpaceGateLyricLineView(context)
@@ -37,8 +39,11 @@ class SpaceGateRichLyricLineView(
         private set
 
     private val assembler = LyricLineAssembler(
-        displayTranslation, displayRoma,
-        enableRelativeProgress, enableRelativeProgressHighlight
+        displayTranslation = displayTranslation,
+        displayRoma = displayRoma,
+        enableRelativeProgress = enableRelativeProgress,
+        enableRelativeHighlight = enableRelativeProgressHighlight,
+        secondaryContentOrder = secondaryContentOrder
     )
     private var displayLineByLine = false
 
@@ -213,9 +218,12 @@ class SpaceGateRichLyricLineView(
     ) {
         displayLineByLine = style.lineDisplay
         assembler.updateFlags(
-            displayTranslation, displayRoma,
-            style.primary.relativeProgress, style.primary.relativeHighlight,
-            displayLineByLine
+            displayTranslation = displayTranslation,
+            displayRoma = displayRoma,
+            enableRelativeProgress = style.primary.relativeProgress,
+            enableRelativeHighlight = style.primary.relativeHighlight,
+            displayLineByLine = displayLineByLine,
+            secondaryContentOrder = secondaryContentOrder
         )
         enableRelativeProgress = style.primary.relativeProgress
         enableRelativeProgressHighlight = style.primary.relativeHighlight
@@ -324,9 +332,12 @@ class SpaceGateRichLyricLineView(
         }
 
         assembler.updateFlags(
-            displayTranslation, displayRoma,
-            enableRelativeProgress, enableRelativeProgressHighlight,
-            displayLineByLine
+            displayTranslation = displayTranslation,
+            displayRoma = displayRoma,
+            enableRelativeProgress = enableRelativeProgress,
+            enableRelativeHighlight = enableRelativeProgressHighlight,
+            displayLineByLine = displayLineByLine,
+            secondaryContentOrder = secondaryContentOrder
         )
         val mainResult = assembler.buildMain(line)
         val secResult = assembler.buildSecondary(line)
