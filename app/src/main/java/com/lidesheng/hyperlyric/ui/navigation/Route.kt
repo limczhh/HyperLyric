@@ -51,9 +51,6 @@ sealed interface Route : NavKey {
     data object VerbatimLyric : Route
 
     @Serializable
-    data object LyricTranslation : Route
-
-    @Serializable
     data object SuperIslandSettings : Route
 
     @Serializable

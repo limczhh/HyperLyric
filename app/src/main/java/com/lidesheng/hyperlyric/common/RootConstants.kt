@@ -470,9 +470,9 @@ object RootConstants {
     const val DEFAULT_HOOK_ONLY_SECONDARY = false
     const val DEFAULT_HOOK_SWAP_SECONDARY = false
     const val DEFAULT_HOOK_LYRIC_SHOW_TRANSLATION = true
-    const val DEFAULT_HOOK_LYRIC_SHOW_ROMA = true
+    const val DEFAULT_HOOK_LYRIC_SHOW_ROMA = false
     const val DEFAULT_HOOK_LYRIC_SHOW_NEXT_LINE = false
-    const val DEFAULT_HOOK_LYRIC_SECONDARY_ORDER = "translation,roma,next_line"
+    const val DEFAULT_HOOK_LYRIC_SECONDARY_ORDER = "translation,next_line,roma"
     const val TEXT_COLOR_STYLE_DEFAULT = 0
     const val TEXT_COLOR_STYLE_COVER_COLOR = 1
     const val TEXT_COLOR_STYLE_COVER_GRADIENT = 2

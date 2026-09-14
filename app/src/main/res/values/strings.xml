@@ -364,13 +364,13 @@
     <string name="summary_syllable_line_display">将带有字词时间轴的歌词降级为整行时间轴显示</string>
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
-    <string name="title_double_line_content">双行内容</string>
+    <string name="title_double_line_content">双行歌词</string>
     <string name="summary_double_line_content">翻译、罗马音、下一句歌词等内容</string>
     <string name="title_translation">翻译</string>
     <string name="title_roma">罗马音</string>
     <string name="title_secondary_lyric">副歌词</string>
-    <string name="title_only_secondary_lyric">仅显示副歌词</string>
-    <string name="title_swap_secondary_lyric">原词副歌词对调位置</string>
+    <string name="title_only_secondary_lyric">仅显示副行歌词</string>
+    <string name="title_swap_secondary_lyric">原词和副行歌词对调位置</string>
     <string name="label_custom_font_path">填写字体文件的完整路径</string>
     <string name="title_next_lyric">下一句歌词</string>
     <string name="summary_lyric_content_none">不显示第二行内容</string>

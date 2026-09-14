@@ -24,7 +24,6 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.SuperIslandSettingsPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.contentlayout.ContentLayoutPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.display.LyricDisplayPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.scroll.LyricScrollPage
-import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.translation.LyricTranslationPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.verbatim.VerbatimLyricPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.MediaCardSettingsPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.aod.AlwaysOnDisplayPage
@@ -66,7 +65,6 @@ fun AppNavigation(startRoute: Route) {
             entry<Route.LyricDisplay> { LyricDisplayPage() }
             entry<Route.LyricScroll> { LyricScrollPage() }
             entry<Route.VerbatimLyric> { VerbatimLyricPage() }
-            entry<Route.LyricTranslation> { LyricTranslationPage() }
             entry<Route.SuperIslandSettings> { SuperIslandSettingsPage() }
             entry<Route.SuperIslandContentLayout> { ContentLayoutPage() }
             entry<Route.MediaCardSettings> { MediaCardSettingsPage() }

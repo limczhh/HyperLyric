@@ -16,8 +16,8 @@ enum class LyricSecondaryContent(val preferenceValue: String) {
     companion object {
         val DEFAULT_ORDER: List<LyricSecondaryContent> = listOf(
             TRANSLATION,
-            ROMA,
-            NEXT_LINE
+            NEXT_LINE,
+            ROMA
         )
 
         fun fromPreferenceValue(value: String): LyricSecondaryContent? =

@@ -340,13 +340,13 @@
     <string name="summary_syllable_line_display">Downgrade lyrics with word-level timing to a line timeline</string>
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
-    <string name="title_double_line_content">Two-Line Content</string>
+    <string name="title_double_line_content">Two-Line Lyrics</string>
     <string name="summary_double_line_content">Translation, romanization, next lyric line, and more</string>
     <string name="title_translation">Translation</string>
     <string name="title_roma">Romanization</string>
     <string name="title_secondary_lyric">Secondary Lyrics</string>
-    <string name="title_only_secondary_lyric">Secondary Lyrics Only</string>
-    <string name="title_swap_secondary_lyric">Swap Original and Secondary Lyrics</string>
+    <string name="title_only_secondary_lyric">Secondary Lyric Line Only</string>
+    <string name="title_swap_secondary_lyric">Swap Original and Secondary Lyric Lines</string>
     <string name="label_custom_font_path">Enter full path of the font file</string>
     <string name="title_next_lyric">Next Lyric Line</string>
     <string name="summary_lyric_content_none">Do not show second-line content</string>

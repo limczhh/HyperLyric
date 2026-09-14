@@ -291,11 +291,6 @@ private fun LazyListScope.hookSettingsSections(
                     enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.VerbatimLyric) })
                 ArrowPreference(
-                    title = stringResource(R.string.title_double_line_content),
-                    summary = stringResource(R.string.summary_double_line_content),
-                    enabled = hookEnabled,
-                    onClick = { navigator.navigate(Route.LyricTranslation) })
-                ArrowPreference(
                     title = stringResource(R.string.title_lyric_anim),
                     enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.LyricAnimation) })
