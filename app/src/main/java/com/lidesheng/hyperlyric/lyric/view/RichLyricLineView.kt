@@ -27,6 +27,7 @@ class RichLyricLineView(
     var enableRelativeProgress: Boolean = false,
     var enableRelativeProgressHighlight: Boolean = false,
     var displayRoma: Boolean = true,
+    var displayBackgroundVocal: Boolean = true,
     var secondaryContentOrder: List<LyricSecondaryContent> = LyricSecondaryContent.DEFAULT_ORDER
 ) : LinearLayout(context), UpdatableColor {
 
@@ -41,6 +42,7 @@ class RichLyricLineView(
     private val assembler = LyricLineAssembler(
         displayTranslation = displayTranslation,
         displayRoma = displayRoma,
+        displayBackgroundVocal = displayBackgroundVocal,
         enableRelativeProgress = enableRelativeProgress,
         enableRelativeHighlight = enableRelativeProgressHighlight,
         secondaryContentOrder = secondaryContentOrder
@@ -55,6 +57,7 @@ class RichLyricLineView(
     private var lastPlaybackSpeed = Float.NaN
 
     var rawLine: IRichLyricLine? = null
+    var rawSecondaryLine: IRichLyricLine? = null
     private var currentMainText: String? = null
     private var secondaryIsNextLinePreview = false
     private var nextLineTransitionRunning = false
@@ -63,20 +66,27 @@ class RichLyricLineView(
     var line: IRichLyricLine?
         get() = rawLine
         set(value) {
-            setLineInternal(value, null, null, null)
+            setLineInternal(value, null, null, null, null)
         }
 
     fun setLineWithCallbacks(
         value: IRichLyricLine?,
         onMainLineWillApply: ((Float) -> Boolean)? = null,
         onMainLineApplied: (() -> Unit)? = null,
-        onMainLineCancelled: (() -> Unit)? = null
+        onMainLineCancelled: (() -> Unit)? = null,
+        secondaryLine: IRichLyricLine? = null
     ) {
-        setLineInternal(value, onMainLineWillApply, onMainLineApplied, onMainLineCancelled)
+        setLineInternal(
+            value,
+            onMainLineWillApply,
+            onMainLineApplied,
+            onMainLineCancelled,
+            secondaryLine
+        )
     }
 
     fun updateMetadataLine(value: IRichLyricLine?) {
-        setLineInternal(value, null, null, null, preserveMarquee = true)
+        setLineInternal(value, null, null, null, null, preserveMarquee = true)
     }
 
     private fun setLineInternal(
@@ -84,6 +94,7 @@ class RichLyricLineView(
         onMainLineWillApply: ((Float) -> Boolean)?,
         onMainLineApplied: (() -> Unit)?,
         onMainLineCancelled: (() -> Unit)?,
+        secondaryLine: IRichLyricLine?,
         preserveMarquee: Boolean = false
     ) {
         val cancellation = pendingMainLineCancelled
@@ -98,6 +109,7 @@ class RichLyricLineView(
         pendingMainLineApplied = onMainLineApplied
         pendingMainLineCancelled = onMainLineCancelled
         rawLine = value
+        rawSecondaryLine = secondaryLine
         if (!preserveMarquee) {
             lastPosition = Long.MIN_VALUE
             lastPlaybackSpeed = Float.NaN
@@ -121,6 +133,7 @@ class RichLyricLineView(
         lastPosition = Long.MIN_VALUE
         lastPlaybackSpeed = Float.NaN
         currentMainText = null
+        rawSecondaryLine = null
         secondaryIsNextLinePreview = false
         alwaysShowSecondary = false
         refreshLines()
@@ -208,6 +221,7 @@ class RichLyricLineView(
         assembler.updateFlags(
             displayTranslation = displayTranslation,
             displayRoma = displayRoma,
+            displayBackgroundVocal = displayBackgroundVocal,
             enableRelativeProgress = style.primary.relativeProgress,
             enableRelativeHighlight = style.primary.relativeHighlight,
             displayLineByLine = displayLineByLine,
@@ -290,6 +304,7 @@ class RichLyricLineView(
     }
 
     private var oldLine: IRichLyricLine? = null
+    private var oldSecondaryLine: IRichLyricLine? = null
     private var lineGeneration = 0
     private var preflightReadyGeneration = -1
 
@@ -305,7 +320,9 @@ class RichLyricLineView(
         } else if (preflightReadyGeneration == lineGeneration) {
             return
         }
-        if (!bypassIdentityCheck && oldLine === line && line.isTitleLine()) {
+        if (!bypassIdentityCheck && oldLine === line &&
+            oldSecondaryLine === rawSecondaryLine && line.isTitleLine()
+        ) {
             pendingMainLineWillApply = null
             dispatchMainLineApplied()
             return
@@ -313,13 +330,14 @@ class RichLyricLineView(
         assembler.updateFlags(
             displayTranslation = displayTranslation,
             displayRoma = displayRoma,
+            displayBackgroundVocal = displayBackgroundVocal,
             enableRelativeProgress = enableRelativeProgress,
             enableRelativeHighlight = enableRelativeProgressHighlight,
             displayLineByLine = displayLineByLine,
             secondaryContentOrder = secondaryContentOrder
         )
         val mainResult = assembler.buildMain(line)
-        val secResult = assembler.buildSecondary(line)
+        val secResult = assembler.buildSecondary(line, rawSecondaryLine)
 
         if (!skipMainLinePreflight) {
             val onMainLineWillApply = pendingMainLineWillApply
@@ -395,6 +413,7 @@ class RichLyricLineView(
         // 只有主、副行真正提交后，才把这一行标记为已应用。动态宽度预检可能会在此之前
         // 暂停刷新；过早更新 oldLine 会让后续重入误以为占位符已经显示，从而跳过 setLyric。
         oldLine = line
+        oldSecondaryLine = rawSecondaryLine
         if (requestMarquee) requestStartMarquee()
         dispatchMainLineApplied()
     }

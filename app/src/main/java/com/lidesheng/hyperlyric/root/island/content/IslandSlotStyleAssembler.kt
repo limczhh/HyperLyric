@@ -94,6 +94,7 @@ internal object IslandSlotStyleAssembler {
                 if (styleChanged) {
                     view.displayTranslation = lyricContentDisplay.showTranslation
                     view.displayRoma = lyricContentDisplay.showRoma
+                    view.displayBackgroundVocal = lyricContentDisplay.showBackgroundVocal
                     view.secondaryContentOrder = lyricContentDisplay.order
                     view.setStyle(style)
                     dispatch = "set_style"
@@ -111,6 +112,7 @@ internal object IslandSlotStyleAssembler {
                 if (styleChanged) {
                     view.displayTranslation = lyricContentDisplay.showTranslation
                     view.displayRoma = lyricContentDisplay.showRoma
+                    view.displayBackgroundVocal = lyricContentDisplay.showBackgroundVocal
                     view.secondaryContentOrder = lyricContentDisplay.order
                     view.setStyle(
                         style,

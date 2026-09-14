@@ -291,7 +291,7 @@ internal object IslandContentUpdateCoordinator {
     ) {
         if (mode != RootConstants.ISLAND_CONTENT_MODE_LYRIC) return
         val lyricView = view.findViewWithTag<View>(tag) ?: return
-        val line = IslandSlotContentFacade.buildSlotLyricLine(
+        val presentation = IslandSlotContentFacade.buildSlotLyricPresentation(
             view = lyricView,
             prefs = prefs,
             config = config,
@@ -301,7 +301,8 @@ internal object IslandContentUpdateCoordinator {
             view = lyricView,
             prefs = prefs,
             config = config,
-            lineOverride = line,
+            lineOverride = presentation.primary,
+            secondaryLineOverride = presentation.secondary,
             playbackActive = playbackActive,
             onLineWillApply = { contentWidthPx ->
                 IslandDynamicWidthCoordinator.prepareLyricWidth(view, tag, contentWidthPx)

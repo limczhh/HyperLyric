@@ -6,10 +6,11 @@ import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
 import com.lidesheng.hyperlyric.common.lyric.METADATA_RESOLVED_SECONDARY_CONTENT
+import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
+import com.lidesheng.hyperlyric.common.lyric.LyricPresentationResolver
 import com.lidesheng.hyperlyric.common.lyric.RichLyricLineSplitter
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContentTransformer
-import com.lidesheng.hyperlyric.common.lyric.preferredContentFor
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
@@ -31,6 +32,7 @@ internal object IslandLyricContentAssembler {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         lineOverride: IRichLyricLine?,
+        secondaryLineOverride: IRichLyricLine? = null,
         force: Boolean,
         playbackActive: Boolean,
         playbackClock: LyriconDataBridge.PlaybackClockReading,
@@ -39,17 +41,22 @@ internal object IslandLyricContentAssembler {
         onLineApplied: (() -> Unit)?,
         onLineCancelled: (() -> Unit)?
     ): Boolean {
-        val targetLine = lineOverride ?: buildSlotLyricLine(
-            view = view,
-            prefs = prefs,
-            config = config,
-            isLeft = view.tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG
-        )
+        val targetPresentation = if (lineOverride != null || secondaryLineOverride != null) {
+            LyricPresentation(lineOverride, secondaryLineOverride)
+        } else {
+            buildSlotLyricPresentation(
+                view = view,
+                prefs = prefs,
+                config = config,
+                isLeft = view.tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG
+            )
+        }
+        val targetLine = targetPresentation.primary
         val nextLinePreviewEnabledForView =
             targetLine?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
         val allSecondaryContentDisabled = !config.lyricContentDisplay.hasEnabledContent()
         val onlySecondary = config.onlySecondary
-        val targetLineSignature = lineContentSignature(targetLine)
+        val targetLineSignature = presentationSignature(targetPresentation)
         val signature = "lyric|$targetLineSignature|${config.styleSignature}"
         val useSharedMarqueeClock = config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
         val marqueeClockOriginActiveTimeMs = if (useSharedMarqueeClock) {
@@ -118,7 +125,8 @@ internal object IslandLyricContentAssembler {
                         targetLine,
                         onMainLineWillApply = onLineWillApply,
                         onMainLineApplied = onCommitted,
-                        onMainLineCancelled = onLineCancelled
+                        onMainLineCancelled = onLineCancelled,
+                        secondaryLine = targetPresentation.secondary
                     )
                 }
 
@@ -127,7 +135,8 @@ internal object IslandLyricContentAssembler {
                         targetLine,
                         onMainLineWillApply = onLineWillApply,
                         onMainLineApplied = onCommitted,
-                        onMainLineCancelled = onLineCancelled
+                        onMainLineCancelled = onLineCancelled,
+                        secondaryLine = targetPresentation.secondary
                     )
                 }
             }
@@ -158,7 +167,8 @@ internal object IslandLyricContentAssembler {
         val viewKey = view.tag?.toString() ?: view.javaClass.simpleName
         val animated = shouldAnimate
         val linePresent = targetLine != null
-        val secondaryPresent = !targetLine?.secondary.isNullOrBlank()
+        val secondaryPresent = targetPresentation.secondary != null ||
+                !targetLine?.secondary.isNullOrBlank()
         val translationPresent = !targetLine?.translation.isNullOrBlank()
         val romaPresent = !targetLine?.roma.isNullOrBlank()
         val debugState = listOf(
@@ -198,6 +208,7 @@ internal object IslandLyricContentAssembler {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         lineOverride: IRichLyricLine?,
+        secondaryLineOverride: IRichLyricLine? = null,
         playbackActive: Boolean,
         playbackClock: LyriconDataBridge.PlaybackClockReading =
             LyriconDataBridge.currentPlaybackClock(),
@@ -209,6 +220,7 @@ internal object IslandLyricContentAssembler {
         prefs = prefs,
         config = config,
         lineOverride = lineOverride,
+        secondaryLineOverride = secondaryLineOverride,
         force = false,
         playbackActive = playbackActive,
         playbackClock = playbackClock,
@@ -218,15 +230,16 @@ internal object IslandLyricContentAssembler {
         onLineCancelled = onLineCancelled
     )
 
-    fun buildSlotLyricLine(
+    fun buildSlotLyricPresentation(
         view: View,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         isLeft: Boolean
-    ): IRichLyricLine? {
-        val rawLine = processedRawLine(prefs, config)
-        if (!config.isSplitMode || rawLine == null) return rawLine
-        if (rawLine.text.isNullOrEmpty()) return rawLine
+    ): LyricPresentation {
+        val rawPresentation = processedPresentation(prefs, config)
+        val rawLine = rawPresentation.primary
+        if (!config.isSplitMode || rawLine == null) return rawPresentation
+        if (rawLine.text.isNullOrEmpty()) return rawPresentation
 
         val density = view.resources.displayMetrics.density
         val fallbackPaint = TextPaint().apply {
@@ -283,7 +296,7 @@ internal object IslandLyricContentAssembler {
                 rightWidthPx = rightMaxContentPx
             )
         }
-        val splitResult = RichLyricLineSplitter.split(
+        val primarySplit = RichLyricLineSplitter.split(
             line = rawLine,
             primaryPaint = textPaint,
             // A next-line preview is rendered in the secondary slot only temporarily. It will
@@ -297,25 +310,46 @@ internal object IslandLyricContentAssembler {
             containerWidthSpec = containerWidthSpec,
             partitionUntimedTimeline = config.syllableRelative
         )
-        return if (isLeft) splitResult.left else splitResult.right
+        val secondarySplit = rawPresentation.secondary?.let { secondaryLine ->
+            RichLyricLineSplitter.split(
+                line = secondaryLine,
+                primaryPaint = secondaryPaint,
+                secondaryPaint = secondaryPaint,
+                containerWidthSpec = containerWidthSpec,
+                partitionUntimedTimeline = config.syllableRelative
+            )
+        }
+        return LyricPresentation(
+            primary = if (isLeft) primarySplit.left else primarySplit.right,
+            secondary = secondarySplit?.let {
+                if (isLeft) it.left else it.right
+            },
+            secondaryContent = rawPresentation.secondaryContent
+        )
     }
 
-    fun processedRawLine(
+    fun processedPresentation(
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig? = null
-    ): IRichLyricLine? {
-        val rawLine = LyriconDataBridge.currentLyricLine
-            ?: return null
-
+    ): LyricPresentation {
+        val rawLine = LyriconDataBridge.currentLyricLine ?: return LyricPresentation(null)
         val displaySettings = config?.lyricContentDisplay ?: LyricContentDisplayPolicy.read(prefs)
+        val sourceLines = LyriconDataBridge.currentLyricLines.ifEmpty { listOf(rawLine) }
         val nextLine = LyriconDataBridge.currentNextLyricLine
-        val selectedContent = displaySettings.preferredContentFor(
-            line = rawLine,
+        val resolved = LyricPresentationResolver.resolve(
+            activeLines = sourceLines,
             nextLine = nextLine,
-            songLines = LyriconDataBridge.currentSong?.lyrics
+            songLines = LyriconDataBridge.currentSong?.lyrics,
+            settings = displaySettings,
+            autoDuet = config?.autoDuet ?: prefs.getBoolean(
+                RootConstants.KEY_HOOK_LYRIC_AUTO_DUET,
+                RootConstants.DEFAULT_HOOK_LYRIC_AUTO_DUET
+            )
         )
+        val primaryLine = resolved.primary ?: return resolved
+        val selectedContent = resolved.secondaryContent
         if (selectedContent == LyricSecondaryContent.NEXT_LINE) {
-            return rawLine.withNextLinePreview(nextLine)
+            return resolved.copy(primary = primaryLine.withNextLinePreview(nextLine))
         }
 
         val onlySecondary = config?.onlySecondary ?: prefs.getBoolean(
@@ -327,15 +361,30 @@ internal object IslandLyricContentAssembler {
             RootConstants.DEFAULT_HOOK_SWAP_SECONDARY
         )
         val resolvedLine = selectedContent
-            ?.takeUnless { it == LyricSecondaryContent.NEXT_LINE }
-            ?.let { rawLine.withResolvedSecondaryContent(it) }
-            ?: rawLine
-        return LyricSecondaryContentTransformer.apply(
-            line = resolvedLine,
-            settings = displaySettings,
-            onlySecondary = onlySecondary,
-            swapSecondary = swapSecondary,
-            songLines = LyriconDataBridge.currentSong?.lyrics
+            ?.takeUnless {
+                it == LyricSecondaryContent.NEXT_LINE ||
+                        it == LyricSecondaryContent.OVERLAPPING_LINE
+            }
+            ?.let { primaryLine.withResolvedSecondaryContent(it) }
+            ?: primaryLine
+        val transformedPrimary = if (selectedContent == LyricSecondaryContent.OVERLAPPING_LINE) {
+            // An independently timed overlap is already the secondary source. Applying the
+            // legacy only/swap transform to the primary here would duplicate or discard rows.
+            primaryLine
+        } else {
+            LyricSecondaryContentTransformer.apply(
+                line = resolvedLine,
+                settings = displaySettings,
+                onlySecondary = onlySecondary,
+                swapSecondary = swapSecondary,
+                songLines = LyriconDataBridge.currentSong?.lyrics
+            )
+        }
+        return resolved.copy(
+            primary = transformedPrimary,
+            secondary = resolved.secondary?.takeIf {
+                selectedContent == LyricSecondaryContent.OVERLAPPING_LINE
+            }
         )
     }
 
@@ -371,13 +420,20 @@ internal object IslandLyricContentAssembler {
         ).hashCode()
     }
 
+    private fun presentationSignature(presentation: LyricPresentation): Int = listOf(
+        lineContentSignature(presentation.primary),
+        lineContentSignature(presentation.secondary)
+    ).hashCode()
+
     private fun appliedLineSignature(view: View): Int? {
-        val line = when (view) {
-            is RichLyricLineView -> view.rawLine
-            is SpaceGateRichLyricLineView -> view.rawLine
+        val presentation = when (view) {
+            is RichLyricLineView -> LyricPresentation(view.rawLine, view.rawSecondaryLine)
+            is SpaceGateRichLyricLineView ->
+                LyricPresentation(view.rawLine, view.rawSecondaryLine)
+
             else -> return null
         }
-        return lineContentSignature(line)
+        return presentationSignature(presentation)
     }
 
     private fun IRichLyricLine.withNextLinePreview(nextLine: IRichLyricLine?): IRichLyricLine {

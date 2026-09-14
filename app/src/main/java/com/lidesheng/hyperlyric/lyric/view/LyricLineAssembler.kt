@@ -23,6 +23,7 @@ internal const val METADATA_NEXT_LINE_PREVIEW = "nextLinePreview"
 internal class LyricLineAssembler(
     private var displayTranslation: Boolean = true,
     private var displayRoma: Boolean = true,
+    private var displayBackgroundVocal: Boolean = true,
     private var enableRelativeProgress: Boolean = false,
     private var enableRelativeHighlight: Boolean = false,
     private var displayLineByLine: Boolean = false,
@@ -32,11 +33,13 @@ internal class LyricLineAssembler(
     private val wordBuilder = RelativeWordBuilder()
 
     fun updateFlags(displayTranslation: Boolean, displayRoma: Boolean,
+                    displayBackgroundVocal: Boolean,
                     enableRelativeProgress: Boolean, enableRelativeHighlight: Boolean,
                     displayLineByLine: Boolean,
                     secondaryContentOrder: List<LyricSecondaryContent>) {
         this.displayTranslation = displayTranslation
         this.displayRoma = displayRoma
+        this.displayBackgroundVocal = displayBackgroundVocal
         this.enableRelativeProgress = enableRelativeProgress
         this.enableRelativeHighlight = enableRelativeHighlight
         this.displayLineByLine = displayLineByLine
@@ -87,7 +90,11 @@ internal class LyricLineAssembler(
         val isLineTimeline: Boolean
     )
 
-    fun buildSecondary(source: IRichLyricLine?): SecondaryResult {
+    fun buildSecondary(
+        source: IRichLyricLine?,
+        explicitSecondary: IRichLyricLine? = null
+    ): SecondaryResult {
+        if (explicitSecondary != null) return buildExplicitSecondary(explicitSecondary)
         if (source == null) return SecondaryResult(LyricLine(), false, false, false, false, false)
 
         var generated = false
@@ -101,13 +108,19 @@ internal class LyricLineAssembler(
 
             // Next-line preview and the original lyric moved by the swap option are explicit
             // secondary-row content. They must not be filtered by the generic content selection.
-            val hasSourceSecondary = !source.secondary.isNullOrBlank() ||
+            val hasSourceSecondary = displayBackgroundVocal &&
+                    (!source.secondary.isNullOrBlank() ||
                     !source.secondaryWords.isNullOrEmpty()
-            val hasExplicitSecondary = isNextLinePreview || isSwappedOriginal || hasSourceSecondary
+                    )
+            val hasExplicitSecondary = isNextLinePreview || isSwappedOriginal
             val resolvedContent = source.metadata
                 ?.getString(METADATA_RESOLVED_SECONDARY_CONTENT)
                 ?.let(LyricSecondaryContent::fromPreferenceValue)
-                ?.takeUnless { it == LyricSecondaryContent.NEXT_LINE }
+                ?.takeUnless {
+                    it == LyricSecondaryContent.NEXT_LINE ||
+                            it == LyricSecondaryContent.OVERLAPPING_LINE
+                }
+                ?.takeIf(::isContentEnabled)
             val selectedContent = if (hasExplicitSecondary) {
                 null
             } else if (resolvedContent != null) {
@@ -115,13 +128,11 @@ internal class LyricLineAssembler(
                 // even when this particular line has no value in that lane, so lower-priority
                 // content cannot make the second row change meaning mid-song.
                 resolvedContent
+            } else if (hasSourceSecondary) {
+                LyricSecondaryContent.BACKGROUND_VOCAL
             } else {
                 secondaryContentOrder.firstOrNull { content ->
-                    when (content) {
-                        LyricSecondaryContent.TRANSLATION -> displayTranslation
-                        LyricSecondaryContent.ROMA -> displayRoma
-                        LyricSecondaryContent.NEXT_LINE -> false
-                    } && content.hasContent(source)
+                    isContentEnabled(content) && content.hasContent(source)
                 }
             }
             val selectedText = if (hasExplicitSecondary) {
@@ -190,6 +201,28 @@ internal class LyricLineAssembler(
             sustainAwareProgress = hasOriginalWords && !lineTimelineGenerated,
             isLineTimeline = lineTimelineGenerated
         )
+    }
+
+    private fun buildExplicitSecondary(source: IRichLyricLine): SecondaryResult {
+        val mainResult = buildMain(source)
+        val hasContent = mainResult.line.text?.isNotBlank() == true ||
+                !mainResult.line.words.isNullOrEmpty()
+        return SecondaryResult(
+            line = mainResult.line,
+            alwaysShow = hasContent,
+            isScrollOnly = mainResult.isScrollOnly,
+            isNextLinePreview = false,
+            sustainAwareProgress = mainResult.sustainAwareProgress,
+            isLineTimeline = mainResult.isLineTimeline
+        )
+    }
+
+    private fun isContentEnabled(content: LyricSecondaryContent): Boolean = when (content) {
+        LyricSecondaryContent.BACKGROUND_VOCAL -> displayBackgroundVocal
+        LyricSecondaryContent.OVERLAPPING_LINE -> false
+        LyricSecondaryContent.TRANSLATION -> displayTranslation
+        LyricSecondaryContent.ROMA -> displayRoma
+        LyricSecondaryContent.NEXT_LINE -> false
     }
 
     /**

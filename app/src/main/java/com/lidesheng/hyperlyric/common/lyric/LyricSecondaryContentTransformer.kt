@@ -18,28 +18,27 @@ object LyricSecondaryContentTransformer {
     ): IRichLyricLine {
         if (!onlySecondary && !swapSecondary) return line
 
-        // Preserve a source-provided secondary lane as the generic "other" secondary content.
-        // It is intentionally not part of the user-sortable translation/Roma/next-line list.
-        val hasSourceSecondary = !line.secondary.isNullOrBlank() ||
-                !line.secondaryWords.isNullOrEmpty()
-        val selectedContent = if (hasSourceSecondary) {
-            null
-        } else {
-            line.metadata
-                ?.getString(METADATA_RESOLVED_SECONDARY_CONTENT)
-                ?.let(LyricSecondaryContent::fromPreferenceValue)
-                ?.takeUnless { it == LyricSecondaryContent.NEXT_LINE }
-                ?: settings.preferredSecondaryContentFor(
-                    line = line,
-                    songLines = songLines
-                )
-        }
-        val selectedText = if (hasSourceSecondary) line.secondary else selectedContent?.textOf(line)
-        val selectedWords = if (hasSourceSecondary) {
-            line.secondaryWords
-        } else {
-            selectedContent?.wordsOf(line)
-        }
+        // Source-provided secondary content is a normal selectable lane. A resolved content type
+        // wins so an explicit song-level choice can place translation/roma before background
+        // vocals without throwing the source lane away.
+        val hasSourceSecondary = settings.isEnabled(LyricSecondaryContent.BACKGROUND_VOCAL) &&
+                (!line.secondary.isNullOrBlank() || !line.secondaryWords.isNullOrEmpty())
+        val resolvedContent = line.metadata
+            ?.getString(METADATA_RESOLVED_SECONDARY_CONTENT)
+            ?.let(LyricSecondaryContent::fromPreferenceValue)
+            ?.takeUnless {
+                it == LyricSecondaryContent.NEXT_LINE ||
+                        it == LyricSecondaryContent.OVERLAPPING_LINE
+            }
+            ?.takeIf(settings::isEnabled)
+        val selectedContent = resolvedContent
+            ?: LyricSecondaryContent.BACKGROUND_VOCAL.takeIf { hasSourceSecondary }
+            ?: settings.preferredSecondaryContentFor(
+                line = line,
+                songLines = songLines
+            )
+        val selectedText = selectedContent?.textOf(line)
+        val selectedWords = selectedContent?.wordsOf(line)
         if (selectedText.isNullOrBlank() && selectedWords.isNullOrEmpty()) return line
 
         val originalText = line.text
@@ -49,7 +48,7 @@ object LyricSecondaryContentTransformer {
                 *(line.metadata?.entries?.map { it.key to it.value } ?: emptyList()).toTypedArray(),
                 METADATA_SWAPPED_ORIGINAL to "true"
             )
-        } else if (hasSourceSecondary) {
+        } else if (selectedContent == LyricSecondaryContent.BACKGROUND_VOCAL) {
             lyricMetadataOf(
                 *(line.metadata?.entries?.filter {
                     it.key != METADATA_RESOLVED_SECONDARY_CONTENT

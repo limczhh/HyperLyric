@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
+import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
@@ -62,6 +63,7 @@ internal object IslandSlotContentFacade {
         config: IslandSlotRuntimeConfig,
         mode: Int,
         lineOverride: IRichLyricLine? = null,
+        secondaryLineOverride: IRichLyricLine? = null,
         force: Boolean = false,
         playbackActive: Boolean,
         suppressAnimation: Boolean = false,
@@ -81,6 +83,7 @@ internal object IslandSlotContentFacade {
                 prefs = prefs,
                 config = config,
                 lineOverride = lineOverride,
+                secondaryLineOverride = secondaryLineOverride,
                 force = force,
                 playbackActive = playbackActive,
                 playbackClock = playbackClock,
@@ -124,6 +127,7 @@ internal object IslandSlotContentFacade {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         lineOverride: IRichLyricLine?,
+        secondaryLineOverride: IRichLyricLine? = null,
         playbackActive: Boolean,
         onLineWillApply: ((Float) -> Boolean)? = null,
         onLineApplied: (() -> Unit)? = null,
@@ -133,28 +137,25 @@ internal object IslandSlotContentFacade {
         prefs = prefs,
         config = config,
         lineOverride = lineOverride,
+        secondaryLineOverride = secondaryLineOverride,
         playbackActive = playbackActive,
         onLineWillApply = onLineWillApply,
         onLineApplied = onLineApplied,
         onLineCancelled = onLineCancelled
     )
 
-    fun buildSlotLyricLine(
+    fun buildSlotLyricPresentation(
         view: View,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         isLeft: Boolean
-    ): IRichLyricLine? = IslandLyricContentAssembler.buildSlotLyricLine(
-        view = view,
-        prefs = prefs,
-        config = config,
-        isLeft = isLeft
-    )
-
-    fun processedRawLine(
-        prefs: SharedPreferences,
-        config: IslandSlotRuntimeConfig? = null
-    ): IRichLyricLine? = IslandLyricContentAssembler.processedRawLine(prefs, config)
+    ): LyricPresentation =
+        IslandLyricContentAssembler.buildSlotLyricPresentation(
+            view = view,
+            prefs = prefs,
+            config = config,
+            isLeft = isLeft
+        )
 
     private fun currentMediaInfo(context: Context): MediaMetadataHelper.MediaInfo {
         val targetPkg = LyriconDataBridge.currentLyricPackageName ?: ""

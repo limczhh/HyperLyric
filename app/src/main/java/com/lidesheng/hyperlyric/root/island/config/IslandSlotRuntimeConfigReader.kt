@@ -253,6 +253,10 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_SWAP_SECONDARY,
                 RootConstants.DEFAULT_HOOK_SWAP_SECONDARY
             ),
+            autoDuet = prefs.getBoolean(
+                RootConstants.KEY_HOOK_LYRIC_AUTO_DUET,
+                RootConstants.DEFAULT_HOOK_LYRIC_AUTO_DUET
+            ),
             lyricContentDisplay = lyricContentDisplay,
             textColorStyle = LyricTextColorStylePolicy.read(prefs),
             customFontPath = prefs.getString(RootConstants.KEY_HOOK_CUSTOM_FONT_PATH, null)
@@ -300,9 +304,12 @@ internal object IslandSlotRuntimeConfigReader {
             "marquee=${config.lyricMarqueeEnabled}:${config.lyricMarqueeSpeed}",
             "metadataMarquee=${config.metadataMarqueeEnabled}:${config.metadataMarqueeSpeed}",
             "secondaryTransform=${config.onlySecondary}/${config.swapSecondary}",
+            "autoDuet=${config.autoDuet}",
             "lyricContent=${config.lyricContentDisplay.showTranslation}/" +
                     "${config.lyricContentDisplay.showRoma}/" +
                     "${config.lyricContentDisplay.showNextLyric}/" +
+                    "${config.lyricContentDisplay.showBackgroundVocal}/" +
+                    "${config.lyricContentDisplay.showOverlappingLine}/" +
                     config.lyricContentDisplay.order.joinToString(",") {
                         it.preferenceValue
                     },

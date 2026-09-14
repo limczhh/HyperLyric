@@ -136,7 +136,9 @@ internal fun LazyListScope.contentLayoutSections(
     onlySecondary: Boolean,
     onOnlySecondaryChange: (Boolean) -> Unit,
     swapSecondary: Boolean,
-    onSwapSecondaryChange: (Boolean) -> Unit
+    onSwapSecondaryChange: (Boolean) -> Unit,
+    autoDuet: Boolean,
+    onAutoDuetChange: (Boolean) -> Unit
 ) {
     item(key = "music_info_title") {
         SmallTitle(text = stringResource(id = R.string.title_content_layout_music_info))
@@ -250,6 +252,12 @@ internal fun LazyListScope.contentLayoutSections(
                     holdDownState = lyricContentSheetVisible
                 )
                 SwitchPreference(
+                    title = stringResource(id = R.string.title_auto_duet),
+                    summary = stringResource(id = R.string.summary_auto_duet),
+                    checked = autoDuet,
+                    onCheckedChange = onAutoDuetChange
+                )
+                SwitchPreference(
                     title = stringResource(id = R.string.title_only_secondary_lyric),
                     checked = onlySecondary,
                     onCheckedChange = onOnlySecondaryChange
@@ -322,7 +330,11 @@ internal fun LyricContentDisplayBottomSheet(
                         showTranslation = LyricSecondaryContent.TRANSLATION in draftSelection,
                         showRoma = LyricSecondaryContent.ROMA in draftSelection,
                         showNextLyric = LyricSecondaryContent.NEXT_LINE in draftSelection,
-                        order = draftOrder
+                        order = draftOrder,
+                        showBackgroundVocal =
+                            LyricSecondaryContent.BACKGROUND_VOCAL in draftSelection,
+                        showOverlappingLine =
+                            LyricSecondaryContent.OVERLAPPING_LINE in draftSelection
                     )
                     onConfirm(settings)
                     onDismiss()
@@ -383,6 +395,8 @@ internal fun LyricContentDisplayBottomSheet(
 }
 
 private fun LyricSecondaryContent.labelRes(): Int = when (this) {
+    LyricSecondaryContent.BACKGROUND_VOCAL -> R.string.title_background_vocal
+    LyricSecondaryContent.OVERLAPPING_LINE -> R.string.title_overlapping_lyric
     LyricSecondaryContent.TRANSLATION -> R.string.title_translation
     LyricSecondaryContent.ROMA -> R.string.title_roma
     LyricSecondaryContent.NEXT_LINE -> R.string.title_next_lyric

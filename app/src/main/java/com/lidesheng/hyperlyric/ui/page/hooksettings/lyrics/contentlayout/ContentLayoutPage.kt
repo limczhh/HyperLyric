@@ -110,6 +110,14 @@ fun ContentLayoutPage() {
             )
         )
     }
+    var autoDuet by remember(prefs) {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_LYRIC_AUTO_DUET,
+                RootConstants.DEFAULT_HOOK_LYRIC_AUTO_DUET
+            )
+        )
+    }
     var editingRow by remember { mutableStateOf<Int?>(null) }
 
     val currentEditingRow = editingRow
@@ -134,6 +142,14 @@ fun ContentLayoutPage() {
             saveConfig(
                 RootConstants.KEY_HOOK_LYRIC_SHOW_NEXT_LINE,
                 settings.showNextLyric
+            )
+            saveConfig(
+                RootConstants.KEY_HOOK_LYRIC_SHOW_BACKGROUND_VOCAL,
+                settings.showBackgroundVocal
+            )
+            saveConfig(
+                RootConstants.KEY_HOOK_LYRIC_SHOW_OVERLAPPING_LINE,
+                settings.showOverlappingLine
             )
             saveConfig(
                 RootConstants.KEY_HOOK_LYRIC_SECONDARY_ORDER,
@@ -247,6 +263,11 @@ fun ContentLayoutPage() {
                     onlySecondary = false
                     saveConfig(RootConstants.KEY_HOOK_ONLY_SECONDARY, false)
                 }
+            },
+            autoDuet = autoDuet,
+            onAutoDuetChange = {
+                autoDuet = it
+                saveConfig(RootConstants.KEY_HOOK_LYRIC_AUTO_DUET, it)
             }
         )
     }

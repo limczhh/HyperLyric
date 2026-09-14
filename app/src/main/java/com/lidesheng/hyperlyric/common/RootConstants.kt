@@ -204,7 +204,10 @@ object RootConstants {
     const val KEY_HOOK_LYRIC_SHOW_TRANSLATION = "key_hook_lyric_show_translation"
     const val KEY_HOOK_LYRIC_SHOW_ROMA = "key_hook_lyric_show_roma"
     const val KEY_HOOK_LYRIC_SHOW_NEXT_LINE = "key_hook_lyric_show_next_line"
+    const val KEY_HOOK_LYRIC_SHOW_BACKGROUND_VOCAL = "key_hook_lyric_show_background_vocal"
+    const val KEY_HOOK_LYRIC_SHOW_OVERLAPPING_LINE = "key_hook_lyric_show_overlapping_line"
     const val KEY_HOOK_LYRIC_SECONDARY_ORDER = "key_hook_lyric_secondary_order"
+    const val KEY_HOOK_LYRIC_AUTO_DUET = "key_hook_lyric_auto_duet"
 
     // ================= COLOR KEYS =================
     const val KEY_HOOK_TEXT_COLOR_STYLE = "key_hook_text_color_style"
@@ -472,7 +475,11 @@ object RootConstants {
     const val DEFAULT_HOOK_LYRIC_SHOW_TRANSLATION = true
     const val DEFAULT_HOOK_LYRIC_SHOW_ROMA = false
     const val DEFAULT_HOOK_LYRIC_SHOW_NEXT_LINE = false
-    const val DEFAULT_HOOK_LYRIC_SECONDARY_ORDER = "translation,next_line,roma"
+    const val DEFAULT_HOOK_LYRIC_SHOW_BACKGROUND_VOCAL = true
+    const val DEFAULT_HOOK_LYRIC_SHOW_OVERLAPPING_LINE = true
+    const val DEFAULT_HOOK_LYRIC_SECONDARY_ORDER =
+        "background_vocal,overlapping_line,translation,next_line,roma"
+    const val DEFAULT_HOOK_LYRIC_AUTO_DUET = true
     const val TEXT_COLOR_STYLE_DEFAULT = 0
     const val TEXT_COLOR_STYLE_COVER_COLOR = 1
     const val TEXT_COLOR_STYLE_COVER_GRADIENT = 2

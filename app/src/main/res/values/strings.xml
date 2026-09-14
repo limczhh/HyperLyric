@@ -319,6 +319,8 @@
     <string name="format_percent">%1$d%%</string>
     <string name="format_ms">%1$dms</string>
     <string name="title_double_line_content">双行歌词</string>
+    <string name="title_background_vocal">和声</string>
+    <string name="title_overlapping_lyric">对唱</string>
     <string name="title_translation">翻译</string>
     <string name="title_roma">罗马音</string>
     <string name="title_only_secondary_lyric">仅显示副行歌词</string>
@@ -326,6 +328,8 @@
     <string name="label_custom_font_path">填写字体文件的完整路径</string>
     <string name="title_next_lyric">下一句歌词</string>
     <string name="summary_lyric_content_none">不显示第二行内容</string>
+    <string name="title_auto_duet">自动区分对唱</string>
+    <string name="summary_auto_duet">根据歌词提供的演唱者信息自动设置左右对齐</string>
     <string name="title_word_motion">逐字字词上浮动画</string>
     <string name="title_word_motion_latin_by_character">拉丁文字逐字母上浮</string>
     <string name="summary_word_motion_latin_by_character">关闭时按整个单词上浮</string>

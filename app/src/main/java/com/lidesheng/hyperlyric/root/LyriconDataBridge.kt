@@ -37,6 +37,10 @@ object LyriconDataBridge {
     @Volatile
     var currentLyricLine: IRichLyricLine? = null
 
+    /** All source lines active at the current position, retained for two-row presentation. */
+    @Volatile
+    var currentLyricLines: List<IRichLyricLine> = emptyList()
+
     @Volatile
     var currentNextLyricLine: IRichLyricLine? = null
 
@@ -193,6 +197,7 @@ object LyriconDataBridge {
         currentSongName = song?.name
         currentLyric = null
         currentLyricLine = null
+        currentLyricLines = emptyList()
         currentNextLyricLine = null
         this.placeholderFormat = normalizePlaceholderFormat(placeholderFormat)
 
@@ -218,6 +223,7 @@ object LyriconDataBridge {
         currentSongName = song.name
         currentLyric = null
         currentLyricLine = null
+        currentLyricLines = emptyList()
         currentNextLyricLine = null
         rebuildTimeline(song, selectCurrentPosition = false)
         return true
@@ -264,6 +270,7 @@ object LyriconDataBridge {
         fullSongLyricsAvailable = null
         currentLyric = null
         currentLyricLine = null
+        currentLyricLines = emptyList()
         currentNextLyricLine = null
         currentPosition = 0L
         resetPlaybackClockPositionPreservingState()
@@ -337,20 +344,29 @@ object LyriconDataBridge {
         val lyrics = song.lyrics
         if (lyrics.isNullOrEmpty()) return false
 
-        // 使用 TimingNavigator 高效定位当前歌词行
-        var foundLine: TimedLine? = null
-        timingNavigator.forEachAtOrPrevious(position) { timedLine ->
-            foundLine = timedLine
+        // 保留当前时刻的全部有效行。Lyricon 的渲染模型允许重叠行，宿主这里只在展示层
+        // 将其裁剪为主行和副行，不能在状态桥接层把它们提前压成一行。
+        val activeLines = buildList {
+            timingNavigator.forEachAt(position) { add(it) }
+        }
+        val selectedLines = if (activeLines.isNotEmpty()) {
+            activeLines
+        } else {
+            timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
         }
 
-        val previousLine = currentLyricLine
+        val previousLines = currentLyricLines
+        val previousNextLine = currentNextLyricLine
+        val foundLine = selectedLines.firstOrNull()
+        currentLyricLines = selectedLines
         currentLyricLine = foundLine
-        currentNextLyricLine = foundLine?.next
+        currentNextLyricLine = selectedLines.lastOrNull()?.next
         // 间奏时保持最后一行歌词，不回退到歌名
         val newText = foundLine?.text ?: currentLyric ?: ""
         // 占位符圆点没有文本，不能只靠文本变化判断是否需要刷新。
         // 切歌或切换到同文本歌词时，新的歌词行仍然需要传给渲染器。
-        val lineChanged = foundLine != null && foundLine !== previousLine
+        val lineChanged = selectedLines != previousLines ||
+                currentNextLyricLine !== previousNextLine
 
         if (lineChanged || newText != currentLyric) {
             currentLyric = newText
@@ -375,6 +391,7 @@ object LyriconDataBridge {
         } else {
             null
         }
+        currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
         currentNextLyricLine = null
     }
 
@@ -383,6 +400,7 @@ object LyriconDataBridge {
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
         currentLyricLine = line
+        currentLyricLines = listOf(line)
         currentNextLyricLine = null
         currentLyric = line.text
     }
@@ -393,6 +411,7 @@ object LyriconDataBridge {
         currentLyricMediaMetadata = null
         currentLyric = null
         currentLyricLine = null
+        currentLyricLines = emptyList()
         currentNextLyricLine = null
         currentPosition = 0L
         resetPlaybackClock()
@@ -427,6 +446,7 @@ object LyriconDataBridge {
         if (selectCurrentPosition) {
             currentLyric = null
             currentLyricLine = null
+            currentLyricLines = emptyList()
             currentNextLyricLine = null
             updatePosition(currentPosition)
         }
