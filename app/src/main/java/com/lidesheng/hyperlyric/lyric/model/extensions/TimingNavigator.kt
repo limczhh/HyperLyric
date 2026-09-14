@@ -53,7 +53,7 @@ class TimingNavigator<T : ILyricTiming>(
         updateCache(position, index)
         if (index == -1) return null
 
-        if (position <= source[index].end) {
+        if (position < source[index].end) {
             return source[index]
         }
 
@@ -177,7 +177,10 @@ class TimingNavigator<T : ILyricTiming>(
         var count = 0
         for (i in start..anchorIndex) {
             val entry = source[i]
-            if (position <= entry.end && position >= entry.begin) {
+            // Line timing uses a half-open interval [begin, end). This keeps two
+            // consecutive lines whose end/start timestamps are equal from being
+            // reported as an overlap at the boundary.
+            if (position < entry.end && position >= entry.begin) {
                 action(entry)
                 count++
             }

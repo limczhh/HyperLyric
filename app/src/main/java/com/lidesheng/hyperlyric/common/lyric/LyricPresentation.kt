@@ -23,7 +23,12 @@ internal data class LyricPresentation(
  * two-agent alignment convention.
  */
 internal object LyricPresentationResolver {
-    private val AGENT_METADATA_KEYS = listOf("agent", "amll:agent")
+    private val AGENT_METADATA_KEYS = listOf(
+        "agent",
+        "amll:agent",
+        "vocal",
+        "amll:vocal"
+    )
 
     fun resolve(
         activeLines: List<IRichLyricLine>,
@@ -41,9 +46,14 @@ internal object LyricPresentationResolver {
         val primary = visibleLines.firstOrNull()
             ?: alignedLines.firstOrNull()
             ?: return LyricPresentation(null)
+        // A timing collision alone is ambiguous: ordinary sources commonly use
+        // end == next.begin for adjacent lines. Only a pair with explicit,
+        // distinct vocal identities may occupy the independent duet row.
         val overlappingLine = visibleLines
             .drop(1)
-            .firstOrNull { hasLyricContent(it) }
+            .firstOrNull { candidate ->
+                hasLyricContent(candidate) && hasDistinctVocalIdentities(primary, candidate)
+            }
         val selectedContent = settings.preferredContentFor(
             line = primary,
             nextLine = nextLine,
@@ -89,6 +99,15 @@ internal object LyricPresentationResolver {
         .asSequence()
         .mapNotNull { key -> metadata?.getString(key)?.trim() }
         .firstOrNull { it.isNotEmpty() }
+
+    private fun hasDistinctVocalIdentities(
+        primary: IRichLyricLine,
+        candidate: IRichLyricLine
+    ): Boolean {
+        val primaryAgent = primary.agentId() ?: return false
+        val candidateAgent = candidate.agentId() ?: return false
+        return primaryAgent != candidateAgent
+    }
 
     private fun IRichLyricLine.withAlignment(isAlignedRight: Boolean): IRichLyricLine {
         if (this.isAlignedRight == isAlignedRight) return this
