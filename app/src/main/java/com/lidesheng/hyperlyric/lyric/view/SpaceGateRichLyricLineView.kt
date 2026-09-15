@@ -85,8 +85,26 @@ class SpaceGateRichLyricLineView(
         )
     }
 
-    fun updateMetadataLine(value: IRichLyricLine?) {
-        setLineInternal(value, null, null, null, null, preserveMarquee = true)
+    internal fun setMetadataLine(
+        value: IRichLyricLine?,
+        secondaryLine: IRichLyricLine? = null,
+        preserveMarquee: Boolean = false
+    ) {
+        setLineInternal(
+            value,
+            null,
+            null,
+            null,
+            secondaryLine,
+            preserveMarquee = preserveMarquee
+        )
+    }
+
+    fun updateMetadataLine(
+        value: IRichLyricLine?,
+        secondaryLine: IRichLyricLine? = null
+    ) {
+        setMetadataLine(value, secondaryLine, preserveMarquee = true)
     }
 
     private fun setLineInternal(

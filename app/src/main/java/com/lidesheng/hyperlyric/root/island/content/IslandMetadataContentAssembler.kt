@@ -32,6 +32,12 @@ internal object IslandMetadataContentAssembler {
         val infinite: Boolean
     )
 
+    /** Metadata owns both rows explicitly; lyric secondary-content settings must not filter them. */
+    private data class MetadataLineContent(
+        val primary: IRichLyricLine?,
+        val secondary: IRichLyricLine?
+    )
+
     private data class MetadataState(
         val mode: Int,
         val firstLineFields: List<String>,
@@ -173,7 +179,7 @@ internal object IslandMetadataContentAssembler {
             lastRemainingSecond = remainingDisplaySecond(playbackPosition, resolvedDuration),
             lastProgressPercent = progressDisplayPercent(playbackPosition, resolvedDuration)
         )
-        val newLine = if (customLayout) {
+        val newContent = if (customLayout) {
             buildCustomLine(
                 firstLineFields = firstLineFields,
                 secondLineFields = secondLineFields,
@@ -190,24 +196,24 @@ internal object IslandMetadataContentAssembler {
         }
 
         if (!force && IslandSlotContentSignatureCache.get(view) == signature &&
-            appliedLine(view) == newLine
+            appliedContent(view) == newContent
         ) {
             if (previousState?.dynamicSignature != state.dynamicSignature) {
-                applyLine(view, newLine, preserveMarquee = true)
+                applyLine(view, newContent, preserveMarquee = true)
                 applyMarquee(view, marquee)
                 return true
             }
             return false
         }
 
-        applyLine(view, newLine)
+        applyLine(view, newContent)
         applyMarquee(view, marquee)
         IslandSlotContentSignatureCache.set(view, signature)
         val viewKey = view.tag?.toString() ?: view.javaClass.simpleName
         val debugState = listOf(
             mode,
             customLayout,
-            newLine != null,
+            newContent != null,
             firstLineFields.joinToString(","),
             secondLineFields.joinToString(","),
             separator,
@@ -220,7 +226,7 @@ internal object IslandMetadataContentAssembler {
             state = debugState
         ) {
             "媒体信息内容已提交: tag=$viewKey, mode=$mode, customLayout=$customLayout, " +
-                    "line=${newLine != null}, " +
+                    "line=${newContent != null}, " +
                     "firstFields=${firstLineFields.joinToString(",")}, " +
                     "secondFields=${secondLineFields.joinToString(",")}, separator=$separator, " +
                     "marquee=${config.metadataMarqueeEnabled}, force=$force"
@@ -419,7 +425,7 @@ internal object IslandMetadataContentAssembler {
         secondLineFields: List<String>,
         fieldValues: Map<String, String>,
         separator: String
-    ): RichLyricLine? {
+    ): MetadataLineContent? {
         val separatorValue = MusicInfoLayoutPolicy.separatorValue(separator)
         val firstLine = joinFields(firstLineFields, fieldValues, separatorValue)
         val secondLine = joinFields(secondLineFields, fieldValues, separatorValue)
@@ -428,13 +434,21 @@ internal object IslandMetadataContentAssembler {
             firstLine.isNotBlank() -> RichLyricLine(
                 text = firstLine,
                 words = emptyList(),
-                secondary = secondLine.takeIf { it.isNotBlank() },
-                secondaryWords = emptyList()
-            )
+            ).let { primary ->
+                MetadataLineContent(
+                    primary = primary,
+                    secondary = secondLine.takeIf { it.isNotBlank() }?.let { secondary ->
+                        RichLyricLine(text = secondary, words = emptyList())
+                    }
+                )
+            }
 
-            secondLine.isNotBlank() -> RichLyricLine(
-                text = secondLine,
-                words = emptyList()
+            secondLine.isNotBlank() -> MetadataLineContent(
+                primary = RichLyricLine(
+                    text = secondLine,
+                    words = emptyList()
+                ),
+                secondary = null
             )
 
             else -> null
@@ -453,30 +467,33 @@ internal object IslandMetadataContentAssembler {
 
     private fun applyLine(
         view: View,
-        line: RichLyricLine?,
+        content: MetadataLineContent?,
         preserveMarquee: Boolean = false
     ) {
         when (view) {
             is RichLyricLineView -> if (preserveMarquee) {
-                view.updateMetadataLine(line)
+                view.updateMetadataLine(content?.primary, content?.secondary)
             } else {
-                view.line = line
+                view.setMetadataLine(content?.primary, content?.secondary)
             }
 
             is SpaceGateRichLyricLineView -> if (preserveMarquee) {
-                view.updateMetadataLine(line)
+                view.updateMetadataLine(content?.primary, content?.secondary)
             } else {
-                view.line = line
+                view.setMetadataLine(content?.primary, content?.secondary)
             }
         }
     }
 
-    private fun appliedLine(view: View): IRichLyricLine? {
-        return when (view) {
-            is RichLyricLineView -> view.rawLine
-            is SpaceGateRichLyricLineView -> view.rawLine
-            else -> null
+    private fun appliedContent(view: View): MetadataLineContent? {
+        val content = when (view) {
+            is RichLyricLineView -> MetadataLineContent(view.rawLine, view.rawSecondaryLine)
+            is SpaceGateRichLyricLineView ->
+                MetadataLineContent(view.rawLine, view.rawSecondaryLine)
+
+            else -> return null
         }
+        return content.takeIf { it.primary != null || it.secondary != null }
     }
 
     private fun applyMarquee(view: View, marquee: MetadataMarqueeState) {
