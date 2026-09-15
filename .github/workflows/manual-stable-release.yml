@@ -46,8 +46,7 @@ jobs:
       - name: 安装 Android SDK Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
-          api-level: 37
-          build-tools: '36.0.0'
+          packages: 'platforms;android-37.0 build-tools;36.0.0 platform-tools'
 
       - name: 配置 Gradle Setup Gradle
         uses: gradle/actions/setup-gradle@v6
