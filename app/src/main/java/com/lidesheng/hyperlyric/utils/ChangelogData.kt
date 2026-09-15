@@ -10,6 +10,14 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "7.6-1939",
+                title = "优化了一些体验",
+                summary = "- 新增歌词切换动画速度选项\n" +
+                        "- 新增和声、对唱等歌词的支持\n" +
+                        "- 新增对 lyricinfo 歌词源其他翻译字段的兼容\n" +
+                        "- 修复插件歌词合并校验"
+            ),
+            ChangelogItem(
                 version = "7.5-1939",
                 title = "优化了一些体验",
                 summary = "- 新增超级岛修改范围（边缘光效进度条不受该选项控制）\n" +
