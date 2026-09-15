@@ -18,6 +18,13 @@ object PluginSongMapper {
     private const val MAX_LYRICS = 20_000
     private const val MAX_WORDS_PER_LINE = 2_000
     private const val MAX_TOTAL_WORDS = 100_000
+    private val CONTENT_ONLY_PATCH_FIELDS = setOf(
+        PluginLyricField.METADATA,
+        PluginLyricField.TEXT,
+        PluginLyricField.SECONDARY,
+        PluginLyricField.TRANSLATION,
+        PluginLyricField.ROMA
+    )
 
     fun toPluginSong(song: Song): PluginSong = PluginSong(
         id = song.id,
@@ -129,17 +136,23 @@ object PluginSongMapper {
                 val patched = base.mapIndexed { index, line ->
                     applyLyricFields(line, candidate[index], changedFields)
                 }
-                // Translation-only plugins neither alter the lyric structure nor add timed words.
-                // Some supported lyric sources intentionally leave begin/end/duration incomplete,
-                // so re-validating their untouched timing here would discard a safe translation.
-                val isSafeTranslationOnlyPatch = changedFields.all {
-                    it == PluginLyricField.TRANSLATION ||
-                        it == PluginLyricField.TRANSLATION_WORDS
+                // Content-only plugins do not alter the line timeline or primary word timing.
+                // Some lyric sources intentionally expose complete text with begin/end/duration
+                // left at zero, so re-validating untouched timing would discard a safe prefix,
+                // harmony, translation or Roma update. Secondary/translation word lanes may also
+                // be explicitly cleared without introducing a new invalid timeline.
+                val isSafeContentOnlyPatch = changedFields.all { field ->
+                    field in CONTENT_ONLY_PATCH_FIELDS ||
+                        field == PluginLyricField.SECONDARY_WORDS ||
+                        field == PluginLyricField.TRANSLATION_WORDS
                 } && (
+                    PluginLyricField.SECONDARY_WORDS !in changedFields ||
+                        candidate.all { it.secondaryWords == null }
+                    ) && (
                     PluginLyricField.TRANSLATION_WORDS !in changedFields ||
                         candidate.all { it.translationWords == null }
                     )
-                if (isSafeTranslationOnlyPatch) return LyricsMergeResult(patched)
+                if (isSafeContentOnlyPatch) return LyricsMergeResult(patched)
                 if (patched.isEmpty() || hasValidLyrics(patched)) {
                     LyricsMergeResult(patched)
                 } else {
