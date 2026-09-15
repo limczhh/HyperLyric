@@ -473,6 +473,8 @@
     <string name="title_behavior_after_pause">暂停音乐后行为</string>
     <string name="option_after_pause_default">恢复默认</string>
     <string name="option_after_pause_keep">保持不变</string>
+    <string name="title_behavior_after_no_lyrics">无歌词时行为</string>
+    <string name="option_after_no_lyrics_music_info">显示音乐信息</string>
     <string name="title_island_long_press_behavior">超级岛长按行为</string>
     <string name="option_island_long_press_default">默认</string>
     <string name="option_island_long_press_lyric_share">拖拽分享</string>

@@ -30,23 +30,26 @@ object LyricInfoParser {
             val rawLyric = obj.optionalText("rawLyric")
             val translationRaw = obj.translationText()
             val romaRaw = obj.optionalText("roma")
-            val primaryRaw = lyricRaw ?: return null
 
             val title = obj.optionalText("songName")
             val artist = obj.optionalText("artist")
             val album = obj.optionalText("album")
             val songId = obj.optionalText("songId")
 
-            val parsedPrimary = if (rawLyric != null) {
-                parseLyricLines(rawLyric, enhanced = true)
+            val parsedPrimary = when {
+                rawLyric != null -> parseLyricLines(rawLyric, enhanced = true) ?: return null
+                lyricRaw != null -> parseLyricLines(lyricRaw, enhanced = false) ?: return null
+                else -> emptyList()
+            }
+            val resultLines = if (parsedPrimary.isEmpty()) {
+                emptyList()
             } else {
-                parseLyricLines(primaryRaw, enhanced = false)
-            } ?: return null
-            val resultLines = attachLanes(
-                originalLines = parsedPrimary,
-                translationRaw = translationRaw,
-                romaRaw = romaRaw
-            )
+                attachLanes(
+                    originalLines = parsedPrimary,
+                    translationRaw = translationRaw,
+                    romaRaw = romaRaw
+                )
+            }
 
             LyricInfoPayload(
                 song = Song(

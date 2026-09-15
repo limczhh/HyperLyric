@@ -18,6 +18,8 @@ internal object IslandRenderPolicy {
         val owner: OwnerEvidence,
         val lyricPackageName: String?,
         val hasLyricsForPresentation: Boolean,
+        val hasMusicInfoForPresentation: Boolean,
+        val showMusicInfoWhenNoLyrics: Boolean,
         val enabled: Boolean,
         val playbackActive: Boolean,
         val pauseBehavior: Int
@@ -34,7 +36,11 @@ internal object IslandRenderPolicy {
     fun evaluate(input: Input): Decision {
         if (input.owner == OwnerEvidence.NotMedia) return Decision.NOT_MEDIA
         if (!input.enabled) return Decision.SUPPRESSED
-        if (!input.hasLyricsForPresentation) return Decision.SUPPRESSED
+        if (!input.hasLyricsForPresentation &&
+            (!input.showMusicInfoWhenNoLyrics || !input.hasMusicInfoForPresentation)
+        ) {
+            return Decision.SUPPRESSED
+        }
 
         val mediaOwner = input.owner as? OwnerEvidence.Media
             ?: return Decision.PENDING

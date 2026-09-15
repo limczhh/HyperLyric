@@ -7,6 +7,7 @@ import com.hchen.superlyricapi.SuperLyricHelper
 import com.hchen.superlyricapi.SuperLyricLine
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
+import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
@@ -165,6 +166,17 @@ class SuperLyricSource : LyricSource {
         ).joinToString("\u001F")
         if (lastMetadataKey != metadataKey) {
             lastMetadataKey = metadataKey
+            // A metadata identity change is the only track boundary SuperLyric exposes. Clear
+            // the previous line before publishing the new metadata so an instrumental track
+            // cannot keep the previous song's lyric on the other island side.
+            currentSink.onSongChanged(
+                Song(
+                    name = lastMetadataTitle,
+                    artist = lastMetadataArtist,
+                    album = lastMetadataAlbum,
+                    lyrics = emptyList()
+                )
+            )
             currentSink.onMetadata(
                 LyricMediaMetadata(
                     sourceId = id,

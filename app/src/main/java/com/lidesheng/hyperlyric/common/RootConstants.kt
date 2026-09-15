@@ -32,6 +32,8 @@ object RootConstants {
     const val KEY_HOOK_ISLAND_DYNAMIC_WIDTH_BASIS = "key_hook_island_dynamic_width_basis"
     const val KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT = "key_hook_island_disable_width_limit"
     const val KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE = "key_hook_island_behavior_after_pause"
+    const val KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS =
+        "key_hook_island_behavior_after_no_lyrics"
     const val KEY_HOOK_ISLAND_LONG_PRESS_BEHAVIOR = "key_hook_island_long_press_behavior"
     const val KEY_HOOK_ISLAND_SWIPE_BEHAVIOR = "key_hook_island_swipe_behavior"
     const val KEY_HOOK_ISLAND_SWIPE_THRESHOLD_DP = "key_hook_island_swipe_threshold_dp"
@@ -269,6 +271,10 @@ object RootConstants {
     const val DEFAULT_HOOK_ISLAND_DYNAMIC_WIDTH_BASIS = ISLAND_DYNAMIC_WIDTH_BASIS_ALL
     const val DEFAULT_HOOK_ISLAND_DISABLE_WIDTH_LIMIT = false
     const val DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE = 0
+    const val ISLAND_NO_LYRICS_BEHAVIOR_DEFAULT = 0
+    const val ISLAND_NO_LYRICS_BEHAVIOR_MUSIC_INFO = 1
+    const val DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS =
+        ISLAND_NO_LYRICS_BEHAVIOR_DEFAULT
     const val ISLAND_LONG_PRESS_BEHAVIOR_LYRIC_SHARE = 0
     const val ISLAND_LONG_PRESS_BEHAVIOR_TOGGLE_PLAYBACK = 1
     const val ISLAND_LONG_PRESS_BEHAVIOR_DEFAULT = 2

@@ -82,6 +82,7 @@ class HookEntry : XposedModule() {
             RootConstants.KEY_HOOK_ISLAND_DYNAMIC_MAX_WIDTH,
             RootConstants.KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT,
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
+            RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
             RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW,
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GRADIENT,

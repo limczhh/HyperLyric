@@ -32,6 +32,19 @@ internal class SongPreprocessor(private val placeholder: TitleSlot) {
         return lines
     }
 
+    /**
+     * Builds a persistent placeholder for a metadata-only song. This is separate from
+     * [fillGap], whose empty-song behavior deliberately keeps the legacy end-of-song title line.
+     */
+    internal fun noLyricsPlaceholder(song: Song): RichLyricLine? = when (placeholder) {
+        TitleSlot.NONE -> null
+        TitleSlot.COUNTDOWN -> countdownLine(Long.MAX_VALUE)
+        TitleSlot.NAME_ARTIST,
+        TitleSlot.NAME -> songTitle(song)?.let {
+            titleLine(Long.MAX_VALUE, Long.MAX_VALUE, it)
+        }
+    }
+
     private fun fillGap(song: Song): Song {
         val lyrics = song.lyrics?.toMutableList() ?: mutableListOf()
         if (lyrics.isEmpty()) {

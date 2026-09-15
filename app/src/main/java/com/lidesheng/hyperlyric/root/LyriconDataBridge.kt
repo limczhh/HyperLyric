@@ -433,6 +433,33 @@ object LyriconDataBridge {
         return !currentLyric.isNullOrBlank() || hasRenderableLine(currentLyricLine)
     }
 
+    /**
+     * Returns whether the active lyric source supplied displayable media fields of its own.
+     * This deliberately does not inspect MediaSession fallback fields: LyricInfo must be judged
+     * by the fields parsed from its lyricInfo JSON rather than by top-level MediaMetadata.
+     */
+    fun hasMusicInfoForPresentation(): Boolean {
+        val metadata = currentLyricMediaMetadata ?: return false
+        return !metadata.title.isNullOrBlank() ||
+                !metadata.artist.isNullOrBlank() ||
+                !metadata.album.isNullOrBlank()
+    }
+
+    /**
+     * Builds the configured lyric-side placeholder for a metadata-only track. The placeholder is
+     * intentionally kept separate from [currentLyricLine], so it cannot make a lyric-less source
+     * pass the lyric gate when the user selected native restoration.
+     */
+    fun noLyricsPlaceholderLine(): IRichLyricLine? {
+        val metadata = currentLyricMediaMetadata ?: return null
+        return SongPreprocessor(resolveTitleSlot(placeholderFormat)).noLyricsPlaceholder(
+            Song(
+                name = metadata.title,
+                artist = metadata.artist
+            )
+        )
+    }
+
     private fun hasRenderableLine(line: IRichLyricLine?): Boolean {
         return line != null && (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())
     }

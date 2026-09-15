@@ -332,6 +332,15 @@ internal object IslandLyricContentAssembler {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig? = null
     ): LyricPresentation {
+        if (!LyriconDataBridge.hasLyricsForPresentation()) {
+            return if (shouldUseNoLyricsPlaceholder(prefs)) {
+                LyriconDataBridge.noLyricsPlaceholderLine()?.let { line ->
+                    LyricPresentation(primary = line)
+                } ?: LyricPresentation(null)
+            } else {
+                LyricPresentation(null)
+            }
+        }
         val rawLine = LyriconDataBridge.currentLyricLine ?: return LyricPresentation(null)
         val displaySettings = config?.lyricContentDisplay ?: LyricContentDisplayPolicy.read(prefs)
         val sourceLines = LyriconDataBridge.currentLyricLines.ifEmpty { listOf(rawLine) }
@@ -386,6 +395,15 @@ internal object IslandLyricContentAssembler {
                 selectedContent == LyricSecondaryContent.OVERLAPPING_LINE
             }
         )
+    }
+
+    fun shouldUseNoLyricsPlaceholder(prefs: SharedPreferences): Boolean {
+        return !LyriconDataBridge.hasLyricsForPresentation() &&
+                LyriconDataBridge.hasMusicInfoForPresentation() &&
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
+                    RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
+                ) == RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_MUSIC_INFO
     }
 
     private fun applyPlaybackSnapshot(

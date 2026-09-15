@@ -76,6 +76,17 @@ fun SuperIslandSettingsPage() {
             ).coerceIn(0, 1) == 1
         )
     }
+    var noLyricsBehavior by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
+                RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
+            ).takeIf {
+                it == RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_DEFAULT ||
+                        it == RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_MUSIC_INFO
+            } ?: RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
+        )
+    }
     var islandContentLeft by remember {
         mutableIntStateOf(
             readContentMode(
@@ -411,6 +422,18 @@ fun SuperIslandSettingsPage() {
     val afterPauseOptions = remember {
         listOf(R.string.option_after_pause_default, R.string.option_after_pause_keep)
     }.map { stringResource(id = it) }
+    val noLyricsBehaviorValues = remember {
+        listOf(
+            RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_DEFAULT,
+            RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_MUSIC_INFO
+        )
+    }
+    val noLyricsBehaviorOptions = remember {
+        listOf(
+            R.string.option_after_pause_default,
+            R.string.option_after_no_lyrics_music_info
+        )
+    }.map { stringResource(id = it) }
     val longPressBehaviorOptions = remember {
         listOf(
             R.string.option_island_long_press_default,
@@ -736,14 +759,31 @@ fun SuperIslandSettingsPage() {
                             .padding(bottom = 12.dp)
                             .fillMaxWidth()
                     ) {
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_split_lyric),
-                            checked = splitLyric,
-                            onCheckedChange = {
-                                splitLyric = it
-                                saveConfig(RootConstants.KEY_HOOK_LYRIC_MODE, if (it) 1 else 0)
-                            }
-                        )
+                        Column {
+                            SwitchPreference(
+                                title = stringResource(id = R.string.title_split_lyric),
+                                checked = splitLyric,
+                                onCheckedChange = {
+                                    splitLyric = it
+                                    saveConfig(RootConstants.KEY_HOOK_LYRIC_MODE, if (it) 1 else 0)
+                                }
+                            )
+                            OverlayDropdownPreference(
+                                title = stringResource(id = R.string.title_behavior_after_no_lyrics),
+                                items = noLyricsBehaviorOptions,
+                                selectedIndex = noLyricsBehaviorValues.indexOf(noLyricsBehavior)
+                                    .coerceAtLeast(0),
+                                onSelectedIndexChange = { index ->
+                                    val behavior = noLyricsBehaviorValues.getOrNull(index)
+                                        ?: RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
+                                    noLyricsBehavior = behavior
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
+                                        behavior
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
                 item(key = "content") {

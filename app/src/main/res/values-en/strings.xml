@@ -465,6 +465,8 @@
     <string name="title_behavior_after_pause">Behavior after music paused</string>
     <string name="option_after_pause_default">Restore default</string>
     <string name="option_after_pause_keep">Keep unchanged</string>
+    <string name="title_behavior_after_no_lyrics">Behavior when no lyrics are available</string>
+    <string name="option_after_no_lyrics_music_info">Show music information</string>
     <string name="title_island_long_press_behavior">Super Island long-press behavior</string>
     <string name="option_island_long_press_default">Default</string>
     <string name="option_island_long_press_lyric_share">Drag to share</string>

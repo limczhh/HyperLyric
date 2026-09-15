@@ -13,6 +13,7 @@ class LyricInfoLyricSource : ServiceLyricSource {
         return try {
             val song = LyricInfoParser.parse(lyricInfo)
             song?.lyrics?.map { LrcLine(it.begin, it.text ?: "") }
+                ?.takeIf { it.isNotEmpty() }
         } catch (_: Exception) {
             null
         }

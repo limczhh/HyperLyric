@@ -7,7 +7,6 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.media.session.MediaSessionManager
 import com.lidesheng.hyperlyric.common.lyric.LyricInfoParser
-import com.lidesheng.hyperlyric.common.lyric.LyricInfoPayload
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
@@ -135,7 +134,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         packageName: String,
         track: TrackIdentity
     ) {
-        if (hasLyrics) sink?.onStop()
+        if (hasLyrics || lastLyricPayload != null) sink?.onStop()
         hasLyrics = false
         lastLyricPayload = null
         activePkg = packageName
@@ -242,8 +241,8 @@ class LyricInfoSource(private val context: Context) : LyricSource {
             if (HookLogger.isDebugEnabled) {
                 logDiagnosis(lyricInfoRaw)
             }
-            val song = payload?.song
-            if (payload != null && song?.lyrics?.isNullOrEmpty() == false) {
+            if (payload != null) {
+                val song = payload.song
                 val mediaMetadata = LyricMediaMetadata(
                     sourceId = id,
                     packageName = pkg,
@@ -258,7 +257,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                     mediaId = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
                 )
                 lastLyricPayload = lyricInfoRaw
-                hasLyrics = true
+                hasLyrics = !song.lyrics.isNullOrEmpty()
                 activePkg = pkg
                 activeController = controller
                 activeTrack = mergeTrackIdentity(
@@ -269,11 +268,18 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                 sink?.onSongChanged(song)
                 sink?.onMetadata(mediaMetadata)
                 handlePlaybackState(controller, playbackState)
-                HookLogger.d(
-                    TAG,
-                    "歌词已就绪: song=${song.name.orEmpty()}, " +
-                            "lines=${song.lyrics!!.size}"
-                )
+                if (hasLyrics) {
+                    HookLogger.d(
+                        TAG,
+                        "歌词已就绪: song=${song.name.orEmpty()}, " +
+                                "lines=${song.lyrics?.size ?: 0}"
+                    )
+                } else {
+                    HookLogger.d(
+                        TAG,
+                        "LyricInfo 媒体信息已就绪但无歌词: song=${song.name.orEmpty()}"
+                    )
+                }
             }
         }
     }

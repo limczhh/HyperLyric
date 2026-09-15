@@ -101,6 +101,10 @@ object BaseIslandRenderer : IslandRenderer {
     }
 
     override fun updateMetadata() {
+        // A metadata-only source event can change presentation eligibility, not just the
+        // contents of a music-information slot. Reconcile the host first so the default mode
+        // restores native content and the opt-in mode can create its lyric-side placeholder.
+        if (refreshForNoLyrics()) return
         // MediaController callbacks can publish several intermediate snapshots. Resolve the
         // current source state once after they return to SystemUI's main queue.
         mainHandler.removeCallbacks(metadataRefreshRunnable)
@@ -150,6 +154,10 @@ object BaseIslandRenderer : IslandRenderer {
     }
 
     override fun updateLyricLine() {
+        // Streaming sources and plugin results can change lyric availability without publishing
+        // metadata. A missing lyric is a presentation-policy transition, so it must restore the
+        // native host (or run the opt-in metadata-only path) instead of only blanking the slot.
+        if (refreshForNoLyrics()) return
         if ((HookEntry.instance?.prefs?.getBoolean(
                 RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
                 RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND
@@ -191,6 +199,12 @@ object BaseIslandRenderer : IslandRenderer {
                 )
             }
         }
+    }
+
+    private fun refreshForNoLyrics(): Boolean {
+        if (LyriconDataBridge.hasLyricsForPresentation()) return false
+        refreshActiveIsland()
+        return true
     }
 
     override fun updateTextColors() {
