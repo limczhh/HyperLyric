@@ -18,11 +18,21 @@ import com.lidesheng.hyperlyric.plugin.api.PluginWord
 class DemoPlugin : HyperLyricPlugin {
     private companion object {
         const val EXTENSION_ID = "demo.logger"
-        const val LYRIC_REPLACEMENT_EXTENSION_ID = "demo.lyric-replacement"
+        const val HARMONY_EXTENSION_ID = "demo.harmony"
+        const val DUET_EXTENSION_ID = "demo.duet"
         const val TRANSLATION_EXTENSION_ID = "demo.translation"
         const val ROMA_METADATA_EXTENSION_ID = "demo.roma-metadata"
-        const val DEMO_PREFIX = "[Demo] "
+        // Keep the old key so an existing Demo installation does not silently lose its switch.
+        const val DUET_CONFIG_KEY = "replace_lyrics"
+        const val HARMONY_CONFIG_KEY = "add_harmony"
+        const val TRANSLATION_CONFIG_KEY = "add_translation"
+        const val ROMA_CONFIG_KEY = "add_roma_metadata"
+        const val HARMONY_PREFIX = "[和声]"
+        const val DUET_PREFIX = "[对唱]"
+        const val ROMA_PREFIX = "[罗马音]"
+        const val TRANSLATION_PREFIX = "[翻译]"
         const val DEMO_METADATA_KEY = "hyperlyric.demo"
+        const val MAX_DUPLICATED_LYRIC_LINES = 10_000
         const val MAX_LOG_LYRIC_LINES = 5
         const val MAX_LOG_WORDS_PER_LINE = 8
         const val MAX_LOG_TEXT_LENGTH = 120
@@ -32,11 +42,12 @@ class DemoPlugin : HyperLyricPlugin {
 
     override fun onLoad(context: PluginContext) {
         this.context = context
-        context.registerExtension(LyricReplacementProcessor(context))
+        context.registerExtension(HarmonyProcessor(context))
+        context.registerExtension(DuetProcessor(context))
         context.registerExtension(TranslationProcessor(context))
         context.registerExtension(RomaMetadataProcessor(context))
         context.registerExtension(LoggerProcessor(context))
-        context.logger.info("lifecycle=onLoad, extensions=4")
+        context.logger.info("lifecycle=onLoad, extensions=5")
     }
 
     override fun onEnable() {
@@ -45,10 +56,11 @@ class DemoPlugin : HyperLyricPlugin {
 
     override fun onConfigChanged(config: PluginConfig) {
         context.logger.debug(
-                    "lifecycle=onConfigChanged, log_song=${config.getBoolean("log_song", true)}, " +
-                    "replace_lyrics=${config.getBoolean("replace_lyrics", false)}, " +
-                    "add_translation=${config.getBoolean("add_translation", false)}, " +
-                    "add_roma_metadata=${config.getBoolean("add_roma_metadata", false)}"
+            "lifecycle=onConfigChanged, log_song=${config.getBoolean("log_song", true)}, " +
+                    "add_harmony=${config.getBoolean(HARMONY_CONFIG_KEY, false)}, " +
+                    "add_duet=${config.getBoolean(DUET_CONFIG_KEY, false)}, " +
+                    "add_translation=${config.getBoolean(TRANSLATION_CONFIG_KEY, false)}, " +
+                    "add_roma=${config.getBoolean(ROMA_CONFIG_KEY, false)}"
         )
     }
 
@@ -125,79 +137,109 @@ class DemoPlugin : HyperLyricPlugin {
         }
     }
 
-    private class LyricReplacementProcessor(
+    private class HarmonyProcessor(
         private val context: PluginContext
     ) : LyricProcessorExtension {
-        override val id: String = LYRIC_REPLACEMENT_EXTENSION_ID
+        override val id: String = HARMONY_EXTENSION_ID
+        override val stage: PluginProcessorStage = PluginProcessorStage.TRANSLATION_ENHANCEMENT
+
+        override fun processResult(song: PluginSong): PluginSongResult? {
+            if (!context.config.getBoolean(HARMONY_CONFIG_KEY, false)) return null
+            val lyrics = song.lyrics ?: return null
+            val enriched = lyrics.map { line ->
+                val sourceText = line.secondary
+                    ?.takeIf { it.isNotBlank() }
+                    ?: line.contentText()
+                    ?: return@map line
+                if (sourceText.startsWith(HARMONY_PREFIX)) return@map line
+
+                val hasExistingSecondary = !line.secondary.isNullOrBlank() ||
+                        !line.secondaryWords.isNullOrEmpty()
+                val sourceWords = if (hasExistingSecondary) {
+                    line.secondaryWords?.takeIf { it.isNotEmpty() }
+                } else {
+                    line.words?.takeIf { it.isNotEmpty() }
+                }
+                line.withFields(
+                    secondary = HARMONY_PREFIX + sourceText,
+                    secondaryWords = prefixWords(
+                        words = sourceWords,
+                        prefix = HARMONY_PREFIX,
+                        lineBegin = line.begin,
+                        lineEnd = line.end
+                    )
+                )
+            }
+            if (enriched == lyrics) return null
+            return PluginSongResult(
+                song = song.withLyrics(enriched),
+                changedFields = setOf(PluginSongField.LYRICS),
+                lyricsUpdateMode = PluginLyricsUpdateMode.PATCH,
+                changedLyricFields = setOf(
+                    PluginLyricField.SECONDARY,
+                    PluginLyricField.SECONDARY_WORDS
+                )
+            )
+        }
+    }
+
+    private class DuetProcessor(
+        private val context: PluginContext
+    ) : LyricProcessorExtension {
+        override val id: String = DUET_EXTENSION_ID
         override val stage: PluginProcessorStage = PluginProcessorStage.LYRIC_REPLACEMENT
 
         override fun processResult(song: PluginSong): PluginSongResult? {
-            if (!context.config.getBoolean("replace_lyrics", false)) return null
+            if (!context.config.getBoolean(DUET_CONFIG_KEY, false)) return null
             val lyrics = song.lyrics ?: return null
-            val replaced = lyrics.map(::replaceLine)
-            return PluginSongResult(
-                song = song.copy(lyrics = replaced),
-                changedFields = setOf(PluginSongField.LYRICS),
-                lyricsUpdateMode = PluginLyricsUpdateMode.PATCH,
-                changedLyricFields = setOf(PluginLyricField.TEXT, PluginLyricField.WORDS)
-            )
-        }
-
-        private fun replaceLine(line: PluginLyricLine): PluginLyricLine {
-            val originalText = line.text
-                ?: line.words?.joinToString("") { it.text.orEmpty() }
-                ?: return line
-            if (originalText.startsWith(DEMO_PREFIX)) return line
-
-            val originalWords = line.words
-            if (originalWords.isNullOrEmpty()) {
-                return line.copy(text = DEMO_PREFIX + originalText)
+            if (lyrics.isEmpty() || lyrics.size > MAX_DUPLICATED_LYRIC_LINES) return null
+            if (lyrics.any { !it.hasValidTimeline() }) {
+                context.logger.warn(
+                    "Demo 对唱降级为原文前缀：歌词存在无法复制的无效时间轴"
+                )
+                return prefixDuetText(song, lyrics)
             }
 
-            val lineDuration = line.end - line.begin
-            val slotCount = originalWords.size + 1
-            if (lineDuration < slotCount) {
-                // There is not enough millisecond precision for a new independent word.
-                // Keep the original timeline valid and attach the prefix to its first word.
-                val first = originalWords.first()
-                return line.copy(
-                    text = DEMO_PREFIX + originalText,
-                    words = originalWords.toMutableList().apply {
-                        set(0, first.copy(text = DEMO_PREFIX + first.text.orEmpty()))
+            val duetLyrics = buildList(lyrics.size * 2) {
+                lyrics.forEach { line ->
+                    val role = line.metadata?.values?.get(DUET_METADATA_KEY)
+                    when (role) {
+                        DUET_SECONDARY_ROLE -> add(line)
+                        DUET_MAIN_ROLE -> add(line)
+                        else -> {
+                            val sourceText = line.contentText()
+                            if (sourceText == null) {
+                                add(line)
+                                return@forEach
+                            }
+
+                            add(line.withDuetMainMetadata())
+                            add(
+                                line.withFields(
+                                    metadata = line.metadata.withDuetMetadata(
+                                        role = DUET_SECONDARY_ROLE,
+                                        agent = DEMO_DUET_AGENT,
+                                        replaceAgent = true
+                                    ),
+                                    text = DUET_PREFIX + sourceText,
+                                    words = prefixWords(
+                                        words = line.words,
+                                        prefix = DUET_PREFIX,
+                                        lineBegin = line.begin,
+                                        lineEnd = line.end
+                                    )
+                                )
+                            )
+                        }
                     }
-                )
-            }
-
-            val segment = lineDuration / slotCount
-            val remainder = lineDuration % slotCount
-            var cursor = line.begin
-
-            fun nextEnd(index: Int): Long {
-                val end = cursor + segment + if (index < remainder) 1L else 0L
-                cursor = end
-                return end
-            }
-
-            val replacedWords = buildList {
-                val prefixEnd = nextEnd(0)
-                add(
-                    PluginWord(
-                        begin = line.begin,
-                        end = prefixEnd,
-                        duration = prefixEnd - line.begin,
-                        text = DEMO_PREFIX
-                    )
-                )
-                originalWords.forEachIndexed { index, word ->
-                    val begin = cursor
-                    val end = nextEnd(index + 1)
-                    add(word.copy(begin = begin, end = end, duration = end - begin))
                 }
             }
-
-            return line.copy(
-                text = DEMO_PREFIX + originalText,
-                words = replacedWords
+            if (duetLyrics == lyrics) return null
+            return PluginSongResult(
+                song = song.withLyrics(duetLyrics),
+                changedFields = setOf(PluginSongField.LYRICS),
+                lyricsUpdateMode = PluginLyricsUpdateMode.REPLACE,
+                changedLyricFields = emptySet()
             )
         }
     }
@@ -209,16 +251,19 @@ class DemoPlugin : HyperLyricPlugin {
         override val stage: PluginProcessorStage = PluginProcessorStage.TRANSLATION_ENHANCEMENT
 
         override fun processResult(song: PluginSong): PluginSongResult? {
-            if (!context.config.getBoolean("add_translation", false)) return null
+            if (!context.config.getBoolean(TRANSLATION_CONFIG_KEY, false)) return null
             val lyrics = song.lyrics ?: return null
             val translated = lyrics.map { line ->
-                line.copy(
-                    translation = line.text?.let { "Demo: $it" },
-                    translationWords = null
-                )
+                val sourceText = line.translation
+                    ?.takeIf { it.isNotBlank() }
+                    ?: line.contentText()
+                    ?: return@map line
+                val translation = prefixed(TRANSLATION_PREFIX, sourceText)
+                line.withFields(translation = translation, translationWords = null)
             }
+            if (translated == lyrics) return null
             return PluginSongResult(
-                song = song.copy(lyrics = translated),
+                song = song.withLyrics(translated),
                 changedFields = setOf(PluginSongField.LYRICS),
                 lyricsUpdateMode = PluginLyricsUpdateMode.PATCH,
                 changedLyricFields = setOf(
@@ -236,28 +281,198 @@ class DemoPlugin : HyperLyricPlugin {
         override val stage: PluginProcessorStage = PluginProcessorStage.TRANSLATION_ENHANCEMENT
 
         override fun processResult(song: PluginSong): PluginSongResult? {
-            if (!context.config.getBoolean("add_roma_metadata", false)) return null
+            if (!context.config.getBoolean(ROMA_CONFIG_KEY, false)) return null
             val lyrics = song.lyrics ?: return null
             var changed = false
             val enriched = lyrics.map { line ->
-                val roma = line.roma ?: line.text?.takeIf { it.isNotBlank() }?.let { "Demo: $it" }
-                val metadata = (line.metadata ?: PluginMetadata()).let { current ->
-                    if (current.values[DEMO_METADATA_KEY] == "true") {
-                        current
-                    } else {
-                        current.copy(values = current.values + (DEMO_METADATA_KEY to "true"))
-                    }
-                }
+                val sourceText = line.roma
+                    ?.takeIf { it.isNotBlank() }
+                    ?: line.contentText()
+                if (sourceText == null) return@map line
+                val roma = prefixed(ROMA_PREFIX, sourceText)
+                val metadata = line.metadata.withValues(DEMO_METADATA_KEY to "true")
                 if (line.roma != roma || line.metadata != metadata) changed = true
-                line.copy(roma = roma, metadata = metadata)
+                line.withFields(roma = roma, metadata = metadata)
             }
             if (!changed) return null
             return PluginSongResult(
-                song = song.copy(lyrics = enriched),
+                song = song.withLyrics(enriched),
                 changedFields = setOf(PluginSongField.LYRICS),
                 lyricsUpdateMode = PluginLyricsUpdateMode.PATCH,
                 changedLyricFields = setOf(PluginLyricField.ROMA, PluginLyricField.METADATA)
             )
+        }
+    }
+}
+
+private const val DUET_METADATA_KEY = "hyperlyric.demo.duet"
+private const val DUET_MAIN_ROLE = "main"
+private const val DUET_SECONDARY_ROLE = "secondary"
+private const val AGENT_METADATA_KEY = "amll:agent"
+private const val DEMO_MAIN_AGENT = "hyperlyric.demo.main"
+private const val DEMO_DUET_AGENT = "hyperlyric.demo.duet"
+private val AGENT_METADATA_KEYS = listOf("agent", "amll:agent", "vocal", "amll:vocal")
+
+private fun prefixDuetText(
+    song: PluginSong,
+    lyrics: List<PluginLyricLine>
+): PluginSongResult? {
+    val prefixed = lyrics.map { line ->
+        val sourceText = line.contentText() ?: return@map line
+        if (sourceText.startsWith("[对唱]")) {
+            line
+        } else {
+            line.withFields(text = "[对唱]" + sourceText)
+        }
+    }
+    if (prefixed == lyrics) return null
+    return PluginSongResult(
+        song = song.withLyrics(prefixed),
+        changedFields = setOf(PluginSongField.LYRICS),
+        lyricsUpdateMode = PluginLyricsUpdateMode.PATCH,
+        changedLyricFields = setOf(PluginLyricField.TEXT)
+    )
+}
+
+private fun PluginLyricLine.contentText(): String? =
+    text?.takeIf { it.isNotBlank() }
+        ?: words?.takeIf { it.isNotEmpty() }
+            ?.joinToString("") { it.text.orEmpty() }
+            ?.takeIf { it.isNotBlank() }
+
+private fun PluginLyricLine.hasValidTimeline(): Boolean =
+    begin >= 0L && end > begin && duration == end - begin
+
+private fun prefixed(prefix: String, text: String): String =
+    if (text.startsWith(prefix)) text else prefix + text
+
+private fun PluginMetadata?.withValues(vararg entries: Pair<String, String?>): PluginMetadata {
+    val values = (this?.values ?: emptyMap()).toMutableMap()
+    entries.forEach { (key, value) -> values[key] = value }
+    return PluginMetadata(values)
+}
+
+private fun PluginMetadata?.withDuetMetadata(
+    role: String,
+    agent: String,
+    replaceAgent: Boolean
+): PluginMetadata {
+    val values = (this?.values ?: emptyMap()).toMutableMap()
+    if (replaceAgent) AGENT_METADATA_KEYS.forEach(values::remove)
+    values[DUET_METADATA_KEY] = role
+    values[AGENT_METADATA_KEY] = agent
+    return PluginMetadata(values)
+}
+
+private fun PluginLyricLine.withDuetMainMetadata(): PluginLyricLine {
+    val hasAgent = AGENT_METADATA_KEYS.any { key ->
+        metadata?.values?.get(key).isNullOrBlank().not()
+    }
+    val nextMetadata = if (hasAgent) {
+        metadata.withValues(DUET_METADATA_KEY to DUET_MAIN_ROLE)
+    } else {
+        metadata.withDuetMetadata(
+            role = DUET_MAIN_ROLE,
+            agent = DEMO_MAIN_AGENT,
+            replaceAgent = false
+        )
+    }
+    return withFields(metadata = nextMetadata)
+}
+
+/** Rebuild host-owned DTOs with their complete constructors across the ClassLoader boundary. */
+private fun PluginSong.withLyrics(lyrics: List<PluginLyricLine>?): PluginSong = PluginSong(
+    id = id,
+    name = name,
+    artist = artist,
+    album = album,
+    duration = duration,
+    metadata = metadata,
+    lyrics = lyrics
+)
+
+private fun PluginLyricLine.withFields(
+    metadata: PluginMetadata? = this.metadata,
+    text: String? = this.text,
+    words: List<PluginWord>? = this.words,
+    secondary: String? = this.secondary,
+    secondaryWords: List<PluginWord>? = this.secondaryWords,
+    translation: String? = this.translation,
+    translationWords: List<PluginWord>? = this.translationWords,
+    roma: String? = this.roma
+): PluginLyricLine = PluginLyricLine(
+    begin = begin,
+    end = end,
+    duration = duration,
+    isAlignedRight = isAlignedRight,
+    metadata = metadata,
+    text = text,
+    words = words,
+    secondary = secondary,
+    secondaryWords = secondaryWords,
+    translation = translation,
+    translationWords = translationWords,
+    roma = roma
+)
+
+private fun PluginWord.withFields(
+    begin: Long = this.begin,
+    end: Long = this.end,
+    duration: Long = this.duration,
+    text: String? = this.text,
+    metadata: PluginMetadata? = this.metadata
+): PluginWord = PluginWord(
+    begin = begin,
+    end = end,
+    duration = duration,
+    text = text,
+    metadata = metadata
+)
+
+private fun prefixWords(
+    words: List<PluginWord>?,
+    prefix: String,
+    lineBegin: Long,
+    lineEnd: Long
+): List<PluginWord>? {
+    if (words.isNullOrEmpty()) return words
+    val lineDuration = lineEnd - lineBegin
+    val slotCount = words.size + 1
+    if (lineDuration <= 0L) return null
+    if (lineDuration < slotCount) {
+        val first = words.first()
+        return words.toMutableList().apply {
+            set(0, first.withFields(text = prefix + first.text.orEmpty()))
+        }
+    }
+
+    val segment = lineDuration / slotCount
+    val remainder = lineDuration % slotCount
+    var cursor = lineBegin
+
+    fun nextEnd(index: Int): Long {
+        val end = cursor + segment + if (index < remainder) 1L else 0L
+        cursor = end
+        return end
+    }
+
+    return buildList {
+        val prefixEnd = nextEnd(0)
+        add(
+            PluginWord(
+                begin = lineBegin,
+                end = prefixEnd,
+                duration = prefixEnd - lineBegin,
+                text = prefix,
+                // The API is supplied by the host ClassLoader. Do not call the Kotlin
+                // DefaultConstructorMarker overload across the plugin boundary.
+                metadata = null
+            )
+        )
+        words.forEachIndexed { index, word ->
+            val begin = cursor
+            val end = nextEnd(index + 1)
+            add(word.withFields(begin = begin, end = end, duration = end - begin))
         }
     }
 }

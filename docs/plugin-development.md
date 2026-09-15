@@ -54,7 +54,7 @@
 | 修改标题、艺术家、专辑等顶层字段 | 在 `changedFields` 中声明对应的 `PluginSongField` |
 | 没有可靠结果 | 返回 `null`，不要返回半成品 |
 
-`PATCH` 必须保持行数和行索引不变；`REPLACE` 可以改变行数和时间轴。只有时间轴可靠时，才写入 `WORDS`、`TRANSLATION_WORDS` 等逐字字段。字段声明和合并规则见[Plugin API 与配置参考](plugins/api.md)。
+`PATCH` 必须保持行数和行索引不变；`REPLACE` 可以改变行数和时间轴。只有时间轴可靠时，才写入 `WORDS`、`TRANSLATION_WORDS` 等逐字字段。只更新文本、metadata、secondary、翻译或罗马音内容时，宿主会保留源歌词未完整的行时间轴；涉及时间轴或新增逐字词时仍必须返回合法时间。字段声明和合并规则见[Plugin API 与配置参考](plugins/api.md)。
 
 ### 4. 把设置交给宿主
 

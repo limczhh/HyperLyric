@@ -13,20 +13,21 @@ HyperLyric 可以通过插件增加更多歌词功能。插件由 HyperLyric 统
 
 插件收到的是独立的只读 `PluginSong` 快照，包含 `id`、`name`、`artist`、`album`、`duration`、`metadata` 和完整 `lyrics`。处理调用还会携带只读的 `PluginProcessingContext.mediaInfo`，用于网络搜索、缓存 key 或提示词。`mediaInfo.sourcePackageName` 只来自本次歌词源的 `LyricMediaMetadata.packageName`，歌词源未提供时就是 `null`；它绝不会由 MediaSession、标题/艺术家匹配、旧歌曲状态或 `MediaMetadataHelper` 推断。插件不能导入宿主内部 `Song`、`LyricMediaMetadata`、`MediaMetadataHelper`、`CurrentMediaInfoResolver`、`LyriconDataBridge`、Xposed 或 SystemUI 类型。
 
-处理器通过 `PluginSongResult` 返回候选结果。当前 API 版本仍为 `1`，Demo 阶段不升级版本号，也不处理正式发布后的兼容迁移：
+处理器通过 `PluginSongResult` 返回候选结果。当前 API 版本仍为 `1`，Demo 插件版本随功能和修复递增，不处理正式发布后的兼容迁移：
 
 - `PluginSongField` 支持 `ID`、`NAME`、`ARTIST`、`ALBUM`、`DURATION`、`METADATA` 和 `LYRICS`；字段未声明时 Core 保留原值，字段已声明且候选为 `null` 时明确清空；
+- 跨宿主/插件 ClassLoader 创建 `PluginSong`、`PluginLyricLine`、`PluginWord` 等 DTO 时必须显式传递全部构造参数，不要依赖 Kotlin 默认参数或 `data class.copy` 的合成调用；
 - `LYRIC_REPLACEMENT` 阶段适合搜索并替换原文歌词、逐字时间轴或罗马音；
 - `TRANSLATION_ENHANCEMENT` 阶段会看到前一阶段已经合并的最新歌词，适合翻译和其他增强；
 - `PluginLyricsUpdateMode.PATCH` 要求行数不变，按稳定行索引只合并声明的 `PluginLyricField`；`REPLACE` 允许返回全新的歌词列表和时间轴；
 - 同阶段按稳定插件 ID、扩展 ID 顺序执行，后一个有效的同字段结果覆盖前值，不同字段同时保留；
 - 插件异常、超时、无匹配或非法时间轴只跳过当前插件，后续插件继续运行，最终没有有效结果时保持原始 Song。
 
-Core 会校验完整候选的行/词时间轴和结果大小：歌词行要求 `begin >= 0`、`end > begin`、`duration == end - begin`、按 begin 升序且有 text 或 words；每个 words 列表必须在行范围内、按 begin 升序，不能产生越界时间轴。只翻译时声明 `TRANSLATION/TRANSLATION_WORDS`，原文插件声明 `TEXT/WORDS`，罗马音插件声明 `ROMA`；这些字段可以在同一批歌词行上同时存在。Album、标题、艺术家、Duration 和 Metadata 通过 DTO 受控写回，不允许插件访问宿主内部媒体对象。
+Core 会校验 `REPLACE` 以及涉及时间轴/逐字词的 PATCH：歌词行要求 `begin >= 0`、`end > begin`、`duration == end - begin`、按 begin 升序且有 text 或 words；每个 words 列表必须在行范围内、按 begin 升序，不能产生越界时间轴。只修改 `TEXT`、`METADATA`、`SECONDARY`、`TRANSLATION`、`ROMA` 等内容字段时，PATCH 会保留源歌词原有的未完整时间轴，不会因为 `begin/end/duration` 为零而丢弃结果。只翻译时声明 `TRANSLATION/TRANSLATION_WORDS`，原文插件声明 `TEXT/WORDS`，罗马音插件声明 `ROMA`；这些字段可以在同一批歌词行上同时存在。Album、标题、艺术家、Duration 和 Metadata 通过 DTO 受控写回，不允许插件访问宿主内部媒体对象。
 
 Core 写回最终 Song 后会同步 `LyriconDataBridge.currentSong`、`currentSongName`、完整歌词可用状态和 `TimingNavigator`，并按修改字段刷新 metadata/lyric。插件只能访问 `PluginContext`、`PluginSong`、`PluginProcessingContext.mediaInfo` 和公开 API，不能访问 `Song`、`LyriconDataBridge`、Renderer、Canvas、MediaMetadataHelper、MediaSession、CurrentMediaInfoResolver、Xposed 或 SystemUI。
 
-对于逐字歌词，渲染使用的是 `words` 的文本和时间轴，不能只修改行级 `text` 后期待逐字内容变化。PATCH 时必须声明 `WORDS` 并返回匹配的行索引；REPLACE 时可以同时返回新的 `words`。每个词的时间必须仍在对应行范围内、按顺序排列。Demo 插件的“替换原文歌词”会新增带时间轴的 `[Demo] ` 词并重排当前行词时间，用于验证字段级合并路径。
+对于逐字歌词，渲染使用的是 `words` 的文本和时间轴，不能只修改行级 `text` 后期待逐字内容变化。PATCH 时必须声明 `WORDS` 并返回匹配的行索引；REPLACE 时可以同时返回新的 `words`。每个词的时间必须仍在对应行范围内、按顺序排列。Demo 插件提供四个可选的标记功能：和声写入 `secondary` 并使用 `[和声]` 前缀，对唱生成带独立 `amll:agent` 和同时间轴的 `[对唱]` 副行，罗马音和翻译分别写入 `roma`、`translation` 并使用 `[罗马音]`、`[翻译]` 前缀。
 
 ## 统一缓存入口
 
