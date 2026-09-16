@@ -1,0 +1,145 @@
+package com.lidesheng.hyperlyric.root.lyricenhancement.translation
+
+import android.content.SharedPreferences
+import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
+import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.lyric.model.Song
+import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementInput
+import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementMediaInfo
+import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
+import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+
+internal class AiTranslationFeature(
+    private val preferences: SharedPreferences,
+    cacheStore: LyricEnhancementCacheStore,
+    logger: LyricEnhancementLogger,
+    private val onConfigChanged: () -> Unit,
+) : AutoCloseable {
+
+    private val gatewayLogger = logger.withTag("Gateway")
+    private val translatorLogger = logger.withTag("Translator")
+    private val cache = TranslationCache(cacheStore, logger.withTag("Cache"))
+    private val engine = AiTranslationEngine(
+        cacheStore = cacheStore,
+        logger = logger,
+        translatorLogger = translatorLogger,
+        translationCache = cache
+    )
+
+    private val preferenceListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key in AiTranslationConfig.PREFERENCE_KEYS) {
+                onConfigChanged()
+            }
+        }
+
+    init {
+        preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
+    }
+
+    fun isEnabled(): Boolean = preferences.getBoolean(
+        RootConstants.KEY_HOOK_AI_TRANS_ENABLE,
+        RootConstants.DEFAULT_HOOK_AI_TRANS_ENABLE
+    )
+
+    fun clearCache(): Boolean {
+        val cleared = engine.clearCache()
+        gatewayLogger.info(if (cleared) "AI 翻译缓存已清除" else "AI 翻译缓存清除不完整")
+        return cleared
+    }
+
+    fun listCacheEntries(): List<LyricEnhancementCacheEntry> = engine.listCacheEntries()
+
+    fun clearCacheEntry(entryId: String): Boolean = engine.clearCacheEntry(entryId)
+
+    fun enhance(
+        song: Song,
+        input: LyricEnhancementInput,
+    ): Song? {
+        return try {
+            val config = AiTranslationConfig.from(preferences)
+            if (!config.enabled) return null
+            val querySong = song.withMediaInfo(input.mediaInfo)
+            TranslationEligibility.skipReason(querySong)?.let { reason ->
+                gatewayLogger.debug("跳过 AI 翻译: reason=${reason}, song=${querySong.name}")
+                return null
+            }
+            val lyrics = querySong.lyrics ?: return null
+
+            if (
+                config.skipExisting &&
+                !config.forceOverride &&
+                lyrics.any { !it.translation.isNullOrBlank() }
+            ) {
+                gatewayLogger.debug(
+                    "跳过 AI 翻译: reason=existing_translation, song=${querySong.name}"
+                )
+                return null
+            }
+
+            if (config.skipLanguages.isNotEmpty()) {
+                val detected = TranslationLanguageDetector.detect(querySong)
+                if (detected != null) {
+                    val margin = detected.secondConfidence?.let {
+                        detected.confidence - it
+                    }
+                    val confidentEnough = detected.confidence >= 0.8f &&
+                            (margin == null || margin >= 0.15f)
+                    val selected = detected.language in config.skipLanguages
+                    val confidence = "%.3f".format(java.util.Locale.US, detected.confidence)
+                    val marginText = margin?.let {
+                        "%.3f".format(java.util.Locale.US, it)
+                    } ?: "-"
+                    gatewayLogger.debug(
+                        "歌词语言识别: song=${querySong.name}, detected=${detected.languageTag}, " +
+                                "confidence=$confidence, margin=$marginText, " +
+                                "hypotheses=${detected.hypothesisCount}, selected=$selected, " +
+                                "confident=$confidentEnough"
+                    )
+                    if (selected && confidentEnough) {
+                        gatewayLogger.debug(
+                            "跳过 AI 翻译: reason=selected_language, song=${querySong.name}, " +
+                                    "detected=${detected.languageTag}"
+                        )
+                        return null
+                    }
+                }
+            }
+
+            if (!config.isUsable) {
+                translatorLogger.warn("跳过翻译：配置不完整，API Key 或其他配置为空")
+                return null
+            }
+            translatorLogger.debug("正在翻译：${querySong.name}（共 ${lyrics.size} 行）")
+            engine.translate(
+                song = querySong,
+                config = config,
+                sourcePackageName = input.mediaInfo?.sourcePackageName
+            )?.let { translated ->
+                song.copy(lyrics = translated.lyrics)
+            }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            null
+        } catch (error: Exception) {
+            translatorLogger.error("翻译过程发生错误", error)
+            null
+        }
+    }
+
+    override fun close() {
+        preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener)
+        engine.close()
+    }
+
+    private fun Song.withMediaInfo(mediaInfo: LyricEnhancementMediaInfo?): Song {
+        mediaInfo ?: return this
+        return copy(
+            name = mediaInfo.title ?: name,
+            artist = mediaInfo.artist ?: artist,
+            album = mediaInfo.album ?: album,
+            duration = mediaInfo.duration ?: duration
+        )
+    }
+
+}

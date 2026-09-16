@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -26,6 +27,8 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -70,6 +73,8 @@ internal fun rememberHookConfigSaver(prefs: SharedPreferences): (String, Any) ->
 @Composable
 internal fun XposedLyricSettingPage(
     title: String,
+    snackbarHostState: SnackbarHostState? = null,
+    topBarActions: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit
 ) {
     val navigator = LocalNavigator.current
@@ -79,6 +84,9 @@ internal fun XposedLyricSettingPage(
     val topAppBarScrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
+        snackbarHost = {
+            snackbarHostState?.let { SnackbarHost(state = it) }
+        },
         topBar = {
             BlurredBar(backdrop, blurActive) {
                 TopAppBar(
@@ -92,7 +100,8 @@ internal fun XposedLyricSettingPage(
                                 contentDescription = stringResource(id = R.string.back)
                             )
                         }
-                    }
+                    },
+                    actions = topBarActions
                 )
             }
         }

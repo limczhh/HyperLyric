@@ -12,9 +12,6 @@ import com.lidesheng.hyperlyric.ui.page.LicensesPage
 import com.lidesheng.hyperlyric.ui.page.LogPage
 import com.lidesheng.hyperlyric.ui.page.MainPage
 import com.lidesheng.hyperlyric.ui.page.PoetryPage
-import com.lidesheng.hyperlyric.ui.page.plugin.PluginManagerPage
-import com.lidesheng.hyperlyric.ui.page.plugin.PluginCachePage
-import com.lidesheng.hyperlyric.ui.page.plugin.PluginSettingsPage
 import com.lidesheng.hyperlyric.ui.page.SettingsPage
 import com.lidesheng.hyperlyric.ui.page.SetupPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.LyricAnimationPage
@@ -29,6 +26,10 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.media.MediaCardSettingsPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.aod.AlwaysOnDisplayPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.island.IslandExpandedMediaCardPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.notification.NotificationCenterMediaCardPage
+import com.lidesheng.hyperlyric.ui.page.lyricenhancement.LyricEnhancementPage
+import com.lidesheng.hyperlyric.ui.page.lyricenhancement.LyricEnhancementSettingsPage
+import com.lidesheng.hyperlyric.ui.page.lyricenhancement.AiTranslationCachePage
+import com.lidesheng.hyperlyric.ui.page.lyricenhancement.AmllTtmlCachePage
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
@@ -55,9 +56,12 @@ fun AppNavigation(startRoute: Route) {
             entry<Route.Main> { MainPage() }
 
             entry<Route.Settings> { SettingsPage() }
-            entry<Route.Plugins> { PluginManagerPage() }
-            entry<Route.PluginSettings> { PluginSettingsPage(it.pluginId) }
-            entry<Route.PluginCache> { PluginCachePage(it.pluginId, it.scopeId) }
+            entry<Route.LyricEnhancement> { LyricEnhancementPage() }
+            entry<Route.LyricEnhancementSettings> {
+                LyricEnhancementSettingsPage(it.featureId)
+            }
+            entry<Route.AmllTtmlCache> { AmllTtmlCachePage() }
+            entry<Route.AiTranslationCache> { AiTranslationCachePage() }
             entry<Route.HookSettings> { HookSettingsPage() }
             entry<Route.LyricSource> { LyricSourcePage() }
             entry<Route.LyricAnimation> { LyricAnimationPage() }

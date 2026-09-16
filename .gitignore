@@ -16,7 +16,6 @@ local.properties
 .vscode/
 小米超级岛反编译相关/
 app/build/
-/Plugins/**/build/
 app/release/
 app/offline/
 app/online/

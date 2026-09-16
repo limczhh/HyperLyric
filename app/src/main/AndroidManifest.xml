@@ -85,9 +85,10 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <provider
-            android:name=".plugin.app.PluginCacheResultProvider"
-            android:authorities="${applicationId}.plugin-cache-result"
+            android:name=".root.lyricenhancement.LyricEnhancementCacheResultProvider"
+            android:authorities="${applicationId}.lyric-enhancement-cache-result"
             android:exported="true" />
+
     </application>
 
 </manifest>

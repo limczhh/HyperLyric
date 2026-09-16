@@ -14,7 +14,7 @@ android {
         minSdk = 33
         targetSdk = 37
         versionCode = 1939
-        versionName = "7.5"
+        versionName = "7.6"
 
         ndk {
             abiFilters.add("arm64-v8a")
@@ -53,8 +53,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":plugins:api"))
-
     // --- 基本依赖 ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -101,6 +99,8 @@ dependencies {
 
     // --- 调试工具 ---
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 
     // --- 网络与序列化 (在线歌词) ---
     implementation(libs.kotlinx.serialization.json)

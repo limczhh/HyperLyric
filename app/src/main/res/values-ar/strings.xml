@@ -46,7 +46,6 @@
   <string name="toast_backup_success">تم إنشاء النسخة الاحتياطية بنجاح</string>
   <string name="toast_backup_failed">فشل إنشاء النسخة الاحتياطية: %1$s</string>
   <string name="toast_restore_success">تمت الاستعادة بنجاح، يرجى إعادة تشغيل التطبيق</string>
-  <string name="toast_restore_success_with_plugins">تمت الاستعادة بنجاح، تمت استعادة %1$d من الإضافات. يرجى إعادة تشغيل واجهة النظام</string>
   <string name="toast_restore_invalid">تنسيق الملف غير صالح</string>
   <string name="toast_restore_failed">فشلت الاستعادة</string>
   <string name="title_settings_page">إعدادات التطبيق</string>
@@ -540,16 +539,4 @@
   <string name="setup_completion_superlyric">من فضلك فعّل وحدة SuperLyric في LSPosed، بعدين أعد تشغيل هاتفك</string>
   <string name="setup_completion_lyricinfo">يُنصح باستخدام LyricInfo: فعّله في LSPosed، اختار تطبيق الموسيقى بتاعك، وأعد تشغيل تطبيق الموسيقى؛ تخطى LyricInfo لو التطبيق بيوفّر بيانات الكلمات بنفسه</string>
   <string name="no_lyric_data">لا توجد بيانات كلمات</string>
-  <string name="title_plugins">Plugins</string>
-  <string name="title_install_plugin">تثبيت إضافة ZIP</string>
-  <string name="title_uninstall_plugin">إلغاء تثبيت الإضافة</string>
-  <string name="plugin_status_enabled">مفعّلة</string>
-  <string name="plugin_status_disabled">معطّلة</string>
-  <string name="summary_plugin_no_settings">لا توجد إعدادات قابلة للضبط لهذه الإضافة</string>
-  <string name="summary_plugin_empty">لم يتم تثبيت أي إضافات</string>
-  <string name="dialog_uninstall_plugin_title">إلغاء تثبيت الإضافة؟</string>
-  <string name="dialog_uninstall_plugin_summary">سيتم حذف ZIP الإضافة وإعداداتها؛ وستتوفر إدارة بيانات التشغيل في إصدار لاحق.</string>
-  <string name="toast_plugin_install_success">تم تثبيت الإضافة. أعد تشغيل واجهة النظام لتطبيقها.</string>
-  <string name="toast_plugin_operation_failed">فشلت عملية الإضافة: %1$s</string>
-  <string name="toast_plugin_requires_xposed">فعّل وحدة HyperLyric في Xposed أولًا</string>
 </resources>

@@ -1,0 +1,27 @@
+package com.lidesheng.hyperlyric.root.lyricenhancement.amll
+
+import android.content.SharedPreferences
+import com.lidesheng.hyperlyric.common.RootConstants
+
+internal data class AmllTtmlConfig(
+    val enabled: Boolean,
+    val platformProbe: Boolean,
+) {
+    companion object {
+        val PREFERENCE_KEYS = setOf(
+            RootConstants.KEY_HOOK_AMLL_TTML_ENABLE,
+            RootConstants.KEY_HOOK_AMLL_TTML_PLATFORM_PROBE,
+        )
+
+        fun from(preferences: SharedPreferences): AmllTtmlConfig = AmllTtmlConfig(
+            enabled = preferences.getBoolean(
+                RootConstants.KEY_HOOK_AMLL_TTML_ENABLE,
+                RootConstants.DEFAULT_HOOK_AMLL_TTML_ENABLE
+            ),
+            platformProbe = preferences.getBoolean(
+                RootConstants.KEY_HOOK_AMLL_TTML_PLATFORM_PROBE,
+                RootConstants.DEFAULT_HOOK_AMLL_TTML_PLATFORM_PROBE
+            ),
+        )
+    }
+}

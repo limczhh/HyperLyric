@@ -5,7 +5,6 @@ import android.content.Context
 import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
 import com.lidesheng.hyperlyric.common.UIConstants
-import com.lidesheng.hyperlyric.plugin.app.PluginRepository
 import com.lidesheng.hyperlyric.ui.utils.AppUtils
 import com.lidesheng.hyperlyric.ui.utils.LocaleUtils
 import com.lidesheng.hyperlyric.utils.LogManager
@@ -28,11 +27,10 @@ class RootApplication : Application() {
             override fun onServiceBind(service: XposedService) {
                 xposedService = service
                 reconcileRemotePreferences(this@RootApplication, service)
-                PluginRepository(this@RootApplication).syncAllRemote(service)
             }
 
             override fun onServiceDied(service: XposedService) {
-                xposedService = null
+                if (xposedService === service) xposedService = null
             }
         })
     }
@@ -73,8 +71,9 @@ class RootApplication : Application() {
             service: XposedService? = xposedService,
             replaceRemote: Boolean = false
         ): Boolean {
+            val connectedService = service ?: return false
             val remotePrefs = try {
-                service?.getRemotePreferences(UIConstants.PREF_NAME)
+                connectedService.getRemotePreferences(UIConstants.PREF_NAME)
             } catch (e: Exception) {
                 LogManager.w(TAG, "获取 Xposed 远程配置失败", e)
                 null
@@ -82,9 +81,12 @@ class RootApplication : Application() {
 
             val localPrefs = context.getSharedPreferences(UIConstants.PREF_NAME, MODE_PRIVATE)
             SyllablePreferencePolicy.normalizeInPlace(localPrefs)
-            return try {
+            val hostSynced = try {
                 val editor = remotePrefs.edit()
-                if (replaceRemote) editor.clear()
+                // LSPosed's RemotePreferences service persists the explicit delete set; its
+                // wrapper-only clear flag is ignored by older service implementations. Rewrite
+                // the group with explicit removals when replacing the remote snapshot.
+                if (replaceRemote) remotePrefs.all.keys.forEach(editor::remove)
                 localPrefs.all.forEach { (key, value) ->
                     when (value) {
                         is Boolean -> editor.putBoolean(key, value)
@@ -103,6 +105,8 @@ class RootApplication : Application() {
                 LogManager.w(TAG, "同步 Xposed 远程配置失败", e)
                 false
             }
+            if (!hostSynced) return false
+            return true
         }
 
         @JvmStatic
@@ -135,4 +139,5 @@ class RootApplication : Application() {
 
         private var appContext: Context? = null
     }
+
 }

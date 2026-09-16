@@ -5,10 +5,6 @@
     public <init>();
 }
 
-# --- HyperLyric Plugin API ---
--keep interface com.lidesheng.hyperlyric.plugin.api.** { *; }
--keep class com.lidesheng.hyperlyric.plugin.api.** { *; }
-
 # --- Shizuku User Service ---
 -keep,allowoptimization class com.lidesheng.hyperlyric.service.utils.shizuku.PrivilegedServiceImpl {
     public <init>();

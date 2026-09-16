@@ -15,13 +15,16 @@ sealed interface Route : NavKey {
     data object Settings : Route
 
     @Serializable
-    data object Plugins : Route
+    data object LyricEnhancement : Route
 
     @Serializable
-    data class PluginSettings(val pluginId: String) : Route
+    data class LyricEnhancementSettings(val featureId: String) : Route
 
     @Serializable
-    data class PluginCache(val pluginId: String, val scopeId: String) : Route
+    data object AmllTtmlCache : Route
+
+    @Serializable
+    data object AiTranslationCache : Route
 
     @Serializable
     data object HookSettings : Route

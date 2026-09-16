@@ -32,7 +32,7 @@ HyperLyric displays line-synced, word-synced, and separated lyrics in Xiaomi Hyp
 - **Line- and word-synced lyrics**: Lyrics are shown one line at a time. With word-level timing, each word is highlighted as the song plays; with line-level timing, the whole line changes together; lyrics without timing can still scroll.
 - **Separated lyrics**: Splits one lyric line across the left and right sides of HyperIsland while keeping word progress and scrolling. The width can stay fixed or change with the lyric.
 - **Second line**: Shows a translation, romanization, or the next lyric line. You can also swap the original and translation, show only the translation, or switch automatically.
-- **OpenAI Translation**: After installing the AI translation plugin, HyperLyric can generate translations through an OpenAI-compatible API. You can set the target language, model, endpoint, and prompt, skip selected source languages, or replace translations supplied by the lyric source.
+- ** AI translation**: After enabling it in Settings, HyperLyric can generate translations through an OpenAI-compatible API. You can set the target language, model, endpoint, and prompt, skip selected source languages, or replace translations supplied by the lyric source.
 - **Lyric time offset**: Each Lyricon provider can move lyrics earlier or later independently.
 
 ### HyperIsland layout and content
@@ -113,13 +113,6 @@ Download the latest HyperLyric APK from [GitHub Releases](https://github.com/lim
 ## Standalone notification mode
 
 Without LSPosed, HyperLyric can listen to media metadata and display lyrics through Xiaomi Notification Spotlight or Android Live Update notifications. This mode includes a player allowlist, notification styling, and a Quick Settings tile.
-
-## Plugins
-
-Plugins are optional HyperLyric lyric features that can be installed when needed, such as translation, romanization, and word-level lyrics.
-
-- [Plugin introduction](docs/en/plugins.md)
-- [Plugin development guide](docs/en/plugin-development.md)
 
 ## Setup and troubleshooting
 

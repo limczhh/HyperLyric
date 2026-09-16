@@ -9,22 +9,14 @@ set -euo pipefail
 : "${RELEASE_NOTES_ZH_FILE:?RELEASE_NOTES_ZH_FILE is required}"
 
 APK="${APK:-}"
-PLUGIN_FILES="${PLUGIN_FILES:-}"
 
 declare -a FILES=()
 if [[ -n "$APK" ]]; then
   FILES+=("$APK")
 fi
 
-if [[ -n "$PLUGIN_FILES" ]]; then
-  while IFS= read -r plugin_file; do
-    [[ -z "$plugin_file" ]] && continue
-    FILES+=("$plugin_file")
-  done <<< "$PLUGIN_FILES"
-fi
-
 if (( ${#FILES[@]} == 0 )); then
-  echo '::error::没有可发送的 APK 或插件文件'
+  echo '::error::没有可发送的 APK 文件'
   exit 1
 fi
 

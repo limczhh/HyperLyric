@@ -211,6 +211,24 @@ object RootConstants {
     const val KEY_HOOK_LYRIC_SECONDARY_ORDER = "key_hook_lyric_secondary_order"
     const val KEY_HOOK_LYRIC_AUTO_DUET = "key_hook_lyric_auto_duet"
 
+    // ================= LYRIC ENHANCEMENT KEYS =================
+    const val KEY_HOOK_AI_TRANS_ENABLE = "key_hook_ai_trans_enable"
+    const val KEY_HOOK_AI_TRANS_SKIP_LANGUAGES = "key_hook_ai_trans_skip_languages"
+    const val KEY_HOOK_AI_TRANS_SKIP_EXISTING_TRANSLATION =
+        "key_hook_ai_trans_skip_existing_translation"
+    const val KEY_HOOK_AI_TRANS_FORCE_OVERRIDE = "key_hook_ai_trans_force_override"
+    const val KEY_HOOK_AI_TRANS_PROVIDER = "key_hook_ai_trans_provider"
+    const val KEY_HOOK_AI_TRANS_API_KEY = "key_hook_ai_trans_api_key"
+    const val KEY_HOOK_AI_TRANS_MODEL = "key_hook_ai_trans_model"
+    const val KEY_HOOK_AI_TRANS_BASE_URL = "key_hook_ai_trans_base_url"
+    const val KEY_HOOK_AI_TRANS_TARGET_LANG = "key_hook_ai_trans_target_lang"
+    const val KEY_HOOK_AI_TRANS_PROMPT = "key_hook_ai_trans_prompt"
+    const val KEY_HOOK_AI_TRANS_TEMPERATURE = "key_hook_ai_trans_temperature"
+    const val KEY_HOOK_AI_TRANS_TOP_P = "key_hook_ai_trans_top_p"
+    const val KEY_HOOK_AI_TRANS_MAX_TOKENS = "key_hook_ai_trans_max_tokens"
+    const val KEY_HOOK_AMLL_TTML_ENABLE = "key_hook_amll_ttml_enable"
+    const val KEY_HOOK_AMLL_TTML_PLATFORM_PROBE = "key_hook_amll_ttml_platform_probe"
+
     // ================= COLOR KEYS =================
     const val KEY_HOOK_TEXT_COLOR_STYLE = "key_hook_text_color_style"
     const val KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR = "key_hook_island_glow_extract_color"
@@ -486,6 +504,21 @@ object RootConstants {
     const val DEFAULT_HOOK_LYRIC_SECONDARY_ORDER =
         "background_vocal,overlapping_line,translation,next_line,roma"
     const val DEFAULT_HOOK_LYRIC_AUTO_DUET = true
+    const val DEFAULT_HOOK_AI_TRANS_ENABLE = false
+    val DEFAULT_HOOK_AI_TRANS_SKIP_LANGUAGES: Set<String> = emptySet()
+    const val DEFAULT_HOOK_AI_TRANS_SKIP_EXISTING_TRANSLATION = false
+    const val DEFAULT_HOOK_AI_TRANS_FORCE_OVERRIDE = false
+    const val DEFAULT_HOOK_AI_TRANS_PROVIDER = "OPENAI"
+    const val DEFAULT_HOOK_AI_TRANS_MODEL = "mimo-v2.5"
+    const val DEFAULT_HOOK_AI_TRANS_BASE_URL = "https://api.xiaomimimo.com/v1/"
+    const val DEFAULT_HOOK_AI_TRANS_TARGET_LANG = "中文"
+    const val DEFAULT_HOOK_AI_TRANS_PROMPT =
+        "你是一名专业的歌词翻译者。请忠实传达原意，使用自然、优美、符合目标语言习惯的表达，保留歌曲的情绪、意象与节奏感，避免生硬直译。"
+    const val DEFAULT_HOOK_AI_TRANS_TEMPERATURE = 1f
+    const val DEFAULT_HOOK_AI_TRANS_TOP_P = 1f
+    const val DEFAULT_HOOK_AI_TRANS_MAX_TOKENS = 0L
+    const val DEFAULT_HOOK_AMLL_TTML_ENABLE = false
+    const val DEFAULT_HOOK_AMLL_TTML_PLATFORM_PROBE = true
     const val TEXT_COLOR_STYLE_DEFAULT = 0
     const val TEXT_COLOR_STYLE_COVER_COLOR = 1
     const val TEXT_COLOR_STYLE_COVER_GRADIENT = 2

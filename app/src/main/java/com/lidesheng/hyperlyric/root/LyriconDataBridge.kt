@@ -13,7 +13,6 @@ import com.lidesheng.hyperlyric.lyric.view.SongPreprocessor
 import com.lidesheng.hyperlyric.lyric.view.TimedLine
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
 import com.lidesheng.hyperlyric.root.utils.HookLogger
-import com.lidesheng.hyperlyric.plugin.api.PluginSongField
 
 object LyriconDataBridge {
 
@@ -211,7 +210,7 @@ object LyriconDataBridge {
     }
 
     /**
-     * Re-apply the source-event state without discarding an already accepted plugin enhancement.
+     * Re-apply the source-event state without discarding an already accepted enhancement.
      * Root uses this only for a repeated source snapshot whose media identity has not yet
      * changed; a later identity change calls [updateSong] with the new raw source Song instead.
      */
@@ -238,7 +237,7 @@ object LyriconDataBridge {
      * render. Source-owned Song fields win because only missing values are filled here.
      *
      * The identity context remains outside Song. A changed result starts a new processing
-     * version so an earlier plugin callback cannot write over the enriched snapshot.
+     * version so an earlier enhancement callback cannot write over the enriched snapshot.
      */
     fun applyResolvedMediaInfo(mediaInfo: MediaMetadataHelper.MediaInfo): Boolean {
         val song = currentSong ?: return false
@@ -278,51 +277,30 @@ object LyriconDataBridge {
     }
 
     /**
-     * Apply a plugin enhancement only while the song generation that produced it is current.
-     * The plugin never receives this bridge; Core remains the owner of the final Song and
-     * renderer refresh.
+     * Apply an enhancement only while the song generation that produced it is current.
+     * The enhancement feature never receives this bridge; Core remains the owner of the final Song
+     * and renderer refresh.
      */
-    fun applyPluginEnhancement(
+    internal fun applyLyricEnhancement(
         enhancedSong: Song,
         expectedVersion: Int,
         expectedBaseSong: Song,
-        changedFields: Set<PluginSongField> = emptySet()
     ): Boolean {
         if (versionCounter.get() != expectedVersion || currentSong !== expectedBaseSong) return false
+        val onlyLyricsChanged = enhancedSong.id == expectedBaseSong.id &&
+                enhancedSong.name == expectedBaseSong.name &&
+                enhancedSong.artist == expectedBaseSong.artist &&
+                enhancedSong.album == expectedBaseSong.album &&
+                enhancedSong.duration == expectedBaseSong.duration &&
+                enhancedSong.metadata == expectedBaseSong.metadata
+        if (!onlyLyricsChanged) {
+            HookLogger.w(TAG, "歌词增强结果修改了歌曲信息，拒绝写回")
+            return false
+        }
+        if (enhancedSong.lyrics == expectedBaseSong.lyrics) return false
         currentSong = enhancedSong
         currentSongName = enhancedSong.name
         fullSongLyricsAvailable = enhancedSong.lyrics?.any(::hasRenderableLine) == true
-        if (changedFields.any { it in MEDIA_SONG_FIELDS }) {
-            currentLyricMediaMetadata?.let { metadata ->
-                currentLyricMediaMetadata = metadata.copy(
-                    songId = if (PluginSongField.ID in changedFields) {
-                        enhancedSong.id
-                    } else {
-                        metadata.songId
-                    },
-                    title = if (PluginSongField.NAME in changedFields) {
-                        enhancedSong.name
-                    } else {
-                        metadata.title
-                    },
-                    artist = if (PluginSongField.ARTIST in changedFields) {
-                        enhancedSong.artist
-                    } else {
-                        metadata.artist
-                    },
-                    album = if (PluginSongField.ALBUM in changedFields) {
-                        enhancedSong.album
-                    } else {
-                        metadata.album
-                    },
-                    duration = if (PluginSongField.DURATION in changedFields) {
-                        enhancedSong.duration.takeIf { it > 0L }
-                    } else {
-                        metadata.duration
-                    }
-                )
-            }
-        }
         rebuildTimeline(enhancedSong, selectCurrentPosition = true)
         return true
     }
@@ -522,15 +500,6 @@ object LyriconDataBridge {
 
     private fun String?.orMissingText(fallback: String): String? =
         this?.takeIf { it.isNotBlank() } ?: fallback.takeIf { it.isNotBlank() }
-
-    private val MEDIA_SONG_FIELDS = setOf(
-        PluginSongField.ID,
-        PluginSongField.NAME,
-        PluginSongField.ARTIST,
-        PluginSongField.ALBUM,
-        PluginSongField.DURATION,
-        PluginSongField.METADATA
-    )
 
 }
 

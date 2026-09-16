@@ -29,7 +29,7 @@ import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaAmb
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.switcher.NotificationMediaSingleCardSwitcherHooker
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
-import com.lidesheng.hyperlyric.root.plugin.PluginRuntime
+import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCoordinator
 import com.lidesheng.hyperlyric.root.source.LyricInfoSource
 import com.lidesheng.hyperlyric.root.source.LyriconSource
 import com.lidesheng.hyperlyric.root.source.RootLyricSink
@@ -137,7 +137,7 @@ class HookEntry : XposedModule() {
     private var prefListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? =
         null
     private var runtimeApp: Application? = null
-    private var pluginRuntime: PluginRuntime? = null
+    private var lyricEnhancementCoordinator: LyricEnhancementCoordinator? = null
     private var rootLyricSink: RootLyricSink? = null
 
     val prefs: android.content.SharedPreferences
@@ -322,12 +322,12 @@ class HookEntry : XposedModule() {
             runtimeApp = app
 
             val renderer = BaseIslandRenderer
-            pluginRuntime = runCatching {
-                PluginRuntime(this, app).also { it.loadInstalledPlugins() }
+            lyricEnhancementCoordinator = runCatching {
+                LyricEnhancementCoordinator(this, app)
             }.onFailure { error ->
-                HookLogger.w(TAG, "插件 Runtime 初始化失败，继续使用原有歌词链路", error)
+                HookLogger.w(TAG, "内置歌词增强初始化失败，继续使用原有歌词链路", error)
             }.getOrNull()
-            val sink = RootLyricSink(renderer, app, prefs, pluginRuntime)
+            val sink = RootLyricSink(renderer, app, prefs, lyricEnhancementCoordinator)
             rootLyricSink = sink
 
             lyriconSource.initialize(app, prefs)
@@ -514,8 +514,8 @@ class HookEntry : XposedModule() {
             runCatching { prefs.unregisterOnSharedPreferenceChangeListener(it) }
         }
         prefListener = null
-        runCatching { pluginRuntime?.close() }
-        pluginRuntime = null
+        runCatching { lyricEnhancementCoordinator?.close() }
+        lyricEnhancementCoordinator = null
         runCatching { sourceManager?.stop() }
         sourceManager = null
         runCatching { rootLyricSink?.close() }
@@ -569,7 +569,6 @@ class HookEntry : XposedModule() {
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
-            if (PluginRuntime.isCreatingPluginClassLoader()) return result
             val cl = chain.thisObject as? ClassLoader ?: return result
             try {
                 SystemUIHookRegistry.hook(this@HookEntry, cl, lyricsOnly = lyricsOnly)

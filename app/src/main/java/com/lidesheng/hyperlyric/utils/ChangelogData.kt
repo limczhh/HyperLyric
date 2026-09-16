@@ -14,8 +14,9 @@ object ChangelogData {
                 title = "优化了一些体验",
                 summary = "- 新增歌词切换动画速度选项\n" +
                         "- 新增和声、对唱等歌词的支持\n" +
+                        "- 新增无歌词时行为设置项\n" +
                         "- 新增对 lyricinfo 歌词源其他翻译字段的兼容\n" +
-                        "- 修复插件歌词合并校验"
+                        "- 移除插件系统，AI 翻译和 AMLL 功能移至内置歌词增强功能"
             ),
             ChangelogItem(
                 version = "7.5-1939",

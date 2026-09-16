@@ -179,8 +179,8 @@ jobs:
             fi
           done
 
-      - name: 构建 APK 和正式插件 Build APK and Stable Plugins
-        run: ./gradlew assembleRelease packageReleasePlugins --build-cache
+      - name: 构建 APK Build APK
+        run: ./gradlew assembleRelease --build-cache
 
       - name: 对齐、签名并校验 APK Sign and Verify APK
         env:
@@ -243,55 +243,6 @@ jobs:
 
           "$APKSIGNER" verify --verbose "$APK_OUT"
 
-      - name: 准备并校验正式插件 Prepare and Verify Stable Plugins
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mkdir -p plugin-release-assets
-          mapfile -t plugin_zips < <(
-            find Plugins/modules -type f \
-              -path '*/build/outputs/plugin/*.zip' \
-              ! -name '*-debug.zip' \
-              -print | sort
-          )
-
-          if [[ "${#plugin_zips[@]}" -eq 0 ]]; then
-            echo '::error::没有找到正式插件 ZIP'
-            exit 1
-          fi
-
-          declare -A plugin_ids=()
-          : > plugin-release-summary.md
-
-          for plugin_zip in "${plugin_zips[@]}"; do
-            manifest="$(unzip -p "$plugin_zip" manifest.json)"
-            plugin_id="$(jq -r '.id // empty' <<< "$manifest")"
-            plugin_version="$(jq -r '.version // empty' <<< "$manifest")"
-            api_version="$(jq -r '.apiVersion // empty' <<< "$manifest")"
-
-            if [[ -z "$plugin_id" || -z "$plugin_version" || -z "$api_version" ]]; then
-              echo "::error::插件 Manifest 缺少必填字段: $plugin_zip"
-              exit 1
-            fi
-            if [[ -n "${plugin_ids[$plugin_id]:-}" ]]; then
-              echo "::error::正式插件 ID 重复: $plugin_id"
-              exit 1
-            fi
-            if ! [[ "$api_version" =~ ^[0-9]+$ ]] || (( api_version > 1 )); then
-              echo "::error::插件 API 版本不受当前宿主支持: $plugin_id ($api_version)"
-              exit 1
-            fi
-            if ! unzip -l "$plugin_zip" | grep -Eq '[[:space:]]classes\.dex$'; then
-              echo "::error::插件 ZIP 缺少 classes.dex: $plugin_zip"
-              exit 1
-            fi
-
-            plugin_ids["$plugin_id"]="$plugin_version"
-            cp "$plugin_zip" plugin-release-assets/
-            printf -- '- `%s` %s\n' "$plugin_id" "$plugin_version" >> plugin-release-summary.md
-          done
-
       - name: 生成 Release 说明 Generate Release Notes
         shell: bash
         run: |
@@ -301,9 +252,6 @@ jobs:
             echo '<!-- 以下为 Copilot 根据提交记录生成的中文草稿，请在正式发布前检查并修改。 -->'
             echo '## 更新内容'
             cat stable-notes-zh.md
-            echo
-            echo '## 正式插件'
-            cat plugin-release-summary.md
           } > release-body.md
 
       - name: 创建 Draft Release Create Draft Release
@@ -318,7 +266,6 @@ jobs:
           generate_release_notes: false
           files: |
             HyperLyric-${{ steps.version.outputs.tag }}.apk
-            plugin-release-assets/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
