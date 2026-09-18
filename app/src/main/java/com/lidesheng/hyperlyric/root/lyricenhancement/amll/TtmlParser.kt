@@ -6,7 +6,7 @@ import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_AGENT_TYPE
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
 import java.util.Locale
@@ -41,9 +41,10 @@ import java.util.Locale
  * - 间奏倒计时行（无 text/words）被宿主校验拒绝，v1 不插入（spec §7.2，
  *   宿主放行 CountdownLine metadata 行后可恢复）。
  */
-internal class TtmlParser(private val logger: LyricEnhancementLogger) {
+internal class TtmlParser {
 
     companion object {
+        private const val LOG_TAG = "LyricEnhancement/AmllTtml/Parser"
         /** TTML 命名空间下的行/文本元素本地名 */
         private const val TAG_PARAGRAPH = "p"
         private const val TAG_SPAN = "span"
@@ -215,7 +216,7 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
             parser.setInput(StringReader(ttml))
             val doc = parseDocument(parser)
             if (doc.paragraphs.isEmpty()) {
-                logger.debug("TTML 解析为空: 无歌词行")
+                HookLogger.d(LOG_TAG, "TTML 解析为空: 无歌词行")
                 return null
             }
             val lines = buildLines(
@@ -225,14 +226,14 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
                 agentTypes = doc.agentTypes
             )
             if (lines.isEmpty()) {
-                logger.debug("TTML 解析为空: 无有效行")
+                HookLogger.d(LOG_TAG, "TTML 解析为空: 无有效行")
                 return null
             }
             val alignedLines = applyDuetAlignment(lines, doc.agentTypes, duetEnabled)
             logStats(alignedLines)
             alignedLines
         } catch (e: Exception) {
-            logger.debug("TTML 解析异常: type=${e.javaClass.simpleName}")
+            HookLogger.d(LOG_TAG, "TTML 解析异常: type=${e.javaClass.simpleName}")
             null
         }
     }
@@ -673,7 +674,7 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
      */
     private fun regularizeLines(lines: List<RichLyricLine>): List<RichLyricLine> {
         if (lines.size > MAX_LINES) {
-            logger.debug("TTML 行数超限: lines=${lines.size}")
+            HookLogger.d(LOG_TAG, "TTML 行数超限: lines=${lines.size}")
             return emptyList()
         }
         val result = mutableListOf<RichLyricLine>()
@@ -684,7 +685,7 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
             totalWords += regularized.secondaryWords?.size ?: 0
             totalWords += regularized.translationWords?.size ?: 0
             if (totalWords > MAX_TOTAL_WORDS) {
-                logger.debug("TTML 词数超限: totalWords>$MAX_TOTAL_WORDS")
+                HookLogger.d(LOG_TAG, "TTML 词数超限: totalWords>$MAX_TOTAL_WORDS")
                 return emptyList()
             }
             result.add(regularized)
@@ -700,7 +701,8 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
             secondaryWordsCount > MAX_WORDS_PER_LINE ||
             translationWordsCount > MAX_WORDS_PER_LINE
         ) {
-            logger.debug(
+            HookLogger.d(
+                LOG_TAG,
                 "TTML 单行词数超限，丢弃该行: words=$wordsCount, secondary=$secondaryWordsCount, " +
                         "translation=$translationWordsCount"
             )
@@ -875,7 +877,8 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
         val bgWordTimingCount = lines.count { !it.secondaryWords.isNullOrEmpty() }
         val agentCount = lines.count { it.metadata?.containsKey(METADATA_KEY_AGENT) == true }
         val translationCount = lines.count { !it.translation.isNullOrBlank() }
-        logger.info(
+        HookLogger.i(
+            LOG_TAG,
             "TTML 解析完成: lines=${lines.size}, wordTiming=$wordTimingCount, " +
                     "bg=$bgCount, bgWordTiming=$bgWordTimingCount, " +
                     "agent=$agentCount, translation=$translationCount"

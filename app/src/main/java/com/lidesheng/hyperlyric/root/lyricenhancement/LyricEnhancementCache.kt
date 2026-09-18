@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.lyricenhancement
 
 import android.content.Context
 import android.util.AtomicFile
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -18,7 +19,7 @@ internal interface LyricEnhancementCacheStore {
 
 internal class FileLyricEnhancementCache(
     private val directory: File,
-    private val logger: LyricEnhancementLogger,
+    private val logTag: String,
 ) : LyricEnhancementCacheStore {
     companion object {
         private const val CACHE_ROOT_DIRECTORY = "hyperlyric_lyric_enhancement_cache"
@@ -39,7 +40,7 @@ internal class FileLyricEnhancementCache(
     private val lock = Any()
 
     init {
-        logger.info("歌词增强缓存目录: ${directory.absolutePath}")
+        HookLogger.i(logTag, "歌词增强缓存目录: ${directory.absolutePath}")
     }
 
     override fun getString(key: String): String? {
@@ -51,7 +52,7 @@ internal class FileLyricEnhancementCache(
         if (!isValidKey(key)) return
         val bytes = value.toByteArray(Charsets.UTF_8)
         if (bytes.size > MAX_VALUE_BYTES) {
-            logger.warn("缓存内容超限，跳过写入: key=$key")
+            HookLogger.w(logTag, "缓存内容超限，跳过写入: key=$key")
             return
         }
         if (value.isEmpty()) {
@@ -60,7 +61,7 @@ internal class FileLyricEnhancementCache(
         }
         synchronized(lock) {
             if (!writeFileValue(fileForKey(key), bytes)) {
-                logger.warn("缓存写入失败: key=$key")
+                HookLogger.w(logTag, "缓存写入失败: key=$key")
             }
         }
     }
@@ -110,7 +111,7 @@ internal class FileLyricEnhancementCache(
                 null
             }
         }.onFailure {
-            logger.warn("缓存读取失败: key=${file.name}", it)
+            HookLogger.w(logTag, "缓存读取失败: key=${file.name}", it)
             deleteFile(file)
         }.getOrNull()
     }
@@ -134,7 +135,7 @@ internal class FileLyricEnhancementCache(
             }
             true
         }.getOrElse {
-            logger.warn("缓存写入异常: key=${file.name}", it)
+            HookLogger.w(logTag, "缓存写入异常: key=${file.name}", it)
             false
         }
     }

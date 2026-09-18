@@ -2,11 +2,13 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.translation
 
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.Locale
 import kotlin.math.abs
 
 internal object TranslationApplicator {
+    private const val LOG_TAG = "LyricEnhancement/AiTranslation/Translator/Applicator"
+
     fun hasTranslation(line: RichLyricLine): Boolean =
         !line.translation.isNullOrBlank() ||
                 line.translationWords.orEmpty().any { !it.text.isNullOrBlank() }
@@ -15,7 +17,6 @@ internal object TranslationApplicator {
         song: Song,
         items: List<TranslationItem>,
         forceOverride: Boolean,
-        logger: LyricEnhancementLogger,
     ): Song? {
         val byIndex = items.associateBy { it.index }
         var appliedCount = 0
@@ -32,7 +33,7 @@ internal object TranslationApplicator {
                 line
             }
         }
-        logger.debug("应用翻译结果: song=${song.name}, lines=$appliedCount")
+        HookLogger.d(LOG_TAG, "应用翻译结果: song=${song.name}, lines=$appliedCount")
         return if (newLyrics != song.lyrics) song.copy(lyrics = newLyrics) else null
     }
 
@@ -46,7 +47,6 @@ internal object TranslationApplicator {
         sourceSong: Song,
         targetSong: Song,
         forceOverride: Boolean,
-        logger: LyricEnhancementLogger,
     ): Song? {
         val sourceLyrics = sourceSong.lyrics.orEmpty()
         val targetLyrics = targetSong.lyrics ?: return null
@@ -77,7 +77,7 @@ internal object TranslationApplicator {
             }
         }
 
-        logger.debug("合并翻译结果: song=${targetSong.name}, lines=$appliedCount")
+        HookLogger.d(LOG_TAG, "合并翻译结果: song=${targetSong.name}, lines=$appliedCount")
         return if (newLyrics != targetLyrics) targetSong.copy(lyrics = newLyrics) else null
     }
 

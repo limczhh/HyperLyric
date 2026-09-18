@@ -1,7 +1,7 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement.translation
 
 import com.lidesheng.hyperlyric.lyric.model.Song
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.EOFException
@@ -12,11 +12,15 @@ import java.net.SocketTimeoutException
 import java.net.URL
 
 /** Small OpenAI-compatible client with timeouts below the host Processor deadline. */
-internal class OpenAiTranslationClient(
-    private val logger: LyricEnhancementLogger,
-    parserLogger: LyricEnhancementLogger,
-) {
-    private val parser = TranslationResponseParser(parserLogger)
+internal class OpenAiTranslationClient {
+    private companion object {
+        const val LOG_TAG = "LyricEnhancement/AiTranslation/OpenAiClient"
+        const val CONNECT_TIMEOUT_MS = 8_000
+        // Keep the network read just below the 35-second AI scheduler deadline.
+        const val READ_TIMEOUT_MS = 34_000
+    }
+
+    private val parser = TranslationResponseParser()
 
     fun request(
         config: AiTranslationConfig,
@@ -25,7 +29,7 @@ internal class OpenAiTranslationClient(
     ): List<TranslationItem>? {
         if (Thread.currentThread().isInterrupted) return null
         if (config.apiKey.isBlank()) {
-            logger.warn("跳过翻译请求: reason=missing_api_key")
+            HookLogger.w(LOG_TAG, "跳过翻译请求: reason=missing_api_key")
             return null
         }
 
@@ -35,7 +39,7 @@ internal class OpenAiTranslationClient(
             }
         }
         if (requestItems.isEmpty()) {
-            logger.debug("跳过翻译请求: reason=no_translatable_lines")
+            HookLogger.d(LOG_TAG, "跳过翻译请求: reason=no_translatable_lines")
             return emptyList()
         }
 
@@ -71,7 +75,7 @@ internal class OpenAiTranslationClient(
 
         var connection: HttpURLConnection? = null
         return try {
-            logger.debug("发送翻译请求: model=${config.model}, url=$apiUrl")
+            HookLogger.d(LOG_TAG, "发送翻译请求: model=${config.model}, url=$apiUrl")
             connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = CONNECT_TIMEOUT_MS
@@ -87,7 +91,7 @@ internal class OpenAiTranslationClient(
             if (Thread.currentThread().isInterrupted) return null
             val responseCode = connection.responseCode
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                logger.error("翻译请求失败: code=$responseCode")
+                HookLogger.e(LOG_TAG, "翻译请求失败: code=$responseCode")
                 return null
             }
 
@@ -99,35 +103,37 @@ internal class OpenAiTranslationClient(
                 ?.optString("content", "")
                 ?.takeIf { it.isNotBlank() }
                 ?: run {
-                    logger.warn("翻译响应为空")
+                    HookLogger.w(LOG_TAG, "翻译响应为空")
                     return null
                 }
-            logger.debug("翻译请求完成: code=$responseCode")
+            HookLogger.d(LOG_TAG, "翻译请求完成: code=$responseCode")
             val parsed = parser.parse(content, requestIndices)
             parsed
         } catch (_: SocketTimeoutException) {
-            logger.warn("翻译网络请求超时: timeoutMs=$READ_TIMEOUT_MS")
+            HookLogger.w(LOG_TAG, "翻译网络请求超时: timeoutMs=$READ_TIMEOUT_MS")
             null
         } catch (error: InterruptedIOException) {
             if (Thread.currentThread().isInterrupted ||
                 error.message.equals("thread interrupted", ignoreCase = true)
             ) {
-                logger.debug("翻译网络请求已取消: reason=interrupted")
+                HookLogger.d(LOG_TAG, "翻译网络请求已取消: reason=interrupted")
             } else {
-                logger.warn("翻译网络请求中断: type=${error.javaClass.simpleName}")
+                HookLogger.w(LOG_TAG, "翻译网络请求中断: type=${error.javaClass.simpleName}")
             }
             null
         } catch (_: EOFException) {
-            logger.warn("翻译连接意外关闭: reason=EOF")
+            HookLogger.w(LOG_TAG, "翻译连接意外关闭: reason=EOF")
             null
         } catch (error: IOException) {
-            logger.error(
+            HookLogger.e(
+                LOG_TAG,
                 "翻译网络请求异常: type=${error.javaClass.simpleName}",
                 error
             )
             null
         } catch (error: Exception) {
-            logger.error(
+            HookLogger.e(
+                LOG_TAG,
                 "翻译网络请求异常: type=${error.javaClass.simpleName}",
                 error
             )
@@ -140,9 +146,4 @@ internal class OpenAiTranslationClient(
     private fun shouldRequestTranslation(text: String): Boolean =
         text.isNotBlank() && text.any { it.isLetter() }
 
-    private companion object {
-        const val CONNECT_TIMEOUT_MS = 8_000
-        // Keep the network read just below the 35-second AI scheduler deadline.
-        const val READ_TIMEOUT_MS = 34_000
-    }
 }

@@ -3,7 +3,7 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheDetail
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -18,9 +18,9 @@ import java.util.Collections
  */
 internal class TtmlCache(
     private val storage: LyricEnhancementCacheStore,
-    private val logger: LyricEnhancementLogger,
 ) {
     companion object {
+        private const val LOG_TAG = "LyricEnhancement/AmllTtml/Cache"
         private const val SCHEMA_PREFIX = "amll.ttml.v2"
         private const val ENTRY_PREFIX = "ttml.entry.v1."
         private const val INDEX_KEY = "ttml.index.v1"
@@ -77,7 +77,7 @@ internal class TtmlCache(
         val raw = runCatching {
             storage.getString(entryKey(physicalKey))
         }.getOrElse {
-            logger.warn("读取缓存失败: key=" + shortKey(semanticKey), it)
+            HookLogger.w(LOG_TAG, "读取缓存失败: key=" + shortKey(semanticKey), it)
             return@synchronized null
         }?.takeIf { it.isNotEmpty() } ?: return@synchronized null
         memory[physicalKey] = raw
@@ -96,12 +96,12 @@ internal class TtmlCache(
         if (ttml.isEmpty()) return
         synchronized(lock) {
             if (generation != expectedGeneration) {
-                logger.debug("缓存已清理，丢弃过期写入: key=" + shortKey(semanticKey))
+                HookLogger.d(LOG_TAG, "缓存已清理，丢弃过期写入: key=" + shortKey(semanticKey))
                 return
             }
             val physicalKey = physicalKeyOf(semanticKey)
             runCatching { storage.putString(entryKey(physicalKey), ttml) }.onFailure {
-                logger.warn("写入缓存失败: key=" + shortKey(semanticKey), it)
+                HookLogger.w(LOG_TAG, "写入缓存失败: key=" + shortKey(semanticKey), it)
                 return
             }
             memory[physicalKey] = ttml
@@ -121,7 +121,7 @@ internal class TtmlCache(
                     val removed = removeAt(lastIndex)
                     memory.remove(removed.key)
                     runCatching { storage.remove(entryKey(removed.key)) }.onFailure {
-                        logger.warn("删除超量 TTML 缓存失败", it)
+                        HookLogger.w(LOG_TAG, "删除超量 TTML 缓存失败", it)
                     }
                 }
             }
@@ -133,7 +133,7 @@ internal class TtmlCache(
         runCatching {
             storage.getString(entryKey(physicalKeyOf(resolveKey(songId))))
         }.getOrElse {
-            logger.warn("读取平台探测缓存失败: songId=" + songId, it)
+            HookLogger.w(LOG_TAG, "读取平台探测缓存失败: songId=" + songId, it)
             null
         }?.takeIf { it.isNotBlank() }
     }
@@ -144,13 +144,13 @@ internal class TtmlCache(
         expectedGeneration: Long = currentGeneration(),
     ) = synchronized(lock) {
         if (generation != expectedGeneration) {
-            logger.debug("缓存已清理，丢弃过期平台探测写入: songId=$songId")
+            HookLogger.d(LOG_TAG, "缓存已清理，丢弃过期平台探测写入: songId=$songId")
             return@synchronized
         }
         runCatching {
             storage.putString(entryKey(physicalKeyOf(resolveKey(songId))), platformName)
         }.onFailure {
-            logger.warn("写入平台探测缓存失败: songId=" + songId, it)
+            HookLogger.w(LOG_TAG, "写入平台探测缓存失败: songId=" + songId, it)
         }
     }
 
@@ -168,7 +168,7 @@ internal class TtmlCache(
             .take(MAX_LIST_ENTRIES)
             .mapNotNull { record ->
                 val body = runCatching { storage.getString(entryKey(record.key)) }
-                    .onFailure { logger.warn("读取 TTML 缓存条目失败", it) }
+                    .onFailure { HookLogger.w(LOG_TAG, "读取 TTML 缓存条目失败", it) }
                     .getOrNull() ?: return@mapNotNull null
                 record to body
             }
@@ -197,7 +197,7 @@ internal class TtmlCache(
             storage.remove(entryKey(entryId))
             true
         }.onFailure { error ->
-            logger.warn("删除 TTML 缓存失败", error)
+            HookLogger.w(LOG_TAG, "删除 TTML 缓存失败", error)
         }.getOrDefault(false)
         val indexWritten = writeIndexLocked(index.filterNot { it.key == entryId })
         removed && indexWritten
@@ -216,7 +216,7 @@ internal class TtmlCache(
 
     private fun readIndexLocked(): List<CacheRecord> {
         val raw = runCatching { storage.getString(INDEX_KEY) }.getOrElse {
-            logger.warn("读取 TTML 缓存索引失败", it)
+            HookLogger.w(LOG_TAG, "读取 TTML 缓存索引失败", it)
             null
         } ?: return emptyList()
         return runCatching {
@@ -230,11 +230,11 @@ internal class TtmlCache(
                     decodeRecord(entries.optJSONObject(index))?.let(::add)
                 }
             }.distinctBy { it.key }.take(MAX_INDEX_ENTRIES)
-        }.getOrElse { error ->
-            logger.warn("TTML 缓存索引损坏，按空列表处理", error)
-            storage.remove(INDEX_KEY)
-            emptyList()
-        }
+    }.getOrElse { error ->
+        HookLogger.w(LOG_TAG, "TTML 缓存索引损坏，按空列表处理", error)
+        storage.remove(INDEX_KEY)
+        emptyList()
+    }
     }
 
     private fun decodeRecord(json: JSONObject?): CacheRecord? {
@@ -255,7 +255,7 @@ internal class TtmlCache(
         storage.putString(INDEX_KEY, encodeIndex(index.take(MAX_INDEX_ENTRIES)))
         true
     }.onFailure { error ->
-        logger.warn("写入 TTML 缓存索引失败", error)
+        HookLogger.w(LOG_TAG, "写入 TTML 缓存索引失败", error)
     }.getOrDefault(false)
 
     private fun rememberHitMetadataLocked(

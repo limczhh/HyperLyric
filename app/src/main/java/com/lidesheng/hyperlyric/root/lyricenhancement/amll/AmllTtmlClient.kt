@@ -1,6 +1,6 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -36,9 +36,10 @@ internal class ProcessingBudget(private val budgetMs: Long) {
  * （main 提交 938560a/3934f16，需 ProGuard 保留泛型签名）在此天然规避：
  * HttpURLConnection 为平台 API，无反射调用链。
  */
-internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
+internal class AmllTtmlClient {
 
     companion object {
+        private const val LOG_TAG = "LyricEnhancement/AmllTtml/Client"
         private const val DEFAULT_BASE_URL = "https://api.amll.dev/"
         private const val GET_PATH = "v1/lyrics/get"
         private const val SEARCH_PATH = "v1/lyrics/search"
@@ -108,7 +109,7 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
         val artistName = artist?.takeIf { it.isNotBlank() }
         val albumName = album?.takeIf { it.isNotBlank() }
         if (musicName == null && artistName == null && albumName == null) {
-            logger.debug("搜索未执行: 无搜索参数")
+            HookLogger.d(LOG_TAG, "搜索未执行: 无搜索参数")
             return null
         }
         val params = buildList {
@@ -125,9 +126,10 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
         val item = items.firstOrNull { AmllMatch.isPlausibleMatch(it, musicName, artistName) }
         if (item == null) {
             if (items.isEmpty()) {
-                logger.debug("搜索未命中: 无结果")
+                HookLogger.d(LOG_TAG, "搜索未命中: 无结果")
             } else {
-                logger.debug(
+                HookLogger.d(
+                    LOG_TAG,
                     "搜索未命中: 结果均不匹配, total=${items.size}, " +
                             "first=${items.firstOrNull()?.musicNames?.joinToString("/") ?: "-"}"
                 )
@@ -140,7 +142,7 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
     /** 提取携带非空 lyrics 的条目；status=200 但 lyrics 为空字符串/null 视为未命中 */
     private fun extractWithLyrics(item: SongItem?): SongItem? {
         if (item == null || item.lyrics.isNullOrBlank()) {
-            logger.debug("查询命中但歌词为空")
+            HookLogger.d(LOG_TAG, "查询命中但歌词为空")
             return null
         }
         return item
@@ -162,11 +164,11 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
         var attempt = 0
         while (true) {
             if (Thread.currentThread().isInterrupted) {
-                logger.debug("请求被中断: request=$requestLabel")
+                HookLogger.d(LOG_TAG, "请求被中断: request=$requestLabel")
                 return null
             }
             if (!budget.hasEnoughForAttempt(CONNECT_TIMEOUT_MS.toLong())) {
-                logger.debug("预算不足，放弃请求: remaining=${budget.remainingMs()}ms, request=$requestLabel")
+                HookLogger.d(LOG_TAG, "预算不足，放弃请求: remaining=${budget.remainingMs()}ms, request=$requestLabel")
                 return null
             }
 
@@ -185,20 +187,21 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
                 }
                 val retryable = code == HTTP_TOO_MANY_REQUESTS || code in 500..599
                 if (!retryable || attempt >= MAX_RETRIES) {
-                    logger.debug("请求失败: code=$code, retries=$attempt, request=$requestLabel")
+                    HookLogger.d(LOG_TAG, "请求失败: code=$code, retries=$attempt, request=$requestLabel")
                     return null
                 }
                 attempt++
-                logger.debug(
+                HookLogger.d(
+                    LOG_TAG,
                     "HTTP 错误重试: code=$code, attempt=$attempt/$MAX_RETRIES, " +
                             "delay=${retryDelay}ms, request=$requestLabel"
                 )
             } catch (e: IOException) {
-                logger.debug("网络错误: type=${e.javaClass.simpleName}, request=$requestLabel")
+                HookLogger.d(LOG_TAG, "网络错误: type=${e.javaClass.simpleName}, request=$requestLabel")
                 return null
             } catch (e: Exception) {
                 // 反序列化等本地异常：不重试（对齐 main：异常不伪装成重试场景）
-                logger.debug("请求异常: type=${e.javaClass.simpleName}, request=$requestLabel")
+                HookLogger.d(LOG_TAG, "请求异常: type=${e.javaClass.simpleName}, request=$requestLabel")
                 return null
             } finally {
                 connection?.disconnect()
@@ -206,14 +209,14 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
 
             // 重试前检查预算：等待 + 一次尝试的最小开销
             if (budget.remainingMs() < retryDelay + CONNECT_TIMEOUT_MS) {
-                logger.debug("预算不足，放弃请求: remaining=${budget.remainingMs()}ms, request=$requestLabel")
+                HookLogger.d(LOG_TAG, "预算不足，放弃请求: remaining=${budget.remainingMs()}ms, request=$requestLabel")
                 return null
             }
             try {
                 Thread.sleep(retryDelay)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
-                logger.debug("请求被中断: request=$requestLabel")
+                HookLogger.d(LOG_TAG, "请求被中断: request=$requestLabel")
                 return null
             }
             retryDelay *= RETRY_BACKOFF_MULTIPLIER

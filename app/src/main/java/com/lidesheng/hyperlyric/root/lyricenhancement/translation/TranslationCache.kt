@@ -2,7 +2,7 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.translation
 
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Collections
@@ -15,9 +15,9 @@ import java.util.Collections
  */
 internal class TranslationCache(
     private val storage: LyricEnhancementCacheStore,
-    private val logger: LyricEnhancementLogger,
 ) {
     private companion object {
+        const val LOG_TAG = "LyricEnhancement/AiTranslation/Cache"
         const val MAX_ENTRIES = 1_000
         const val MAX_LIST_ENTRIES = 100
         const val INDEX_KEY = "cache.index.v2"
@@ -51,12 +51,12 @@ internal class TranslationCache(
             return@synchronized CacheLookup(it, fromMemory = true)
         }
         val raw = runCatching { storage.getString(entryKey(key)) }.getOrElse {
-            logger.warn("读取翻译缓存失败", it)
+            HookLogger.w(LOG_TAG, "读取翻译缓存失败", it)
             return@synchronized null
         } ?: return@synchronized null
         val items = decode(raw)
         if (items.isNullOrEmpty()) {
-            logger.warn("翻译缓存内容损坏，已删除")
+            HookLogger.w(LOG_TAG, "翻译缓存内容损坏，已删除")
             storage.remove(entryKey(key))
             return@synchronized null
         }
@@ -75,12 +75,12 @@ internal class TranslationCache(
         if (items.isEmpty()) return
         synchronized(lock) {
             if (generation != expectedGeneration) {
-                logger.debug("缓存已清理，丢弃过期翻译结果")
+                HookLogger.d(LOG_TAG, "缓存已清理，丢弃过期翻译结果")
                 return
             }
             val encoded = encode(items)
             runCatching { storage.putString(entryKey(key), encoded) }.onFailure {
-                logger.warn("写入翻译缓存失败", it)
+                HookLogger.w(LOG_TAG, "写入翻译缓存失败", it)
                 return
             }
             memory[key] = items
@@ -96,7 +96,7 @@ internal class TranslationCache(
                     val removed = removeAt(lastIndex)
                     memory.remove(removed.key)
                     runCatching { storage.remove(entryKey(removed.key)) }.onFailure {
-                        logger.warn("删除翻译缓存失败", it)
+                        HookLogger.w(LOG_TAG, "删除翻译缓存失败", it)
                     }
                 }
             }
@@ -117,7 +117,7 @@ internal class TranslationCache(
             .take(MAX_LIST_ENTRIES)
             .filter { record ->
                 runCatching { storage.getString(entryKey(record.key)) }
-                    .onFailure { logger.warn("读取翻译缓存条目失败", it) }
+                    .onFailure { HookLogger.w(LOG_TAG, "读取翻译缓存条目失败", it) }
                     .getOrNull() != null
             }
             .map { record ->
@@ -141,7 +141,7 @@ internal class TranslationCache(
             storage.remove(entryKey(entryId))
             true
         }.onFailure { error ->
-            logger.warn("删除翻译缓存失败", error)
+            HookLogger.w(LOG_TAG, "删除翻译缓存失败", error)
         }.getOrDefault(false)
         val indexWritten = writeIndexLocked(index.filterNot { it.key == entryId })
         removed && indexWritten
@@ -155,13 +155,13 @@ internal class TranslationCache(
 
     private fun readIndexLocked(): List<CacheRecord> {
         val current = runCatching { storage.getString(INDEX_KEY) }.getOrElse {
-            logger.warn("读取翻译缓存索引失败", it)
+            HookLogger.w(LOG_TAG, "读取翻译缓存索引失败", it)
             null
         }
         if (current != null) return parseCurrentIndex(current)
 
         val legacy = runCatching { storage.getString(LEGACY_INDEX_KEY) }.getOrElse {
-            logger.warn("读取旧翻译缓存索引失败", it)
+            HookLogger.w(LOG_TAG, "读取旧翻译缓存索引失败", it)
             null
         } ?: return emptyList()
         return parseLegacyIndex(legacy)
@@ -179,7 +179,7 @@ internal class TranslationCache(
             }
         }.distinctBy { it.key }.take(MAX_ENTRIES)
     }.getOrElse { error ->
-        logger.warn("翻译缓存索引损坏，按空列表处理", error)
+        HookLogger.w(LOG_TAG, "翻译缓存索引损坏，按空列表处理", error)
         storage.remove(INDEX_KEY)
         emptyList()
     }
@@ -195,7 +195,7 @@ internal class TranslationCache(
             }
         }.distinctBy { it.key }.take(MAX_ENTRIES)
     }.getOrElse { error ->
-        logger.warn("旧翻译缓存索引损坏，按空列表处理", error)
+        HookLogger.w(LOG_TAG, "旧翻译缓存索引损坏，按空列表处理", error)
         storage.remove(LEGACY_INDEX_KEY)
         emptyList()
     }
@@ -215,7 +215,7 @@ internal class TranslationCache(
         storage.remove(LEGACY_INDEX_KEY)
         true
     }.onFailure { error ->
-        logger.warn("写入翻译缓存索引失败", error)
+        HookLogger.w(LOG_TAG, "写入翻译缓存索引失败", error)
     }.getOrDefault(false)
 
     private fun rememberHitMetadataLocked(

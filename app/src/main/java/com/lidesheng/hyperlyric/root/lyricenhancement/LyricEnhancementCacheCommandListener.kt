@@ -9,6 +9,7 @@ import com.lidesheng.hyperlyric.common.LyricEnhancementCacheOperationRequest
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheOperationResponse
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheOperationType
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheResultChannel
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -27,8 +28,11 @@ internal class LyricEnhancementCacheCommandListener(
     private val listFeatureCache: (String) -> List<LyricEnhancementCacheEntry>?,
     private val clearFeatureCache: (String) -> Boolean,
     private val clearCacheEntry: (String, String) -> Boolean,
-    private val logger: LyricEnhancementLogger,
 ) : AutoCloseable {
+    private companion object {
+        const val LOG_TAG = "LyricEnhancement/Cache"
+    }
+
     private val closed = AtomicBoolean(false)
     private val consuming = AtomicBoolean(false)
     private val lastConsumedCommands = mutableMapOf<String, String?>()
@@ -71,14 +75,15 @@ internal class LyricEnhancementCacheCommandListener(
                     val cleared = runCatching {
                         clearFeatureCache(clear.request.featureId)
                     }.getOrElse { error ->
-                        logger.warn(
+                        HookLogger.w(
+                            LOG_TAG,
                             "清除歌词增强缓存失败: feature=${clear.request.featureId}",
                             error
                         )
                         false
                     }
                     if (cleared) {
-                        logger.info("歌词增强缓存已清除: feature=${clear.request.featureId}")
+                        HookLogger.i(LOG_TAG, "歌词增强缓存已清除: feature=${clear.request.featureId}")
                     }
                 }
             } finally {
@@ -134,7 +139,8 @@ internal class LyricEnhancementCacheCommandListener(
                 }
             }
         }.getOrElse { error ->
-            logger.warn(
+            HookLogger.w(
+                LOG_TAG,
                 "歌词增强缓存操作失败: feature=${request.featureId}, type=${request.type}",
                 error
             )
@@ -147,7 +153,8 @@ internal class LyricEnhancementCacheCommandListener(
             response = response
         )
         if (!accepted) {
-            logger.warn(
+            HookLogger.w(
+                LOG_TAG,
                 "歌词增强缓存操作结果未被 App 接收: request=${request.requestId}",
                 null
             )

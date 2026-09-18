@@ -7,22 +7,23 @@ import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementInput
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementMediaInfo
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 internal class AiTranslationFeature(
     private val preferences: SharedPreferences,
     cacheStore: LyricEnhancementCacheStore,
-    logger: LyricEnhancementLogger,
     private val onConfigChanged: () -> Unit,
 ) : AutoCloseable {
 
-    private val gatewayLogger = logger.withTag("Gateway")
-    private val translatorLogger = logger.withTag("Translator")
-    private val cache = TranslationCache(cacheStore, logger.withTag("Cache"))
+    private companion object {
+        const val LOG_TAG = "LyricEnhancement/AiTranslation"
+        const val GATEWAY_LOG_TAG = "$LOG_TAG/Gateway"
+        const val TRANSLATOR_LOG_TAG = "$LOG_TAG/Translator"
+    }
+
+    private val cache = TranslationCache(cacheStore)
     private val engine = AiTranslationEngine(
         cacheStore = cacheStore,
-        logger = logger,
-        translatorLogger = translatorLogger,
         translationCache = cache
     )
 
@@ -44,7 +45,7 @@ internal class AiTranslationFeature(
 
     fun clearCache(): Boolean {
         val cleared = engine.clearCache()
-        gatewayLogger.info(if (cleared) "AI 翻译缓存已清除" else "AI 翻译缓存清除不完整")
+        HookLogger.i(GATEWAY_LOG_TAG, if (cleared) "AI 翻译缓存已清除" else "AI 翻译缓存清除不完整")
         return cleared
     }
 
@@ -62,7 +63,7 @@ internal class AiTranslationFeature(
             if (!config.enabled) return null
             val querySong = song.withMediaInfo(input.mediaInfo)
             TranslationEligibility.skipReason(querySong)?.let { reason ->
-                gatewayLogger.debug("跳过 AI 翻译: reason=${reason}, song=${querySong.name}")
+                HookLogger.d(GATEWAY_LOG_TAG, "跳过 AI 翻译: reason=${reason}, song=${querySong.name}")
                 return null
             }
             val lyrics = querySong.lyrics ?: return null
@@ -76,7 +77,8 @@ internal class AiTranslationFeature(
                                 .any { TranslationApplicator.hasTranslation(it) }
                     )
             ) {
-                gatewayLogger.debug(
+                HookLogger.d(
+                    GATEWAY_LOG_TAG,
                     "跳过 AI 翻译: reason=existing_translation, song=${querySong.name}"
                 )
                 return null
@@ -95,14 +97,16 @@ internal class AiTranslationFeature(
                     val marginText = margin?.let {
                         "%.3f".format(java.util.Locale.US, it)
                     } ?: "-"
-                    gatewayLogger.debug(
+                    HookLogger.d(
+                        GATEWAY_LOG_TAG,
                         "歌词语言识别: song=${querySong.name}, detected=${detected.languageTag}, " +
                                 "confidence=$confidence, margin=$marginText, " +
                                 "hypotheses=${detected.hypothesisCount}, selected=$selected, " +
                                 "confident=$confidentEnough"
                     )
                     if (selected && confidentEnough) {
-                        gatewayLogger.debug(
+                        HookLogger.d(
+                            GATEWAY_LOG_TAG,
                             "跳过 AI 翻译: reason=selected_language, song=${querySong.name}, " +
                                     "detected=${detected.languageTag}"
                         )
@@ -112,10 +116,10 @@ internal class AiTranslationFeature(
             }
 
             if (!config.isUsable) {
-                translatorLogger.warn("跳过翻译：配置不完整，API Key 或其他配置为空")
+                HookLogger.w(TRANSLATOR_LOG_TAG, "跳过翻译：配置不完整，API Key 或其他配置为空")
                 return null
             }
-            translatorLogger.debug("正在翻译：${querySong.name}（共 ${lyrics.size} 行）")
+            HookLogger.d(TRANSLATOR_LOG_TAG, "正在翻译：${querySong.name}（共 ${lyrics.size} 行）")
             engine.translate(
                 song = querySong,
                 config = config,
@@ -128,7 +132,6 @@ internal class AiTranslationFeature(
                         sourceSong = translated,
                         targetSong = enhancedSong,
                         forceOverride = config.forceOverride,
-                        logger = translatorLogger.withTag("Applicator")
                     )
                 }
             }
@@ -136,7 +139,7 @@ internal class AiTranslationFeature(
             Thread.currentThread().interrupt()
             null
         } catch (error: Exception) {
-            translatorLogger.error("翻译过程发生错误", error)
+            HookLogger.e(TRANSLATOR_LOG_TAG, "翻译过程发生错误", error)
             null
         }
     }

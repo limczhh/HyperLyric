@@ -1,14 +1,13 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement.translation
 
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 
-internal class TranslationResponseParser(
-    private val logger: LyricEnhancementLogger,
-) {
+internal class TranslationResponseParser {
     private companion object {
+        const val LOG_TAG = "LyricEnhancement/AiTranslation/ResponseParser"
         const val MAX_LOG_BODY_LENGTH = 1_000
     }
 
@@ -74,7 +73,8 @@ internal class TranslationResponseParser(
             }
         }
         val result = accepted.values.toList()
-        logger.debug(
+        HookLogger.d(
+            LOG_TAG,
             "解析翻译响应完成: parsed=${array.length()}, accepted=${result.size}, " +
                     "rejectedIndex=$rejectedIndex, rejectedTranslation=$rejectedTranslation, " +
                     "duplicate=$duplicate, unsupported=$unsupported, stringItems=$stringItems"
@@ -127,14 +127,14 @@ internal class TranslationResponseParser(
             .filter { it >= 0 }
             .minOrNull()
             ?: return null.also {
-                logger.warn("翻译响应缺少 JSON: body=${trimForLog(trimmed)}")
+                HookLogger.w(LOG_TAG, "翻译响应缺少 JSON: body=${trimForLog(trimmed)}")
             }
         val open = trimmed[start]
         val close = if (open == '{') '}' else ']'
         val end = findMatching(trimmed, start, open, close)
         return end.takeIf { it > start }?.let { trimmed.substring(start, it + 1) }
             ?: run {
-                logger.warn("翻译响应缺少 JSON: body=${trimForLog(trimmed)}")
+                HookLogger.w(LOG_TAG, "翻译响应缺少 JSON: body=${trimForLog(trimmed)}")
                 null
             }
     }

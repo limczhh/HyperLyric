@@ -10,6 +10,7 @@ import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.root.lyricenhancement.amll.AmllTtmlFeature
 import com.lidesheng.hyperlyric.root.lyricenhancement.translation.AiTranslationFeature
 import com.lidesheng.hyperlyric.root.lyricenhancement.translation.TranslationApplicator
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedModule
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -27,7 +28,6 @@ internal class LyricEnhancementCoordinator(
     private val module: XposedModule,
     private val application: Application,
 ) : AutoCloseable {
-    private val logger = LyricEnhancementLogger("LyricEnhancement")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val enhancementExecutor: ExecutorService =
         Executors.newCachedThreadPool { runnable ->
@@ -39,12 +39,12 @@ internal class LyricEnhancementCoordinator(
     private val remotePreferences: SharedPreferences? = runCatching {
         module.getRemotePreferences(UIConstants.PREF_NAME)
     }.onFailure {
-        logger.warn("歌词增强配置初始化失败", it)
+        HookLogger.w(LOG_TAG, "歌词增强配置初始化失败", it)
     }.getOrNull()
     private val cacheRemotePreferences: SharedPreferences? = runCatching {
         module.getRemotePreferences(LyricEnhancementCacheCommand.REMOTE_PREFERENCES)
     }.onFailure {
-        logger.warn("歌词增强缓存控制初始化失败", it)
+        HookLogger.w(LOG_TAG, "歌词增强缓存控制初始化失败", it)
     }.getOrNull()
 
     private val amllFeature: AmllTtmlFeature?
@@ -65,9 +65,9 @@ internal class LyricEnhancementCoordinator(
             listFeatureCache = ::listFeatureCache,
             clearFeatureCache = ::clearFeatureCache,
             clearCacheEntry = ::clearCacheEntry,
-            logger = logger.withTag("Cache")
         )
-        logger.info(
+        HookLogger.i(
+            LOG_TAG,
             "歌词增强初始化完成: " +
                     "amll=${amllFeature != null}, translation=${aiTranslationFeature != null}"
         )
@@ -106,7 +106,6 @@ internal class LyricEnhancementCoordinator(
                         sourceSong = sourceSong,
                         targetSong = enhancedSong,
                         forceOverride = false,
-                        logger = logger.withTag("TranslationMerge")
                     ) ?: enhancedSong
                 }
             }
@@ -193,45 +192,41 @@ internal class LyricEnhancementCoordinator(
     private fun createAmllFeature(): AmllTtmlFeature? {
         val preferences = remotePreferences ?: return null
         return runCatching {
-            val featureLogger = logger.withTag("AmllTtml")
             AmllTtmlFeature(
                 preferences = preferences,
                 cacheStore = createCache(
                     featureId = LyricEnhancementConstants.AMLL_TTML_FEATURE_ID,
-                    logger = featureLogger
+                    logTag = "$LOG_TAG/AmllTtml/Cache"
                 ),
-                baseLogger = featureLogger,
                 onConfigChanged = ::notifyConfigChanged
             )
         }.onFailure {
-            logger.warn("AMLL 歌词增强初始化失败", it)
+            HookLogger.w("$LOG_TAG/AmllTtml", "AMLL 歌词增强初始化失败", it)
         }.getOrNull()
     }
 
     private fun createAiTranslationFeature(): AiTranslationFeature? {
         val preferences = remotePreferences ?: return null
         return runCatching {
-            val featureLogger = logger.withTag("AiTranslation")
             AiTranslationFeature(
                 preferences = preferences,
                 cacheStore = createCache(
                     featureId = LyricEnhancementConstants.AI_TRANSLATION_FEATURE_ID,
-                    logger = featureLogger
+                    logTag = "$LOG_TAG/AiTranslation/Cache"
                 ),
-                logger = featureLogger,
                 onConfigChanged = ::notifyConfigChanged
             )
         }.onFailure {
-            logger.warn("AI 翻译初始化失败", it)
+            HookLogger.w("$LOG_TAG/AiTranslation", "AI 翻译初始化失败", it)
         }.getOrNull()
     }
 
     private fun createCache(
         featureId: String,
-        logger: LyricEnhancementLogger,
+        logTag: String,
     ): LyricEnhancementCacheStore = FileLyricEnhancementCache(
         directory = FileLyricEnhancementCache.directory(application, featureId),
-        logger = logger.withTag("Cache")
+        logTag = logTag
     )
 
     private fun isFeatureEnabled(block: () -> Boolean): Boolean =
@@ -249,10 +244,11 @@ internal class LyricEnhancementCoordinator(
         operation = operation,
         timeoutMs = MAX_FEATURE_TIMEOUT_MS,
         onFailure = { error ->
-            logger.warn("歌词增强功能执行失败: feature=${featureName}", error)
+            HookLogger.w(LOG_TAG, "歌词增强功能执行失败: feature=${featureName}", error)
         },
         onTimeout = {
-            logger.warn(
+            HookLogger.w(
+                LOG_TAG,
                 "歌词增强功能执行超时: feature=${featureName}, " +
                         "timeoutMs=${MAX_FEATURE_TIMEOUT_MS}"
             )
@@ -271,7 +267,7 @@ internal class LyricEnhancementCoordinator(
                 candidate.duration == baseSong.duration &&
                 candidate.metadata == baseSong.metadata
         if (!onlyLyricsChanged) {
-            logger.warn("歌词增强功能修改了歌曲信息，拒绝写回: feature=${featureName}")
+            HookLogger.w(LOG_TAG, "歌词增强功能修改了歌曲信息，拒绝写回: feature=${featureName}")
             return null
         }
         return candidate
@@ -282,11 +278,12 @@ internal class LyricEnhancementCoordinator(
         result: Song?,
     ) {
         runCatching { onResult(result) }.onFailure {
-            logger.warn("歌词增强结果回调失败", it)
+            HookLogger.w(LOG_TAG, "歌词增强结果回调失败", it)
         }
     }
 
     private companion object {
+        const val LOG_TAG = "LyricEnhancement"
         const val MAX_FEATURE_TIMEOUT_MS = 40_000L
     }
 }

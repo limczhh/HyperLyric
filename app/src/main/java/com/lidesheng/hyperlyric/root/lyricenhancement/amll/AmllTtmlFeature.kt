@@ -8,7 +8,7 @@ import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementInput
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
-import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /** 命中结果：TTML 原文 + 来源标记（缓存命中/网络获取），用于日志准确上报 */
 internal data class TtmlFetch(
@@ -35,14 +35,18 @@ internal data class TtmlFetch(
 internal class AmllTtmlFeature(
     private val preferences: SharedPreferences,
     cacheStore: LyricEnhancementCacheStore,
-    baseLogger: LyricEnhancementLogger,
     private val onConfigChanged: () -> Unit,
 ) : AutoCloseable {
 
-    private val logger = baseLogger
-    private val client = AmllTtmlClient(baseLogger.withTag("Client"))
-    private val parser = TtmlParser(baseLogger.withTag("Parser"))
-    private val cache = TtmlCache(cacheStore, baseLogger.withTag("Cache"))
+    private val client = AmllTtmlClient()
+    private val parser = TtmlParser()
+    private val cache = TtmlCache(cacheStore)
+
+    private companion object {
+        const val LOG_TAG = "LyricEnhancement/AmllTtml"
+        /** 处理总预算：低于宿主 40s 硬超时，保证结果在硬超时前产出 */
+        const val BUDGET_MS = 34_000L
+    }
 
     private val preferenceListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -62,7 +66,7 @@ internal class AmllTtmlFeature(
 
     fun clearCache(): Boolean {
         val cleared = cache.clear()
-        logger.info(if (cleared) "AMLL TTML 缓存已清除" else "AMLL TTML 缓存清除不完整")
+        HookLogger.i(LOG_TAG, if (cleared) "AMLL TTML 缓存已清除" else "AMLL TTML 缓存清除不完整")
         return cleared
     }
 
@@ -78,10 +82,11 @@ internal class AmllTtmlFeature(
             processSongInternal(song, input)
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
-            logger.debug("处理被中断")
+            HookLogger.d(LOG_TAG, "处理被中断")
             null
         } catch (error: Exception) {
-            logger.warn(
+            HookLogger.w(
+                LOG_TAG,
                 "处理异常: type=${error.javaClass.simpleName}, " +
                         "msg=${error.message?.take(200)}",
                 null
@@ -96,7 +101,7 @@ internal class AmllTtmlFeature(
     ): Song? {
         val config = AmllTtmlConfig.from(preferences)
         if (!config.enabled) {
-            logger.debug("跳过处理: 功能已禁用, song=${song.name}")
+            HookLogger.d(LOG_TAG, "跳过处理: 功能已禁用, song=${song.name}")
             return null
         }
         client.updateBaseUrl(config.apiBaseUrl)
@@ -115,7 +120,8 @@ internal class AmllTtmlFeature(
         // 可信度高，映射到平台后单次精确直查（spec §7.1 宿主建议已落地）
         val sourcePackageName = mediaInfo?.sourcePackageName?.takeIf { it.isNotBlank() }
 
-        logger.debug(
+        HookLogger.d(
+            LOG_TAG,
             "开始处理: song=\"${song.name.orEmpty()}\", songId=${songId ?: "null"}, " +
                     "package=${sourcePackageName ?: "null"}, " +
                     "title=${title ?: "null"}, artist=${artist ?: "null"}, album=${album ?: "null"}"
@@ -139,7 +145,7 @@ internal class AmllTtmlFeature(
 
         // 2. 搜索回退：title 或 artist 至少一个可用（对齐 main：二者皆空不触发搜索）
         if (title == null && artist == null) {
-            logger.debug("搜索未触发: 无标题与歌手")
+            HookLogger.d(LOG_TAG, "搜索未触发: 无标题与歌手")
             return null
         }
         val searchTtml = searchFallback(title, artist, album, budget) ?: return null
@@ -180,7 +186,7 @@ internal class AmllTtmlFeature(
             mappedPlatform != null -> listOf(mappedPlatform)
             resolvedPlatform != null -> listOf(resolvedPlatform)
             else -> if (title == null && artist == null) {
-                logger.debug("平台探测未触发: 无标题与歌手")
+                HookLogger.d(LOG_TAG, "平台探测未触发: 无标题与歌手")
                 return null
             } else {
                 AmllPlatformId.probeOrderFor(songId)
@@ -192,41 +198,43 @@ internal class AmllTtmlFeature(
         val generation = cache.currentGeneration()
         for (platform in probeOrder) {
             if (Thread.currentThread().isInterrupted) {
-                logger.debug("处理被中断")
+                HookLogger.d(LOG_TAG, "处理被中断")
                 return null
             }
             if (budget.isExhausted()) {
-                logger.debug("预算耗尽: phase=平台探测")
+                HookLogger.d(LOG_TAG, "预算耗尽: phase=平台探测")
                 return null
             }
 
             // 平台内精确缓存命中：零网络返回
             val exactKey = TtmlCache.exactKey(platform, songId)
             cache.get(exactKey, title = title, artist = artist)?.let { lookup ->
-                logger.debug(
+                HookLogger.d(
+                    LOG_TAG,
                     "缓存命中: key=${TtmlCache.shortKey(exactKey)}, " +
                             "size=${lookup.ttml.toByteArray().size}B"
                 )
                 return TtmlFetch(lookup.ttml, fromCache = true)
             }
-            logger.debug("缓存未命中: key=${TtmlCache.shortKey(exactKey)}")
+            HookLogger.d(LOG_TAG, "缓存未命中: key=${TtmlCache.shortKey(exactKey)}")
 
             val item = client.fetchByPlatformId(platform, songId, budget)
             if (item == null) {
-                logger.debug("平台探测未命中: platform=${platform.name}")
+                HookLogger.d(LOG_TAG, "平台探测未命中: platform=${platform.name}")
                 continue
             }
             val ttml = item.lyrics
             if (ttml.isNullOrBlank()) {
-                logger.debug("平台探测歌词为空: platform=${platform.name}")
+                HookLogger.d(LOG_TAG, "平台探测歌词为空: platform=${platform.name}")
                 continue
             }
             if (requireVerification && !AmllMatch.isPlausibleMatch(item, title, artist)) {
                 // 跨平台 ID 撞号：条目与请求 title/artist 不匹配，拒绝并继续下一平台
-                logger.debug("平台探测校验拒绝: platform=${platform.name}")
+                HookLogger.d(LOG_TAG, "平台探测校验拒绝: platform=${platform.name}")
                 continue
             }
-            logger.debug(
+            HookLogger.d(
+                LOG_TAG,
                 "平台探测命中: platform=${platform.name}, " +
                         "id=${item.id}, size=${ttml.toByteArray().size}B"
             )
@@ -253,26 +261,28 @@ internal class AmllTtmlFeature(
     ): TtmlFetch? {
         val searchKey = TtmlCache.searchKey(title.orEmpty(), artist.orEmpty())
         cache.get(searchKey, title = title, artist = artist)?.let { lookup ->
-            logger.debug(
+            HookLogger.d(
+                LOG_TAG,
                 "缓存命中: key=${TtmlCache.shortKey(searchKey)}, " +
                         "size=${lookup.ttml.toByteArray().size}B"
             )
             return TtmlFetch(lookup.ttml, fromCache = true)
         }
-        logger.debug("缓存未命中: key=${TtmlCache.shortKey(searchKey)}")
+        HookLogger.d(LOG_TAG, "缓存未命中: key=${TtmlCache.shortKey(searchKey)}")
 
         if (Thread.currentThread().isInterrupted) {
-            logger.debug("处理被中断")
+            HookLogger.d(LOG_TAG, "处理被中断")
             return null
         }
         if (budget.isExhausted()) {
-            logger.debug("预算耗尽: phase=搜索")
+            HookLogger.d(LOG_TAG, "预算耗尽: phase=搜索")
             return null
         }
 
         val generation = cache.currentGeneration()
         val searchItem = client.searchByMetadata(title, artist, album, budget) ?: return null
-        logger.debug(
+        HookLogger.d(
+            LOG_TAG,
             "搜索命中: id=${searchItem.id}, " +
                     "music=${searchItem.musicNames?.joinToString("/")}, " +
                     "artist=${searchItem.artistNames?.joinToString("/")}"
@@ -280,7 +290,7 @@ internal class AmllTtmlFeature(
         val fullItem = searchItem.id?.let { client.fetchById(it, budget) } ?: return null
         val ttml = fullItem.lyrics
         if (ttml.isNullOrBlank()) return null
-        logger.debug("搜索回退取回歌词: size=${ttml.toByteArray().size}B")
+        HookLogger.d(LOG_TAG, "搜索回退取回歌词: size=${ttml.toByteArray().size}B")
         // 展示元数据优先用 AMLL 条目自身的歌名/歌手（与缓存正文内容一致）
         cache.put(
             semanticKey = searchKey,
@@ -306,15 +316,15 @@ internal class AmllTtmlFeature(
     ): Song? {
         val lines = parser.parse(ttml, duetEnabled = duetPerformance)
         if (lines == null) {
-            logger.debug("解析失败: fromCache=$fromCache")
+            HookLogger.d(LOG_TAG, "解析失败: fromCache=$fromCache")
             return null
         }
         // 终检：解析器已规整，此处防御性复核并留下明确日志
         if (!LyricsValidator.isValidLyrics(lines)) {
-            logger.warn("终检失败，放弃替换: lines=${lines.size}", null)
+            HookLogger.w(LOG_TAG, "终检失败，放弃替换: lines=${lines.size}", null)
             return null
         }
-        logger.debug("替换歌词: lines=${lines.size}, fromCache=$fromCache")
+        HookLogger.d(LOG_TAG, "替换歌词: lines=${lines.size}, fromCache=$fromCache")
         return song.copy(lyrics = lines)
     }
 
@@ -322,10 +332,6 @@ internal class AmllTtmlFeature(
         preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener)
     }
 
-    private companion object {
-        /** 处理总预算：低于宿主 40s 硬超时，保证结果在硬超时前产出 */
-        const val BUDGET_MS = 34_000L
-    }
 }
 
 /**
