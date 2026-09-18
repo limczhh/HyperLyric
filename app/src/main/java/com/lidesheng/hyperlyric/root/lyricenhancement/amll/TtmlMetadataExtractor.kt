@@ -46,6 +46,7 @@ internal object TtmlMetadataExtractor {
         parser.setInput(StringReader(ttml))
 
         val groups = LinkedHashMap<String, LinkedHashSet<String>>()
+        val definedAgents = LinkedHashSet<String>()
         val bodyAgents = LinkedHashSet<String>()
         var hasTranslation = false
 
@@ -60,6 +61,7 @@ internal object TtmlMetadataExtractor {
                         }
                     }
 
+                    "agent" -> attrValue(parser, "id")?.let(definedAgents::add)
                     "translation" -> hasTranslation = true
                     "p" -> attrValue(parser, "agent")?.let(bodyAgents::add)
                     "span" -> if (
@@ -74,24 +76,20 @@ internal object TtmlMetadataExtractor {
             if (hasTranslation && bodyAgents.size >= 2) break
         }
 
-        if (groups.isEmpty() && bodyAgents.size < 2 && !hasTranslation) return emptyList()
-        return buildDetails(groups, bodyAgents.size >= 2, hasTranslation, useZhLabels)
+        val agents = definedAgents.ifEmpty { bodyAgents }
+        if (groups.isEmpty() && agents.isEmpty() && !hasTranslation) return emptyList()
+        return buildDetails(groups, agents, hasTranslation, useZhLabels)
     }
 
     private fun buildDetails(
         groups: Map<String, LinkedHashSet<String>>,
-        hasDuet: Boolean,
+        agents: Set<String>,
         hasTranslation: Boolean,
         useZhLabels: Boolean,
     ): List<LyricEnhancementCacheDetail> {
         val details = mutableListOf<LyricEnhancementCacheDetail>()
 
         fun label(zh: String, en: String): String = if (useZhLabels) zh else en
-        fun flagValue(present: Boolean): String = if (useZhLabels) {
-            if (present) "有" else "无"
-        } else {
-            if (present) "Yes" else "No"
-        }
         fun newlineGroup(key: String): String? =
             groups[key]?.joinToString("\n")?.takeIf(String::isNotEmpty)
 
@@ -132,11 +130,23 @@ internal object TtmlMetadataExtractor {
             details.add(LyricEnhancementCacheDetail(label("歌词作者", "Author"), it))
         }
 
+        if (agents.isNotEmpty()) {
+            details.add(
+                LyricEnhancementCacheDetail(
+                    label("演唱者（Agent）", "Agent"),
+                    agents.joinToString(" / ")
+                )
+            )
+        }
         details.add(
-            LyricEnhancementCacheDetail(label("对唱歌词", "Duet Lyrics"), flagValue(hasDuet))
-        )
-        details.add(
-            LyricEnhancementCacheDetail(label("翻译", "Translation"), flagValue(hasTranslation))
+            LyricEnhancementCacheDetail(
+                label("翻译", "Translation"),
+                if (useZhLabels) {
+                    if (hasTranslation) "有" else "无"
+                } else {
+                    if (hasTranslation) "Yes" else "No"
+                }
+            )
         )
 
         groups.filterKeys { it !in KNOWN_KEYS }.forEach { (key, values) ->

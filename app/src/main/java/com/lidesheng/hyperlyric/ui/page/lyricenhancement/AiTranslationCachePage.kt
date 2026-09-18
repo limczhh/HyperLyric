@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.lyricenhancement
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -24,11 +26,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -55,34 +57,45 @@ internal fun AiTranslationCachePage() {
         mutableStateOf<AiTranslationCachePageState>(AiTranslationCachePageState.Loading)
     }
     var busy by remember { mutableStateOf(false) }
+    var initialLoadCompleted by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var selectedEntry by remember { mutableStateOf<LyricEnhancementCacheEntry?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
 
-    fun loadEntries() {
+    fun loadEntries(refresh: Boolean = false) {
         if (busy) return
         busy = true
-        state = AiTranslationCachePageState.Loading
+        if (refresh) {
+            isRefreshing = true
+        } else {
+            state = AiTranslationCachePageState.Loading
+        }
         scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                sender.listEntries(LyricEnhancementConstants.AI_TRANSLATION_FEATURE_ID)
-            }
-            busy = false
-            state = when (outcome) {
-                is LyricEnhancementCacheOperationOutcome.Completed -> {
-                    if (outcome.response.success) {
-                        outcome.response.entries.takeIf { it.isNotEmpty() }
-                            ?.let(AiTranslationCachePageState::Entries)
-                            ?: AiTranslationCachePageState.Empty
-                    } else {
-                        AiTranslationCachePageState.Failure(unavailableText)
-                    }
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    sender.listEntries(LyricEnhancementConstants.AI_TRANSLATION_FEATURE_ID)
                 }
+                state = when (outcome) {
+                    is LyricEnhancementCacheOperationOutcome.Completed -> {
+                        if (outcome.response.success) {
+                            outcome.response.entries.takeIf { it.isNotEmpty() }
+                                ?.let(AiTranslationCachePageState::Entries)
+                                ?: AiTranslationCachePageState.Empty
+                        } else {
+                            AiTranslationCachePageState.Failure(unavailableText)
+                        }
+                    }
 
-                is LyricEnhancementCacheOperationOutcome.Unavailable ->
-                    AiTranslationCachePageState.Failure(unavailableText)
+                    is LyricEnhancementCacheOperationOutcome.Unavailable ->
+                        AiTranslationCachePageState.Failure(unavailableText)
 
-                is LyricEnhancementCacheOperationOutcome.Failed ->
-                    AiTranslationCachePageState.Failure(failedText)
+                    is LyricEnhancementCacheOperationOutcome.Failed ->
+                        AiTranslationCachePageState.Failure(failedText)
+                }
+                initialLoadCompleted = true
+            } finally {
+                busy = false
+                isRefreshing = false
             }
         }
     }
@@ -163,6 +176,9 @@ internal fun AiTranslationCachePage() {
     XposedLyricSettingPage(
         title = stringResource(R.string.title_ai_translation_cache),
         snackbarHostState = snackbarHostState,
+        isInitialLoading = !initialLoadCompleted && state is AiTranslationCachePageState.Loading,
+        isRefreshing = isRefreshing,
+        onRefresh = { loadEntries(refresh = true) },
         topBarActions = {
             IconButton(
                 onClick = { showClearAllDialog = true },
@@ -175,11 +191,8 @@ internal fun AiTranslationCachePage() {
             }
         }
     ) {
-        item(key = "ai_cache_description") {
-            SmallTitle(text = stringResource(R.string.title_lyric_enhancement_cache))
-        }
         when (val current = state) {
-            AiTranslationCachePageState.Loading -> cacheStatusItem("loading", loadingText)
+            AiTranslationCachePageState.Loading -> cacheStatusItem("loading", loadingText, true)
             AiTranslationCachePageState.Empty -> cacheStatusItem("empty", emptyText)
             is AiTranslationCachePageState.Failure -> {
                 cacheStatusItem("failure", current.message)
@@ -193,7 +206,7 @@ internal fun AiTranslationCachePage() {
                         ArrowPreference(
                             title = retryText,
                             enabled = !busy,
-                            onClick = ::loadEntries
+                            onClick = { loadEntries() }
                         )
                     }
                 }
@@ -258,15 +271,25 @@ private fun androidx.compose.foundation.lazy.LazyItemScope.itemCard(
 private fun androidx.compose.foundation.lazy.LazyListScope.cacheStatusItem(
     key: String,
     message: String,
+    loading: Boolean = false,
 ) {
     item(key = key) {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            BasicComponent(title = message)
+        if (loading) {
+            Box(
+                modifier = Modifier.fillParentMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp)
+                    .fillMaxWidth()
+            ) {
+                BasicComponent(title = message)
+            }
         }
     }
 }

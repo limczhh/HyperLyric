@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.lyricenhancement
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -25,11 +27,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -57,34 +59,45 @@ internal fun AmllTtmlCachePage() {
         mutableStateOf<AmllTtmlCachePageState>(AmllTtmlCachePageState.Loading)
     }
     var busy by remember { mutableStateOf(false) }
+    var initialLoadCompleted by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var showClearAllDialog by remember { mutableStateOf(false) }
     var seenEntriesVersion by remember { mutableStateOf(AmllTtmlCacheEntriesVersion.version) }
 
-    fun loadEntries() {
+    fun loadEntries(refresh: Boolean = false) {
         if (busy) return
         busy = true
-        state = AmllTtmlCachePageState.Loading
+        if (refresh) {
+            isRefreshing = true
+        } else {
+            state = AmllTtmlCachePageState.Loading
+        }
         scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                sender.listEntries(LyricEnhancementConstants.AMLL_TTML_FEATURE_ID)
-            }
-            busy = false
-            state = when (outcome) {
-                is LyricEnhancementCacheOperationOutcome.Completed -> {
-                    if (outcome.response.success) {
-                        outcome.response.entries.takeIf { it.isNotEmpty() }
-                            ?.let(AmllTtmlCachePageState::Entries)
-                            ?: AmllTtmlCachePageState.Empty
-                    } else {
-                        AmllTtmlCachePageState.Failure(unavailableText)
-                    }
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    sender.listEntries(LyricEnhancementConstants.AMLL_TTML_FEATURE_ID)
                 }
+                state = when (outcome) {
+                    is LyricEnhancementCacheOperationOutcome.Completed -> {
+                        if (outcome.response.success) {
+                            outcome.response.entries.takeIf { it.isNotEmpty() }
+                                ?.let(AmllTtmlCachePageState::Entries)
+                                ?: AmllTtmlCachePageState.Empty
+                        } else {
+                            AmllTtmlCachePageState.Failure(unavailableText)
+                        }
+                    }
 
-                is LyricEnhancementCacheOperationOutcome.Unavailable ->
-                    AmllTtmlCachePageState.Failure(unavailableText)
+                    is LyricEnhancementCacheOperationOutcome.Unavailable ->
+                        AmllTtmlCachePageState.Failure(unavailableText)
 
-                is LyricEnhancementCacheOperationOutcome.Failed ->
-                    AmllTtmlCachePageState.Failure(failedText)
+                    is LyricEnhancementCacheOperationOutcome.Failed ->
+                        AmllTtmlCachePageState.Failure(failedText)
+                }
+                initialLoadCompleted = true
+            } finally {
+                busy = false
+                isRefreshing = false
             }
         }
     }
@@ -123,7 +136,7 @@ internal fun AmllTtmlCachePage() {
         val deletedSinceLastLoad =
             AmllTtmlCacheEntriesVersion.version != seenEntriesVersion
         seenEntriesVersion = AmllTtmlCacheEntriesVersion.version
-        loadEntries()
+        loadEntries(refresh = deletedSinceLastLoad)
         if (deletedSinceLastLoad) {
             snackbarHostState.showSnackbar(
                 deleteSuccessText,
@@ -153,6 +166,9 @@ internal fun AmllTtmlCachePage() {
     XposedLyricSettingPage(
         title = stringResource(R.string.title_amll_ttml_cache),
         snackbarHostState = snackbarHostState,
+        isInitialLoading = !initialLoadCompleted && state is AmllTtmlCachePageState.Loading,
+        isRefreshing = isRefreshing,
+        onRefresh = { loadEntries(refresh = true) },
         topBarActions = {
             IconButton(
                 onClick = { showClearAllDialog = true },
@@ -165,11 +181,8 @@ internal fun AmllTtmlCachePage() {
             }
         }
     ) {
-        item(key = "amll_cache_description") {
-            SmallTitle(text = stringResource(R.string.title_lyric_enhancement_cache))
-        }
         when (val current = state) {
-            AmllTtmlCachePageState.Loading -> cacheStatusItem("loading", loadingText)
+            AmllTtmlCachePageState.Loading -> cacheStatusItem("loading", loadingText, true)
             AmllTtmlCachePageState.Empty -> cacheStatusItem("empty", emptyText)
             is AmllTtmlCachePageState.Failure -> {
                 cacheStatusItem("failure", current.message)
@@ -183,7 +196,7 @@ internal fun AmllTtmlCachePage() {
                         ArrowPreference(
                             title = retryText,
                             enabled = !busy,
-                            onClick = ::loadEntries
+                            onClick = { loadEntries() }
                         )
                     }
                 }
@@ -238,15 +251,25 @@ private fun androidx.compose.foundation.lazy.LazyItemScope.itemCard(
 private fun androidx.compose.foundation.lazy.LazyListScope.cacheStatusItem(
     key: String,
     message: String,
+    loading: Boolean = false,
 ) {
     item(key = key) {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            BasicComponent(title = message)
+        if (loading) {
+            Box(
+                modifier = Modifier.fillParentMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp)
+                    .fillMaxWidth()
+            ) {
+                BasicComponent(title = message)
+            }
         }
     }
 }

@@ -5,12 +5,15 @@ import android.content.SharedPreferences
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -20,16 +23,20 @@ import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
+import com.lidesheng.hyperlyric.ui.page.hooksettings.rememberEntryTransitionContentReady
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -75,6 +82,9 @@ internal fun XposedLyricSettingPage(
     title: String,
     snackbarHostState: SnackbarHostState? = null,
     topBarActions: @Composable RowScope.() -> Unit = {},
+    isInitialLoading: Boolean = false,
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
     content: LazyListScope.() -> Unit
 ) {
     val navigator = LocalNavigator.current
@@ -117,18 +127,73 @@ internal fun XposedLyricSettingPage(
             )
         }
         val lazyListState = rememberLazyListState()
+        val pullToRefreshState = rememberPullToRefreshState()
+        val contentReady = if (onRefresh != null) {
+            rememberEntryTransitionContentReady()
+        } else {
+            true
+        }
+        val refreshTexts = listOf(
+            stringResource(R.string.refresh_pull_down),
+            stringResource(R.string.refresh_release),
+            stringResource(R.string.refreshing),
+            stringResource(R.string.refresh_success)
+        )
 
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.pageScrollModifiers(
-                    enableScrollEndHaptic = true,
-                    showTopAppBar = true,
-                    topAppBarScrollBehavior = topAppBarScrollBehavior
-                ),
-                contentPadding = contentPadding,
-                content = content
-            )
+        val showInitialLoading = onRefresh != null && (!contentReady || isInitialLoading)
+        if (showInitialLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                InfiniteProgressIndicator()
+            }
+        } else {
+            Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+                if (onRefresh == null) {
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.pageScrollModifiers(
+                            enableScrollEndHaptic = true,
+                            showTopAppBar = true,
+                            topAppBarScrollBehavior = topAppBarScrollBehavior
+                        ),
+                        contentPadding = contentPadding,
+                        content = content
+                    )
+                } else {
+                    PullToRefresh(
+                        isRefreshing = isRefreshing,
+                        onRefresh = onRefresh,
+                        pullToRefreshState = pullToRefreshState,
+                        contentPadding = PaddingValues(top = topPadding),
+                        topAppBarScrollBehavior = topAppBarScrollBehavior,
+                        refreshTexts = refreshTexts,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        val refreshContentPadding = remember(topPadding, bottomPadding) {
+                            PaddingValues(
+                                top = topPadding,
+                                start = 0.dp,
+                                end = 0.dp,
+                                bottom = bottomPadding
+                            )
+                        }
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier.pageScrollModifiers(
+                                enableScrollEndHaptic = true,
+                                showTopAppBar = false,
+                                topAppBarScrollBehavior = topAppBarScrollBehavior
+                            ),
+                            contentPadding = refreshContentPadding,
+                            content = content
+                        )
+                    }
+                }
+            }
         }
     }
 }

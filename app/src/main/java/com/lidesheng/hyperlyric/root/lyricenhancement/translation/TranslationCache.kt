@@ -114,12 +114,12 @@ internal class TranslationCache(
 
     fun listEntries(): List<LyricEnhancementCacheEntry> = synchronized(lock) {
         readIndexLocked().asSequence()
+            .take(MAX_LIST_ENTRIES)
             .filter { record ->
                 runCatching { storage.getString(entryKey(record.key)) }
                     .onFailure { logger.warn("读取翻译缓存条目失败", it) }
                     .getOrNull() != null
             }
-            .take(MAX_LIST_ENTRIES)
             .map { record ->
                 LyricEnhancementCacheEntry(
                     id = record.key,

@@ -165,13 +165,13 @@ internal class TtmlCache(
 
     fun listEntries(): List<LyricEnhancementCacheEntry> = synchronized(lock) {
         readIndexLocked().asSequence()
+            .take(MAX_LIST_ENTRIES)
             .mapNotNull { record ->
                 val body = runCatching { storage.getString(entryKey(record.key)) }
                     .onFailure { logger.warn("读取 TTML 缓存条目失败", it) }
                     .getOrNull() ?: return@mapNotNull null
                 record to body
             }
-            .take(MAX_LIST_ENTRIES)
             .map { (record, body) ->
                 LyricEnhancementCacheEntry(
                     id = record.key,
