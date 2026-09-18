@@ -17,7 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
 import com.lidesheng.hyperlyric.common.LyricEnhancementConstants
-import com.lidesheng.hyperlyric.ui.component.SimpleDialog
+import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
+import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,10 +33,12 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 internal fun AmllTtmlCachePage() {
     val context = LocalContext.current
+    val navigator = LocalNavigator.current
     val sender = remember(context) { LyricEnhancementCacheCommandSender(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -44,8 +47,7 @@ internal fun AmllTtmlCachePage() {
     val failedText = stringResource(R.string.toast_lyric_enhancement_cache_failed)
     val unavailableText = stringResource(R.string.toast_lyric_enhancement_cache_unavailable)
     val retryText = stringResource(R.string.lyric_enhancement_cache_retry)
-    val deleteEntryText = stringResource(R.string.title_lyric_enhancement_cache_delete_entry)
-    val deleteAllText = stringResource(R.string.title_lyric_enhancement_cache_clear_all)
+    val clearAllText = stringResource(R.string.title_lyric_enhancement_cache_clear_all)
     val deleteSuccessText = stringResource(R.string.toast_lyric_enhancement_cache_entry_cleared)
     val deleteAllSuccessText = stringResource(
         R.string.toast_lyric_enhancement_cache_all_cleared
@@ -55,8 +57,8 @@ internal fun AmllTtmlCachePage() {
         mutableStateOf<AmllTtmlCachePageState>(AmllTtmlCachePageState.Loading)
     }
     var busy by remember { mutableStateOf(false) }
-    var selectedEntry by remember { mutableStateOf<LyricEnhancementCacheEntry?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
+    var seenEntriesVersion by remember { mutableStateOf(AmllTtmlCacheEntriesVersion.version) }
 
     fun loadEntries() {
         if (busy) return
@@ -83,47 +85,6 @@ internal fun AmllTtmlCachePage() {
 
                 is LyricEnhancementCacheOperationOutcome.Failed ->
                     AmllTtmlCachePageState.Failure(failedText)
-            }
-        }
-    }
-
-    fun deleteEntry(entry: LyricEnhancementCacheEntry) {
-        if (busy) return
-        selectedEntry = null
-        busy = true
-        scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                sender.clearEntry(
-                    featureId = LyricEnhancementConstants.AMLL_TTML_FEATURE_ID,
-                    entryId = entry.id
-                )
-            }
-            busy = false
-            if (outcome is LyricEnhancementCacheOperationOutcome.Completed &&
-                outcome.response.success
-            ) {
-                val current = state
-                state = if (current is AmllTtmlCachePageState.Entries) {
-                    current.entries.filterNot { it.id == entry.id }
-                        .takeIf { it.isNotEmpty() }
-                        ?.let(AmllTtmlCachePageState::Entries)
-                        ?: AmllTtmlCachePageState.Empty
-                } else {
-                    current
-                }
-                snackbarHostState.showSnackbar(
-                    deleteSuccessText,
-                    duration = SnackbarDuration.Custom(2500L)
-                )
-            } else {
-                snackbarHostState.showSnackbar(
-                    if (outcome is LyricEnhancementCacheOperationOutcome.Unavailable) {
-                        unavailableText
-                    } else {
-                        failedText
-                    },
-                    duration = SnackbarDuration.Custom(2500L)
-                )
             }
         }
     }
@@ -158,7 +119,36 @@ internal fun AmllTtmlCachePage() {
         }
     }
 
-    LaunchedEffect(Unit) { loadEntries() }
+    LaunchedEffect(AmllTtmlCacheEntriesVersion.version) {
+        val deletedSinceLastLoad =
+            AmllTtmlCacheEntriesVersion.version != seenEntriesVersion
+        seenEntriesVersion = AmllTtmlCacheEntriesVersion.version
+        loadEntries()
+        if (deletedSinceLastLoad) {
+            snackbarHostState.showSnackbar(
+                deleteSuccessText,
+                duration = SnackbarDuration.Custom(2500L)
+            )
+        }
+    }
+
+    if (showClearAllDialog) {
+        WindowDialog(
+            title = clearAllText,
+            show = true,
+            onDismissRequest = { showClearAllDialog = false }
+        ) {
+            CacheConfirmContent(
+                message = stringResource(
+                    R.string.dialog_lyric_enhancement_cache_clear_all_summary
+                ),
+                confirmText = stringResource(R.string.confirm),
+                cancelText = stringResource(R.string.cancel),
+                onConfirm = ::clearAll,
+                onDismiss = { showClearAllDialog = false }
+            )
+        }
+    }
 
     XposedLyricSettingPage(
         title = stringResource(R.string.title_amll_ttml_cache),
@@ -170,7 +160,7 @@ internal fun AmllTtmlCachePage() {
             ) {
                 Icon(
                     imageVector = MiuixIcons.Delete,
-                    contentDescription = stringResource(R.string.delete)
+                    contentDescription = clearAllText
                 )
             }
         }
@@ -201,36 +191,24 @@ internal fun AmllTtmlCachePage() {
 
             is AmllTtmlCachePageState.Entries -> {
                 items(current.entries, key = { it.id }) { entry ->
-                    itemCard(entry, busy) { selectedEntry = entry }
+                    itemCard(entry, busy) {
+                        navigator.navigate(
+                            Route.AmllTtmlCacheDetail(
+                                entryId = entry.id,
+                                title = entry.title,
+                                artist = entry.artist,
+                                sizeBytes = entry.sizeBytes,
+                                updatedAtEpochMs = entry.updatedAtEpochMs,
+                                details = entry.details.map {
+                                    Route.CacheDetailLine(it.label, it.value)
+                                }
+                            )
+                        )
+                    }
                 }
             }
         }
     }
-
-    val entry = selectedEntry
-    val entrySummary = if (entry == null) {
-        null
-    } else {
-        stringResource(
-            R.string.dialog_lyric_enhancement_cache_clear_entry_summary,
-            entry.title
-        )
-    }
-    SimpleDialog(
-        show = entry != null,
-        title = deleteEntryText,
-        summary = entrySummary,
-        onDismiss = { selectedEntry = null },
-        onConfirm = { entry?.let(::deleteEntry) }
-    )
-
-    SimpleDialog(
-        show = showClearAllDialog,
-        title = deleteAllText,
-        summary = stringResource(R.string.dialog_lyric_enhancement_cache_clear_all_summary),
-        onDismiss = { showClearAllDialog = false },
-        onConfirm = ::clearAll
-    )
 }
 
 @Composable
@@ -239,6 +217,8 @@ private fun androidx.compose.foundation.lazy.LazyItemScope.itemCard(
     busy: Boolean,
     onClick: () -> Unit,
 ) {
+    val summary = entry.artist?.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.lyric_enhancement_cache_unknown_artist)
     Card(
         modifier = Modifier
             .padding(horizontal = 12.dp)
@@ -247,7 +227,7 @@ private fun androidx.compose.foundation.lazy.LazyItemScope.itemCard(
     ) {
         ArrowPreference(
             title = entry.title,
-            summary = entry.artist ?: stringResource(R.string.lyric_enhancement_cache_unknown_artist),
+            summary = summary,
             enabled = !busy,
             holdDownState = false,
             onClick = onClick
@@ -276,4 +256,9 @@ private sealed interface AmllTtmlCachePageState {
     data object Empty : AmllTtmlCachePageState
     data class Entries(val entries: List<LyricEnhancementCacheEntry>) : AmllTtmlCachePageState
     data class Failure(val message: String) : AmllTtmlCachePageState
+}
+
+/** 详情页删除单条缓存后递增，列表页据此刷新并显示成功提示。 */
+internal object AmllTtmlCacheEntriesVersion {
+    var version by mutableStateOf(0)
 }

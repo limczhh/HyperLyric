@@ -592,12 +592,14 @@
     <string name="title_lyric_enhancement">Lyric Enhancement</string>
     <string name="title_openai_translation">OpenAI Translation</string>
     <string name="title_amll_ttml">AMLL TTML Lyrics</string>
-    <string name="summary_amll_ttml">Fetch higher-quality word-level lyrics from the AMLL TTML database; falls back to the current lyric source</string>
+    <string name="summary_amll_ttml">Fetch high-quality word-level lyrics (background vocals/translation/roma) from the AMLL TTML database; falls back to the current lyric source on miss</string>
     <string name="summary_lyric_enhancement_unavailable">This lyric enhancement is currently unavailable</string>
     <string name="summary_lyric_enhancement_no_settings">This lyric enhancement has no configurable settings</string>
     <string name="title_lyric_enhancement_basic_settings">Basic Settings</string>
     <string name="title_lyric_enhancement_advanced_settings">Advanced Settings</string>
     <string name="title_lyric_enhancement_cache">Cache</string>
+    <string name="title_lyric_enhancement_cache_manage">Manage Cache</string>
+    <string name="summary_lyric_enhancement_cache_manage">View and delete the cache for individual songs</string>
     <string name="title_lyric_enhancement_clear_cache">Clear Cache</string>
     <string name="summary_lyric_enhancement_cache">Delete the lyric cache for this feature without changing its settings</string>
     <string name="summary_lyric_enhancement_cache_clearing">Clearing cache…</string>
@@ -605,6 +607,19 @@
     <string name="toast_lyric_enhancement_cache_requested">SystemUI was asked to clear the cache</string>
     <string name="toast_lyric_enhancement_cache_failed">Failed to clear cache</string>
     <string name="toast_lyric_enhancement_cache_unavailable">Xposed service is unavailable; restart SystemUI and try again</string>
+    <string name="title_amll_ttml_cache">AMLL Lyrics Cache</string>
+    <string name="summary_amll_ttml_cache">View cached AMLL TTML lyrics</string>
+    <string name="title_ai_translation_cache">AI Translation Cache</string>
+    <string name="lyric_enhancement_cache_loading">Reading cache…</string>
+    <string name="lyric_enhancement_cache_empty">No cache entries</string>
+    <string name="lyric_enhancement_cache_retry">Reload</string>
+    <string name="lyric_enhancement_cache_unknown_artist">Unknown artist</string>
+    <string name="title_lyric_enhancement_cache_delete_entry">Delete Cache</string>
+    <string name="title_lyric_enhancement_cache_clear_all">Clear All Cache</string>
+    <string name="dialog_lyric_enhancement_cache_clear_entry_summary">Delete the cache for “%1$s”?</string>
+    <string name="dialog_lyric_enhancement_cache_clear_all_summary">Delete all cache entries for this feature?</string>
+    <string name="toast_lyric_enhancement_cache_entry_cleared">Cache entry deleted</string>
+    <string name="toast_lyric_enhancement_cache_all_cleared">All cache entries deleted</string>
     <string name="title_ai_translation_skip_languages">Automatically Skip Languages</string>
     <string name="summary_ai_translation_skip_languages">Lyrics detected as selected languages will not be sent for AI translation</string>
     <string name="summary_ai_translation_skip_languages_none">None (off)</string>
@@ -635,6 +650,14 @@
     <string name="default_ai_translation_model">mimo-v2.5</string>
     <string name="title_amll_platform_probe">Platform ID Probe</string>
     <string name="summary_amll_platform_probe">Try the song ID against NCM/QQ/Apple/Spotify exact endpoints with title/artist verification; disable to use metadata search only</string>
+    <string name="title_amll_api_base_url">Lyrics API Base URL</string>
+    <string name="summary_amll_api_base_url">Base URL of the AMLL TTML lyrics API. Defaults to the official endpoint; a self-hosted mirror can be used instead. If you don\'t know what this is, please don\'t change it.</string>
+    <string name="title_amll_duet_performance">Enable Duet Performance</string>
+    <string name="summary_amll_duet_performance">When enabled, duet lyrics are aligned to left/right sides</string>
+    <string name="title_amll_ready_playlist">AMLL TTML Ready Playlist</string>
+    <string name="title_amll_ttml_database">Want to contribute to the lyrics DB?</string>
+    <string name="title_amll_ttml_cache_detail">Lyric Details</string>
+    <string name="lyric_enhancement_cache_detail_empty">No details available</string>
 
     <!-- Media card layout debug -->
 

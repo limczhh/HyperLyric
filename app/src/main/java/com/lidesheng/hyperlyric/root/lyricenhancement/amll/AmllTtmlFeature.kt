@@ -99,6 +99,7 @@ internal class AmllTtmlFeature(
             logger.debug("跳过处理: 功能已禁用, song=${song.name}")
             return null
         }
+        client.updateBaseUrl(config.apiBaseUrl)
 
         val budget = ProcessingBudget(BUDGET_MS)
         val mediaInfo = input.mediaInfo
@@ -127,7 +128,12 @@ internal class AmllTtmlFeature(
         ) {
             val probeTtml = probePlatforms(songId, title, artist, sourcePackageName, budget)
             if (probeTtml != null) {
-                return buildResult(song, probeTtml.ttml, probeTtml.fromCache)
+                return buildResult(
+                    song = song,
+                    ttml = probeTtml.ttml,
+                    fromCache = probeTtml.fromCache,
+                    duetPerformance = config.duetPerformance
+                )
             }
         }
 
@@ -137,7 +143,12 @@ internal class AmllTtmlFeature(
             return null
         }
         val searchTtml = searchFallback(title, artist, album, budget) ?: return null
-        return buildResult(song, searchTtml.ttml, searchTtml.fromCache)
+        return buildResult(
+            song = song,
+            ttml = searchTtml.ttml,
+            fromCache = searchTtml.fromCache,
+            duetPerformance = config.duetPerformance
+        )
     }
 
     /**
@@ -224,7 +235,8 @@ internal class AmllTtmlFeature(
                 ttml = ttml,
                 expectedGeneration = generation,
                 title = title,
-                artist = artist
+                artist = artist,
+                details = TtmlMetadataExtractor.extract(ttml)
             )
             cache.putResolve(songId, platform.name, generation)
             return TtmlFetch(ttml, fromCache = false)
@@ -275,7 +287,8 @@ internal class AmllTtmlFeature(
             ttml = ttml,
             expectedGeneration = generation,
             title = title,
-            artist = artist
+            artist = artist,
+            details = TtmlMetadataExtractor.extract(ttml)
         )
         return TtmlFetch(ttml, fromCache = false)
     }
@@ -285,8 +298,13 @@ internal class AmllTtmlFeature(
      * （对齐 main 分支 buildSong 语义）。解析失败/无有效行/终检不通过均返回 null
      * （视为未命中回落原歌词，防止空歌词或非法歌词替换掉原本可用的平台歌词）。
      */
-    private fun buildResult(song: Song, ttml: String, fromCache: Boolean): Song? {
-        val lines = parser.parse(ttml)
+    private fun buildResult(
+        song: Song,
+        ttml: String,
+        fromCache: Boolean,
+        duetPerformance: Boolean,
+    ): Song? {
+        val lines = parser.parse(ttml, duetEnabled = duetPerformance)
         if (lines == null) {
             logger.debug("解析失败: fromCache=$fromCache")
             return null

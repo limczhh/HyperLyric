@@ -39,7 +39,7 @@ internal class ProcessingBudget(private val budgetMs: Long) {
 internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
 
     companion object {
-        private const val BASE_URL = "https://api.amll.dev/"
+        private const val DEFAULT_BASE_URL = "https://api.amll.dev/"
         private const val GET_PATH = "v1/lyrics/get"
         private const val SEARCH_PATH = "v1/lyrics/search"
 
@@ -49,6 +49,13 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
         private const val RETRY_BACKOFF_MULTIPLIER = 2L
         private const val MAX_RETRIES = 2
         private const val HTTP_TOO_MANY_REQUESTS = 429
+    }
+
+    @Volatile
+    private var baseUrl = DEFAULT_BASE_URL
+
+    fun updateBaseUrl(value: String) {
+        baseUrl = normalizeBaseUrl(value)
     }
 
     /**
@@ -218,6 +225,17 @@ internal class AmllTtmlClient(private val logger: LyricEnhancementLogger) {
         val query = params.joinToString("&") { (key, value) ->
             "$key=${URLEncoder.encode(value, "UTF-8")}"
         }
-        return "$BASE_URL$path?$query"
+        return "$baseUrl$path?$query"
+    }
+
+    private fun normalizeBaseUrl(value: String): String {
+        val candidate = value.trim()
+        if (candidate.isEmpty() || candidate.any(Char::isWhitespace)) return DEFAULT_BASE_URL
+        return runCatching {
+            val url = URL(candidate)
+            require(url.protocol == "http" || url.protocol == "https")
+            require(url.host.isNotBlank())
+            candidate.trimEnd('/') + "/"
+        }.getOrElse { DEFAULT_BASE_URL }
     }
 }

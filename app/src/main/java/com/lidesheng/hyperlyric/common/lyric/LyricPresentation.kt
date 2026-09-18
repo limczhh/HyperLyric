@@ -2,6 +2,10 @@ package com.lidesheng.hyperlyric.common.lyric
 
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
+import java.util.Locale
+
+internal const val METADATA_KEY_ALIGNMENT_RESOLVED = "hyperlyric:alignment-resolved"
+internal const val METADATA_KEY_AGENT_TYPE = "amll:agent-type"
 
 /**
  * The host-side presentation boundary for one lyric frame.
@@ -28,6 +32,12 @@ internal object LyricPresentationResolver {
         "amll:agent",
         "vocal",
         "amll:vocal"
+    )
+    private val AGENT_TYPE_METADATA_KEYS = listOf(
+        METADATA_KEY_AGENT_TYPE,
+        "agent:type",
+        "agentType",
+        "vocal:type"
     )
 
     fun resolve(
@@ -82,6 +92,12 @@ internal object LyricPresentationResolver {
                 if (agent !in this) add(agent)
             }
         }
+        val hasExplicitAgentTypes = (songLines.orEmpty() + lines).any {
+            it.agentType() != null
+        }
+        if (hasExplicitAgentTypes) {
+            return alignTypedAgents(lines)
+        }
         if (agents.size < 2) return lines
 
         // Keep the first singer on the normal/left side and group subsequent agents on the
@@ -90,14 +106,56 @@ internal object LyricPresentationResolver {
             indexed.value to (indexed.index > 0)
         }
         return lines.map { line ->
+            if (line.metadata?.getBoolean(METADATA_KEY_ALIGNMENT_RESOLVED) == true) {
+                return@map line
+            }
             val right = line.agentId()?.let { rightByAgent[it] } ?: return@map line
+            if (line.isAlignedRight) return@map line
             line.withAlignment(right)
+        }
+    }
+
+    /**
+     * AMLL declares `group` agents as a single singer and `other` agents as the first
+     * alternating singer. This is deliberately host-side so the rule also applies to future
+     * non-AMLL sources that publish the same metadata contract.
+     */
+    private fun alignTypedAgents(lines: List<IRichLyricLine>): List<IRichLyricLine> {
+        var lastAgent: String? = null
+        var lastRight = false
+        return lines.map { line ->
+            if (line.metadata?.getBoolean(METADATA_KEY_ALIGNMENT_RESOLVED) == true) {
+                return@map line
+            }
+            val agent = line.agentId() ?: return@map line
+            if (line.agentType() == "group") return@map line
+
+            val right = when {
+                lastAgent == null -> {
+                    lastAgent = agent
+                    lastRight = line.agentType() == "other"
+                    lastRight
+                }
+
+                lastAgent == agent -> lastRight
+                else -> {
+                    lastAgent = agent
+                    lastRight = !lastRight
+                    lastRight
+                }
+            }
+            if (line.isAlignedRight) line else line.withAlignment(right)
         }
     }
 
     private fun IRichLyricLine.agentId(): String? = AGENT_METADATA_KEYS
         .asSequence()
         .mapNotNull { key -> metadata?.getString(key)?.trim() }
+        .firstOrNull { it.isNotEmpty() }
+
+    private fun IRichLyricLine.agentType(): String? = AGENT_TYPE_METADATA_KEYS
+        .asSequence()
+        .mapNotNull { key -> metadata?.getString(key)?.trim()?.lowercase(Locale.ROOT) }
         .firstOrNull { it.isNotEmpty() }
 
     private fun hasDistinctVocalIdentities(

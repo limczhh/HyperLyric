@@ -24,6 +24,19 @@ sealed interface Route : NavKey {
     data object AmllTtmlCache : Route
 
     @Serializable
+    data class AmllTtmlCacheDetail(
+        val entryId: String,
+        val title: String,
+        val artist: String? = null,
+        val sizeBytes: Long? = null,
+        val updatedAtEpochMs: Long? = null,
+        val details: List<CacheDetailLine> = emptyList(),
+    ) : Route
+
+    @Serializable
+    data class CacheDetailLine(val label: String, val value: String)
+
+    @Serializable
     data object AiTranslationCache : Route
 
     @Serializable

@@ -228,6 +228,8 @@ object RootConstants {
     const val KEY_HOOK_AI_TRANS_MAX_TOKENS = "key_hook_ai_trans_max_tokens"
     const val KEY_HOOK_AMLL_TTML_ENABLE = "key_hook_amll_ttml_enable"
     const val KEY_HOOK_AMLL_TTML_PLATFORM_PROBE = "key_hook_amll_ttml_platform_probe"
+    const val KEY_HOOK_AMLL_TTML_API_BASE_URL = "key_hook_amll_ttml_api_base_url"
+    const val KEY_HOOK_AMLL_TTML_DUET_PERFORMANCE = "key_hook_amll_ttml_duet_performance"
 
     // ================= COLOR KEYS =================
     const val KEY_HOOK_TEXT_COLOR_STYLE = "key_hook_text_color_style"
@@ -519,6 +521,8 @@ object RootConstants {
     const val DEFAULT_HOOK_AI_TRANS_MAX_TOKENS = 0L
     const val DEFAULT_HOOK_AMLL_TTML_ENABLE = false
     const val DEFAULT_HOOK_AMLL_TTML_PLATFORM_PROBE = true
+    const val DEFAULT_HOOK_AMLL_TTML_API_BASE_URL = "https://api.amll.dev/"
+    const val DEFAULT_HOOK_AMLL_TTML_DUET_PERFORMANCE = true
     const val TEXT_COLOR_STYLE_DEFAULT = 0
     const val TEXT_COLOR_STYLE_COVER_COLOR = 1
     const val TEXT_COLOR_STYLE_COVER_GRADIENT = 2

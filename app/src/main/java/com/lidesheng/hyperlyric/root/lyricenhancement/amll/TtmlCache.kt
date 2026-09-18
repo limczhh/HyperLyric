@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 
+import com.lidesheng.hyperlyric.common.LyricEnhancementCacheDetail
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementLogger
@@ -12,8 +13,8 @@ import java.util.Collections
 /**
  * AMLL TTML 缓存。
  *
- * TTML 正文仍只保存在 SystemUI。新增的索引只保存歌名和歌手，用于缓存管理页面；resolve
- * 条目继续保持内部实现细节，不出现在列表中。
+ * TTML 正文仍只保存在 SystemUI。索引保存缓存管理页面需要的歌名、歌手、大小、时间和
+ * TTML 元数据；resolve 条目继续保持内部实现细节，不出现在列表中。
  */
 internal class TtmlCache(
     private val storage: LyricEnhancementCacheStore,
@@ -90,6 +91,7 @@ internal class TtmlCache(
         expectedGeneration: Long = currentGeneration(),
         title: String? = null,
         artist: String? = null,
+        details: List<LyricEnhancementCacheDetail> = emptyList(),
     ) {
         if (ttml.isEmpty()) return
         synchronized(lock) {
@@ -107,7 +109,10 @@ internal class TtmlCache(
             val record = CacheRecord(
                 key = physicalKey,
                 title = title.orEmpty().ifBlank { UNKNOWN_TITLE },
-                artist = artist.orEmpty().ifBlank { null }
+                artist = artist.orEmpty().ifBlank { null },
+                sizeBytes = ttml.toByteArray(Charsets.UTF_8).size.toLong(),
+                updatedAtEpochMs = System.currentTimeMillis(),
+                details = sanitizeDetails(details)
             )
             val updated = readIndexLocked().toMutableList().apply {
                 removeAll { it.key == physicalKey }
@@ -160,17 +165,22 @@ internal class TtmlCache(
 
     fun listEntries(): List<LyricEnhancementCacheEntry> = synchronized(lock) {
         readIndexLocked().asSequence()
-            .filter { record ->
-                runCatching { storage.getString(entryKey(record.key)) }
+            .mapNotNull { record ->
+                val body = runCatching { storage.getString(entryKey(record.key)) }
                     .onFailure { logger.warn("读取 TTML 缓存条目失败", it) }
-                    .getOrNull() != null
+                    .getOrNull() ?: return@mapNotNull null
+                record to body
             }
             .take(MAX_LIST_ENTRIES)
-            .map { record ->
+            .map { (record, body) ->
                 LyricEnhancementCacheEntry(
                     id = record.key,
                     title = record.title,
-                    artist = record.artist
+                    artist = record.artist,
+                    sizeBytes = record.sizeBytes
+                        ?: body.toByteArray(Charsets.UTF_8).size.toLong(),
+                    updatedAtEpochMs = record.updatedAtEpochMs,
+                    details = record.details
                 )
             }
             .toList()
@@ -233,7 +243,11 @@ internal class TtmlCache(
         return CacheRecord(
             key = key,
             title = json.optString("title", "").trim().ifBlank { UNKNOWN_TITLE },
-            artist = json.optString("artist", "").trim().takeIf { it.isNotBlank() }
+            artist = json.optString("artist", "").trim().takeIf { it.isNotBlank() },
+            sizeBytes = json.optLong("sizeBytes", -1L).takeIf { it >= 0L },
+            updatedAtEpochMs = json.optLong("updatedAtEpochMs", -1L)
+                .takeIf { it > 0L },
+            details = decodeDetails(json.optJSONArray("details"))
         )
     }
 
@@ -255,7 +269,10 @@ internal class TtmlCache(
         val record = CacheRecord(
             key = physicalKey,
             title = title.orEmpty().ifBlank { existing?.title ?: UNKNOWN_TITLE },
-            artist = artist.orEmpty().ifBlank { existing?.artist }
+            artist = artist.orEmpty().ifBlank { existing?.artist },
+            sizeBytes = existing?.sizeBytes,
+            updatedAtEpochMs = existing?.updatedAtEpochMs,
+            details = existing?.details.orEmpty()
         )
         if (existing?.title == record.title && existing.artist == record.artist) return
         writeIndexLocked(index.filterNot { it.key == physicalKey }.let { listOf(record) + it })
@@ -270,10 +287,59 @@ internal class TtmlCache(
                         .put("key", record.key)
                         .put("title", record.title)
                         .also { item -> record.artist?.let { item.put("artist", it) } }
+                        .also { item -> record.sizeBytes?.let { item.put("sizeBytes", it) } }
+                        .also { item ->
+                            record.updatedAtEpochMs?.let {
+                                item.put("updatedAtEpochMs", it)
+                            }
+                        }
+                        .also { item ->
+                            if (record.details.isNotEmpty()) {
+                                item.put("details", JSONArray().apply {
+                                    record.details.forEach { detail ->
+                                        put(
+                                            JSONObject()
+                                                .put("label", detail.label)
+                                                .put("value", detail.value)
+                                        )
+                                    }
+                                })
+                            }
+                        }
                 )
             }
         })
         .toString()
+
+    private fun decodeDetails(array: JSONArray?): List<LyricEnhancementCacheDetail> {
+        if (array == null) return emptyList()
+        return sanitizeDetails(buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val label = item.optString("label", "").trim()
+                val value = item.optString("value", "").trim()
+                if (label.isNotBlank() && value.isNotBlank()) {
+                    add(LyricEnhancementCacheDetail(label, value))
+                }
+            }
+        })
+    }
+
+    private fun sanitizeDetails(
+        details: List<LyricEnhancementCacheDetail>,
+    ): List<LyricEnhancementCacheDetail> = details.asSequence()
+        .mapNotNull { detail ->
+            val label = detail.label.trim().takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            val value = detail.value.trim().takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            LyricEnhancementCacheDetail(
+                label = label.take(32),
+                value = value.take(120)
+            )
+        }
+        .take(10)
+        .toList()
 
     private fun entryKey(physicalKey: String): String = ENTRY_PREFIX + physicalKey
 
@@ -281,6 +347,9 @@ internal class TtmlCache(
         val key: String,
         val title: String,
         val artist: String?,
+        val sizeBytes: Long? = null,
+        val updatedAtEpochMs: Long? = null,
+        val details: List<LyricEnhancementCacheDetail> = emptyList(),
     )
 
 }

@@ -601,7 +601,7 @@
     <string name="title_lyric_enhancement">歌词增强</string>
     <string name="title_openai_translation">OpenAI 翻译</string>
     <string name="title_amll_ttml">AMLL TTML 逐字歌词</string>
-    <string name="summary_amll_ttml">从 AMLL TTML 词库获取更高质量的逐字歌词，未命中时保持当前歌词源</string>
+    <string name="summary_amll_ttml">从 AMLL TTML DataBase 获取高质量逐字歌词（背景人声/翻译/罗马音），未命中时保持当前歌词源</string>
     <string name="summary_lyric_enhancement_unavailable">此歌词增强功能当前不可用</string>
     <string name="summary_lyric_enhancement_no_settings">此歌词增强功能没有可配置项</string>
     <string name="title_lyric_enhancement_basic_settings">基础设置</string>
@@ -616,7 +616,8 @@
     <string name="toast_lyric_enhancement_cache_requested">已请求 SystemUI 清除缓存</string>
     <string name="toast_lyric_enhancement_cache_failed">缓存清除失败</string>
     <string name="toast_lyric_enhancement_cache_unavailable">Xposed 服务不可用，请重启 SystemUI 后重试</string>
-    <string name="title_amll_ttml_cache">AMLL TTML 缓存</string>
+    <string name="title_amll_ttml_cache">AMLL 歌词缓存</string>
+    <string name="summary_amll_ttml_cache">查看已缓存的 AMLL TTML 歌词</string>
     <string name="title_ai_translation_cache">AI 翻译缓存</string>
     <string name="lyric_enhancement_cache_loading">正在读取缓存…</string>
     <string name="lyric_enhancement_cache_empty">暂无缓存</string>
@@ -658,5 +659,13 @@
     <string name="default_ai_translation_model">mimo-v2.5</string>
     <string name="title_amll_platform_probe">歌曲 ID 平台探测</string>
     <string name="summary_amll_platform_probe">将歌曲 ID 依次尝试网易云/QQ/Apple/Spotify 精确匹配并校验歌名歌手，关闭后仅按歌名歌手搜索</string>
+    <string name="title_amll_api_base_url">歌词 API 地址</string>
+    <string name="summary_amll_api_base_url">AMLL TTML 词库的 API 服务地址，默认为官方地址，可填写自建镜像加速访问；如果你不知道这个是什么，请不要修改。</string>
+    <string name="title_amll_duet_performance">启用对唱表演</string>
+    <string name="summary_amll_duet_performance">开启后，对唱歌曲的歌词会左右分侧对齐显示</string>
+    <string name="title_amll_ready_playlist">AMLL TTML Ready 歌单</string>
+    <string name="title_amll_ttml_database">想要为歌词库做出贡献？</string>
+    <string name="title_amll_ttml_cache_detail">歌词详情</string>
+    <string name="lyric_enhancement_cache_detail_empty">无详细信息</string>
 
 </resources>

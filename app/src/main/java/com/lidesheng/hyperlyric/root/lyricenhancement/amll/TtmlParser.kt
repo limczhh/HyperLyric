@@ -1,6 +1,8 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 
 import android.util.Xml
+import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_ALIGNMENT_RESOLVED
+import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_AGENT_TYPE
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
@@ -45,6 +47,7 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
         /** TTML 命名空间下的行/文本元素本地名 */
         private const val TAG_PARAGRAPH = "p"
         private const val TAG_SPAN = "span"
+        private const val TAG_AGENT = "agent"
 
         /** head iTunesMetadata 内的块级翻译元素本地名（transliterations 下的 transliteration 不含此名） */
         private const val TAG_ITUNES_TRANSLATION = "translation"
@@ -55,6 +58,7 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
         private const val ROLE_ROMAN = "x-roman"
 
         const val METADATA_KEY_AGENT = "amll:agent"
+        private const val DEFAULT_AGENT_ID = "v1"
 
         /** 间奏提示的最小行间隔（main 分支常量，v1 未使用，见类注释） */
         @Suppress("unused")
@@ -202,7 +206,8 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
      */
     fun parse(
         ttml: String,
-        preferredLang: String? = Locale.getDefault().toLanguageTag()
+        preferredLang: String? = Locale.getDefault().toLanguageTag(),
+        duetEnabled: Boolean = true,
     ): List<RichLyricLine>? {
         return try {
             val parser = Xml.newPullParser()
@@ -213,13 +218,19 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
                 logger.debug("TTML 解析为空: 无歌词行")
                 return null
             }
-            val lines = buildLines(doc.paragraphs, preferredLang, doc.itunesTranslations)
+            val lines = buildLines(
+                paragraphs = doc.paragraphs,
+                preferredLang = preferredLang,
+                itunesTranslations = doc.itunesTranslations,
+                agentTypes = doc.agentTypes
+            )
             if (lines.isEmpty()) {
                 logger.debug("TTML 解析为空: 无有效行")
                 return null
             }
-            logStats(lines)
-            lines
+            val alignedLines = applyDuetAlignment(lines, doc.agentTypes, duetEnabled)
+            logStats(alignedLines)
+            alignedLines
         } catch (e: Exception) {
             logger.debug("TTML 解析异常: type=${e.javaClass.simpleName}")
             null
@@ -231,7 +242,8 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
     /** 文档级解析结果：正文行 + head iTunesMetadata 块级翻译（itunes:key → 各语言候选） */
     private class ParsedDocument(
         val paragraphs: MutableList<ParsedParagraph> = mutableListOf(),
-        val itunesTranslations: MutableMap<String, MutableList<TranslationCandidate>> = mutableMapOf()
+        val itunesTranslations: MutableMap<String, MutableList<TranslationCandidate>> = mutableMapOf(),
+        val agentTypes: MutableMap<String, String> = mutableMapOf(),
     )
 
     private fun parseDocument(parser: XmlPullParser): ParsedDocument {
@@ -244,6 +256,14 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
                     // head 内 iTunesMetadata/translations 块级翻译（body 中无此标签名）
                     TAG_ITUNES_TRANSLATION ->
                         parseItunesTranslationBlock(parser, doc.itunesTranslations)
+                    TAG_AGENT -> {
+                        val id = attrValue(parser, "id")
+                        val type = attrValue(parser, "type")
+                        if (id != null && type != null) {
+                            doc.agentTypes[id] = type.lowercase(Locale.ROOT)
+                        }
+                        skipCurrentElement(parser)
+                    }
                 }
             }
             eventType = parser.next()
@@ -505,7 +525,8 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
     private fun buildLines(
         paragraphs: List<ParsedParagraph>,
         preferredLang: String?,
-        itunesTranslations: Map<String, List<TranslationCandidate>>
+        itunesTranslations: Map<String, List<TranslationCandidate>>,
+        agentTypes: Map<String, String>,
     ): List<RichLyricLine> {
         val merged = mutableListOf<RichLyricLine>()
         for (paragraph in paragraphs) {
@@ -516,7 +537,7 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
                     paragraph.translations.addAll(itunesTranslations[key].orEmpty())
                 }
             }
-            val line = buildLine(paragraph, preferredLang) ?: continue
+            val line = buildLine(paragraph, preferredLang, agentTypes) ?: continue
             val lastIndex = merged.lastIndex
             val last = merged.getOrNull(lastIndex)
             if (last != null && last.begin == line.begin) {
@@ -536,7 +557,11 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
         return regularizeLines(merged)
     }
 
-    private fun buildLine(paragraph: ParsedParagraph, preferredLang: String?): RichLyricLine? {
+    private fun buildLine(
+        paragraph: ParsedParagraph,
+        preferredLang: String?,
+        agentTypes: Map<String, String>,
+    ): RichLyricLine? {
         val bgText = buildString {
             paragraph.bgWords.forEach { append(it.text.orEmpty()) }
             append(paragraph.bgExtraText.toString().trim())
@@ -550,7 +575,14 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
 
         val begin = paragraph.begin.coerceAtLeast(0L)
         val end = if (paragraph.end >= paragraph.begin && paragraph.end >= 0) paragraph.end else begin
-        val metadata = paragraph.agent?.let { LyricMetadata(mapOf(METADATA_KEY_AGENT to it)) }
+        val metadataValues = mutableMapOf<String, String?>(
+            METADATA_KEY_ALIGNMENT_RESOLVED to "true"
+        )
+        paragraph.agent?.let { agent ->
+            metadataValues[METADATA_KEY_AGENT] = agent
+            agentTypes[agent]?.let { type -> metadataValues[METADATA_KEY_AGENT_TYPE] = type }
+        }
+        val metadata = LyricMetadata(metadataValues)
 
         if (mainText.isBlank()) {
             // 纯背景人声行（间奏和声等，主文本为空、仅有 x-bg）：背景人声是该行唯一内容，
@@ -590,6 +622,39 @@ internal class TtmlParser(private val logger: LyricEnhancementLogger) {
             translationWords = pickedTranslation?.words?.takeIf { it.isNotEmpty() },
             roma = if (hasBg) null else paragraph.romaText?.trim()?.takeIf { it.isNotBlank() }
         )
+    }
+
+    /** AMLL 官方声部约定：group 不参与切换，other 首位在右侧，其他声部交替切换。 */
+    private fun applyDuetAlignment(
+        lines: List<RichLyricLine>,
+        agentTypes: Map<String, String>,
+        enabled: Boolean,
+    ): List<RichLyricLine> {
+        var lastPersonAgentId: String? = null
+        var lastPersonIsDuet = false
+        return lines.map { line ->
+            val agentId = line.metadata?.getString(METADATA_KEY_AGENT) ?: DEFAULT_AGENT_ID
+            val type = agentTypes[agentId]
+            val isDuet = if (!enabled) {
+                false
+            } else {
+                when {
+                    type == "group" -> false
+                    lastPersonAgentId == null -> {
+                        lastPersonAgentId = agentId
+                        lastPersonIsDuet = type == "other"
+                        lastPersonIsDuet
+                    }
+                    lastPersonAgentId == agentId -> lastPersonIsDuet
+                    else -> {
+                        lastPersonAgentId = agentId
+                        lastPersonIsDuet = !lastPersonIsDuet
+                        lastPersonIsDuet
+                    }
+                }
+            }
+            line.copy(isAlignedRight = isDuet)
+        }
     }
 
     // ==================== 防御性时间轴规整（宿主校验适配） ====================

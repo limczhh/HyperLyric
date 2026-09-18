@@ -29,11 +29,19 @@ internal data class LyricEnhancementCacheOperationRequest(
     val createdAtEpochMs: Long = System.currentTimeMillis(),
 )
 
-/** Only the fields needed by the first cache-management UI. */
+/** Small, bounded metadata returned to the cache-management UI. */
+internal data class LyricEnhancementCacheDetail(
+    val label: String,
+    val value: String,
+)
+
 internal data class LyricEnhancementCacheEntry(
     val id: String,
     val title: String,
     val artist: String?,
+    val sizeBytes: Long? = null,
+    val updatedAtEpochMs: Long? = null,
+    val details: List<LyricEnhancementCacheDetail> = emptyList(),
 )
 
 internal data class LyricEnhancementCacheOperationResponse(
@@ -52,6 +60,9 @@ internal object LyricEnhancementCacheOperationCodec {
     const val MAX_ID_LENGTH = 128
     const val MAX_TITLE_LENGTH = 160
     const val MAX_ARTIST_LENGTH = 320
+    const val MAX_DETAILS_PER_ENTRY = 10
+    const val MAX_DETAIL_LABEL_LENGTH = 32
+    const val MAX_DETAIL_VALUE_LENGTH = 120
     const val RESPONSE_TTL_MS = 5 * 60 * 1000L
 
     private val requestIdPattern = Regex("[A-Za-z0-9][A-Za-z0-9._-]{7,79}")
@@ -131,7 +142,10 @@ internal object LyricEnhancementCacheOperationCodec {
                 LyricEnhancementCacheEntry(
                     id = id,
                     title = title,
-                    artist = entry.artist?.takeIf { it.isNotBlank() }?.take(MAX_ARTIST_LENGTH)
+                    artist = entry.artist?.takeIf { it.isNotBlank() }?.take(MAX_ARTIST_LENGTH),
+                    sizeBytes = entry.sizeBytes?.takeIf { it >= 0L },
+                    updatedAtEpochMs = entry.updatedAtEpochMs?.takeIf { it > 0L },
+                    details = sanitizeDetails(entry.details)
                 )
             )
         }
@@ -170,6 +184,21 @@ internal object LyricEnhancementCacheOperationCodec {
                                 .put("title", entry.title)
                                 .also { item ->
                                     entry.artist?.let { item.put("artist", it) }
+                                    entry.sizeBytes?.let { item.put("sizeBytes", it) }
+                                    entry.updatedAtEpochMs?.let {
+                                        item.put("updatedAtEpochMs", it)
+                                    }
+                                    if (entry.details.isNotEmpty()) {
+                                        item.put("details", JSONArray().apply {
+                                            entry.details.forEach { detail ->
+                                                put(
+                                                    JSONObject()
+                                                        .put("label", detail.label)
+                                                        .put("value", detail.value)
+                                                )
+                                            }
+                                        })
+                                    }
                                 }
                         )
                     }
@@ -189,7 +218,12 @@ internal object LyricEnhancementCacheOperationCodec {
                     LyricEnhancementCacheEntry(
                         id = id,
                         title = title,
-                        artist = item.optionalString("artist")
+                        artist = item.optionalString("artist"),
+                        sizeBytes = item.optLong("sizeBytes", -1L)
+                            .takeIf { it >= 0L },
+                        updatedAtEpochMs = item.optLong("updatedAtEpochMs", -1L)
+                            .takeIf { it > 0L },
+                        details = decodeDetails(item.optJSONArray("details"))
                     )
                 )
             }
@@ -232,4 +266,29 @@ internal object LyricEnhancementCacheOperationCodec {
 
     private fun JSONObject.optionalString(key: String): String? =
         opt(key)?.takeUnless { it === JSONObject.NULL }?.toString()
+
+    private fun sanitizeDetails(
+        details: List<LyricEnhancementCacheDetail>,
+    ): List<LyricEnhancementCacheDetail> = details.asSequence()
+        .mapNotNull { detail ->
+            val label = detail.label.takeIf { it.isNotBlank() }?.take(MAX_DETAIL_LABEL_LENGTH)
+                ?: return@mapNotNull null
+            val value = detail.value.takeIf { it.isNotBlank() }?.take(MAX_DETAIL_VALUE_LENGTH)
+                ?: return@mapNotNull null
+            LyricEnhancementCacheDetail(label, value)
+        }
+        .take(MAX_DETAILS_PER_ENTRY)
+        .toList()
+
+    private fun decodeDetails(array: JSONArray?): List<LyricEnhancementCacheDetail> {
+        if (array == null || array.length() > MAX_DETAILS_PER_ENTRY) return emptyList()
+        return buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val label = item.optionalString("label") ?: continue
+                val value = item.optionalString("value") ?: continue
+                add(LyricEnhancementCacheDetail(label, value))
+            }
+        }.let(::sanitizeDetails)
+    }
 }

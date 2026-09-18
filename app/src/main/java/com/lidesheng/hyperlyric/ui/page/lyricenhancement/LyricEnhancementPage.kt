@@ -1,9 +1,12 @@
 package com.lidesheng.hyperlyric.ui.page.lyricenhancement
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -12,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.AiTranslationLanguageSettings
@@ -48,6 +53,11 @@ private const val AI_KEY_MAX_TOKENS = RootConstants.KEY_HOOK_AI_TRANS_MAX_TOKENS
 
 private const val AMLL_KEY_ENABLED = RootConstants.KEY_HOOK_AMLL_TTML_ENABLE
 private const val AMLL_KEY_PLATFORM_PROBE = RootConstants.KEY_HOOK_AMLL_TTML_PLATFORM_PROBE
+private const val AMLL_KEY_API_BASE_URL = RootConstants.KEY_HOOK_AMLL_TTML_API_BASE_URL
+private const val AMLL_KEY_DUET_PERFORMANCE = RootConstants.KEY_HOOK_AMLL_TTML_DUET_PERFORMANCE
+
+private const val AMLL_READY_PLAYLIST_URL = "https://music.163.com/m/playlist?id=13303023713"
+private const val AMLL_TTML_DB_URL = "https://github.com/amll-dev/amll-ttml-db"
 
 @Composable
 fun LyricEnhancementPage() {
@@ -515,12 +525,30 @@ private fun AmllTtmlSettingsPage() {
     val prefs = rememberLyricEnhancementPrefs()
     val saveConfig = rememberLyricEnhancementConfigSaver(prefs)
     val navigator = LocalNavigator.current
+    val context = LocalContext.current
     var enabled by remember(prefs) {
         mutableStateOf(prefs.getBoolean(AMLL_KEY_ENABLED, false))
     }
     var platformProbe by remember(prefs) {
         mutableStateOf(prefs.getBoolean(AMLL_KEY_PLATFORM_PROBE, true))
     }
+    var apiBaseUrl by remember(prefs) {
+        mutableStateOf(
+            prefs.getString(
+                AMLL_KEY_API_BASE_URL,
+                RootConstants.DEFAULT_HOOK_AMLL_TTML_API_BASE_URL
+            ) ?: RootConstants.DEFAULT_HOOK_AMLL_TTML_API_BASE_URL
+        )
+    }
+    var duetPerformance by remember(prefs) {
+        mutableStateOf(
+            prefs.getBoolean(
+                AMLL_KEY_DUET_PERFORMANCE,
+                RootConstants.DEFAULT_HOOK_AMLL_TTML_DUET_PERFORMANCE
+            )
+        )
+    }
+    var showApiBaseUrlDialog by remember { mutableStateOf(false) }
 
     XposedLyricSettingPage(title = stringResource(R.string.title_amll_ttml)) {
         item(key = "amll_enable") {
@@ -557,6 +585,41 @@ private fun AmllTtmlSettingsPage() {
                         saveConfig(AMLL_KEY_PLATFORM_PROBE, it)
                     }
                 )
+                ArrowPreference(
+                    title = stringResource(R.string.title_amll_api_base_url),
+                    summary = apiBaseUrl,
+                    onClick = { showApiBaseUrlDialog = true }
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.title_amll_duet_performance),
+                    summary = stringResource(R.string.summary_amll_duet_performance),
+                    enabled = enabled,
+                    checked = duetPerformance,
+                    onCheckedChange = {
+                        duetPerformance = it
+                        saveConfig(AMLL_KEY_DUET_PERFORMANCE, it)
+                    }
+                )
+                ArrowPreference(
+                    title = stringResource(R.string.title_amll_ready_playlist),
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(AMLL_READY_PLAYLIST_URL))
+                            )
+                        }
+                    }
+                )
+                ArrowPreference(
+                    title = stringResource(R.string.title_amll_ttml_database),
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(AMLL_TTML_DB_URL))
+                            )
+                        }
+                    }
+                )
             }
         }
         item(key = "amll_cache_title") {
@@ -571,12 +634,25 @@ private fun AmllTtmlSettingsPage() {
             ) {
                 ArrowPreference(
                     title = stringResource(R.string.title_lyric_enhancement_cache_manage),
-                    summary = stringResource(R.string.summary_lyric_enhancement_cache_manage),
+                    summary = stringResource(R.string.summary_amll_ttml_cache),
                     onClick = { navigator.navigate(Route.AmllTtmlCache) }
                 )
             }
         }
     }
+
+    TextInputDialog(
+        show = showApiBaseUrlDialog,
+        title = stringResource(R.string.title_amll_api_base_url),
+        summary = stringResource(R.string.summary_amll_api_base_url),
+        initialValue = apiBaseUrl,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        onDismiss = { showApiBaseUrlDialog = false },
+        onConfirm = {
+            apiBaseUrl = it.trim()
+            saveConfig(AMLL_KEY_API_BASE_URL, apiBaseUrl)
+        }
+    )
 }
 
 @Composable
