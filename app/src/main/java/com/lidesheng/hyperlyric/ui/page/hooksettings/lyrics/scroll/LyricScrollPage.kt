@@ -14,6 +14,9 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSe
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookConfigSaver
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookPrefs
 
+private const val MAX_LYRIC_MARQUEE_DELAY_MS = 10_000
+private const val MAX_METADATA_MARQUEE_DELAY_MS = 20_000
+
 @Composable
 fun LyricScrollPage() {
     val prefs = rememberHookPrefs()
@@ -142,7 +145,7 @@ fun LyricScrollPage() {
         label = stringResource(id = R.string.label_marquee_delay_range),
         initialValue = marqueeDelay,
         min = 0,
-        max = 5000,
+        max = MAX_LYRIC_MARQUEE_DELAY_MS,
         onDismiss = { showMarqueeDelayDialog = false },
         onConfirm = { value ->
             marqueeDelay = value
@@ -155,7 +158,7 @@ fun LyricScrollPage() {
         label = stringResource(id = R.string.label_marquee_loop_range),
         initialValue = marqueeLoop,
         min = 0,
-        max = 5000,
+        max = MAX_LYRIC_MARQUEE_DELAY_MS,
         onDismiss = { showMarqueeLoopDialog = false },
         onConfirm = { value ->
             marqueeLoop = value
@@ -178,10 +181,10 @@ fun LyricScrollPage() {
     NumberInputDialog(
         show = showMarqueeMetadataDelayDialog,
         title = stringResource(id = R.string.title_marquee_metadata_delay),
-        label = stringResource(id = R.string.label_marquee_delay_range),
+        label = stringResource(id = R.string.label_marquee_metadata_delay_range),
         initialValue = marqueeMetadataDelay,
         min = 0,
-        max = 10000,
+        max = MAX_METADATA_MARQUEE_DELAY_MS,
         onDismiss = { showMarqueeMetadataDelayDialog = false },
         onConfirm = { value ->
             marqueeMetadataDelay = value
@@ -191,10 +194,10 @@ fun LyricScrollPage() {
     NumberInputDialog(
         show = showMarqueeMetadataLoopDialog,
         title = stringResource(id = R.string.title_marquee_metadata_loop),
-        label = stringResource(id = R.string.label_marquee_loop_range),
+        label = stringResource(id = R.string.label_marquee_metadata_loop_range),
         initialValue = marqueeMetadataLoopDelay,
         min = 0,
-        max = 10000,
+        max = MAX_METADATA_MARQUEE_DELAY_MS,
         onDismiss = { showMarqueeMetadataLoopDialog = false },
         onConfirm = { value ->
             marqueeMetadataLoopDelay = value

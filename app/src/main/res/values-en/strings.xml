@@ -297,6 +297,8 @@
     <string name="title_marquee_metadata_delay">Initial Marquee Delay</string>
     <string name="title_marquee_metadata_loop">Loop Interval</string>
     <string name="title_marquee_metadata_infinite">Infinite Loop</string>
+    <string name="label_marquee_metadata_delay_range">ms Range: 0 ~ 20000</string>
+    <string name="label_marquee_metadata_loop_range">ms Range: 0 ~ 20000</string>
     <string name="title_marquee_delay">Initial Marquee Delay</string>
     <string name="label_marquee_delay_range">ms Range: 0 ~ 10000</string>
     <string name="title_marquee_loop">Loop Interval</string>

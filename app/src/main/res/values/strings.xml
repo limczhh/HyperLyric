@@ -296,6 +296,8 @@
     <string name="title_marquee_metadata_delay">初始滚动延迟</string>
     <string name="title_marquee_metadata_loop">循环间隔</string>
     <string name="title_marquee_metadata_infinite">无限循环</string>
+    <string name="label_marquee_metadata_delay_range">ms 范围：0 ~ 20000</string>
+    <string name="label_marquee_metadata_loop_range">ms 范围：0 ~ 20000</string>
     <string name="title_marquee_delay">初始滚动延迟</string>
     <string name="label_marquee_delay_range">ms 范围：0 ~ 10000</string>
     <string name="title_marquee_loop">循环间隔</string>
