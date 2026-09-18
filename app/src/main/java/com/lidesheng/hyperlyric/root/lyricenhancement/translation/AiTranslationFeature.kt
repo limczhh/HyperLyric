@@ -55,6 +55,7 @@ internal class AiTranslationFeature(
     fun enhance(
         song: Song,
         input: LyricEnhancementInput,
+        enhancedSong: Song? = null,
     ): Song? {
         return try {
             val config = AiTranslationConfig.from(preferences)
@@ -69,7 +70,11 @@ internal class AiTranslationFeature(
             if (
                 config.skipExisting &&
                 !config.forceOverride &&
-                lyrics.any { !it.translation.isNullOrBlank() }
+                (
+                    lyrics.any { TranslationApplicator.hasTranslation(it) } ||
+                            enhancedSong?.lyrics.orEmpty()
+                                .any { TranslationApplicator.hasTranslation(it) }
+                    )
             ) {
                 gatewayLogger.debug(
                     "跳过 AI 翻译: reason=existing_translation, song=${querySong.name}"
@@ -116,7 +121,16 @@ internal class AiTranslationFeature(
                 config = config,
                 sourcePackageName = input.mediaInfo?.sourcePackageName
             )?.let { translated ->
-                song.copy(lyrics = translated.lyrics)
+                if (enhancedSong == null) {
+                    song.copy(lyrics = translated.lyrics)
+                } else {
+                    TranslationApplicator.merge(
+                        sourceSong = translated,
+                        targetSong = enhancedSong,
+                        forceOverride = config.forceOverride,
+                        logger = translatorLogger.withTag("Applicator")
+                    )
+                }
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()

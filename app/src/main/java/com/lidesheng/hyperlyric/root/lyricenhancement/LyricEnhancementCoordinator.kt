@@ -9,6 +9,7 @@ import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.root.lyricenhancement.amll.AmllTtmlFeature
 import com.lidesheng.hyperlyric.root.lyricenhancement.translation.AiTranslationFeature
+import com.lidesheng.hyperlyric.root.lyricenhancement.translation.TranslationApplicator
 import io.github.libxposed.api.XposedModule
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -100,18 +101,29 @@ internal class LyricEnhancementCoordinator(
                     amllFeature.enhance(sourceSong.deepCopy(), input)
                 }?.let { candidate ->
                     acceptLyricsOnly(sourceSong, candidate, "AmllTtml")
+                }?.let { enhancedSong ->
+                    TranslationApplicator.merge(
+                        sourceSong = sourceSong,
+                        targetSong = enhancedSong,
+                        forceOverride = false,
+                        logger = logger.withTag("TranslationMerge")
+                    ) ?: enhancedSong
                 }
             }
 
             if (!isActive || currentGeneration != generation.get()) return@launch
-            if (result == null &&
-                aiTranslationFeature?.let { isFeatureEnabled { it.isEnabled() } } == true
+            if (aiTranslationFeature?.let { isFeatureEnabled { it.isEnabled() } } == true
             ) {
-                result = runFeature("AiTranslation") {
-                    aiTranslationFeature.enhance(sourceSong.deepCopy(), input)
+                val translated = runFeature("AiTranslation") {
+                    aiTranslationFeature.enhance(
+                        song = sourceSong.deepCopy(),
+                        input = input,
+                        enhancedSong = result?.deepCopy()
+                    )
                 }?.let { candidate ->
                     acceptLyricsOnly(sourceSong, candidate, "AiTranslation")
                 }
+                if (translated != null) result = translated
             }
 
             if (!isActive || currentGeneration != generation.get()) return@launch
