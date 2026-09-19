@@ -53,20 +53,22 @@ object LyricStyleHelper {
                 mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO
 
         val isLyricMode = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
-        val centerIfPossible = if (isLyricMode) {
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_CENTER_LYRIC,
-                RootConstants.DEFAULT_HOOK_CENTER_LYRIC
+        val contentAlignment = RootConstants.normalizeHookContentAlignment(
+            prefs.getInt(
+                if (isLyricMode) {
+                    RootConstants.KEY_HOOK_LYRIC_ALIGNMENT
+                } else {
+                    RootConstants.KEY_HOOK_MUSIC_INFO_ALIGNMENT
+                },
+                if (isLyricMode) {
+                    RootConstants.DEFAULT_HOOK_LYRIC_ALIGNMENT
+                } else {
+                    RootConstants.DEFAULT_HOOK_MUSIC_INFO_ALIGNMENT
+                }
             )
-        } else {
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_CENTER_MUSIC_INFO,
-                prefs.getBoolean(
-                    RootConstants.KEY_HOOK_CENTER_LYRIC,
-                    RootConstants.DEFAULT_HOOK_CENTER_MUSIC_INFO
-                )
-            )
-        }
+        )
+        val centerIfPossible = contentAlignment == RootConstants.CONTENT_ALIGNMENT_CENTER
+        val rightIfPossible = contentAlignment == RootConstants.CONTENT_ALIGNMENT_RIGHT
         val isMarqueeEnabled = if (isLyricMode) {
             prefs.getBoolean(
                 RootConstants.KEY_HOOK_MARQUEE_MODE,
@@ -245,10 +247,7 @@ object LyricStyleHelper {
             ),
             placeholder = TitleSlot.NONE,
             centerIfPossible = centerIfPossible,
-            rightIfPossible = isLyricMode && prefs.getBoolean(
-                RootConstants.KEY_HOOK_RIGHT_LYRIC,
-                RootConstants.DEFAULT_HOOK_RIGHT_LYRIC
-            ),
+            rightIfPossible = rightIfPossible,
         )
     }
 }

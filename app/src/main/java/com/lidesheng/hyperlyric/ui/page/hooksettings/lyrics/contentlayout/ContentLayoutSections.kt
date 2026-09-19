@@ -77,6 +77,30 @@ internal enum class ContentLayoutField(
     )
 }
 
+internal enum class ContentLayoutAlignment(
+    val value: Int,
+    @param:StringRes val labelRes: Int
+) {
+    Left(
+        value = RootConstants.CONTENT_ALIGNMENT_LEFT,
+        labelRes = R.string.content_layout_alignment_left
+    ),
+    Center(
+        value = RootConstants.CONTENT_ALIGNMENT_CENTER,
+        labelRes = R.string.content_layout_alignment_center
+    ),
+    Right(
+        value = RootConstants.CONTENT_ALIGNMENT_RIGHT,
+        labelRes = R.string.content_layout_alignment_right
+    );
+
+    companion object {
+        fun fromValue(value: Int): ContentLayoutAlignment {
+            return values().firstOrNull { it.value == value } ?: Left
+        }
+    }
+}
+
 internal enum class ContentLayoutSeparator(
     val key: String,
     @param:StringRes val labelRes: Int
@@ -120,12 +144,10 @@ internal fun LazyListScope.contentLayoutSections(
     separator: ContentLayoutSeparator,
     onEditField: (Int) -> Unit,
     onSeparatorChange: (ContentLayoutSeparator) -> Unit,
-    centerMusicInfo: Boolean,
-    onCenterMusicInfoChange: (Boolean) -> Unit,
-    centerLyric: Boolean,
-    onCenterLyricChange: (Boolean) -> Unit,
-    rightLyric: Boolean,
-    onRightLyricChange: (Boolean) -> Unit,
+    musicInfoAlignment: ContentLayoutAlignment,
+    onMusicInfoAlignmentChange: (ContentLayoutAlignment) -> Unit,
+    lyricAlignment: ContentLayoutAlignment,
+    onLyricAlignmentChange: (ContentLayoutAlignment) -> Unit,
     placeholderFormat: Int,
     onPlaceholderFormatChange: (Int) -> Unit,
     hideTitleAlias: Boolean,
@@ -174,10 +196,17 @@ internal fun LazyListScope.contentLayoutSections(
                         ContentLayoutSeparator.values().getOrNull(index)?.let(onSeparatorChange)
                     }
                 )
-                SwitchPreference(
-                    title = stringResource(id = R.string.title_center_music_info),
-                    checked = centerMusicInfo,
-                    onCheckedChange = onCenterMusicInfoChange
+                OverlayDropdownPreference(
+                    title = stringResource(id = R.string.title_content_layout_alignment),
+                    items = ContentLayoutAlignment.values().map { alignment ->
+                        stringResource(id = alignment.labelRes)
+                    },
+                    selectedIndex = musicInfoAlignment.ordinal,
+                    onSelectedIndexChange = { index ->
+                        ContentLayoutAlignment.values().getOrNull(index)?.let(
+                            onMusicInfoAlignmentChange
+                        )
+                    }
                 )
                 SwitchPreference(
                     title = stringResource(id = R.string.title_hide_title_alias),
@@ -205,15 +234,17 @@ internal fun LazyListScope.contentLayoutSections(
                 .fillMaxWidth()
         ) {
             Column {
-                SwitchPreference(
-                    title = stringResource(id = R.string.title_center_lyric),
-                    checked = centerLyric,
-                    onCheckedChange = onCenterLyricChange
-                )
-                SwitchPreference(
-                    title = stringResource(id = R.string.title_right_lyric),
-                    checked = rightLyric,
-                    onCheckedChange = onRightLyricChange
+                OverlayDropdownPreference(
+                    title = stringResource(id = R.string.title_content_layout_alignment),
+                    items = ContentLayoutAlignment.values().map { alignment ->
+                        stringResource(id = alignment.labelRes)
+                    },
+                    selectedIndex = lyricAlignment.ordinal,
+                    onSelectedIndexChange = { index ->
+                        ContentLayoutAlignment.values().getOrNull(index)?.let(
+                            onLyricAlignmentChange
+                        )
+                    }
                 )
                 OverlayDropdownPreference(
                     title = stringResource(id = R.string.title_placeholder_format),

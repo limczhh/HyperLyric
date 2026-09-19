@@ -173,9 +173,8 @@ object RootConstants {
     const val KEY_HOOK_FONT_ITALIC = "key_hook_font_italic"
     const val KEY_HOOK_FADING_EDGE_LENGTH = "key_hook_fading_edge_length"
     const val KEY_HOOK_GRADIENT_PROGRESS = "key_hook_gradient_progress"
-    const val KEY_HOOK_CENTER_LYRIC = "key_hook_center_lyric"
-    const val KEY_HOOK_CENTER_MUSIC_INFO = "key_hook_center_music_info"
-    const val KEY_HOOK_RIGHT_LYRIC = "key_hook_right_lyric"
+    const val KEY_HOOK_LYRIC_ALIGNMENT = "key_hook_lyric_alignment"
+    const val KEY_HOOK_MUSIC_INFO_ALIGNMENT = "key_hook_music_info_alignment"
     const val KEY_HOOK_PLACEHOLDER_FORMAT = "key_hook_placeholder_format"
     const val KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE = "key_hook_island_music_wave_style"
 
@@ -458,9 +457,18 @@ object RootConstants {
     const val DEFAULT_HOOK_NARROW_LATIN_FONT = false
     const val DEFAULT_HOOK_FADING_EDGE_LENGTH = 15
     const val DEFAULT_HOOK_GRADIENT_PROGRESS = true
-    const val DEFAULT_HOOK_CENTER_LYRIC = false
-    const val DEFAULT_HOOK_CENTER_MUSIC_INFO = false
-    const val DEFAULT_HOOK_RIGHT_LYRIC = false
+    const val CONTENT_ALIGNMENT_LEFT = 0
+    const val CONTENT_ALIGNMENT_CENTER = 1
+    const val CONTENT_ALIGNMENT_RIGHT = 2
+    const val DEFAULT_HOOK_LYRIC_ALIGNMENT = CONTENT_ALIGNMENT_LEFT
+    const val DEFAULT_HOOK_MUSIC_INFO_ALIGNMENT = CONTENT_ALIGNMENT_LEFT
+
+    fun normalizeHookContentAlignment(value: Int): Int {
+        return value.takeIf {
+            it in CONTENT_ALIGNMENT_LEFT..CONTENT_ALIGNMENT_RIGHT
+        } ?: CONTENT_ALIGNMENT_LEFT
+    }
+
     const val PLACEHOLDER_FORMAT_NONE = 0
     const val PLACEHOLDER_FORMAT_TITLE_ARTIST = 1
     const val PLACEHOLDER_FORMAT_TITLE = 2

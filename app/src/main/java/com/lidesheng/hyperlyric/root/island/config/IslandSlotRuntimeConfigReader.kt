@@ -169,20 +169,17 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_GRADIENT_PROGRESS,
                 RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS
             ),
-            centerLyric = prefs.getBoolean(
-                RootConstants.KEY_HOOK_CENTER_LYRIC,
-                RootConstants.DEFAULT_HOOK_CENTER_LYRIC
-            ),
-            centerMusicInfo = prefs.getBoolean(
-                RootConstants.KEY_HOOK_CENTER_MUSIC_INFO,
-                prefs.getBoolean(
-                    RootConstants.KEY_HOOK_CENTER_LYRIC,
-                    RootConstants.DEFAULT_HOOK_CENTER_MUSIC_INFO
+            lyricAlignment = RootConstants.normalizeHookContentAlignment(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_LYRIC_ALIGNMENT,
+                    RootConstants.DEFAULT_HOOK_LYRIC_ALIGNMENT
                 )
             ),
-            rightLyric = prefs.getBoolean(
-                RootConstants.KEY_HOOK_RIGHT_LYRIC,
-                RootConstants.DEFAULT_HOOK_RIGHT_LYRIC
+            musicInfoAlignment = RootConstants.normalizeHookContentAlignment(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_MUSIC_INFO_ALIGNMENT,
+                    RootConstants.DEFAULT_HOOK_MUSIC_INFO_ALIGNMENT
+                )
             ),
             lyricAnimationEnabled = prefs.getBoolean(
                 RootConstants.KEY_HOOK_ANIM_ENABLE,
@@ -300,6 +297,7 @@ internal object IslandSlotRuntimeConfigReader {
             "rhythm=${config.geometry.showRhythm}",
             "pause=${config.pauseBehavior}",
             "text=${config.textSizeSp}/${config.textSizeRatio}/${config.fontWeight}/${config.fontItalic}",
+            "alignment=${config.musicInfoAlignment}/${config.lyricAlignment}",
             "animation=${config.lyricAnimationEnabled}:${config.lyricAnimationId}:${config.lyricAnimationSpeedRate}",
             "marquee=${config.lyricMarqueeEnabled}:${config.lyricMarqueeSpeed}",
             "metadataMarquee=${config.metadataMarqueeEnabled}:${config.metadataMarqueeSpeed}",

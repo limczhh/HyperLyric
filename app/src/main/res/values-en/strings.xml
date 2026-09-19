@@ -402,7 +402,10 @@
     <string name="summary_content_layout">Customize music information and lyric layout</string>
     <string name="title_content_layout_music_info">Music information</string>
     <string name="title_content_layout_lyric">Lyrics</string>
-    <string name="title_center_music_info">Center display</string>
+    <string name="title_content_layout_alignment">Alignment</string>
+    <string name="content_layout_alignment_left">Left</string>
+    <string name="content_layout_alignment_center">Center</string>
+    <string name="content_layout_alignment_right">Right</string>
     <string name="title_hide_title_alias">Hide title alias</string>
     <string name="summary_hide_title_alias">Remove bracketed aliases from the song title, e.g. show only the main name; other information may be removed accidentally</string>
     <string name="title_content_layout_first_line">First line</string>
@@ -554,8 +557,6 @@
 
     <string name="channel_name_live">Live Update Notification Lyrics</string>
     <string name="channel_name_focus">Xiaomi Notification Spotlight Lyrics</string>
-    <string name="title_center_lyric">Center Lyric</string>
-    <string name="title_right_lyric">Right-align Lyrics</string>
 
     <!-- Shizuku Bypass Limits -->
     <string name="title_bypass_focus_limit">Bypass focus notification limit</string>

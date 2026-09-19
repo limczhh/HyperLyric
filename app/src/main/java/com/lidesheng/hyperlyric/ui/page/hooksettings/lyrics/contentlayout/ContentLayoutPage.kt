@@ -44,30 +44,27 @@ fun ContentLayoutPage() {
             } ?: ContentLayoutSeparator.Hyphen
         )
     }
-    var centerMusicInfo by remember(prefs) {
+    var musicInfoAlignment by remember(prefs) {
         mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_CENTER_MUSIC_INFO,
-                prefs.getBoolean(
-                    RootConstants.KEY_HOOK_CENTER_LYRIC,
-                    RootConstants.DEFAULT_HOOK_CENTER_MUSIC_INFO
+            ContentLayoutAlignment.fromValue(
+                RootConstants.normalizeHookContentAlignment(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_MUSIC_INFO_ALIGNMENT,
+                        RootConstants.DEFAULT_HOOK_MUSIC_INFO_ALIGNMENT
+                    )
                 )
             )
         )
     }
-    var centerLyric by remember(prefs) {
+    var lyricAlignment by remember(prefs) {
         mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_CENTER_LYRIC,
-                RootConstants.DEFAULT_HOOK_CENTER_LYRIC
-            )
-        )
-    }
-    var rightLyric by remember(prefs) {
-        mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_RIGHT_LYRIC,
-                RootConstants.DEFAULT_HOOK_RIGHT_LYRIC
+            ContentLayoutAlignment.fromValue(
+                RootConstants.normalizeHookContentAlignment(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_LYRIC_ALIGNMENT,
+                        RootConstants.DEFAULT_HOOK_LYRIC_ALIGNMENT
+                    )
+                )
             )
         )
     }
@@ -207,28 +204,15 @@ fun ContentLayoutPage() {
                     it.key
                 )
             },
-            centerMusicInfo = centerMusicInfo,
-            onCenterMusicInfoChange = {
-                centerMusicInfo = it
-                PrefsBridge.putBoolean(RootConstants.KEY_HOOK_CENTER_MUSIC_INFO, it)
+            musicInfoAlignment = musicInfoAlignment,
+            onMusicInfoAlignmentChange = {
+                musicInfoAlignment = it
+                PrefsBridge.putInt(RootConstants.KEY_HOOK_MUSIC_INFO_ALIGNMENT, it.value)
             },
-            centerLyric = centerLyric,
-            onCenterLyricChange = {
-                centerLyric = it
-                if (it && rightLyric) {
-                    rightLyric = false
-                    PrefsBridge.putBoolean(RootConstants.KEY_HOOK_RIGHT_LYRIC, false)
-                }
-                PrefsBridge.putBoolean(RootConstants.KEY_HOOK_CENTER_LYRIC, it)
-            },
-            rightLyric = rightLyric,
-            onRightLyricChange = {
-                rightLyric = it
-                if (it && centerLyric) {
-                    centerLyric = false
-                    PrefsBridge.putBoolean(RootConstants.KEY_HOOK_CENTER_LYRIC, false)
-                }
-                PrefsBridge.putBoolean(RootConstants.KEY_HOOK_RIGHT_LYRIC, it)
+            lyricAlignment = lyricAlignment,
+            onLyricAlignmentChange = {
+                lyricAlignment = it
+                PrefsBridge.putInt(RootConstants.KEY_HOOK_LYRIC_ALIGNMENT, it.value)
             },
             placeholderFormat = placeholderFormat,
             onPlaceholderFormatChange = {

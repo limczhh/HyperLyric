@@ -407,7 +407,10 @@
     <string name="summary_content_layout">音乐信息、歌词布局自定义</string>
     <string name="title_content_layout_music_info">音乐信息</string>
     <string name="title_content_layout_lyric">歌词</string>
-    <string name="title_center_music_info">居中显示</string>
+    <string name="title_content_layout_alignment">对齐方式</string>
+    <string name="content_layout_alignment_left">左对齐</string>
+    <string name="content_layout_alignment_center">居中</string>
+    <string name="content_layout_alignment_right">右对齐</string>
     <string name="title_hide_title_alias">隐藏歌名别名</string>
     <string name="summary_hide_title_alias">移除歌名中括号内的别名，可能会误删信息，请谨慎开启</string>
     <string name="title_content_layout_first_line">第一行</string>
@@ -563,8 +566,6 @@
 
     <string name="channel_name_live">实时通知歌词</string>
     <string name="channel_name_focus">焦点通知歌词</string>
-    <string name="title_center_lyric">居中显示</string>
-    <string name="title_right_lyric">歌词右对齐</string>
 
     <!-- Shizuku 绕过限制相关 -->
     <string name="title_bypass_focus_limit">绕过焦点通知限制</string>
