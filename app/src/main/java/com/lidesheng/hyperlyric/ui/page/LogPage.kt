@@ -79,11 +79,13 @@ fun LogPage() {
     // 应用日志状态
     val appLogs = remember { mutableStateListOf<LogEntry>() }
     var appIsLoading by remember { mutableStateOf(true) }
+    var appHasLoaded by remember { mutableStateOf(false) }
     var appSelectedLevel by remember { mutableStateOf("ALL") }
 
     // 模块日志状态
     val moduleLogs = remember { mutableStateListOf<LogEntry>() }
     var moduleIsLoading by remember { mutableStateOf(true) }
+    var moduleHasLoaded by remember { mutableStateOf(false) }
     var moduleSelectedLevel by remember { mutableStateOf("ALL") }
 
     var showMorePopup by remember { mutableStateOf(false) }
@@ -105,6 +107,7 @@ fun LogPage() {
                 if (elapsed < 300) kotlinx.coroutines.delay(300 - elapsed)
                 appLogs.clear()
                 appLogs.addAll(logs)
+                appHasLoaded = true
                 appIsLoading = false
             }
         }
@@ -120,6 +123,7 @@ fun LogPage() {
                 if (elapsed < 300) kotlinx.coroutines.delay(300 - elapsed)
                 moduleLogs.clear()
                 moduleLogs.addAll(logs)
+                moduleHasLoaded = true
                 moduleIsLoading = false
             }
         }
@@ -318,6 +322,7 @@ fun LogPage() {
                 val isApp = page == 0
                 val currentLogs = if (isApp) filteredAppLogs else filteredModuleLogs
                 val currentLoading = if (isApp) appIsLoading else moduleIsLoading
+                val currentHasLoaded = if (isApp) appHasLoaded else moduleHasLoaded
                 val top = padding.calculateTopPadding()
                 val bottom = padding.calculateBottomPadding()
                 val contentPadding = remember(top, bottom) {
@@ -326,7 +331,8 @@ fun LogPage() {
 
                 LogTabContent(
                     logs = currentLogs,
-                    isLoading = currentLoading,
+                    isInitialLoading = currentLoading && !currentHasLoaded,
+                    isRefreshing = currentLoading && currentHasLoaded,
                     onRefresh = { if (isApp) reloadAppLogs() else reloadModuleLogs() },
                     topAppBarScrollBehavior = topAppBarScrollBehavior,
                     contentPadding = contentPadding,
