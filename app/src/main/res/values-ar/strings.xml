@@ -376,7 +376,10 @@
   <string name="summary_content_layout">تخصيص تخطيط معلومات الموسيقى والكلمات</string>
   <string name="title_content_layout_music_info">معلومات الموسيقى</string>
   <string name="title_content_layout_lyric">الكلمات</string>
-  <string name="title_center_music_info">عرض في المنتصف</string>
+  <string name="title_content_layout_alignment">المحاذاة</string>
+  <string name="content_layout_alignment_left">محاذاة لليسار</string>
+  <string name="content_layout_alignment_center">توسيط</string>
+  <string name="content_layout_alignment_right">محاذاة لليمين</string>
   <string name="title_hide_title_alias">إخفاء الاسم البديل للأغنية</string>
   <string name="summary_hide_title_alias">إزالة الأسماء البديلة بين الأقواس من اسم الأغنية، وقد يؤدي ذلك إلى حذف معلومات أخرى بالخطأ</string>
   <string name="title_content_layout_first_line">السطر الأول</string>
@@ -508,8 +511,6 @@
   <string name="format_export_time">وقت التصدير: %1$s</string>
   <string name="channel_name_live">كلمات إشعار التحديث المباشر</string>
   <string name="channel_name_focus">كلمات بؤرة إشعارات شاومي</string>
-  <string name="title_center_lyric">الكلمات في المنتصف</string>
-  <string name="title_right_lyric">محاذاة الكلمات لليمين</string>
   <string name="title_bypass_focus_limit">تجاوز حد إشعار البؤرة</string>
   <string name="summary_bypass_focus_limit">ميزة تجريبية، فعّلها وانت واخد بالك</string>
   <string name="toast_shizuku_not_running">Shizuku مش شغّال</string>
