@@ -1,5 +1,7 @@
 package com.lidesheng.hyperlyric.root.mediacard.island.layout.coloros
 
+import android.content.res.ColorStateList
+import android.graphics.BlendMode
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
 import android.view.View
@@ -24,7 +26,8 @@ internal object IslandExpandedMediaColorOsAccessoryController {
     fun apply(
         views: IslandExpandedMediaColorOsAccessoryViews,
         hideDeviceSwitch: Boolean,
-        hideCustomActions: Boolean
+        hideCustomActions: Boolean,
+        foregroundColor: Int?
     ) {
         val state = synchronized(states) {
             val existing = states[views.player]
@@ -44,7 +47,7 @@ internal object IslandExpandedMediaColorOsAccessoryController {
         if (hideDeviceSwitch || hideCustomActions) {
             state.restoreAction4()
         } else {
-            state.applyDeviceSwitchToAction4()
+            state.applyDeviceSwitchToAction4(foregroundColor)
         }
     }
 
@@ -56,7 +59,8 @@ internal object IslandExpandedMediaColorOsAccessoryController {
         fakeExpandedView: View,
         reference: IslandExpandedMediaColorOsAccessoryViews,
         hideDeviceSwitch: Boolean,
-        hideCustomActions: Boolean
+        hideCustomActions: Boolean,
+        foregroundColor: Int?
     ) {
         val fakeRoot = fakeExpandedView as? ViewGroup ?: return
         val container = fakeRoot.findViewById<View>(reference.container.id) as? ViewGroup
@@ -80,7 +84,8 @@ internal object IslandExpandedMediaColorOsAccessoryController {
                 action4 = action4
             ),
             hideDeviceSwitch = hideDeviceSwitch,
-            hideCustomActions = hideCustomActions
+            hideCustomActions = hideCustomActions,
+            foregroundColor = foregroundColor
         )
     }
 
@@ -101,6 +106,8 @@ internal object IslandExpandedMediaColorOsAccessoryController {
         val originalActionDrawable: Drawable?,
         val originalActionContentDescription: CharSequence?,
         val originalActionEnabled: Boolean,
+        val originalActionTint: ColorStateList?,
+        val originalActionTintBlendMode: BlendMode?,
         var appIconView: ImageView? = null,
         var action4Replaced: Boolean = false
     ) {
@@ -130,7 +137,7 @@ internal object IslandExpandedMediaColorOsAccessoryController {
             views.container.isFocusable = false
         }
 
-        fun applyDeviceSwitchToAction4() {
+        fun applyDeviceSwitchToAction4(foregroundColor: Int?) {
             val drawable = views.sourceIcon.drawable ?: run {
                 restoreAction4()
                 return
@@ -141,6 +148,13 @@ internal object IslandExpandedMediaColorOsAccessoryController {
             )
             action4.contentDescription = views.sourceIcon.contentDescription
             action4.isEnabled = true
+            action4.imageTintList = foregroundColor?.let(ColorStateList::valueOf)
+                ?: views.sourceIcon.imageTintList
+            action4.imageTintBlendMode = if (foregroundColor != null) {
+                BlendMode.SRC_IN
+            } else {
+                views.sourceIcon.imageTintBlendMode
+            }
             action4.visibility = View.VISIBLE
             action4.setOnClickListener {
                 if (views.sourceButton?.performClick() == true) return@setOnClickListener
@@ -161,6 +175,8 @@ internal object IslandExpandedMediaColorOsAccessoryController {
             action4.setImageDrawable(originalActionDrawable)
             action4.contentDescription = originalActionContentDescription
             action4.isEnabled = originalActionEnabled
+            action4.imageTintList = originalActionTint
+            action4.imageTintBlendMode = originalActionTintBlendMode
             action4.visibility = originalActionVisibility
             action4.setOnClickListener(null)
             action4Replaced = false
@@ -201,7 +217,9 @@ internal object IslandExpandedMediaColorOsAccessoryController {
                     originalActionVisibility = views.action4.visibility,
                     originalActionDrawable = views.action4.drawable,
                     originalActionContentDescription = views.action4.contentDescription,
-                    originalActionEnabled = views.action4.isEnabled
+                    originalActionEnabled = views.action4.isEnabled,
+                    originalActionTint = views.action4.imageTintList,
+                    originalActionTintBlendMode = views.action4.imageTintBlendMode
                 )
             }
         }

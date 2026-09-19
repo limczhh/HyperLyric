@@ -35,8 +35,11 @@ import kotlin.math.min
 import kotlin.random.Random
 
 internal data class NotificationMediaColorConfig(
-    val textPrimary: Int,
-    val textSecondary: Int,
+    /** Tone measured from the final rendered background bitmap. */
+    val backgroundIsDark: Boolean
+)
+
+private data class BaseBackgroundColors(
     val backgroundStart: Int,
     val backgroundEnd: Int
 )
@@ -166,17 +169,20 @@ internal class NotificationMediaBackgroundRenderer(
             source.recycle()
             return null
         }
-        val colors = colorConfig(style, profile, autoInvert, softCoverTone)
+        val baseColors = colorConfig(style, profile, autoInvert, softCoverTone)
         val result = when (style) {
-            1 -> renderCoverArt(source, colors, darkMode, fingerprint, width, height)
-            2 -> renderBlurredCover(source, colors, blurAmount, width, height)
-            3 -> renderRadialGradient(source, colors, width, height)
-            4 -> renderLinearGradient(source, colors, width, height)
+            1 -> renderCoverArt(source, baseColors, darkMode, fingerprint, width, height)
+            2 -> renderBlurredCover(source, baseColors, blurAmount, width, height)
+            3 -> renderRadialGradient(source, baseColors, width, height)
+            4 -> renderLinearGradient(source, baseColors, width, height)
             5 -> renderSoftCover(profile.rawColors, softCoverTone, width, height)
             else -> null
         }
         source.recycle()
         result ?: return null
+        val colors = NotificationMediaColorConfig(
+            backgroundIsDark = result.brightness() < 192f
+        )
         cacheBackground(cacheKey, result, colors)
         return RenderedNotificationMediaBackground(result, colors, fingerprint)
     }
@@ -186,53 +192,47 @@ internal class NotificationMediaBackgroundRenderer(
         profile: ArtworkProfile,
         autoInvert: Boolean,
         softCoverTone: Int
-    ): NotificationMediaColorConfig {
+    ): BaseBackgroundColors {
         val palette = profile.palette
         return when (style) {
-            1 -> NotificationMediaColorConfig(
-                palette.accent1[2], palette.accent1[2],
-                palette.accent1[8], palette.accent1[8]
+            1 -> BaseBackgroundColors(
+                backgroundStart = palette.accent1[8],
+                backgroundEnd = palette.accent1[8]
             )
 
-            2, 3 -> NotificationMediaColorConfig(
-                palette.neutral1[1], palette.neutral2[3],
-                palette.accent2[9], palette.accent1[9]
+            2, 3 -> BaseBackgroundColors(
+                backgroundStart = palette.accent2[9],
+                backgroundEnd = palette.accent1[9]
             )
 
             4 -> {
                 val reverse = autoInvert && profile.brightness >= 192f
-                val text = palette.accent1[if (reverse) 8 else 2]
                 val background = palette.accent1[if (reverse) 3 else 8]
-                NotificationMediaColorConfig(text, text, background, background)
+                BaseBackgroundColors(
+                    backgroundStart = background,
+                    backgroundEnd = background
+                )
             }
 
             5 -> {
                 val tone = softCoverTone.toFlowTone()
                 val surface = MediaSoftArtworkFactory.appearance(tone).surface
-                if (tone == MediaFlowTone.LIGHT) {
-                    NotificationMediaColorConfig(
-                        0xff1d1d1f.toInt(),
-                        0xa61d1d1f.toInt(),
-                        surface,
-                        surface
-                    )
-                } else {
-                    NotificationMediaColorConfig(
-                        Color.WHITE,
-                        0xccffffff.toInt(),
-                        surface,
-                        surface
-                    )
-                }
+                BaseBackgroundColors(
+                    backgroundStart = surface,
+                    backgroundEnd = surface
+                )
             }
 
-            else -> NotificationMediaColorConfig(Color.WHITE, Color.WHITE, Color.BLACK, Color.BLACK)
+            else -> BaseBackgroundColors(
+                backgroundStart = Color.BLACK,
+                backgroundEnd = Color.BLACK
+            )
         }
     }
 
     private fun renderCoverArt(
         artwork: Bitmap,
-        colors: NotificationMediaColorConfig,
+        colors: BaseBackgroundColors,
         darkMode: Boolean,
         fingerprint: Long,
         width: Int,
@@ -297,7 +297,7 @@ internal class NotificationMediaBackgroundRenderer(
 
     private fun renderBlurredCover(
         artwork: Bitmap,
-        colors: NotificationMediaColorConfig,
+        colors: BaseBackgroundColors,
         blurAmount: Int,
         width: Int,
         height: Int
@@ -321,7 +321,7 @@ internal class NotificationMediaBackgroundRenderer(
 
     private fun renderRadialGradient(
         artwork: Bitmap,
-        colors: NotificationMediaColorConfig,
+        colors: BaseBackgroundColors,
         width: Int,
         height: Int
     ): Bitmap {
@@ -338,7 +338,7 @@ internal class NotificationMediaBackgroundRenderer(
 
     private fun renderLinearGradient(
         artwork: Bitmap,
-        colors: NotificationMediaColorConfig,
+        colors: BaseBackgroundColors,
         width: Int,
         height: Int
     ): Bitmap {
@@ -597,8 +597,6 @@ internal class NotificationMediaBackgroundRenderer(
     )
 
     private data class MonetPalette(
-        val neutral1: List<Int>,
-        val neutral2: List<Int>,
         val accent1: List<Int>,
         val accent2: List<Int>
     )
@@ -607,8 +605,6 @@ internal class NotificationMediaBackgroundRenderer(
         private val constructor: java.lang.reflect.Constructor<*>,
         private val styleContent: Any,
         private val allShadesField: java.lang.reflect.Field,
-        private val neutral1Field: java.lang.reflect.Field,
-        private val neutral2Field: java.lang.reflect.Field,
         private val accent1Field: java.lang.reflect.Field,
         private val accent2Field: java.lang.reflect.Field
     ) {
@@ -620,8 +616,6 @@ internal class NotificationMediaBackgroundRenderer(
                 constructor.newInstance(colors, styleContent)
             }
             MonetPalette(
-                allShadesField.get(neutral1Field.get(scheme)) as List<Int>,
-                allShadesField.get(neutral2Field.get(scheme)) as List<Int>,
                 allShadesField.get(accent1Field.get(scheme)) as List<Int>,
                 allShadesField.get(accent2Field.get(scheme)) as List<Int>
             )
@@ -643,8 +637,6 @@ internal class NotificationMediaBackgroundRenderer(
                     constructor,
                     valueOf.invoke(null, "CONTENT") ?: error("Monet CONTENT style is unavailable"),
                     paletteClass.requiredField("allShades"),
-                    schemeClass.requiredField("mNeutral1", "neutral1"),
-                    schemeClass.requiredField("mNeutral2", "neutral2"),
                     schemeClass.requiredField("mAccent1", "accent1"),
                     schemeClass.requiredField("mAccent2", "accent2")
                 )

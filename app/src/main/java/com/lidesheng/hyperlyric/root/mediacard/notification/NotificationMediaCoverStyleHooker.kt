@@ -12,6 +12,7 @@ import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.MediaCoverRotationController
 import com.lidesheng.hyperlyric.root.mediacard.notification.aod.NotificationMediaFullAodAnimatedHeightHook
 import com.lidesheng.hyperlyric.root.mediacard.notification.aod.NotificationMediaFullAodHook
+import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundController
 import com.lidesheng.hyperlyric.root.mediacard.notification.layout.NotificationMediaLayoutController
 import com.lidesheng.hyperlyric.root.mediacard.notification.layout.NotificationMediaLayoutResourceIds
 import com.lidesheng.hyperlyric.root.mediacard.notification.layout.miui.NotificationMediaMiuiStyle
@@ -176,7 +177,11 @@ object NotificationMediaCoverStyleHooker {
                     config.hideDeviceSwitch ||
                         config.layoutStyle == RootConstants.NOTIFICATION_MEDIA_LAYOUT_STYLE_COLOROS ||
                         config.layoutStyle == RootConstants.NOTIFICATION_MEDIA_LAYOUT_STYLE_ONEUI ||
-                        config.layoutStyle == RootConstants.NOTIFICATION_MEDIA_LAYOUT_STYLE_PIXEL
+                        config.layoutStyle == RootConstants.NOTIFICATION_MEDIA_LAYOUT_STYLE_PIXEL ||
+                        config.backgroundStyle !=
+                            RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_DEFAULT ||
+                        config.ambientFlowMode !=
+                            RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED
                 "onFullAodStateChanged" -> shouldKeepExpandedInFullAod()
                 "updateForegroundColors" ->
                     config.layoutStyle == RootConstants.NOTIFICATION_MEDIA_LAYOUT_STYLE_MIUI ||
@@ -271,6 +276,10 @@ object NotificationMediaCoverStyleHooker {
                 runCatching { refreshPixelAppIcon(controller) }
                     .onFailure { HookLogger.e(TAG, "刷新 Pixel 媒体卡片应用图标失败", it) }
             }
+            if (methodName == "setSeamless" && shouldApplyUnifiedForeground(controller)) {
+                runCatching { NotificationMediaAmbientFlowHooker.applyUnifiedForeground(controller) }
+                    .onFailure { HookLogger.e(TAG, "刷新媒体卡片统一前景色失败", it) }
+            }
             if (
                 methodName == "updateForegroundColors" &&
                     (runtimeConfig.notification.layoutStyle ==
@@ -292,6 +301,12 @@ object NotificationMediaCoverStyleHooker {
             }
             return result
         }
+    }
+
+    private fun shouldApplyUnifiedForeground(controller: Any): Boolean {
+        return NotificationMediaBackgroundController.isActive(controller) ||
+            runtimeConfig.notification.ambientFlowMode !=
+            RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED
     }
 
     private class ActionButtonHook : Hooker {

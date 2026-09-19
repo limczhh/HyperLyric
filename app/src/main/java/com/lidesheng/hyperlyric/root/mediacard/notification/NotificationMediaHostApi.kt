@@ -9,6 +9,8 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import com.lidesheng.hyperlyric.root.mediacard.notification.layout.NotificationMediaConstraintBridge
+import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
+import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 
@@ -173,7 +175,9 @@ internal class NotificationMediaHostApi private constructor(
     fun getSeamlessIcon(holder: Any): ImageView? =
         seamlessIconField?.get(holder) as? ImageView
 
-    fun getSeekBar(holder: Any): View? = seekBarField?.get(holder) as? View
+    fun getSeekBar(holder: Any): View? =
+        MediaProgressStyleHooker.replacementSeekBar(holder)
+            ?: (seekBarField?.get(holder) as? View)
 
     fun getElapsedTimeView(holder: Any): TextView? =
         elapsedTimeViewField?.get(holder) as? TextView
@@ -188,6 +192,7 @@ internal class NotificationMediaHostApi private constructor(
     fun getNormalAlbumLayout(controller: Any): Any? = normalAlbumLayoutField.get(controller)
 
     fun removeSeekBarTrackInset(seekBar: View) {
+        if (seekBar is SquigglySeekBar) return
         val paddingField = seekBarPaddingOffsetField ?: return
         val trackPositionField = seekBarTrackPositionField ?: return
         val trackPosition = trackPositionField.get(seekBar) as? FloatArray ?: return

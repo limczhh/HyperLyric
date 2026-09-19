@@ -1,44 +1,16 @@
 package com.lidesheng.hyperlyric.root.mediacard.island.style
 
-import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.BlendMode
 import android.graphics.BlendModeColorFilter
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
-import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaColorConfig
+import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPalette
 import java.util.Collections
 import java.util.WeakHashMap
-
-internal data class IslandExpandedMediaForegroundColors(
-    val primaryText: Int,
-    val secondaryText: Int,
-    val durationText: Int,
-    val action: Int,
-    val seekBarForeground: Int,
-    val seekBarBackground: Int
-) {
-    companion object {
-        fun from(context: Context): IslandExpandedMediaForegroundColors {
-            fun color(name: String): Int {
-                val id = context.resources.getIdentifier(name, "color", context.packageName)
-                require(id != 0) { "Missing color resource: $name" }
-                return context.getColor(id)
-            }
-            return IslandExpandedMediaForegroundColors(
-                primaryText = color("media_primary_text"),
-                secondaryText = color("media_secondary_text"),
-                durationText = color("media_duration_time_font_color"),
-                action = color("notification_media_action_button_light_color"),
-                seekBarForeground = Color.BLACK,
-                seekBarBackground = color("media_seekbar_background_color")
-            )
-        }
-    }
-}
 
 internal interface IslandExpandedMediaForegroundAccess {
     fun getTitleText(holder: Any): TextView
@@ -72,6 +44,9 @@ internal object IslandExpandedMediaForegroundStyler {
     private val seekBarThemeStates = Collections.synchronizedMap(
         WeakHashMap<View, SeekBarThemeState>()
     )
+    private val appliedPalettes = Collections.synchronizedMap(
+        WeakHashMap<Any, MediaCardForegroundPalette>()
+    )
     private val islandSeekBars = Collections.synchronizedSet(
         Collections.newSetFromMap(WeakHashMap<View, Boolean>())
     )
@@ -79,7 +54,7 @@ internal object IslandExpandedMediaForegroundStyler {
     fun applyLightForeground(
         access: IslandExpandedMediaForegroundAccess,
         holder: Any,
-        colors: IslandExpandedMediaForegroundColors
+        colors: MediaCardForegroundPalette
     ) {
         val seekBar = access.getSeekBar(holder)
         val state = seekBarThemeStates.getOrPut(seekBar) {
@@ -88,32 +63,33 @@ internal object IslandExpandedMediaForegroundStyler {
                 originalHeadGlowAlpha = access.getSeekBarHeadGlowAlpha(seekBar)
             )
         }
-        access.getTitleText(holder).setTextColor(colors.primaryText)
-        access.getArtistText(holder).setTextColor(colors.secondaryText)
-        access.getElapsedTime(holder).setTextColor(colors.durationText)
-        access.getTotalTime(holder).setTextColor(colors.durationText)
+        access.getTitleText(holder).setTextColor(colors.primary)
+        access.getArtistText(holder).setTextColor(colors.secondary)
+        access.getElapsedTime(holder).setTextColor(colors.duration)
+        access.getTotalTime(holder).setTextColor(colors.duration)
 
         access.getSeamlessIcon(holder).imageTintList =
-            ColorStateList.valueOf(colors.seekBarForeground)
-        val actionTint = ColorStateList.valueOf(colors.action)
+            ColorStateList.valueOf(colors.primary)
+        val actionTint = ColorStateList.valueOf(colors.primary)
         access.getActionViews(holder).forEach { action ->
             action.imageTintBlendMode = BlendMode.SRC_IN
             action.imageTintList = actionTint
         }
 
-        access.setSeekBarForeground(seekBar, colors.seekBarForeground)
-        access.setSeekBarBackground(seekBar, colors.seekBarBackground)
+        access.setSeekBarForeground(seekBar, colors.primary)
+        access.setSeekBarBackground(seekBar, colors.progressTrack)
         access.setSeekBarShaderColorFilter(
             seekBar,
-            BlendModeColorFilter(colors.seekBarForeground, BlendMode.SRC_IN)
+            BlendModeColorFilter(colors.primary, BlendMode.SRC_IN)
         )
         access.setSeekBarHeadGlowAlpha(seekBar, state.originalHeadGlowAlpha)
+        appliedPalettes[holder] = colors
     }
 
     fun applyCustomForeground(
         access: IslandExpandedMediaForegroundAccess,
         holder: Any,
-        colors: NotificationMediaColorConfig
+        colors: MediaCardForegroundPalette
     ) {
         val seekBar = access.getSeekBar(holder)
         val state = seekBarThemeStates.getOrPut(seekBar) {
@@ -122,32 +98,36 @@ internal object IslandExpandedMediaForegroundStyler {
                 originalHeadGlowAlpha = access.getSeekBarHeadGlowAlpha(seekBar)
             )
         }
-        access.getTitleText(holder).setTextColor(colors.textPrimary)
-        access.getArtistText(holder).setTextColor(colors.textSecondary)
-        access.getElapsedTime(holder).setTextColor(colors.textSecondary)
-        access.getTotalTime(holder).setTextColor(colors.textSecondary)
+        access.getTitleText(holder).setTextColor(colors.primary)
+        access.getArtistText(holder).setTextColor(colors.secondary)
+        access.getElapsedTime(holder).setTextColor(colors.duration)
+        access.getTotalTime(holder).setTextColor(colors.duration)
 
-        val tint = ColorStateList.valueOf(colors.textPrimary)
+        val tint = ColorStateList.valueOf(colors.primary)
         access.getSeamlessIcon(holder).imageTintList = tint
         access.getActionViews(holder).forEach { action ->
             action.imageTintBlendMode = BlendMode.SRC_IN
             action.imageTintList = tint
         }
 
-        access.setSeekBarForeground(seekBar, colors.textPrimary)
-        access.setSeekBarBackground(
-            seekBar,
-            colors.textPrimary and 0x00ffffff or (0x33 shl 24)
-        )
+        access.setSeekBarForeground(seekBar, colors.primary)
+        access.setSeekBarBackground(seekBar, colors.progressTrack)
         access.setSeekBarShaderColorFilter(
             seekBar,
-            BlendModeColorFilter(colors.textPrimary, BlendMode.SRC_IN)
+            BlendModeColorFilter(colors.primary, BlendMode.SRC_IN)
         )
         access.setSeekBarHeadGlowAlpha(seekBar, state.originalHeadGlowAlpha)
+        appliedPalettes[holder] = colors
     }
 
+    fun appliedPalette(holder: Any): MediaCardForegroundPalette? = appliedPalettes[holder]
+
     fun restore(access: IslandExpandedMediaForegroundAccess, holder: Any) {
+        appliedPalettes.remove(holder)
         val seekBar = access.getSeekBar(holder)
+        if (seekBar is SquigglySeekBar) {
+            seekBar.clearWaveColors()
+        }
         seekBarThemeStates.remove(seekBar)?.let { state ->
             access.setSeekBarShaderColorFilter(seekBar, state.originalColorFilter)
             access.setSeekBarHeadGlowAlpha(seekBar, state.originalHeadGlowAlpha)

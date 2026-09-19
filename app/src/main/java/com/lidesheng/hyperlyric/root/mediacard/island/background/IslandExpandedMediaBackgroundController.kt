@@ -16,6 +16,8 @@ import com.lidesheng.hyperlyric.common.media.MediaCardTonePolicy
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.MediaBackgroundRendererPool
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaColorConfig
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPalette
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPaletteResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.Collections
 import java.util.WeakHashMap
@@ -49,14 +51,19 @@ internal interface IslandExpandedMediaBackgroundApi {
     fun getBackgroundHosts(binder: Any): List<IslandExpandedMediaBackgroundHost>
     fun prepareCustomBackground(target: IslandExpandedBackgroundTarget)
     fun restoreNativeBackground(target: IslandExpandedBackgroundTarget)
-    fun applyCustomForeground(holder: Any, colors: NotificationMediaColorConfig)
+    fun restoreCustomForeground(binder: Any, holder: Any)
+    fun applyCustomForeground(
+        binder: Any,
+        holder: Any,
+        colors: MediaCardForegroundPalette
+    )
 }
 
 internal object IslandExpandedMediaBackgroundController {
     private const val TAG = "IslandExpandedMediaBackgroundController"
     private val states = Collections.synchronizedMap(WeakHashMap<Any, BinderState>())
     private val foregroundColors = Collections.synchronizedMap(
-        WeakHashMap<Any, NotificationMediaColorConfig>()
+        WeakHashMap<Any, MediaCardForegroundPalette>()
     )
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor: ExecutorService = newExecutor()
@@ -149,7 +156,7 @@ internal object IslandExpandedMediaBackgroundController {
         val artworkUpdated = api.isArtworkUpdated(binder)
         val hosts = api.getBackgroundHosts(binder)
         if (hosts.isEmpty()) {
-            restoreTargets(binderState, api)
+            restoreTargets(binder, binderState, api)
             if (allowRetry) scheduleBindRetry(binder, binderState, mediaData, api)
             return
         }
@@ -158,7 +165,7 @@ internal object IslandExpandedMediaBackgroundController {
         binderState.targets.entries.removeAll { (view, state) ->
             if (view in activeViews) return@removeAll false
             state.request.incrementAndGet()
-            restoreTarget(state, api)
+            restoreTarget(binder, state, api)
             true
         }
 
@@ -176,6 +183,7 @@ internal object IslandExpandedMediaBackgroundController {
             .values
             .mapNotNull { groupedHosts ->
                 prepareTarget(
+                    binder = binder,
                     binderState = binderState,
                     hosts = groupedHosts,
                     artworkUpdated = artworkUpdated,
@@ -216,16 +224,17 @@ internal object IslandExpandedMediaBackgroundController {
     fun restore(binder: Any) {
         val state = states.remove(binder) ?: return
         cancelBindRetry(state)
-        restoreTargets(state, state.api)
+        restoreTargets(binder, state, state.api)
     }
 
     private fun restoreTargets(
+        binder: Any,
         binderState: BinderState,
         api: IslandExpandedMediaBackgroundApi
     ) {
         binderState.targets.values.forEach { target ->
             target.request.incrementAndGet()
-            restoreTarget(target, api)
+            restoreTarget(binder, target, api)
         }
         binderState.targets.clear()
     }
@@ -237,7 +246,9 @@ internal object IslandExpandedMediaBackgroundController {
     ) {
         states[binder]?.targets?.values?.forEach { target ->
             val colors = target.colors ?: return@forEach
-            target.holders.forEach { holder -> applyForeground(holder, colors, api, force) }
+            target.holders.forEach { holder ->
+                applyForeground(binder, holder, colors, api, force)
+            }
         }
     }
 
@@ -254,12 +265,16 @@ internal object IslandExpandedMediaBackgroundController {
                 target.holders.any { current -> current === holder }
             }
             ?.colors
-            ?: return false
-        applyForeground(holder, colors, api, force)
-        return true
+            ?: run {
+                foregroundColors.remove(holder)
+                api.restoreCustomForeground(binder, holder)
+                return false
+            }
+        return applyForeground(binder, holder, colors, api, force)
     }
 
     private fun prepareTarget(
+        binder: Any,
         binderState: BinderState,
         hosts: List<IslandExpandedMediaBackgroundHost>,
         artworkUpdated: Boolean?,
@@ -282,7 +297,10 @@ internal object IslandExpandedMediaBackgroundController {
         val nextHolders = hosts.map { it.holder }
         targetState.holders
             .filter { previous -> nextHolders.none { current -> current === previous } }
-            .forEach(foregroundColors::remove)
+            .forEach { holder ->
+                foregroundColors.remove(holder)
+                api.restoreCustomForeground(binder, holder)
+            }
         targetState.holders = nextHolders
         val renderSize = resolveRenderSize(hosts, targetState, fallbackSize) ?: return null
         val width = renderSize.width
@@ -300,7 +318,7 @@ internal object IslandExpandedMediaBackgroundController {
             if (targetState.customApplied) {
                 ensureBackgroundAttached(targetState, api)
                 targetState.colors?.let { colors ->
-                    hosts.forEach { applyForeground(it.holder, colors, api) }
+                    hosts.forEach { applyForeground(binder, it.holder, colors, api) }
                 }
             }
             return null
@@ -343,7 +361,7 @@ internal object IslandExpandedMediaBackgroundController {
                 }
                 .getOrNull()
             if (renderer == null) {
-                clearPendingOnMain(binder, binderState, preparedTargets)
+                clearPendingOnMain(binder, binderState, preparedTargets, api)
                 return@execute
             }
             preparedTargets.forEach { prepared ->
@@ -369,7 +387,7 @@ internal object IslandExpandedMediaBackgroundController {
                     HookLogger.e(TAG, "渲染展开态媒体背景失败", error)
                 }.getOrNull()
                 if (rendered == null) {
-                    clearPendingOnMain(binder, binderState, listOf(prepared))
+                    clearPendingOnMain(binder, binderState, listOf(prepared), api)
                     return@forEach
                 }
                 mainHandler.post {
@@ -408,7 +426,7 @@ internal object IslandExpandedMediaBackgroundController {
                         targetState.artworkFingerprint = rendered.artworkFingerprint
                     }
                     prepared.hosts.forEach { host ->
-                        applyForeground(host.holder, rendered.colors, api)
+                        applyForeground(binder, host.holder, rendered.colors, api)
                     }
                     targetState.colors = rendered.colors
                     targetState.renderPending = false
@@ -420,13 +438,14 @@ internal object IslandExpandedMediaBackgroundController {
     private fun clearPendingOnMain(
         binder: Any,
         binderState: BinderState,
-        preparedTargets: List<PreparedTarget>
+        preparedTargets: List<PreparedTarget>,
+        api: IslandExpandedMediaBackgroundApi
     ) {
         mainHandler.post {
             if (states[binder] !== binderState) return@post
             preparedTargets.forEach { prepared ->
                 if (prepared.state.request.get() == prepared.request) {
-                    prepared.state.renderPending = false
+                    restoreTarget(binder, prepared.state, api)
                 }
             }
         }
@@ -531,10 +550,14 @@ internal object IslandExpandedMediaBackgroundController {
     }
 
     private fun restoreTarget(
+        binder: Any,
         state: TargetState,
         api: IslandExpandedMediaBackgroundApi
     ) {
-        state.holders.forEach(foregroundColors::remove)
+        state.holders.forEach { holder ->
+            foregroundColors.remove(holder)
+            api.restoreCustomForeground(binder, holder)
+        }
         val hadCustomBackground = state.customApplied || state.background != null
         state.customApplied = false
         if (hadCustomBackground) api.restoreNativeBackground(state.target)
@@ -623,14 +646,31 @@ internal object IslandExpandedMediaBackgroundController {
     }
 
     private fun applyForeground(
+        binder: Any,
         holder: Any,
         colors: NotificationMediaColorConfig,
         api: IslandExpandedMediaBackgroundApi,
         force: Boolean = false
-    ) {
-        if (!force && foregroundColors[holder] == colors) return
-        api.applyCustomForeground(holder, colors)
-        foregroundColors[holder] = colors
+    ): Boolean {
+        val palette = MediaCardForegroundPaletteResolver.resolve(
+            context = api.getContext(binder),
+            backgroundIsDark = colors.backgroundIsDark
+        ) ?: run {
+            foregroundColors.remove(holder)
+            api.restoreCustomForeground(binder, holder)
+            return false
+        }
+        if (!force && foregroundColors[holder] == palette) return true
+        foregroundColors.remove(holder)
+        return try {
+            api.applyCustomForeground(binder, holder, palette)
+            foregroundColors[holder] = palette
+            true
+        } catch (error: Throwable) {
+            HookLogger.e(TAG, "应用展开态媒体前景调色板失败", error)
+            api.restoreCustomForeground(binder, holder)
+            false
+        }
     }
 
     private fun currentStyle(): Int {

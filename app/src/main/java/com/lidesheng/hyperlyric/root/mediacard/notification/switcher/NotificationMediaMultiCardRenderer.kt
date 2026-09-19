@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostApi
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostClasses
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
+import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
@@ -862,7 +863,11 @@ internal class NotificationMediaMultiCardRenderer(
 
     private fun compactHiddenViews(card: Card): List<View> {
         val views = mutableListOf<View>()
-        listOf("seekBar", "elapsedTimeView", "totalTimeView")
+        (
+            MediaProgressStyleHooker.replacementSeekBar(card.holder)
+                ?: (readField(card.holder, "seekBar") as? View)
+        )?.let(views::add)
+        listOf("elapsedTimeView", "totalTimeView")
             .forEach { fieldName ->
                 (readField(card.holder, fieldName) as? View)?.let(views::add)
             }

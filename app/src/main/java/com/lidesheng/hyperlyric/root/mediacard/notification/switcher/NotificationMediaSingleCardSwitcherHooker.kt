@@ -11,6 +11,7 @@ import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostClasses
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
+import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
@@ -761,10 +762,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             // MediaSortUtils on every native attach so a re-inflated header does
             // not resume with a partial order until the next MediaData callback.
             seedFromNativeSort()
-            seekBar = (NotificationMediaSingleCardSwitcherHooker.readField(
-                holder,
-                "seekBar"
-            ) as? View)?.let(::WeakReference)
+            seekBar = visibleSeekBar(holder)?.let(::WeakReference)
             touchSlop = ViewConfiguration.get(currentPlayer.context).scaledTouchSlop
             resetTouch(currentPlayer)
             registerSeekBar(currentPlayer, holder)
@@ -1228,11 +1226,15 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         }
 
         private fun registerSeekBar(currentPlayer: View, holder: Any) {
-            (NotificationMediaSingleCardSwitcherHooker.readField(
-                holder,
-                "seekBar"
-            ) as? View)?.let { seekBars[currentPlayer] = it }
+            visibleSeekBar(holder)?.let { seekBars[currentPlayer] = it }
         }
+
+        private fun visibleSeekBar(holder: Any): View? =
+            MediaProgressStyleHooker.replacementSeekBar(holder)
+                ?: (NotificationMediaSingleCardSwitcherHooker.readField(
+                    holder,
+                    "seekBar"
+                ) as? View)
 
         private fun isAnySeekBarTouch(event: MotionEvent): Boolean {
             val players = synchronized(seekBars) { seekBars.keys.toList() }

@@ -64,7 +64,9 @@ class SquigglySeekBar @JvmOverloads constructor(
     private var heightAnimator: ValueAnimator? = null
     private var phaseOffset = 0f
     private var lastFrameTime = -1L
-    private var baseColor = Color.WHITE
+    private var tintFallbackColor = Color.WHITE
+    private var explicitWaveForeground: Int? = null
+    private var explicitWaveTrack: Int? = null
     private var touchAnimProgress = 0f
     private var touchAnimator: ValueAnimator? = null
     private var realProgress = 0
@@ -136,7 +138,7 @@ class SquigglySeekBar @JvmOverloads constructor(
         linePaint.strokeCap = Paint.Cap.ROUND
         wavePaint.style = Paint.Style.STROKE
         linePaint.style = Paint.Style.STROKE
-        linePaint.alpha = DISABLED_ALPHA
+        linePaint.alpha = ALPHA
         updateColorsFromTint()
     }
 
@@ -293,8 +295,34 @@ class SquigglySeekBar @JvmOverloads constructor(
         updateColorsFromTint()
     }
 
+    override fun setProgressBackgroundTintList(tint: ColorStateList?) {
+        super.setProgressBackgroundTintList(tint)
+        updateColorsFromTint()
+    }
+
     override fun drawableStateChanged() {
         super.drawableStateChanged()
+        updateColorsFromTint()
+    }
+
+    /** Sets the colors used by the active wave and its inactive track. */
+    fun setWaveColors(foreground: Int, track: Int) {
+        explicitWaveForeground = foreground
+        explicitWaveTrack = track
+        applyPaintColors(foreground, track)
+    }
+
+    fun setWaveForegroundColor(foreground: Int) {
+        setWaveColors(foreground, explicitWaveTrack ?: defaultTrackColor(foreground))
+    }
+
+    fun setWaveTrackColor(track: Int) {
+        setWaveColors(explicitWaveForeground ?: tintFallbackColor, track)
+    }
+
+    fun clearWaveColors() {
+        explicitWaveForeground = null
+        explicitWaveTrack = null
         updateColorsFromTint()
     }
 
@@ -359,14 +387,43 @@ class SquigglySeekBar @JvmOverloads constructor(
     }
 
     private fun updateColorsFromTint() {
-        progressTintList?.getColorForState(drawableState, baseColor)?.let {
-            baseColor = it
+        val explicitForeground = explicitWaveForeground
+        val explicitTrack = explicitWaveTrack
+        if (explicitForeground != null || explicitTrack != null) {
+            val foreground = explicitForeground ?: tintFallbackColor
+            applyPaintColors(
+                foreground,
+                explicitTrack ?: defaultTrackColor(foreground)
+            )
+            return
         }
-        val rgb = baseColor and 0x00ffffff
-        wavePaint.color = rgb or (ALPHA shl 24)
-        thumbPaint.color = rgb or (ALPHA shl 24)
-        linePaint.color = rgb or (DISABLED_ALPHA shl 24)
+
+        val foreground = progressTintList?.getColorForState(
+            drawableState,
+            tintFallbackColor
+        ) ?: tintFallbackColor
+        val track = progressBackgroundTintList?.getColorForState(
+            drawableState,
+            defaultTrackColor(foreground)
+        ) ?: defaultTrackColor(foreground)
+        applyPaintColors(foreground, track)
+    }
+
+    private fun applyPaintColors(foreground: Int, track: Int) {
+        wavePaint.color = foreground
+        thumbPaint.color = foreground
+        linePaint.color = track
+        linePaint.alpha = ALPHA
         invalidate()
+    }
+
+    private fun defaultTrackColor(foreground: Int): Int {
+        return Color.argb(
+            DISABLED_ALPHA,
+            Color.red(foreground),
+            Color.green(foreground),
+            Color.blue(foreground)
+        )
     }
 
     private fun lerp(start: Float, stop: Float, amount: Float): Float {

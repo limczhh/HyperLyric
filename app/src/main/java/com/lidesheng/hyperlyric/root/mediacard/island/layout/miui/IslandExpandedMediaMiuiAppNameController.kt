@@ -21,7 +21,8 @@ internal object IslandExpandedMediaMiuiAppNameController {
 
     fun apply(
         elements: IslandExpandedMediaElements,
-        appName: CharSequence?
+        appName: CharSequence?,
+        textColor: Int?
     ) {
         val player = elements.player as? ViewGroup ?: return
         val title = elements.title as? TextView ?: return
@@ -33,7 +34,7 @@ internal object IslandExpandedMediaMiuiAppNameController {
         val state = states[player]
             ?: AppNameState.create(player, title)?.also { states[player] = it }
             ?: return
-        state.apply(appName, artist)
+        state.apply(appName, artist, textColor)
     }
 
     fun refreshColor(elements: IslandExpandedMediaElements) {
@@ -50,7 +51,8 @@ internal object IslandExpandedMediaMiuiAppNameController {
     fun applyToFakeView(
         fakeExpandedView: View,
         referenceElements: IslandExpandedMediaElements,
-        appName: CharSequence?
+        appName: CharSequence?,
+        textColor: Int?
     ) {
         val titleId = referenceElements.title.id
         val artistId = referenceElements.artist.id
@@ -65,7 +67,7 @@ internal object IslandExpandedMediaMiuiAppNameController {
         val state = states[player]
             ?: AppNameState.create(player, title)?.also { states[player] = it }
             ?: return
-        state.apply(appName, artist)
+        state.apply(appName, artist, textColor)
     }
 
     private data class AppNameState(
@@ -73,15 +75,15 @@ internal object IslandExpandedMediaMiuiAppNameController {
         val titleConstraintState: TitleVerticalConstraintState,
         val titleGap: Int
     ) {
-        fun apply(appName: CharSequence, reference: TextView) {
+        fun apply(appName: CharSequence, reference: TextView, textColor: Int?) {
             label.text = appName
             label.visibility = View.VISIBLE
-            applyColor(reference)
+            applyColor(reference, textColor)
             titleConstraintState.connectBelow(label.id, titleGap)
         }
 
-        fun applyColor(reference: TextView) {
-            label.setTextColor(reference.currentTextColor)
+        fun applyColor(reference: TextView, textColor: Int? = null) {
+            label.setTextColor(textColor ?: reference.currentTextColor)
             label.alpha = reference.alpha
             label.typeface = reference.typeface
             label.includeFontPadding = reference.includeFontPadding

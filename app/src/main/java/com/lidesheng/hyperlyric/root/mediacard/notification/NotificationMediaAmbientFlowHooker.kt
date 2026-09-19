@@ -167,11 +167,20 @@ object NotificationMediaAmbientFlowHooker {
                     HookLogger.e(TAG, "准备通知中心媒体卡片主题失败", it)
                 }
             }
+            if (action != Action.DETACH &&
+                !NotificationMediaBackgroundController.isActive(controller) &&
+                !hasVisibleCustomFlow(controller)
+            ) {
+                // Let the native bind/attach path establish the current
+                // SystemUI colors before a custom foreground is applied again.
+                NotificationMediaForegroundStyler.clear(controller)
+            }
             val result = chain.proceed()
             runCatching {
                 when (action) {
                     Action.ATTACH -> {
                         syncView(controller)
+                        applyUnifiedForeground(controller)
                     }
 
                     Action.BIND -> {
@@ -180,6 +189,7 @@ object NotificationMediaAmbientFlowHooker {
                             chain.args.firstOrNull()
                         )
                         bind(controller, chain.args.firstOrNull())
+                        applyUnifiedForeground(controller)
                     }
 
                     Action.DETACH -> Unit
@@ -215,6 +225,7 @@ object NotificationMediaAmbientFlowHooker {
                 NotificationMediaBackgroundController.onUiModeChanged(controller)
                 refreshCustomFlowTone(controller)
             }
+            applyUnifiedForeground(controller)
             return result
         }
     }
@@ -349,6 +360,7 @@ object NotificationMediaAmbientFlowHooker {
                     if (palette != null) {
                         applyPalette(latest, palette)
                         latest.colorToken = colorToken
+                        applyUnifiedForeground(controller)
                     }
                 }
             }
@@ -520,6 +532,53 @@ object NotificationMediaAmbientFlowHooker {
 
     private fun refreshCustomFlowTone(controller: Any) {
         states[controller]?.let(::configureCustomView)
+    }
+
+    private fun hasVisibleCustomFlow(controller: Any): Boolean {
+        if (currentMode() != RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL) {
+            return false
+        }
+        val state = states[controller] ?: return false
+        return state.customView && state.hasColors && state.view?.visibility == View.VISIBLE
+    }
+
+    /**
+     * The native controller remains the source of truth when its background is
+     * native. Every custom notification background, however, must use the
+     * shared foreground palette for all holder elements.
+     */
+    internal fun applyUnifiedForeground(controller: Any) {
+        if (NotificationMediaBackgroundController.isActive(controller)) {
+            val backgroundIsDark =
+                NotificationMediaBackgroundController.currentBackgroundIsDark(controller)
+            if (backgroundIsDark == null) {
+                NotificationMediaForegroundStyler.clear(controller)
+            } else {
+                NotificationMediaForegroundStyler.apply(
+                    controller = controller,
+                    backgroundIsDark = backgroundIsDark
+                )
+            }
+            return
+        }
+        val mode = currentMode()
+        if (mode != RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL) {
+            NotificationMediaForegroundStyler.clear(controller)
+            return
+        }
+        val state = states[controller]
+        if (state?.customView != true || !state.hasColors || state.view?.visibility != View.VISIBLE) {
+            NotificationMediaForegroundStyler.clear(controller)
+            return
+        }
+        val context = readField(controller, "context") as? Context ?: run {
+            NotificationMediaForegroundStyler.clear(controller)
+            return
+        }
+        NotificationMediaForegroundStyler.apply(
+            controller = controller,
+            backgroundIsDark = currentFlowTone(context) == MediaFlowTone.DARK
+        )
     }
 
     private fun invokeZeroArgMethods(receiver: Any, name: String) {

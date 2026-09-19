@@ -10,9 +10,6 @@ package com.lidesheng.hyperlyric.root.mediacard.progress
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.ColorStateList
-import android.content.res.Configuration
-import android.graphics.Color
 import android.text.format.DateUtils
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +18,7 @@ import android.widget.TextView
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
+import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundController
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.ThumbStyle
@@ -59,12 +57,23 @@ object MediaProgressStyleHooker {
     private val hookedClassLoaders = Collections.synchronizedSet(
         Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     )
-    private val waveSeekBars = Collections.synchronizedMap(WeakHashMap<Any, SeekBar>())
-    private val nativeGlowHolders = Collections.synchronizedSet(
-        Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
-    )
+    private val waveSeekBars =
+        Collections.synchronizedMap(WeakHashMap<Any, SquigglySeekBar>())
+    private val waveStates =
+        Collections.synchronizedMap(WeakHashMap<Any, WaveSeekBarState>())
+    private val nativeGlowStates =
+        Collections.synchronizedMap(WeakHashMap<Any, NativeGlowState>())
     private val nativeGlowSeekBars =
         Collections.synchronizedMap(WeakHashMap<Any, SeekBar>())
+
+    /**
+     * The holder's seekBar field is a concrete HyperProgressSeekBar on some
+     * SystemUI builds, so a wave replacement cannot be stored in that field.
+     * Consumers that operate on the visible view must resolve this registry
+     * before falling back to the native field value.
+     */
+    internal fun replacementSeekBar(holder: Any): SeekBar? =
+        waveSeekBars[holder] ?: nativeGlowSeekBars[holder]
 
     fun hook(xposedModule: XposedModule, classLoader: ClassLoader) {
         if (!hookedClassLoaders.add(classLoader)) return
@@ -176,13 +185,32 @@ object MediaProgressStyleHooker {
                     installed++
                 }
             }
+            api.fullAodMethod?.let { method ->
+                installMethod(xposedModule, method, NotificationControllerHook(api, Action.FULL_AOD)) {
+                    installed++
+                }
+            }
+        }
+        if (
+            style == RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE ||
+            progressHeadGlow
+        ) {
             api.detachMethod?.let { method ->
                 installMethod(xposedModule, method, NotificationControllerHook(api, Action.DETACH)) {
                     installed++
                 }
             }
-            api.fullAodMethod?.let { method ->
-                installMethod(xposedModule, method, NotificationControllerHook(api, Action.FULL_AOD)) {
+        }
+        if (
+            progressHeadGlow &&
+            style != RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE
+        ) {
+            api.attachMethod?.let { method ->
+                installMethod(
+                    xposedModule,
+                    method,
+                    NotificationControllerHook(api, Action.NATIVE_GLOW_ATTACH)
+                ) {
                     installed++
                 }
             }
@@ -333,9 +361,8 @@ object MediaProgressStyleHooker {
             runCatching {
                 when (action) {
                     Action.ATTACH -> api.attachWaveListener(controller)
-                    Action.DETACH -> api.getHolder(controller)?.let {
-                        waveSeekBars[it]?.setOnSeekBarChangeListener(null)
-                    }
+                    Action.DETACH -> api.detachProgress(controller)
+                    Action.NATIVE_GLOW_ATTACH -> api.attachNativeGlow(controller)
 
                     Action.FULL_AOD -> {
                         val toFullAod = chain.args.getOrNull(0) as? Boolean ?: false
@@ -368,7 +395,7 @@ object MediaProgressStyleHooker {
                 when (action) {
                     Action.ATTACH -> api.attachWaveListeners(binder)
                     Action.DETACH -> api.getHolders(binder).forEach { holder ->
-                        waveSeekBars[holder]?.setOnSeekBarChangeListener(null)
+                        api.detachWave(holder)
                     }
 
                     else -> Unit
@@ -383,6 +410,7 @@ object MediaProgressStyleHooker {
     private enum class Action {
         ATTACH,
         DETACH,
+        NATIVE_GLOW_ATTACH,
         FULL_AOD,
         FOREGROUND
     }
@@ -400,7 +428,7 @@ object MediaProgressStyleHooker {
     ) {
         @SuppressLint("SetTextI18n")
         fun updateProgress(holder: Any, progress: Any, isIsland: Boolean): Boolean {
-            val seekBar = waveSeekBars[holder] as? SquigglySeekBar ?: return false
+            val seekBar = waveSeekBars[holder] ?: return false
             val holderApi = if (isIsland) {
                 IslandApi.currentHolderFields
             } else {
@@ -474,8 +502,21 @@ object MediaProgressStyleHooker {
     private data class HolderFields(
         val seekBarField: Field,
         val elapsedTimeField: Field,
-        val totalTimeField: Field,
-        val titleTextField: Field?
+        val totalTimeField: Field
+    )
+
+    private data class WaveSeekBarState(
+        val original: SeekBar,
+        val replacement: SquigglySeekBar,
+        val parent: ViewGroup,
+        val originalIndex: Int
+    )
+
+    private data class NativeGlowState(
+        val original: SeekBar,
+        val replacement: SeekBar,
+        val parent: ViewGroup,
+        val originalIndex: Int
     )
 
     private class NotificationApi private constructor(
@@ -486,11 +527,7 @@ object MediaProgressStyleHooker {
         private val runtimeShaderField: Field?,
         private val observerOuterField: Field?,
         private val controllerHolderField: Field,
-        private val controllerContextField: Field,
         private val controllerSeekBarViewModelField: Field,
-        private val controllerFullAodField: Field?,
-        private val lazyGetMethod: Method?,
-        private val fullAodEnabledField: Field?,
         val observerOnChanged: Method?,
         val attachMethod: Method?,
         val detachMethod: Method?,
@@ -508,26 +545,38 @@ object MediaProgressStyleHooker {
 
         fun replaceWithNativeGlow(holder: Any) {
             currentHolderFields = holderFields
+            nativeGlowStates[holder]?.let { state ->
+                if (holderFields.seekBarField.get(holder) !== state.replacement) {
+                    holderFields.seekBarField.set(holder, state.replacement)
+                }
+                ensureNativeGlowAttached(state)
+                nativeGlowSeekBars[holder] = state.replacement
+                return
+            }
             val original = holderFields.seekBarField.get(holder) as? SeekBar ?: return
             val parent = original.parent as? ViewGroup ?: return
-            if (!nativeGlowHolders.add(holder)) return
+            val originalIndex = parent.indexOfChild(original).takeIf { it >= 0 } ?: return
+            var createdReplacement: SeekBar? = null
             try {
                 val constructor = hyperSeekBarConstructor
                     ?: error("HyperProgressSeekBar(Context) constructor unavailable")
                 val shaderField = runtimeShaderField
                     ?: error("HyperProgressSeekBar runtimeShader unavailable")
                 val context = original.context
-                val replacement = constructor.newInstance(context) as? SeekBar ?: return
+                val replacement = (constructor.newInstance(context) as? SeekBar ?: return)
+                    .also { createdReplacement = it }
                 if (shaderField.get(replacement) == null) {
                     HookLogger.w(TAG, "当前设备级别不支持原生光辉进度条，保留通知中心默认样式")
                     return
                 }
                 replacement.id = original.id
-                replacement.layoutParams = original.layoutParams
+                replacement.layoutParams = copyLayoutParams(original)
                 replacement.visibility = original.visibility
+                replacement.alpha = original.alpha
                 replacement.isEnabled = original.isEnabled
                 replacement.max = original.max
                 replacement.progress = original.progress
+                replacement.secondaryProgress = original.secondaryProgress
                 replacement.contentDescription = original.contentDescription
                 replacement.thumbTintList = original.thumbTintList
                 replacement.progressTintList = original.progressTintList
@@ -539,16 +588,19 @@ object MediaProgressStyleHooker {
                     original.paddingRight,
                     original.paddingBottom
                 )
-                val index = (parent.indexOfChild(original) + 1).coerceIn(0, parent.childCount)
+                val state = NativeGlowState(original, replacement, parent, originalIndex)
                 holderFields.seekBarField.set(holder, replacement)
-                parent.addView(replacement, index)
+                parent.addView(replacement, originalIndex.coerceIn(0, parent.childCount))
                 parent.removeView(original)
+                nativeGlowStates[holder] = state
                 nativeGlowSeekBars[holder] = replacement
-                resolveForegroundColor(holder, original)?.let { color ->
-                    applyNativeGlowColor(replacement, color)
-                }
             } catch (error: Throwable) {
-                nativeGlowHolders.remove(holder)
+                holderFields.seekBarField.set(holder, original)
+                createdReplacement?.let { replacement ->
+                    if (replacement.parent === parent) parent.removeView(replacement)
+                }
+                nativeGlowStates.remove(holder)
+                nativeGlowSeekBars.remove(holder)
                 throw error
             }
         }
@@ -562,50 +614,41 @@ object MediaProgressStyleHooker {
 
         fun attachWaveListener(controller: Any) {
             val holder = getHolder(controller) ?: return
+            val seekBar = replaceWithWave(holder) ?: return
             val viewModel = controllerSeekBarViewModelField.get(controller) ?: return
             val listener = common?.createChangeListener(viewModel) ?: return
-            waveSeekBars[holder]?.setOnSeekBarChangeListener(listener)
+            seekBar.setOnSeekBarChangeListener(listener)
+        }
+
+        fun attachNativeGlow(controller: Any) {
+            getHolder(controller)?.let { holder -> replaceWithNativeGlow(holder) }
+        }
+
+        fun detachProgress(controller: Any) {
+            getHolder(controller)?.let { holder ->
+                restoreWaveSeekBar(holder)
+                restoreNativeGlow(holder, holderFields.seekBarField)
+            }
         }
 
         fun updateProgressColor(controller: Any) {
             val holder = getHolder(controller) ?: return
-            nativeGlowSeekBars[holder]?.let { seekBar ->
-                resolveForegroundColor(holder, seekBar)?.let { color ->
-                    applyNativeGlowColor(seekBar, color)
-                }
+            if (
+                NotificationMediaBackgroundController.isActive(controller) &&
+                !NotificationMediaForegroundStyler.hasAppliedPalette(controller)
+            ) {
                 return
             }
-            val context = controllerContextField.get(controller) as? Context ?: return
-            val fullAodEnabled = controllerFullAodField?.get(controller)
-                ?.let { lazy -> lazyGetMethod?.invoke(lazy) }
-                ?.let { fullAod -> fullAodEnabledField?.getBoolean(fullAod) } == true
-            val nightMode = context.resources.configuration.uiMode and
-                Configuration.UI_MODE_NIGHT_MASK
-            val isDark = fullAodEnabled || nightMode == Configuration.UI_MODE_NIGHT_YES
-            waveSeekBars[holder]?.progressTintList = ColorStateList.valueOf(
-                if (isDark) Color.WHITE else Color.BLACK
-            )
-        }
-
-        private fun resolveForegroundColor(holder: Any, seekBar: SeekBar): Int? {
-            (holderFields.titleTextField?.get(holder) as? TextView)?.let {
-                return it.currentTextColor
+            nativeGlowSeekBars[holder]?.let { seekBar ->
+                NotificationMediaForegroundStyler.applyProgressColors(controller, seekBar)
+                return
             }
-            return seekBar.progressTintList?.getColorForState(
-                seekBar.drawableState,
-                Color.WHITE
-            )
-        }
-
-        private fun applyNativeGlowColor(seekBar: SeekBar, color: Int) {
-            val foreground = ColorStateList.valueOf(color)
-            seekBar.thumbTintList = foreground
-            seekBar.progressTintList = foreground
-            NotificationMediaForegroundStyler.applySeekBarForegroundColor(
-                seekBar,
-                color
-            )
-            seekBar.invalidate()
+            waveSeekBars[holder]?.let { seekBar ->
+                NotificationMediaForegroundStyler.applyProgressColors(
+                    controller = controller,
+                    seekBar = seekBar
+                )
+            }
         }
 
         companion object {
@@ -623,13 +666,6 @@ object MediaProgressStyleHooker {
                 val observerOuter = observerClass?.let {
                     findField(it, "this\$0")
                 }
-                val fullAodField = findField(controllerClass, "fullAodController")
-                val fullAodClass = runCatching {
-                    classLoader.loadClass(
-                        "com.android.systemui.statusbar.notification.fullaod.NotifiFullAodController"
-                    )
-                }.getOrNull()
-                val lazyClass = runCatching { classLoader.loadClass("dagger.Lazy") }.getOrNull()
                 return NotificationApi(
                     common = common,
                     holderConstructors = holderClass.declaredConstructors.toList(),
@@ -645,18 +681,9 @@ object MediaProgressStyleHooker {
                     observerOuterField = observerOuter,
                     controllerHolderField = controllerClass.getDeclaredField("holder")
                         .apply { isAccessible = true },
-                    controllerContextField = controllerClass.getDeclaredField("context")
-                        .apply { isAccessible = true },
                     controllerSeekBarViewModelField =
                         controllerClass.getDeclaredField("seekBarViewModel")
                             .apply { isAccessible = true },
-                    controllerFullAodField = fullAodField,
-                    lazyGetMethod = lazyClass?.declaredMethods?.firstOrNull {
-                        it.name == "get" && it.parameterCount == 0
-                    }?.apply { isAccessible = true },
-                    fullAodEnabledField = fullAodClass?.let {
-                        findField(it, "mEnableFullAod")
-                    },
                     observerOnChanged = observerClass?.declaredMethods?.firstOrNull {
                         it.name == "onChanged" && it.parameterCount == 1
                     },
@@ -698,10 +725,15 @@ object MediaProgressStyleHooker {
         fun attachWaveListeners(binder: Any) {
             val viewModel = binderSeekBarViewModelField.get(binder) ?: return
             getHolders(binder).forEach { holder ->
+                val seekBar = replaceWithWave(holder) ?: return@forEach
                 common.createChangeListener(viewModel)?.let { listener ->
-                    waveSeekBars[holder]?.setOnSeekBarChangeListener(listener)
+                    seekBar.setOnSeekBarChangeListener(listener)
                 }
             }
+        }
+
+        fun detachWave(holder: Any) {
+            restoreWaveSeekBar(holder)
         }
 
         companion object {
@@ -740,18 +772,49 @@ object MediaProgressStyleHooker {
         seekBarField: Field,
         thumbStyle: Int
     ): SeekBar? {
-        waveSeekBars[holder]?.let { return it }
+        waveStates[holder]?.let { state ->
+            ensureWaveAttached(state)
+            waveSeekBars[holder] = state.replacement
+            return state.replacement
+        }
         val original = seekBarField.get(holder) as? SeekBar ?: return null
+        if (original is SquigglySeekBar) {
+            waveSeekBars[holder] = original
+            return original
+        }
         val parent = original.parent as? ViewGroup ?: return null
         val context = original.context
-        val layoutParams = original.layoutParams
-        (layoutParams as? ViewGroup.MarginLayoutParams)?.apply {
-            topMargin = 0
-            bottomMargin = 0
+        val originalIndex = parent.indexOfChild(original).takeIf { it >= 0 } ?: return null
+        val layoutParams = original.layoutParams?.let { params ->
+            when (params) {
+                is ViewGroup.MarginLayoutParams ->
+                    ViewGroup.MarginLayoutParams(params).apply {
+                        topMargin = 0
+                        bottomMargin = 0
+                    }
+
+                else -> ViewGroup.LayoutParams(params)
+            }
         }
         val replacement = SquigglySeekBar(context).apply {
             id = original.id
             this.layoutParams = layoutParams
+            visibility = original.visibility
+            alpha = original.alpha
+            isEnabled = original.isEnabled
+            max = original.max
+            progress = original.progress
+            secondaryProgress = original.secondaryProgress
+            contentDescription = original.contentDescription
+            thumbTintList = original.thumbTintList
+            progressTintList = original.progressTintList
+            progressBackgroundTintList = original.progressBackgroundTintList
+            setPadding(
+                original.paddingLeft,
+                original.paddingTop,
+                original.paddingRight,
+                original.paddingBottom
+            )
             this.thumbStyle = when (thumbStyle) {
                 RootConstants.NOTIFICATION_MEDIA_THUMB_STYLE_VERTICAL -> ThumbStyle.VerticalBar
                 RootConstants.NOTIFICATION_MEDIA_THUMB_STYLE_HIDDEN -> ThumbStyle.Hidden
@@ -762,11 +825,99 @@ object MediaProgressStyleHooker {
             phaseSpeed = context.dp(8f)
             strokeWidth = context.dp(2f)
         }
-        val index = (parent.indexOfChild(original) + 1).coerceIn(0, parent.childCount)
-        parent.addView(replacement, index)
-        parent.removeView(original)
-        waveSeekBars[holder] = replacement
+        val state = WaveSeekBarState(original, replacement, parent, originalIndex)
+        try {
+            parent.addView(replacement, originalIndex.coerceIn(0, parent.childCount))
+            parent.removeView(original)
+            waveStates[holder] = state
+            waveSeekBars[holder] = replacement
+        } catch (error: Throwable) {
+            if (replacement.parent === parent) parent.removeView(replacement)
+            throw error
+        }
         return replacement
+    }
+
+    private fun ensureWaveAttached(state: WaveSeekBarState) {
+        if (state.replacement.parent === state.parent) return
+        (state.replacement.parent as? ViewGroup)?.removeView(state.replacement)
+        if (state.original.parent === state.parent) {
+            state.parent.removeView(state.original)
+        }
+        state.parent.addView(
+            state.replacement,
+            state.originalIndex.coerceIn(0, state.parent.childCount)
+        )
+    }
+
+    private fun ensureNativeGlowAttached(state: NativeGlowState) {
+        if (state.replacement.parent === state.parent) return
+        (state.replacement.parent as? ViewGroup)?.removeView(state.replacement)
+        if (state.original.parent === state.parent) {
+            state.parent.removeView(state.original)
+        }
+        state.parent.addView(
+            state.replacement,
+            state.originalIndex.coerceIn(0, state.parent.childCount)
+        )
+    }
+
+    private fun restoreWaveSeekBar(holder: Any) {
+        val state = waveStates.remove(holder) ?: run {
+            waveSeekBars.remove(holder)
+            return
+        }
+        state.replacement.setOnSeekBarChangeListener(null)
+        val currentParent = state.replacement.parent as? ViewGroup
+        if (currentParent != null) {
+            currentParent.removeView(state.replacement)
+            if (state.original.parent == null) {
+                state.parent.addView(
+                    state.original,
+                    state.originalIndex.coerceIn(0, state.parent.childCount)
+                )
+            }
+        } else if (state.original.parent == null) {
+            state.parent.addView(
+                state.original,
+                state.originalIndex.coerceIn(0, state.parent.childCount)
+            )
+        }
+        waveSeekBars.remove(holder)
+    }
+
+    private fun restoreNativeGlow(holder: Any, seekBarField: Field) {
+        val state = nativeGlowStates.remove(holder) ?: run {
+            nativeGlowSeekBars.remove(holder)
+            return
+        }
+        if (seekBarField.get(holder) === state.replacement) {
+            seekBarField.set(holder, state.original)
+        }
+        val currentParent = state.replacement.parent as? ViewGroup
+        if (currentParent != null) {
+            currentParent.removeView(state.replacement)
+            if (state.original.parent == null) {
+                state.parent.addView(
+                    state.original,
+                    state.originalIndex.coerceIn(0, state.parent.childCount)
+                )
+            }
+        } else if (state.original.parent == null) {
+            state.parent.addView(
+                state.original,
+                state.originalIndex.coerceIn(0, state.parent.childCount)
+            )
+        }
+        nativeGlowSeekBars.remove(holder)
+    }
+
+    private fun copyLayoutParams(view: View): ViewGroup.LayoutParams? {
+        val params = view.layoutParams ?: return null
+        return when (params) {
+            is ViewGroup.MarginLayoutParams -> ViewGroup.MarginLayoutParams(params)
+            else -> ViewGroup.LayoutParams(params)
+        }
     }
 
     private fun holderFields(holderClass: Class<*>): HolderFields {
@@ -779,8 +930,7 @@ object MediaProgressStyleHooker {
             },
             totalTimeField = holderClass.getDeclaredField("totalTimeView").apply {
                 isAccessible = true
-            },
-            titleTextField = findField(holderClass, "titleText")
+            }
         )
     }
 

@@ -38,6 +38,9 @@ internal object NotificationMediaBackgroundController {
         return supportedLoaders.contains(classLoader) && resolveRenderer(classLoader) != null
     }
 
+    fun currentBackgroundIsDark(controller: Any): Boolean? =
+        states[controller]?.backgroundIsDark
+
     fun setNativeHooksAvailable(classLoader: ClassLoader, available: Boolean) {
         if (available) supportedLoaders.add(classLoader) else supportedLoaders.remove(classLoader)
     }
@@ -45,10 +48,15 @@ internal object NotificationMediaBackgroundController {
     fun onBind(controller: Any, mediaData: Any?) {
         val state = states.getOrPut(controller) { ControllerState() }
         if (!isActive(controller)) {
+            state.request.incrementAndGet()
+            if (state.customApplied) restoreMediaBackground(state)
+            NotificationMediaForegroundStyler.clear(controller)
             state.token = null
+            state.appliedRenderKey = null
             state.customApplied = false
             state.renderPending = false
-            NotificationMediaForegroundStyler.forget(controller)
+            state.backgroundIsDark = null
+            state.lastMediaData = null
             return
         }
         mediaData ?: return
@@ -91,6 +99,7 @@ internal object NotificationMediaBackgroundController {
         state.renderPending = true
         val request = state.request.incrementAndGet()
         val renderer = resolveRenderer(controller.javaClass.classLoader) ?: run {
+            clearCustomBackground(controller, state)
             state.renderPending = false
             return
         }
@@ -107,6 +116,7 @@ internal object NotificationMediaBackgroundController {
             if (rendered == null) {
                 mediaBg.post {
                     if (states[controller] === state && state.request.get() == request) {
+                        clearCustomBackground(controller, state)
                         state.renderPending = false
                     }
                 }
@@ -121,19 +131,57 @@ internal object NotificationMediaBackgroundController {
                     rendered.bitmap.recycle()
                     return@post
                 }
-                if (
-                    state.customApplied && state.appliedToken == token &&
-                    state.artworkFingerprint == rendered.artworkFingerprint
-                ) {
+                val currentHolder = readField(controller, "holder")
+                val currentMediaBg = currentHolder
+                    ?.let { readField(it, "mediaBg") as? ImageView }
+                if (currentHolder !== holder || currentMediaBg !== mediaBg) {
                     rendered.bitmap.recycle()
+                    NotificationMediaForegroundStyler.clear(controller)
+                    restoreMediaBackground(state)
+                    state.mediaBg = null
+                    state.customApplied = false
+                    state.renderPending = false
+                    state.backgroundIsDark = null
+                    state.token = null
+                    state.appliedRenderKey = null
+                    state.lastMediaData?.let { latest -> onBind(controller, latest) }
+                    return@post
+                }
+                val renderKey = buildRenderKey(
+                    style = style,
+                    blurAmount = blurAmount,
+                    autoInvert = autoInvert,
+                    softCoverTone = softCoverTone,
+                    nightMode = nightMode,
+                    packageName = packageName,
+                    width = width,
+                    height = height,
+                    artworkFingerprint = rendered.artworkFingerprint
+                )
+                if (state.customApplied && state.appliedRenderKey == renderKey) {
+                    NotificationMediaForegroundStyler.apply(
+                        controller = controller,
+                        holder = holder,
+                        backgroundIsDark = rendered.colors.backgroundIsDark
+                    )
+                    rendered.bitmap.recycle()
+                    state.backgroundIsDark = rendered.colors.backgroundIsDark
                     state.renderPending = false
                     return@post
                 }
-                applyBackground(mediaBg, rendered.bitmap)
-                NotificationMediaForegroundStyler.apply(controller, holder, rendered.colors)
+                applyBackground(
+                    mediaBg = mediaBg,
+                    bitmap = rendered.bitmap,
+                    animate = currentColorAnimation()
+                )
+                NotificationMediaForegroundStyler.apply(
+                    controller = controller,
+                    holder = holder,
+                    backgroundIsDark = rendered.colors.backgroundIsDark
+                )
                 state.customApplied = true
-                state.appliedToken = token
-                state.artworkFingerprint = rendered.artworkFingerprint
+                state.appliedRenderKey = renderKey
+                state.backgroundIsDark = rendered.colors.backgroundIsDark
                 state.renderPending = false
             }
         }
@@ -199,11 +247,11 @@ internal object NotificationMediaBackgroundController {
         })
     }
 
-    private fun applyBackground(mediaBg: ImageView, bitmap: Bitmap) {
+    private fun applyBackground(mediaBg: ImageView, bitmap: Bitmap, animate: Boolean) {
         mediaBg.setPadding(0, 0, 0, 0)
         mediaBg.clipToOutline = true
         val next = BitmapDrawable(mediaBg.resources, bitmap)
-        if (!currentColorAnimation() || !mediaBg.isShown || !mediaBg.isAttachedToWindow) {
+        if (!animate || !mediaBg.isShown || !mediaBg.isAttachedToWindow) {
             mediaBg.setImageDrawable(next)
             return
         }
@@ -247,6 +295,14 @@ internal object NotificationMediaBackgroundController {
         mediaBg.invalidate()
     }
 
+    private fun clearCustomBackground(controller: Any, state: ControllerState) {
+        if (state.customApplied) restoreMediaBackground(state)
+        NotificationMediaForegroundStyler.clear(controller)
+        state.customApplied = false
+        state.backgroundIsDark = null
+        state.appliedRenderKey = null
+    }
+
     private fun resolveRenderer(classLoader: ClassLoader?): NotificationMediaBackgroundRenderer? {
         classLoader ?: return null
         if (unavailableLoaders.contains(classLoader)) return null
@@ -281,6 +337,20 @@ internal object NotificationMediaBackgroundController {
     private fun currentColorAnimation(): Boolean =
         MediaCardRuntimeConfig.current.notification.backgroundColorAnimation
 
+    private fun buildRenderKey(
+        style: Int,
+        blurAmount: Int,
+        autoInvert: Boolean,
+        softCoverTone: Int,
+        nightMode: Int,
+        packageName: String,
+        width: Int,
+        height: Int,
+        artworkFingerprint: Long
+    ): String =
+        "$style:$blurAmount:$autoInvert:$softCoverTone:$nightMode:" +
+            "$packageName:$width:$height:$artworkFingerprint"
+
     private fun readField(receiver: Any, name: String): Any? {
         return findField(receiver.javaClass, name)?.let { field ->
             runCatching { field.get(receiver) }.getOrNull()
@@ -305,10 +375,10 @@ internal object NotificationMediaBackgroundController {
 
     private data class ControllerState(
         var token: String? = null,
-        var appliedToken: String? = null,
-        var artworkFingerprint: Long? = null,
+        var appliedRenderKey: String? = null,
         var customApplied: Boolean = false,
         var renderPending: Boolean = false,
+        var backgroundIsDark: Boolean? = null,
         var mediaBg: ImageView? = null,
         var originalDrawable: Drawable? = null,
         var originalScaleType: ImageView.ScaleType? = null,

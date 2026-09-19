@@ -44,9 +44,11 @@ import com.lidesheng.hyperlyric.root.mediacard.island.layout.miui.IslandExpanded
 import com.lidesheng.hyperlyric.root.mediacard.island.layout.miui.IslandExpandedMediaMiuiTimeController
 import com.lidesheng.hyperlyric.root.mediacard.island.layout.pixel.IslandExpandedMediaPixelStyleController
 import com.lidesheng.hyperlyric.root.mediacard.island.style.IslandExpandedMediaForegroundAccess
-import com.lidesheng.hyperlyric.root.mediacard.island.style.IslandExpandedMediaForegroundColors
 import com.lidesheng.hyperlyric.root.mediacard.island.style.IslandExpandedMediaForegroundStyler
-import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaColorConfig
+import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
+import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPalette
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPaletteResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
@@ -341,8 +343,10 @@ object IslandExpandedMediaAmbientFlowHooker {
                             holder,
                             api
                         )
-                    syncMusicWave(binder, holder, api)
-                    syncLayoutAccessory(binder, holder, api)
+                    if (foregroundApplied) {
+                        syncMusicWave(binder, holder, api)
+                        syncLayoutAccessory(binder, holder, api)
+                    }
                     foregroundApplied
                 }.getOrElse { error ->
                     HookLogger.e(TAG, "保持展开态媒体前景色失败", error)
@@ -353,11 +357,14 @@ object IslandExpandedMediaAmbientFlowHooker {
                     return null
                 }
                 val result = chain.proceed()
+                syncMusicWave(binder, holder, api)
+                syncLayoutAccessory(binder, holder, api)
                 enforceHeadGlowPreference(api, holder)
                 return result
             }
             val api = nativeApi ?: return chain.proceed()
             if (!shouldUseLightTheme(binder)) {
+                IslandExpandedMediaForegroundStyler.restore(api, holder)
                 val result = chain.proceed()
                 syncMusicWave(binder, holder, api)
                 syncLayoutAccessory(binder, holder, api)
@@ -367,10 +374,21 @@ object IslandExpandedMediaAmbientFlowHooker {
             return try {
                 val lightContext = api.getContext(binder)
                     .withNightMode(Configuration.UI_MODE_NIGHT_NO)
+                val colors = MediaCardForegroundPaletteResolver.resolve(
+                    context = lightContext,
+                    backgroundIsDark = false
+                ) ?: run {
+                    IslandExpandedMediaForegroundStyler.restore(api, holder)
+                    val result = chain.proceed()
+                    syncMusicWave(binder, holder, api)
+                    syncLayoutAccessory(binder, holder, api)
+                    enforceHeadGlowPreference(api, holder)
+                    return result
+                }
                 IslandExpandedMediaForegroundStyler.applyLightForeground(
                     api,
                     holder,
-                    IslandExpandedMediaForegroundColors.from(lightContext)
+                    colors
                 )
                 syncMusicWave(binder, holder, api)
                 syncLayoutAccessory(binder, holder, api)
@@ -378,7 +396,10 @@ object IslandExpandedMediaAmbientFlowHooker {
                 null
             } catch (error: Throwable) {
                 HookLogger.e(TAG, "应用原生浅色前景失败", error)
+                IslandExpandedMediaForegroundStyler.restore(api, holder)
                 val result = chain.proceed()
+                syncMusicWave(binder, holder, api)
+                syncLayoutAccessory(binder, holder, api)
                 enforceHeadGlowPreference(api, holder)
                 result
             }
@@ -534,7 +555,13 @@ object IslandExpandedMediaAmbientFlowHooker {
         }
 
         val lightContext = api.getContext(binder).withNightMode(Configuration.UI_MODE_NIGHT_NO)
-        val colors = IslandExpandedMediaForegroundColors.from(lightContext)
+        val colors = MediaCardForegroundPaletteResolver.resolve(
+            context = lightContext,
+            backgroundIsDark = false
+        ) ?: run {
+            restoreCardTheme(binder)
+            return
+        }
         api.getHolders(binder).forEach { holder ->
             val player = api.getPlayer(holder)
             if (!applyLightExpandedBackground(api, player)) {
@@ -729,7 +756,10 @@ object IslandExpandedMediaAmbientFlowHooker {
         IslandExpandedMediaColorOsAccessoryController.apply(
             views = views,
             hideDeviceSwitch = hideDeviceSwitch(),
-            hideCustomActions = hideCustomActions()
+            hideCustomActions = hideCustomActions(),
+            foregroundColor = IslandExpandedMediaForegroundStyler
+                .appliedPalette(holder)
+                ?.primary
         )
     }
 
@@ -743,7 +773,9 @@ object IslandExpandedMediaAmbientFlowHooker {
             views = views,
             appIcon = api.getAppIdentityDrawable(binder, holder, context),
             appName = api.getApplicationName(binder, context),
-            textColor = api.getIdentityTextColor(holder)
+            textColor = IslandExpandedMediaForegroundStyler.appliedPalette(holder)
+                ?.secondary
+                ?: api.getIdentityTextColor(holder)
         )
     }
 
@@ -761,7 +793,9 @@ object IslandExpandedMediaAmbientFlowHooker {
         val elements = api.getMediaElements(holder)
         IslandExpandedMediaMiuiAppNameController.apply(
             elements = elements,
-            appName = api.getApplicationName(binder, api.getContext(binder))
+            appName = api.getApplicationName(binder, api.getContext(binder)),
+            textColor = IslandExpandedMediaForegroundStyler.appliedPalette(holder)
+                ?.secondary
         )
     }
 
@@ -783,7 +817,9 @@ object IslandExpandedMediaAmbientFlowHooker {
         ) {
             IslandExpandedMediaMusicWaveController.apply(
                 player = player,
-                color = api.getMusicWaveColor(holder),
+                color = IslandExpandedMediaForegroundStyler.appliedPalette(holder)
+                    ?.primary
+                    ?: api.getMusicWaveColor(holder),
                 playing = api.isPlaying(binder)
             )
         } else {
@@ -890,6 +926,14 @@ object IslandExpandedMediaAmbientFlowHooker {
         val referenceElements = api.getHolders(activeBinder).firstNotNullOfOrNull { holder ->
             runCatching { api.getMediaElements(holder) }.getOrNull()
         } ?: return false
+        val referenceHolder = api.getHolders(activeBinder).firstOrNull { holder ->
+            runCatching {
+                api.getMediaElements(holder).player === referenceElements.player
+            }.getOrDefault(false)
+        } ?: api.getHolders(activeBinder).firstOrNull()
+        val foregroundPalette = referenceHolder?.let { holder ->
+            IslandExpandedMediaForegroundStyler.appliedPalette(holder)
+        }
         IslandExpandedMediaElementController.applyToFakeView(
             fakeExpandedView = fakeExpandedView,
             referenceElements = referenceElements,
@@ -913,7 +957,8 @@ object IslandExpandedMediaAmbientFlowHooker {
                     fakeExpandedView = fakeExpandedView,
                     reference = referenceAccessory,
                     hideDeviceSwitch = hideDeviceSwitch,
-                    hideCustomActions = hideCustomActions
+                    hideCustomActions = hideCustomActions,
+                    foregroundColor = foregroundPalette?.primary
                 )
             }
         }
@@ -926,11 +971,6 @@ object IslandExpandedMediaAmbientFlowHooker {
                 fakeExpandedView = fakeExpandedView,
                 referenceElements = referenceElements
             )
-            val referenceHolder = api.getHolders(activeBinder).firstOrNull { holder ->
-                runCatching {
-                    api.getMediaElements(holder).player === referenceElements.player
-                }.getOrDefault(false)
-            } ?: api.getHolders(activeBinder).firstOrNull()
             referenceHolder?.let { holder ->
                 val context = api.getContext(activeBinder)
                 api.getOneUiAccessoryViews(holder)?.let { referenceAccessory ->
@@ -939,7 +979,8 @@ object IslandExpandedMediaAmbientFlowHooker {
                         reference = referenceAccessory,
                         appIcon = api.getAppIdentityDrawable(activeBinder, holder, context),
                         appName = api.getApplicationName(activeBinder, context),
-                        textColor = api.getIdentityTextColor(holder)
+                        textColor = foregroundPalette?.secondary
+                            ?: api.getIdentityTextColor(holder)
                     )
                 }
             }
@@ -959,7 +1000,8 @@ object IslandExpandedMediaAmbientFlowHooker {
                 appName = api.getApplicationName(
                     activeBinder,
                     api.getContext(activeBinder)
-                )
+                ),
+                textColor = foregroundPalette?.secondary
             )
         }
         if (isPixel) {
@@ -1511,9 +1553,12 @@ object IslandExpandedMediaAmbientFlowHooker {
             return mediaDataIsPlayingField.get(mediaData) == true
         }
 
-        override fun getSeekBar(holder: Any): View = seekBarField.get(holder) as View
+        override fun getSeekBar(holder: Any): View =
+            MediaProgressStyleHooker.replacementSeekBar(holder)
+                ?: (seekBarField.get(holder) as View)
 
         fun captureSeekBarTrackState(seekBar: View): SeekBarTrackState? {
+            if (seekBar is SquigglySeekBar) return null
             val paddingField = seekBarPaddingOffsetField ?: return null
             val trackPositionField = seekBarTrackPositionField ?: return null
             val trackPosition = trackPositionField.get(seekBar) as? FloatArray ?: return null
@@ -1524,6 +1569,7 @@ object IslandExpandedMediaAmbientFlowHooker {
         }
 
         fun setSeekBarTrackOffset(seekBar: View, paddingOffset: Int, trackPositionX: Float) {
+            if (seekBar is SquigglySeekBar) return
             val paddingField = seekBarPaddingOffsetField ?: return
             val trackPositionField = seekBarTrackPositionField ?: return
             paddingField.setInt(seekBar, paddingOffset)
@@ -1700,21 +1746,34 @@ object IslandExpandedMediaAmbientFlowHooker {
         }
 
         override fun setSeekBarForeground(seekBar: View, color: Int) {
-            setSeekBarForegroundMethod.invoke(seekBar, color)
+            if (seekBar is SquigglySeekBar) {
+                seekBar.setWaveForegroundColor(color)
+            } else {
+                setSeekBarForegroundMethod.invoke(seekBar, color)
+            }
         }
 
         override fun setSeekBarBackground(seekBar: View, color: Int) {
-            setSeekBarBackgroundMethod.invoke(seekBar, color)
+            if (seekBar is SquigglySeekBar) {
+                seekBar.setWaveTrackColor(color)
+            } else {
+                setSeekBarBackgroundMethod.invoke(seekBar, color)
+            }
         }
 
         override fun applyCustomForeground(
+            binder: Any,
             holder: Any,
-            colors: NotificationMediaColorConfig
+            colors: MediaCardForegroundPalette
         ) {
             IslandExpandedMediaForegroundStyler.applyCustomForeground(this, holder, colors)
+            syncMusicWave(binder, holder, this)
+            syncLayoutAccessory(binder, holder, this)
+            enforceHeadGlowPreference(this, holder)
         }
 
         override fun getSeekBarShaderColorFilter(seekBar: View): android.graphics.ColorFilter? {
+            if (seekBar is SquigglySeekBar) return null
             return (seekBarPaintField.get(seekBar) as Paint).colorFilter
         }
 
@@ -1722,15 +1781,18 @@ object IslandExpandedMediaAmbientFlowHooker {
             seekBar: View,
             colorFilter: android.graphics.ColorFilter?
         ) {
+            if (seekBar is SquigglySeekBar) return
             (seekBarPaintField.get(seekBar) as Paint).colorFilter = colorFilter
             seekBar.invalidate()
         }
 
         override fun getSeekBarHeadGlowAlpha(seekBar: View): Float {
+            if (seekBar is SquigglySeekBar) return 1f
             return seekBarHeadGlowAlphaField.getFloat(seekBar)
         }
 
         override fun setSeekBarHeadGlowAlpha(seekBar: View, alpha: Float) {
+            if (seekBar is SquigglySeekBar) return
             seekBarHeadGlowAlphaField.setFloat(seekBar, alpha)
             (seekBarRuntimeShaderField.get(seekBar) as? RuntimeShader)?.setFloatUniform(
                 "uHeadGlowAlpha",
@@ -1865,6 +1927,19 @@ object IslandExpandedMediaAmbientFlowHooker {
                     false
                 )
             }
+        }
+
+        override fun restoreCustomForeground(binder: Any, holder: Any) {
+            IslandExpandedMediaForegroundStyler.restore(this, holder)
+            restoringNativeForeground.set(true)
+            try {
+                applyNativeForeground(binder, holder)
+            } finally {
+                restoringNativeForeground.remove()
+            }
+            syncMusicWave(binder, holder, this)
+            syncLayoutAccessory(binder, holder, this)
+            enforceHeadGlowPreference(this, holder)
         }
 
         private fun expandedBackgroundMethods(
