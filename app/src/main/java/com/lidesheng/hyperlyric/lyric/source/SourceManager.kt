@@ -36,8 +36,10 @@ class SourceManager(
                 "歌词源配置回退: requested=$sourceId, actual=${source.id}, reason=unavailable"
             )
         }
-        logger.i("SourceManager", "启动歌词源: ${source.displayName}")
         startSession(source)
+        if (activeSource === source) {
+            logger.i("SourceManager", "启动歌词源: ${source.displayName}")
+        }
     }
 
     fun switchSource(sourceId: String) {
@@ -52,7 +54,6 @@ class SourceManager(
             return
         }
 
-        logger.i("SourceManager", "切换歌词源: ${source.displayName}")
         startSession(source)
     }
 

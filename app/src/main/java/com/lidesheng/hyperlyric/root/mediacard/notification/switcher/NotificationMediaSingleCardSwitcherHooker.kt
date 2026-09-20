@@ -766,7 +766,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                 "player"
             ) as? View ?: return null
             player = WeakReference(currentPlayer)
-            playbackPolicy.initialize(currentPlayer.context)
+            playbackPolicy.initialize()
             // detach() clears the policy and selection snapshots. Re-seed from
             // MediaSortUtils on every native attach so a re-inflated header does
             // not resume with a partial order until the next MediaData callback.

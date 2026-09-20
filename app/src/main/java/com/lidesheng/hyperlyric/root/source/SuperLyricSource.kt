@@ -1,6 +1,5 @@
 package com.lidesheng.hyperlyric.root.source
 
-import android.os.SystemClock
 import com.hchen.superlyricapi.ISuperLyricReceiver
 import com.hchen.superlyricapi.SuperLyricData
 import com.hchen.superlyricapi.SuperLyricHelper
@@ -47,8 +46,6 @@ class SuperLyricSource : LyricSource {
     private var lastMetadataTitle: String? = null
     private var lastMetadataArtist: String? = null
     private var lastMetadataAlbum: String? = null
-    private var lastDebugLyricSignature: String? = null
-    private var lastDebugLyricAt: Long = 0L
 
     fun initialize(app: android.app.Application) {
         this.app = app
@@ -210,8 +207,6 @@ class SuperLyricSource : LyricSource {
 
                 @Suppress("DEPRECATION")
                 val dl = lyric.delay
-                logLyricEvent(publisher, lyric.text, st, et, dl)
-
                 if (st == 0L && et == 0L) {
                     val pos = lastKnownPosition.takeIf { it >= 0 }
                         ?: app?.let { MediaMetadataHelper.getPlaybackPosition(it, publisher) }
@@ -282,32 +277,6 @@ class SuperLyricSource : LyricSource {
         )
     }
 
-    private fun logLyricEvent(
-        publisher: String,
-        text: String,
-        startTime: Long,
-        endTime: Long,
-        delay: Long
-    ) {
-        if (!HookLogger.isDebugEnabled) return
-        val now = SystemClock.uptimeMillis()
-        val signature = "$publisher\u001F$text\u001F$startTime\u001F$endTime\u001F$delay"
-        synchronized(this) {
-            if (signature == lastDebugLyricSignature ||
-                now - lastDebugLyricAt < DEBUG_LYRIC_LOG_MIN_INTERVAL_MS
-            ) {
-                return
-            }
-            lastDebugLyricSignature = signature
-            lastDebugLyricAt = now
-        }
-        HookLogger.d(
-            TAG,
-            "歌词事件: text=$text, start=$startTime, end=$endTime, " +
-                    "delay=$delay, pos=$lastKnownPosition, pub=$publisher"
-        )
-    }
-
     private fun startPositionPolling(publisher: String) {
         if (positionPublisher == publisher && positionJob?.isActive == true) return
         positionJob?.cancel()
@@ -336,8 +305,6 @@ class SuperLyricSource : LyricSource {
         positionJob = null
         positionPublisher = null
         lastKnownPosition = -1L
-        lastDebugLyricSignature = null
-        lastDebugLyricAt = 0L
         if (clearMetadata) {
             lastMetadataKey = null
             lastMetadataTitle = null
@@ -348,7 +315,5 @@ class SuperLyricSource : LyricSource {
 
     companion object {
         private const val TAG = "SuperLyricSource"
-        private const val DEBUG_LYRIC_LOG_MIN_INTERVAL_MS = 200L
     }
 }
-

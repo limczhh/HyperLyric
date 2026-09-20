@@ -40,7 +40,7 @@ internal class FileLyricEnhancementCache(
     private val lock = Any()
 
     init {
-        HookLogger.i(logTag, "歌词增强缓存目录: ${directory.absolutePath}")
+        HookLogger.d(logTag, "歌词增强缓存目录: ${directory.absolutePath}")
     }
 
     override fun getString(key: String): String? {

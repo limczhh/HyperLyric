@@ -1,9 +1,7 @@
 package com.lidesheng.hyperlyric.root.mediacard.notification.switcher
 
-import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.LinkedHashMap
 
@@ -25,7 +23,6 @@ internal class NotificationMediaPlaybackPolicy(
 ) {
     private companion object {
         const val TAG = "NotificationMediaPlaybackPolicy"
-        const val IGNORE_MUSIC_FOCUS_SETTING = "key_ignore_music_focus_req"
         const val SETTLE_DELAY_MS = 250L
     }
 
@@ -34,7 +31,6 @@ internal class NotificationMediaPlaybackPolicy(
     private var settlementRunnable: Runnable? = null
     private var settlementTargetConcurrent: Boolean? = null
     private var settingRead = false
-    private var ignoreMusicFocus = false
     private var concurrentCandidate = false
     private var concurrentConfirmed = false
     private var latestPlayingKey: String? = null
@@ -44,24 +40,10 @@ internal class NotificationMediaPlaybackPolicy(
     val shouldPreserveNativeOrder: Boolean
         get() = concurrentCandidate
 
-    fun initialize(context: Context) {
+    fun initialize() {
         if (settingRead) return
         settingRead = true
-        ignoreMusicFocus = runCatching {
-            Settings.Global.getInt(
-                context.contentResolver,
-                IGNORE_MUSIC_FOCUS_SETTING,
-                0
-            ) != 0
-        }.onFailure { error ->
-            HookLogger.w(TAG, "读取忽略音乐音频焦点设置失败，改用 MediaData.isPlaying", error)
-        }.getOrDefault(false)
-
-        HookLogger.d(
-            TAG,
-            "音频焦点策略: ignoreMusicFocus=$ignoreMusicFocus, " +
-                "实际并发状态以 MediaData.isPlaying 为准"
-        )
+        HookLogger.d(TAG, "音频焦点策略初始化: 实际并发状态以 MediaData.isPlaying 为准")
         reevaluate(scheduleSettlement = true)
     }
 

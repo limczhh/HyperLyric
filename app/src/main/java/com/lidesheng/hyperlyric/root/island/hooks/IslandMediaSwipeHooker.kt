@@ -93,7 +93,7 @@ internal object IslandMediaSwipeHooker {
                 hooker = TouchEventHook(),
             )
 
-            HookLogger.i(
+            HookLogger.d(
                 TAG,
                 "媒体超级岛横滑切歌 Hook 已初始化: nativeThresholdOverride=$nativeThresholdOverrideInstalled"
             )

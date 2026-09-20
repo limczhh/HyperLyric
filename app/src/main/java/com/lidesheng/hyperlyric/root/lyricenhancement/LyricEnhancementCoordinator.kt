@@ -69,7 +69,7 @@ internal class LyricEnhancementCoordinator(
             clearFeatureCache = ::clearFeatureCache,
             clearCacheEntry = ::clearCacheEntry,
         )
-        HookLogger.i(
+        HookLogger.d(
             LOG_TAG,
             "歌词增强初始化完成: " +
                     "amll=${amllFeature != null}, translation=${aiTranslationFeature != null}"

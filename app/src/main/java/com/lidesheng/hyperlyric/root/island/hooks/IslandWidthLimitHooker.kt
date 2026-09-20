@@ -171,7 +171,7 @@ internal object IslandWidthLimitHooker {
             }
 
             if (installed > 0) {
-                HookLogger.i(
+                HookLogger.d(
                     TAG,
                     "解除超级岛长度限制 Hook 已初始化: branch=phone, " +
                             "hooks=$installed, capabilities=${installedCapabilities.joinToString(",")}"

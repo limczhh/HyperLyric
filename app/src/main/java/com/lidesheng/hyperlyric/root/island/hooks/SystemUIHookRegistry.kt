@@ -54,7 +54,7 @@ object SystemUIHookRegistry {
             IslandAlbumCoverStyleHooker.hook(module, cl)
 
             isHookedSuccess = true
-            HookLogger.i(
+            HookLogger.d(
                 TAG,
                 "超级岛 Hook 已初始化"
             )

@@ -43,7 +43,7 @@ internal object IslandContentUpdateCoordinator {
         hostKind: IslandViewRegistry.HostKind
     ) {
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(view.context, packageName, HookLogger)
-        prepareSharedCoverPalette(packageName, mediaInfo, prefs)
+        prepareSharedCoverPalette(mediaInfo, prefs)
         if (hostKind == IslandViewRegistry.HostKind.REAL) {
             IslandHostFacade.updateHostGlow(view, prefs)
             IslandHostFacade.updateProgressGlow(view, packageName, mediaInfo, prefs)
@@ -92,7 +92,7 @@ internal object IslandContentUpdateCoordinator {
         hostKind: IslandViewRegistry.HostKind
     ) {
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(view.context, packageName, HookLogger)
-        prepareSharedCoverPalette(packageName, mediaInfo, prefs)
+        prepareSharedCoverPalette(mediaInfo, prefs)
         if (hostKind == IslandViewRegistry.HostKind.REAL) {
             IslandHostFacade.updateHostGlow(view, prefs)
             IslandHostFacade.updateProgressGlow(view, packageName, mediaInfo, prefs)
@@ -182,7 +182,7 @@ internal object IslandContentUpdateCoordinator {
         config: IslandSlotRuntimeConfig
     ) {
         val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(view.context, packageName, HookLogger)
-        prepareSharedCoverPalette(packageName, mediaInfo, prefs)
+        prepareSharedCoverPalette(mediaInfo, prefs)
         updateSlotColors(
             view,
             IslandProbeUtils.LEFT_TEST_VIEW_TAG,
@@ -207,48 +207,17 @@ internal object IslandContentUpdateCoordinator {
             String,
             SharedPreferences,
             IslandSlotRuntimeConfig
-        ) -> Unit
+    ) -> Unit
     ) {
-        if (!IslandPresentationCoordinator.shouldRenderInjectedIsland()) {
-            HookLogger.dState(
-                stateId = "IslandContentUpdateCoordinator.activeHosts",
-                tag = "IslandContentUpdateCoordinator",
-                state = "skip|presentation_not_target"
-            ) {
-                "颜色刷新未执行: reason=presentation_not_target"
-            }
-            return
-        }
+        if (!IslandPresentationCoordinator.shouldRenderInjectedIsland()) return
         val packageName = LyriconDataBridge.currentLyricPackageName
             ?.takeIf { it.isNotEmpty() }
-            ?: run {
-                HookLogger.dState(
-                    stateId = "IslandContentUpdateCoordinator.activeHosts",
-                    tag = "IslandContentUpdateCoordinator",
-                    state = "skip|no_lyric_package"
-                ) {
-                    "颜色刷新未执行: reason=no_lyric_package"
-                }
-                return
-            }
+            ?: return
         val expectedLyricVersion = LyriconDataBridge.versionCounter.get()
         val expectedPresentationRevision =
             IslandPresentationCoordinator.currentPresentationRevision()
 
         val hosts = IslandPresentationCoordinator.snapshotAttachedHosts(packageName)
-        val realHostCount = hosts.count { it.kind == IslandViewRegistry.HostKind.REAL }
-        val fakeHostCount = hosts.size - realHostCount
-        HookLogger.dState(
-            stateId = "IslandContentUpdateCoordinator.activeHosts",
-            tag = "IslandContentUpdateCoordinator",
-            state = "hosts|$packageName|$realHostCount|$fakeHostCount|" +
-                    "$expectedLyricVersion|$expectedPresentationRevision"
-        ) {
-            "颜色刷新目标: package=$packageName, realHosts=$realHostCount, " +
-                    "fakeHosts=$fakeHostCount, " +
-                    "lyricVersion=$expectedLyricVersion, " +
-                    "presentationRevision=$expectedPresentationRevision"
-        }
 
         hosts.forEach { token ->
             if (!IslandPresentationCoordinator.isCurrentHost(token) ||
@@ -394,26 +363,8 @@ internal object IslandContentUpdateCoordinator {
         config: IslandSlotRuntimeConfig,
         mediaInfo: MediaMetadataHelper.MediaInfo
     ) {
-        if (mode == RootConstants.ISLAND_CONTENT_MODE_NONE) {
-            HookLogger.dState(
-                stateId = "IslandContentUpdateCoordinator.slotColor:$tag",
-                tag = "IslandContentUpdateCoordinator",
-                state = "mode_none"
-            ) {
-                "歌词颜色未提交: tag=$tag, reason=content_mode_none"
-            }
-            return
-        }
-        val slotView = view.findViewWithTag<View>(tag) ?: run {
-            HookLogger.dState(
-                stateId = "IslandContentUpdateCoordinator.slotColor:$tag",
-                tag = "IslandContentUpdateCoordinator",
-                state = "slot_missing|$mode"
-            ) {
-                "歌词颜色未提交: tag=$tag, mode=$mode, reason=slot_view_missing"
-            }
-            return
-        }
+        if (mode == RootConstants.ISLAND_CONTENT_MODE_NONE) return
+        val slotView = view.findViewWithTag<View>(tag) ?: return
         IslandSlotContentFacade.configureView(
             view = slotView,
             prefs = prefs,
@@ -429,7 +380,6 @@ internal object IslandContentUpdateCoordinator {
      * callbacks, which disappear when an external-device icon occupies that island slot.
      */
     private fun prepareSharedCoverPalette(
-        packageName: String,
         mediaInfo: MediaMetadataHelper.MediaInfo,
         prefs: SharedPreferences
     ) {
@@ -454,16 +404,6 @@ internal object IslandContentUpdateCoordinator {
                 CoverColorHelper.currentArtworkRequest() == null
             ) {
                 IslandMusicWaveColorHooker.refresh()
-            }
-            HookLogger.dState(
-                stateId = "IslandContentUpdateCoordinator.coverInput",
-                tag = "IslandContentUpdateCoordinator",
-                state = "no_art|${rawAlbumArt == null}|${rawAlbumArt?.isRecycled == true}"
-            ) {
-                        "共享取色未执行: reason=${if (rawAlbumArt == null) "album_art_missing" else "album_art_recycled"}, " +
-                        "package=$packageName, artworkSource=${mediaInfo.artworkSource}, " +
-                        "titlePresent=${mediaInfo.title.isNotBlank()}, " +
-                        "artistPresent=${mediaInfo.artist.isNotBlank()}"
             }
             return
         }

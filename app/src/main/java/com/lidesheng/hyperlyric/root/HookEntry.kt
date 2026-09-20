@@ -579,7 +579,7 @@ class HookEntry : XposedModule() {
                                 manager?.switchSource(newSourceId)
                                 val activeSourceId = manager?.getActiveSource()?.id
                                 if (activeSourceId == newSourceId) {
-                                    HookLogger.i(TAG, "歌词源切换完成: source=$newSourceId")
+                                    HookLogger.d(TAG, "歌词源切换完成: source=$newSourceId")
                                 }
                             }
                         }
@@ -596,7 +596,7 @@ class HookEntry : XposedModule() {
                             Handler(Looper.getMainLooper()).post {
                                 activeMode = newMode
                                 IslandSettingsRefreshCoordinator.request()
-                                HookLogger.i(TAG, "歌词模式切换完成: mode=$newMode")
+                                HookLogger.d(TAG, "歌词模式切换完成: mode=$newMode")
                             }
                         }
 
@@ -679,7 +679,7 @@ class HookEntry : XposedModule() {
                 prefs.registerOnSharedPreferenceChangeListener(it)
             }
 
-            HookLogger.i(
+            HookLogger.d(
                 TAG,
                 "系统环境初始化完成: enabled=${SystemUiEnhancementGate.isEnabled()}, " +
                         "source=${sourceManager?.getActiveSource()?.displayName ?: "inactive"}, " +
@@ -705,7 +705,7 @@ class HookEntry : XposedModule() {
             IslandAlbumCoverStyleHooker.refresh()
             IslandMusicWaveColorHooker.refresh()
         }
-        HookLogger.i(TAG, "更新系统界面增强状态: enabled=$enabled")
+        HookLogger.d(TAG, "更新系统界面增强状态: enabled=$enabled")
     }
 
     private fun restoreSuperIslandWhitelistListeners(
@@ -860,7 +860,7 @@ class HookEntry : XposedModule() {
         // publisher callback replace it if that identity changes.
         val restored = LyriconDataBridge.restoreHotReloadSnapshot(snapshot)
         if (restored) {
-            HookLogger.i(TAG, "已恢复 SuperLyric 中立热重载快照: package=$packageName")
+            HookLogger.d(TAG, "已恢复 SuperLyric 中立热重载快照: package=$packageName")
         }
         return restored
     }

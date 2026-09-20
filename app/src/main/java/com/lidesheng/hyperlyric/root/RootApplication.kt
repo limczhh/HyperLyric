@@ -130,7 +130,7 @@ class RootApplication : Application() {
                         error("无法创建远程配置对账标记")
                     }
                 }.onSuccess {
-                    LogManager.i(TAG, "已按当前安装数据重置 Xposed 远程配置")
+                    LogManager.d(TAG, "已按当前安装数据重置 Xposed 远程配置")
                 }.onFailure {
                     LogManager.w(TAG, "保存 Xposed 远程配置对账状态失败", it)
                 }

@@ -23,7 +23,6 @@ import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
-import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 internal object IslandLyricContentAssembler {
 
@@ -54,8 +53,6 @@ internal object IslandLyricContentAssembler {
         val targetLine = targetPresentation.primary
         val nextLinePreviewEnabledForView =
             targetLine?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
-        val allSecondaryContentDisabled = !config.lyricContentDisplay.hasEnabledContent()
-        val onlySecondary = config.onlySecondary
         val targetLineSignature = presentationSignature(targetPresentation)
         val signature = "lyric|$targetLineSignature|${config.styleSignature}"
         val useSharedMarqueeClock = config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
@@ -164,38 +161,6 @@ internal object IslandLyricContentAssembler {
             applyLine(view)
         }
         IslandSlotContentSignatureCache.set(view, signature)
-        val viewKey = view.tag?.toString() ?: view.javaClass.simpleName
-        val animated = shouldAnimate
-        val linePresent = targetLine != null
-        val secondaryPresent = targetPresentation.secondary != null ||
-                !targetLine?.secondary.isNullOrBlank()
-        val translationPresent = !targetLine?.translation.isNullOrBlank()
-        val romaPresent = !targetLine?.roma.isNullOrBlank()
-        val debugState = listOf(
-            linePresent,
-            secondaryPresent,
-            translationPresent,
-            romaPresent,
-            allSecondaryContentDisabled,
-            onlySecondary,
-            nextLinePreviewEnabledForView,
-            animated,
-            view.isAttachedToWindow
-        ).joinToString("|")
-        HookLogger.dState(
-            stateId = "IslandLyricContentAssembler:$viewKey",
-            tag = "IslandLyricContentAssembler",
-            state = debugState
-        ) {
-            "歌词内容状态已提交: tag=$viewKey, linePresent=$linePresent, " +
-                    "secondaryPresent=$secondaryPresent, translationPresent=$translationPresent, " +
-                    "romaPresent=$romaPresent, " +
-                    "onlySecondary=$onlySecondary, allSecondaryContentDisabled=" +
-                    "$allSecondaryContentDisabled, " +
-                    "nextLinePreview=$nextLinePreviewEnabledForView, " +
-                    "animationEnabled=${config.lyricAnimationEnabled}, animated=$animated, " +
-                    "attached=${view.isAttachedToWindow}"
-        }
         return true
     }
 

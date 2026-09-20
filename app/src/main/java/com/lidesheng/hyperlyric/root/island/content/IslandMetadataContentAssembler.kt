@@ -11,7 +11,6 @@ import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
-import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.WeakHashMap
 import kotlin.math.roundToInt
 
@@ -209,28 +208,6 @@ internal object IslandMetadataContentAssembler {
         applyLine(view, newContent)
         applyMarquee(view, marquee)
         IslandSlotContentSignatureCache.set(view, signature)
-        val viewKey = view.tag?.toString() ?: view.javaClass.simpleName
-        val debugState = listOf(
-            mode,
-            customLayout,
-            newContent != null,
-            firstLineFields.joinToString(","),
-            secondLineFields.joinToString(","),
-            separator,
-            config.metadataMarqueeEnabled,
-            force
-        ).joinToString("|")
-        HookLogger.dState(
-            stateId = "IslandMetadataContentAssembler:$viewKey",
-            tag = "IslandMetadataContentAssembler",
-            state = debugState
-        ) {
-            "媒体信息内容已提交: tag=$viewKey, mode=$mode, customLayout=$customLayout, " +
-                    "line=${newContent != null}, " +
-                    "firstFields=${firstLineFields.joinToString(",")}, " +
-                    "secondFields=${secondLineFields.joinToString(",")}, separator=$separator, " +
-                    "marquee=${config.metadataMarqueeEnabled}, force=$force"
-        }
         return true
     }
 

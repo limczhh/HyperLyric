@@ -48,7 +48,6 @@ class LyriconSource : LyricSource {
 
     override fun start(sink: LyricSink) {
         if (this.subscriber != null) {
-            HookLogger.d(TAG, "跳过重复启动: reason=already_running")
             return
         }
         this.sink = sink

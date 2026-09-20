@@ -58,7 +58,7 @@ internal object IslandLyricShareHooker {
             capability = "island.long_press",
             hooker = LongPressedHook(),
         )
-        HookLogger.i(TAG, "超级岛长按 Hook 已初始化")
+        HookLogger.d(TAG, "超级岛长按 Hook 已初始化")
     }
 
     internal class LongPressedHook : Hooker {
