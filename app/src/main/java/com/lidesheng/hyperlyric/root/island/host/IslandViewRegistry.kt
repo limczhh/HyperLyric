@@ -235,6 +235,16 @@ internal object IslandViewRegistry {
         return result
     }
 
+    fun snapshotAll(): List<HostToken> {
+        val result = mutableListOf<HostToken>()
+        synchronized(lock) {
+            activeHosts.entries.forEach { (root, record) ->
+                result += record.toToken(root)
+            }
+        }
+        return result
+    }
+
     fun snapshotAttachedInjectedViews(
         packageName: String? = null,
         kind: HostKind? = null

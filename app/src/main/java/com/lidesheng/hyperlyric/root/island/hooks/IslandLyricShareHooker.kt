@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -52,8 +53,11 @@ internal object IslandLyricShareHooker {
         }
 
         method.isAccessible = true
-        module.deoptimize(method)
-        module.hook(method).intercept(LongPressedHook())
+        module.managedHook(
+            executable = method,
+            capability = "island.long_press",
+            hooker = LongPressedHook(),
+        )
         HookLogger.i(TAG, "超级岛长按 Hook 已初始化")
     }
 

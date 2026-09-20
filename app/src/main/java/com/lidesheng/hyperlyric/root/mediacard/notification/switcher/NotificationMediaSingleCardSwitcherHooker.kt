@@ -7,12 +7,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.root.HookRuntimeRegistry
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostClasses
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -181,7 +183,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             HookLogger.e(TAG, "单卡片横滑 Hook 安装失败，准备回滚", error)
         } finally {
             if (!installed) {
-                rollbackHooks(installedHandles)
+                rollbackHooks(xposedModule, installedHandles)
                 hookedClassLoaders.remove(classLoader)
             }
         }
@@ -358,8 +360,11 @@ internal object NotificationMediaSingleCardSwitcherHooker {
     ): HookHandle? {
         return try {
             executable.isAccessible = true
-            xposedModule.deoptimize(executable)
-            xposedModule.hook(executable).intercept(hooker)
+            xposedModule.managedHook(
+                executable = executable,
+                capability = "media.notification.switcher.${executable.name}",
+                hooker = hooker,
+            )
         } catch (error: Exception) {
             HookLogger.e(
                 TAG,
@@ -370,9 +375,10 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         }
     }
 
-    private fun rollbackHooks(handles: List<HookHandle>) {
+    private fun rollbackHooks(module: XposedModule, handles: List<HookHandle>) {
         handles.asReversed().forEach { handle ->
             try {
+                HookRuntimeRegistry.forget(module, handle)
                 handle.unhook()
             } catch (error: Exception) {
                 HookLogger.e(TAG, "回滚单卡片横滑 Hook 失败", error)
@@ -392,8 +398,11 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         var installed = false
         try {
             method.isAccessible = true
-            xposedModule.deoptimize(method)
-            xposedModule.hook(method).intercept(DispatchTouchHook())
+            xposedModule.managedHook(
+                executable = method,
+                capability = "media.notification.switcher.dispatch_touch",
+                hooker = DispatchTouchHook(),
+            )
             installed = true
         } catch (error: Exception) {
             HookLogger.e(TAG, "安装媒体卡片触摸分发 Hook 失败", error)

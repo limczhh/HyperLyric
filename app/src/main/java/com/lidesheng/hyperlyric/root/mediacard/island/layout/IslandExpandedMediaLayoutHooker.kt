@@ -12,6 +12,7 @@ import com.lidesheng.hyperlyric.root.mediacard.island.layout.oneui.IslandExpande
 import com.lidesheng.hyperlyric.root.mediacard.island.layout.miui.IslandExpandedMediaMiuiLayoutPreset
 import com.lidesheng.hyperlyric.root.mediacard.island.layout.pixel.IslandExpandedMediaPixelLayoutPreset
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -51,20 +52,29 @@ object IslandExpandedMediaLayoutHooker {
 
         val handles = mutableListOf<HookHandle>()
         api.constraintSetLoadMethods.forEach { method ->
-            xposedModule.deoptimize(method)
-            handles += xposedModule.hook(method).intercept(ConstraintSetLoadHook())
+            handles += xposedModule.managedHook(
+                executable = method,
+                capability = "media.island.layout.constraint_set",
+                hooker = ConstraintSetLoadHook(),
+            )
         }
         // Keep the same two layout lifecycle points as XiaomiHelper: the media
         // controller reinflates its cached set, and each player creates its own
         // set.  Both the real and dummy player are covered without touching the
         // Fake View animation path.
         api.reInflateMethods.forEach { method ->
-            xposedModule.deoptimize(method)
-            handles += xposedModule.hook(method).intercept(ReinflateHook(api))
+            handles += xposedModule.managedHook(
+                executable = method,
+                capability = "media.island.layout.reinflate",
+                hooker = ReinflateHook(api),
+            )
         }
         api.playerConstructors.forEach { constructor ->
-            xposedModule.deoptimize(constructor)
-            handles += xposedModule.hook(constructor).intercept(PlayerConstructorHook(api))
+            handles += xposedModule.managedHook(
+                executable = constructor,
+                capability = "media.island.layout.player_constructor",
+                hooker = PlayerConstructorHook(api),
+            )
         }
         HookLogger.d(TAG, "超级岛展开态媒体布局 Hook 已初始化: methods=${handles.size}")
     }

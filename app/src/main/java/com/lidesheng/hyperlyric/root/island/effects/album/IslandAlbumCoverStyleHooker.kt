@@ -11,6 +11,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -76,8 +77,11 @@ internal object IslandAlbumCoverStyleHooker {
                     .apply { isAccessible = true }
             )
 
-            xposedModule.deoptimize(fixMethod)
-            xposedModule.hook(fixMethod).intercept(SetFixIconHook(accessor))
+            xposedModule.managedHook(
+                executable = fixMethod,
+                capability = "island.album.set_fix_icon",
+                hooker = SetFixIconHook(accessor),
+            )
             HookLogger.d(TAG, "超级岛封面样式 Hook 已初始化")
         } catch (e: ClassNotFoundException) {
             hookedClassLoaders.remove(classLoader)
@@ -139,10 +143,13 @@ internal object IslandAlbumCoverStyleHooker {
     }
 
     fun cleanup() {
+        releaseAll()
         IslandAlbumCoverRotationController.cleanup()
         synchronized(trackedHolders) {
             trackedHolders.clear()
         }
+        hookedClassLoaders.clear()
+        module = null
     }
 
     private fun applyStyle(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {

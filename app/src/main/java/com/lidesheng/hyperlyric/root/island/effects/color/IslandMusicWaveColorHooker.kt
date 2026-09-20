@@ -8,6 +8,7 @@ import android.view.View
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
@@ -82,9 +83,10 @@ internal object IslandMusicWaveColorHooker {
             }
             if (setLottieColorMethod != null) {
                 setLottieColorMethod.isAccessible = true
-                xposedModule.deoptimize(setLottieColorMethod)
-                xposedModule.hook(setLottieColorMethod).intercept(
-                    SetLottieColorHook(dataField, lottieViewField)
+                xposedModule.managedHook(
+                    executable = setLottieColorMethod,
+                    capability = "island.music_wave.set_lottie_color",
+                    hooker = SetLottieColorHook(dataField, lottieViewField),
                 )
             } else {
                 HookLogger.w(TAG, "音频律动原生取色接口不可用: target=setLottieColor")
@@ -98,9 +100,10 @@ internal object IslandMusicWaveColorHooker {
             }
             if (registerCallbackMethod != null) {
                 registerCallbackMethod.isAccessible = true
-                xposedModule.deoptimize(registerCallbackMethod)
-                xposedModule.hook(registerCallbackMethod).intercept(
-                    RegisterLottieCallbackHook(dataField, lottieViewField, picInfoField)
+                xposedModule.managedHook(
+                    executable = registerCallbackMethod,
+                    capability = "island.music_wave.register_callback",
+                    hooker = RegisterLottieCallbackHook(dataField, lottieViewField, picInfoField),
                 )
             } else {
                 HookLogger.w(TAG, "音频律动刷新接口不可用: target=registerLottieCallback")
@@ -193,7 +196,9 @@ internal object IslandMusicWaveColorHooker {
             synchronized(nativeColorsByHolder) {
                 nativeColorsByHolder.clear()
             }
+            hookedClassLoaders.clear()
             colorAccessor = null
+            module = null
         }
     }
 

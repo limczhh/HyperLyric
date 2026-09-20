@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.island.view.MaxWidthFrameLayout
+import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
+import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.WeakHashMap
 
@@ -177,6 +179,38 @@ object IslandViewHelper {
         layoutParams.width = targetWidth
         view.layoutParams = layoutParams
         return true
+    }
+
+    /**
+     * Hard teardown used only when a module generation is leaving the process.  The regular
+     * restore path deliberately keeps hidden lyric views for cheap self-heal; hot reload must
+     * remove them so a host View tree cannot retain the old module classloader.
+     */
+    fun removeInjectedViews(rootView: ViewGroup): Boolean {
+        clearInjectedViews(rootView)
+        return removeOwnedViews(rootView)
+    }
+
+    private fun removeOwnedViews(parent: ViewGroup): Boolean {
+        var changed = false
+        for (index in parent.childCount - 1 downTo 0) {
+            val child = parent.getChildAt(index)
+            if (isModuleOwned(child)) {
+                parent.removeViewAt(index)
+                changed = true
+            } else if (child is ViewGroup && removeOwnedViews(child)) {
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    private fun isModuleOwned(view: View): Boolean {
+        val tag = view.tag as? String
+        return tag?.startsWith("HYPERLYRIC") == true ||
+                view is RichLyricLineView ||
+                view is SpaceGateRichLyricLineView ||
+                view is MaxWidthFrameLayout
     }
 
     fun restoreInjectedContainerWidths(rootView: ViewGroup, parentName: String): Boolean {

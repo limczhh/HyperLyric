@@ -49,6 +49,7 @@ internal class RootLyricSink(
     private var lastDispatchedPlaybackSpeed = Float.NaN
     private var currentPlaybackSpeed = 1f
     private val artworkColorRefreshRunnable = Runnable {
+        if (closed) return@Runnable
         handleColorBindingUpdate(
             LyricColorBindingCoordinator.retry(context, playbackActive),
             reason = "delayed_retry"
@@ -69,6 +70,7 @@ internal class RootLyricSink(
         }
     }
     private val positionDispatchRunnable = Runnable {
+        if (closed) return@Runnable
         positionDispatchScheduled = false
         val latest = pendingPosition ?: return@Runnable
         pendingPosition = null
@@ -92,6 +94,7 @@ internal class RootLyricSink(
     }
 
     override fun onSongChanged(song: Song?) {
+        if (closed) return
         cancelArtworkColorRefresh()
         cancelPendingPositionDispatch()
         lastReceivedPosition = Long.MIN_VALUE
@@ -136,17 +139,19 @@ internal class RootLyricSink(
     }
 
     override fun onLyricLine(line: IRichLyricLine) {
+        if (closed) return
         LyriconDataBridge.updateLyricLine(line)
         renderer.updateLyricLine()
     }
 
     override fun onPlainText(text: String?) {
-
+        if (closed) return
         LyriconDataBridge.updateLyric(text)
         renderer.updateLyricLine()
     }
 
     override fun onStop() {
+        if (closed) return
         cancelArtworkColorRefresh()
         playbackActive = false
         cancelPendingPositionDispatch()
@@ -163,6 +168,7 @@ internal class RootLyricSink(
     }
 
     override fun onMetadata(metadata: LyricMediaMetadata?) {
+        if (closed) return
         val normalized = metadata?.normalized()
         normalized?.packageName?.let(LyriconDataBridge::updateLyricPackage)
         if (normalized == null) {
@@ -239,6 +245,7 @@ internal class RootLyricSink(
     }
 
     override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float) {
+        if (closed) return
         playbackActive = isPlaying
         explicitPlaybackSpeed(playbackSpeed)?.let { currentPlaybackSpeed = it }
         LyriconDataBridge.updatePlaybackState(
@@ -257,6 +264,7 @@ internal class RootLyricSink(
     }
 
     override fun onPositionChanged(position: Long, playbackSpeed: Float) {
+        if (closed) return
         val now = SystemClock.uptimeMillis()
         val resolvedSpeed = resolvePlaybackSpeed(position, playbackSpeed, now)
         if (position == lastReceivedPosition &&
@@ -304,6 +312,7 @@ internal class RootLyricSink(
         sample: PositionSample,
         now: Long = SystemClock.uptimeMillis()
     ) {
+        if (closed) return
         if (sample.position == lastDispatchedPosition &&
             abs(sample.playbackSpeed - lastDispatchedPlaybackSpeed) < SPEED_CHANGE_EPSILON
         ) return

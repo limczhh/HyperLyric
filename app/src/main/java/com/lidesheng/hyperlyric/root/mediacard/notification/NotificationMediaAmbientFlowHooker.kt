@@ -19,6 +19,7 @@ import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowTone
 import com.lidesheng.hyperlyric.root.mediacard.notification.background.NotificationMediaBackgroundController
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -74,9 +75,11 @@ object NotificationMediaAmbientFlowHooker {
             .forEach { method ->
                 runCatching {
                     method.isAccessible = true
-                    xposedModule.deoptimize(method)
-                    xposedModule.hook(method)
-                        .intercept(hookerFor(method) ?: return@runCatching)
+                    xposedModule.managedHook(
+                        executable = method,
+                        capability = "media.notification.ambient.${method.name}",
+                        hooker = hookerFor(method) ?: return@runCatching,
+                    )
                     installed++
                     if (method.name in NATIVE_BACKGROUND_UPDATE_METHODS) {
                         installedNativeUpdates.add(method.name)
@@ -97,8 +100,11 @@ object NotificationMediaAmbientFlowHooker {
             val seekBarClass = classLoader.loadClass(HYPER_PROGRESS_SEEK_BAR_CLASS)
             findNearestMethods(seekBarClass, "onDraw").forEach { method ->
                 method.isAccessible = true
-                xposedModule.deoptimize(method)
-                xposedModule.hook(method).intercept(ProgressDrawHook())
+                xposedModule.managedHook(
+                    executable = method,
+                    capability = "media.notification.progress_draw",
+                    hooker = ProgressDrawHook(),
+                )
                 installed++
             }
         }.onFailure { error ->

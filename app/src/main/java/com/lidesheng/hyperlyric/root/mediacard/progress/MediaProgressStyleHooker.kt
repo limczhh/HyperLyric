@@ -23,6 +23,7 @@ import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMe
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.ThumbStyle
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -164,9 +165,10 @@ object MediaProgressStyleHooker {
         api.holderConstructors.forEach { constructor ->
             runCatching {
                 constructor.isAccessible = true
-                xposedModule.deoptimize(constructor)
-                xposedModule.hook(constructor).intercept(
-                    NotificationHolderHook(api, style, progressHeadGlow)
+                xposedModule.managedHook(
+                    executable = constructor,
+                    capability = "media.progress.notification_holder",
+                    hooker = NotificationHolderHook(api, style, progressHeadGlow),
                 )
                 installed++
             }.onFailure {
@@ -248,8 +250,11 @@ object MediaProgressStyleHooker {
         api.holderConstructors.forEach { constructor ->
             runCatching {
                 constructor.isAccessible = true
-                xposedModule.deoptimize(constructor)
-                xposedModule.hook(constructor).intercept(IslandHolderHook(api))
+                xposedModule.managedHook(
+                    executable = constructor,
+                    capability = "media.progress.island_holder",
+                    hooker = IslandHolderHook(api),
+                )
                 installed++
             }.onFailure {
                 HookLogger.e(TAG, "安装超级岛进度条构造 Hook 失败", it)
@@ -279,8 +284,11 @@ object MediaProgressStyleHooker {
     ) {
         runCatching {
             method.isAccessible = true
-            xposedModule.deoptimize(method)
-            xposedModule.hook(method).intercept(hooker)
+            xposedModule.managedHook(
+                executable = method,
+                capability = "media.progress.${method.name}",
+                hooker = hooker,
+            )
             onInstalled()
         }.onFailure {
             HookLogger.e(TAG, "安装媒体进度条 Hook 失败: method=${method.name}", it)

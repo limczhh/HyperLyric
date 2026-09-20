@@ -330,6 +330,18 @@ object BaseIslandRenderer : IslandRenderer {
         }
     }
 
+    /** Cancel renderer-owned main queue work before a module generation is retired. */
+    fun prepareForHotReload() {
+        check(Looper.myLooper() == Looper.getMainLooper()) {
+            "BaseIslandRenderer.prepareForHotReload must run on the main thread"
+        }
+        mainHandler.removeCallbacks(refreshRunnable)
+        mainHandler.removeCallbacks(metadataRefreshRunnable)
+        mainHandler.removeCallbacks(textColorRefreshRunnable)
+        positionDispatchGeneration.incrementAndGet()
+        contentDispatchGeneration.incrementAndGet()
+    }
+
     private fun isDispatchCurrent(
         token: IslandViewRegistry.HostToken,
         lyricPackage: String,

@@ -15,5 +15,6 @@ internal enum class IslandReconcileReason {
     SETTINGS_CHANGED,
     STABLE_REFRESH,
     LYRIC_SELF_HEAL,
-    PLAYBACK_RESUME
+    PLAYBACK_RESUME,
+    HOT_RELOAD_TAKEOVER
 }

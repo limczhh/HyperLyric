@@ -6,6 +6,8 @@ import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.media.session.MediaSessionManager
+import android.os.Handler
+import android.os.Looper
 import com.lidesheng.hyperlyric.common.lyric.LyricInfoParser
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
@@ -16,14 +18,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class LyricInfoSource(private val context: Context) : LyricSource {
 
     private companion object {
         const val TAG = "LyricInfoSource"
+        const val MAIN_THREAD_TIMEOUT_MS = 2_500L
     }
 
     override val id = "lyricinfo"
@@ -31,9 +38,12 @@ class LyricInfoSource(private val context: Context) : LyricSource {
 
     private val manager =
         context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val trackedControllers =
         java.util.concurrent.ConcurrentHashMap<MediaController, MediaController.Callback>()
     private var sink: LyricSink? = null
+    @Volatile
+    private var running = false
 
     private var lastLyricPayload: String? = null
     private var hasLyrics: Boolean = false
@@ -61,8 +71,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
     }
 
     private var positionJob: Job? = null
-    private val positionJob_supervisor = SupervisorJob()
-    private val positionScope = CoroutineScope(Dispatchers.Main + positionJob_supervisor)
+    private var positionScope: CoroutineScope? = null
 
     private val sessionListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
@@ -73,31 +82,40 @@ class LyricInfoSource(private val context: Context) : LyricSource {
 
     override fun start(sink: LyricSink) {
         this.sink = sink
+        positionScope?.cancel()
+        positionScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         trackedControllers.clear()
+        running = true
         try {
-            manager.addOnActiveSessionsChangedListener(sessionListener, null)
-            onActiveSessionsChanged(manager.getActiveSessions(null))
+            runOnMainAndWait {
+                manager.addOnActiveSessionsChangedListener(sessionListener, null, mainHandler)
+                onActiveSessionsChanged(manager.getActiveSessions(null))
+            }
             HookLogger.d(TAG, "数据源已启动")
         } catch (e: Exception) {
+            runCatching { stop() }
             HookLogger.e(TAG, "数据源启动失败", e)
         }
     }
 
     override fun stop() {
         stopPositionPolling()
-        try {
-            manager.removeOnActiveSessionsChangedListener(sessionListener)
-        } catch (_: Exception) {
-        }
-        trackedControllers.forEach { (ctrl, cb) ->
-            try {
-                ctrl.unregisterCallback(cb)
-            } catch (_: Exception) {
+        positionScope?.cancel()
+        positionScope = null
+        running = false
+        runCatching {
+            runOnMainAndWait {
+                unregisterMediaSessionListeners()
+                clearLyrics()
+                sink?.onStop()
+                sink = null
             }
+        }.onFailure {
+            trackedControllers.clear()
+            clearLyrics()
+            sink = null
+            HookLogger.w(TAG, "主线程注销媒体会话失败", it)
         }
-        trackedControllers.clear()
-        clearLyrics()
-        sink?.onStop(); sink = null
     }
 
     private fun clearLyrics() {
@@ -145,7 +163,7 @@ class LyricInfoSource(private val context: Context) : LyricSource {
     }
 
     private fun onActiveSessionsChanged(controllers: List<MediaController>?) {
-        if (controllers == null) return
+        if (!running || controllers == null) return
         val currentSessions = controllers.toSet()
         trackedControllers.keys.filter { it !in currentSessions }.forEach { dead ->
             trackedControllers.remove(dead)?.let {
@@ -163,10 +181,12 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         for (ctrl in controllers) {
             if (!trackedControllers.containsKey(ctrl)) {
                 val cb = object : MediaController.Callback() {
-                    override fun onMetadataChanged(metadata: MediaMetadata?) =
-                        onMetadataUpdate(ctrl, metadataSnapshot = metadata)
+                    override fun onMetadataChanged(metadata: MediaMetadata?) {
+                        if (running) onMetadataUpdate(ctrl, metadataSnapshot = metadata)
+                    }
 
                     override fun onPlaybackStateChanged(state: PlaybackState?) {
+                        if (!running) return
                         if (state?.state == PlaybackState.STATE_PLAYING) {
                             onMetadataUpdate(ctrl, state)
                         } else if (isCurrentController(ctrl)) {
@@ -174,16 +194,56 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                         }
                     }
 
-                    override fun onSessionDestroyed() =
-                        onActiveSessionsChanged(manager.getActiveSessions(null))
+                    override fun onSessionDestroyed() {
+                        if (running) onActiveSessionsChanged(manager.getActiveSessions(null))
+                    }
                 }
                 try {
-                    ctrl.registerCallback(cb); trackedControllers[ctrl] = cb; onMetadataUpdate(ctrl)
+                    ctrl.registerCallback(cb, mainHandler)
+                    trackedControllers[ctrl] = cb
+                    onMetadataUpdate(ctrl)
                 } catch (_: Exception) {
                 }
             }
         }
 
+    }
+
+    private fun unregisterMediaSessionListeners() {
+        try {
+            manager.removeOnActiveSessionsChangedListener(sessionListener)
+        } catch (_: Exception) {
+        }
+        trackedControllers.forEach { (ctrl, cb) ->
+            try {
+                ctrl.unregisterCallback(cb)
+            } catch (_: Exception) {
+            }
+        }
+        trackedControllers.clear()
+    }
+
+    private fun <T> runOnMainAndWait(block: () -> T): T {
+        if (Looper.myLooper() == Looper.getMainLooper()) return block()
+
+        val latch = CountDownLatch(1)
+        var value: T? = null
+        var error: Throwable? = null
+        mainHandler.post {
+            try {
+                value = block()
+            } catch (throwable: Throwable) {
+                error = throwable
+            } finally {
+                latch.countDown()
+            }
+        }
+        if (!latch.await(MAIN_THREAD_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            throw TimeoutException("等待主线程处理媒体会话超时")
+        }
+        error?.let { throw it }
+        @Suppress("UNCHECKED_CAST")
+        return value as T
     }
 
     /**
@@ -331,7 +391,8 @@ class LyricInfoSource(private val context: Context) : LyricSource {
 
     private fun startPositionPolling(controller: MediaController) {
         positionJob?.cancel()
-        positionJob = positionScope.launch {
+        val scope = positionScope ?: return
+        positionJob = scope.launch {
             while (isActive) {
                 try {
                     val state = controller.playbackState

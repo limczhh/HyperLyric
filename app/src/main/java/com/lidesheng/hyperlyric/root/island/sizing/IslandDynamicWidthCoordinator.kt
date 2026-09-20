@@ -30,6 +30,15 @@ internal object IslandDynamicWidthCoordinator {
     private val preflightTargets = WeakHashMap<ViewGroup, MutableMap<String, Float>>()
     private val metadataContentWidths = WeakHashMap<ViewGroup, MutableMap<String, Float>>()
 
+    /** Cancel host-scoped width work before a module generation leaves the process. */
+    fun prepareForHotReload() {
+        mainHandler.removeCallbacksAndMessages(null)
+        synchronized(refreshPending) { refreshPending.clear() }
+        synchronized(relayoutPending) { relayoutPending.clear() }
+        synchronized(preflightTargets) { preflightTargets.clear() }
+        synchronized(metadataContentWidths) { metadataContentWidths.clear() }
+    }
+
     fun requestRefresh(rootView: ViewGroup) {
         val hostToken = IslandViewRegistry.tokenFor(rootView) ?: return
         val shouldPost = synchronized(refreshPending) {

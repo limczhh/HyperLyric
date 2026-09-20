@@ -6,6 +6,7 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
@@ -38,6 +39,13 @@ internal object IslandPresentationCoordinator {
             }
         }
     }
+
+    data class HotReloadHostTransfer(
+        val root: ViewGroup,
+        val packageName: String,
+        val kind: IslandViewRegistry.HostKind,
+        val moduleType: String?,
+    )
 
     private val presentationState = IslandPresentationState()
     private val decisionEvaluator = IslandPresentationDecisionEvaluator(presentationState)
@@ -251,6 +259,83 @@ internal object IslandPresentationCoordinator {
         if (IslandViewRegistry.isCurrent(token)) {
             IslandViewRegistry.refreshInjectedViews(token)
         }
+    }
+
+    /**
+     * Stops and removes every module-owned view before the old module classloader is retired.
+     * The returned records contain only host references and primitive metadata; callers may pass
+     * them to the next generation after verifying that the host tree is module-free.
+     */
+    fun prepareForHotReload(): List<HotReloadHostTransfer> {
+        val hosts = IslandViewRegistry.snapshotAll()
+        val transfer = hosts.map { token ->
+            HotReloadHostTransfer(
+                root = token.root,
+                packageName = token.packageName,
+                kind = token.kind,
+                moduleType = token.moduleType,
+            )
+        }
+        val failures = mutableListOf<Throwable>()
+        hosts.forEach { token ->
+            stopObservingHostAttachment(token.root)
+            runCatching {
+                IslandInjectionReconciler.restoreNative(
+                    token.root,
+                    targetFor(token)
+                )
+                IslandHostFacade.removeInjectedViewsForHotReload(token.root)
+            }.onFailure { error ->
+                failures += error
+                HookLogger.w(TAG, "热重载前恢复超级岛原生视图失败", error)
+            }
+            IslandViewRegistry.unregister(token)
+        }
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException(
+                "${failures.size} Super Island host(s) could not be detached",
+                failures.first()
+            )
+        }
+        presentationState.invalidatePresentation()
+        presentationState.updatePlaybackState(false)
+        return transfer
+    }
+
+    /**
+     * Re-registers host objects retained by the API 102 neutral handoff.  Current island data is
+     * read again from the host; the package/kind values from the old generation are not trusted.
+     */
+    fun adoptHotReloadHosts(transfers: List<HotReloadHostTransfer>): Int {
+        var adopted = 0
+        transfers.forEach { transfer ->
+            val data = IslandProbeUtils.getCurrentIslandDataForHost(transfer.root)
+            val owner = ownerEvidence(data)
+            val media = owner as? IslandRenderPolicy.OwnerEvidence.Media
+            if (media == null) {
+                return@forEach
+            }
+            val token = when (transfer.kind) {
+                IslandViewRegistry.HostKind.REAL ->
+                    IslandViewRegistry.registerReal(transfer.root, media.packageName)
+
+                IslandViewRegistry.HostKind.FAKE ->
+                    IslandViewRegistry.registerFake(
+                        transfer.root,
+                        media.packageName,
+                        transfer.moduleType
+                    )
+            }
+            observeHostAttachment(transfer.root)
+            if (transfer.root.isAttachedToWindow) {
+                reconcileRegisteredHost(
+                    token = token,
+                    reason = IslandReconcileReason.HOT_RELOAD_TAKEOVER
+                )
+                adopted++
+            }
+        }
+        return adopted
     }
 
     private fun reconcileRealRoot(

@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
@@ -11,13 +12,11 @@ import com.lidesheng.hyperlyric.lyric.source.SourceManager
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHooker
-import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowController
-import com.lidesheng.hyperlyric.root.island.hooks.IslandModuleRestoreHooker
-import com.lidesheng.hyperlyric.root.island.hooks.IslandLyricShareHooker
-import com.lidesheng.hyperlyric.root.island.hooks.RealIslandHooker
+import com.lidesheng.hyperlyric.root.island.SuperIslandHotReloadCoordinator
 import com.lidesheng.hyperlyric.root.island.hooks.SystemUIHookRegistry
-import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
+import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
+import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
 import com.lidesheng.hyperlyric.root.island.renderer.IslandSettingsRefreshCoordinator
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardConfigurationRefreshHooker
@@ -42,17 +41,20 @@ import io.github.libxposed.api.XposedModuleInterface.HotReloadedParam
 import io.github.libxposed.api.XposedModuleInterface.HotReloadingParam
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
-import java.lang.reflect.Constructor
-import java.lang.reflect.Executable
-import java.lang.reflect.Method
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 private const val TAG = "HookEntry"
 
 class HookEntry : XposedModule() {
 
     companion object {
+        private const val HOT_RELOAD_TRANSFER_VERSION = 1
         private const val STATE_RUNTIME_READY = "runtimeReady"
+        private const val STATE_SYSTEM_UI_LOADED = "systemUiLoaded"
         private const val STATE_STATUS_BAR_TEXT_COLOR = "statusBarTextColor"
+        private const val STATE_SNAPSHOT = "snapshot"
 
         @Volatile
         var activeMode = 0
@@ -136,8 +138,15 @@ class HookEntry : XposedModule() {
     private var prefListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? =
         null
     private var runtimeApp: Application? = null
+    private var systemUiClassLoader: ClassLoader? = null
+    private var systemUiLoaded = false
     private var lyricEnhancementCoordinator: LyricEnhancementCoordinator? = null
     private var rootLyricSink: RootLyricSink? = null
+    private val superIslandHotReloadCoordinator = SuperIslandHotReloadCoordinator(
+        object : SuperIslandHotReloadCoordinator.MainThreadExecutor {
+            override fun <T> execute(block: () -> T): T = runOnMainAndWait(block)
+        }
+    )
 
     val prefs: android.content.SharedPreferences
         get() {
@@ -151,6 +160,7 @@ class HookEntry : XposedModule() {
         super.onModuleLoaded(param)
         instance = this
         HookLogger.module = this
+        HookRuntimeRegistry.activate(this)
         HookLogger.i(
             TAG,
             "模块加载完成，当前应用版本${com.lidesheng.hyperlyric.BuildConfig.VERSION_CODE}-${com.lidesheng.hyperlyric.BuildConfig.VERSION_NAME}"
@@ -158,64 +168,198 @@ class HookEntry : XposedModule() {
     }
 
     override fun onHotReloading(param: HotReloadingParam): Boolean {
-        param.setSavedInstanceState(
-            Bundle().apply {
-                putBoolean(STATE_RUNTIME_READY, runtimeApp != null)
-                putInt(
-                    STATE_STATUS_BAR_TEXT_COLOR,
-                    StatusBarTextColorHooker.currentTextColor()
-                )
+        val runtimeReady = runtimeApp != null
+        val systemUiWasLoaded = systemUiLoaded
+        val snapshot = LyriconDataBridge.exportHotReloadSnapshot()
+        val statusBarTextColor = StatusBarTextColorHooker.currentTextColor()
+        val dispatcher = StatusBarTextColorHooker.dispatcherForHotReload()
+
+        // A main-thread handoff timeout is checked before the old owner is deactivated.  This is
+        // the only point at which declining the reload can leave the old runtime untouched.
+        if (runtimeReady || systemUiWasLoaded) {
+            runCatching { runOnMainAndWait { Unit } }.onFailure { error ->
+                HookLogger.e(TAG, "拒绝热重载: 无法取得 SystemUI 主线程交接点", error)
+                return false
             }
+        }
+
+        // These listeners are external entry points. Detach them before stopping the old
+        // runtime, so a failure here can decline the reload without partially tearing down views
+        // or lyric sources.
+        val islandWhitelistPrepared = runCatching {
+            UnlockIslandWhitelist.prepareForHotReload()
+        }.getOrDefault(false)
+        val focusWhitelistPrepared = runCatching {
+            UnlockFocusWhitelist.prepareForHotReload()
+        }.getOrDefault(false)
+        if (!islandWhitelistPrepared || !focusWhitelistPrepared) {
+            restoreSuperIslandWhitelistListeners(
+                restoreIsland = islandWhitelistPrepared,
+                restoreFocus = focusWhitelistPrepared,
+            )
+            HookLogger.e(TAG, "拒绝热重载: 超级岛白名单偏好监听未能注销")
+            return false
+        }
+
+        if (!HookRuntimeRegistry.deactivateAndAwait(this, 2500L, TimeUnit.MILLISECONDS)) {
+            HookRuntimeRegistry.activate(this)
+            restoreSuperIslandWhitelistListeners()
+            HookLogger.e(TAG, "拒绝热重载: 旧代 Hook 回调未在交接期限内退出")
+            return false
+        }
+        val transfers = try {
+            superIslandHotReloadCoordinator.prepareForHotReload()
+        } catch (error: Throwable) {
+            HookRuntimeRegistry.activate(this)
+            restoreSuperIslandWhitelistListeners()
+            HookLogger.e(TAG, "拒绝热重载: 超级岛宿主无法安全交接", error)
+            return false
+        }
+
+        val cleanupSucceeded = cleanupRuntime()
+        if (!cleanupSucceeded) {
+            HookRuntimeRegistry.activate(this)
+            restoreSuperIslandWhitelistListeners()
+            HookLogger.e(TAG, "拒绝热重载: 旧运行时仍有异步任务未退出")
+            return false
+        }
+
+        param.setSavedInstanceState(
+            encodeHotReloadState(
+                runtimeReady = runtimeReady,
+                systemUiLoaded = systemUiWasLoaded,
+                snapshot = snapshot,
+                statusBarTextColor = statusBarTextColor,
+                dispatcher = dispatcher,
+                transfers = transfers,
+            )
         )
-        // The media-card hookers intentionally stay alive in the old generation. Their
-        // configuration is restart-only, so replacing them here is both unnecessary and
-        // unsafe for active SystemUI card/fake-view animations.
-        cleanupRuntime(preserveMediaHooks = true)
-        HookLogger.d(TAG, "超级岛歌词热重载准备完成")
+        HookLogger.d(
+            TAG,
+            "超级岛热重载准备完成: hosts=${transfers.size}, " +
+                    "snapshot=${snapshot != null}, runtimeReady=$runtimeReady"
+        )
+        HookLogger.module = null
+        HookRuntimeRegistry.release(this)
         return true
     }
 
     override fun onHotReloaded(param: HotReloadedParam) {
         instance = this
         HookLogger.module = this
+        HookRuntimeRegistry.activate(this)
+        HookRuntimeRegistry.beginHotReload(this, param.oldHookHandles)
 
-        var replacedCount = 0
-        var skippedCount = 0
-        param.oldHookHandles.forEach { handle ->
-            val replacement = createLyricReplacementHooker(handle.executable)
-            if (replacement == null) {
-                // Hooks without a current replacement, including media-card hooks, stay as-is.
-                skippedCount++
-                return@forEach
-            }
-            runCatching {
-                handle.replaceHook(replacement)
-                replacedCount++
-            }.onFailure {
-                // A failed hot replacement is resolved by restarting SystemUI.
-                skippedCount++
-            }
-        }
+        val state = decodeHotReloadState(param.savedInstanceState)
+        val app = findCurrentApplication()
+        val classLoader = app?.classLoader
+            ?: param.oldHookHandles.asSequence()
+                .map { it.executable.declaringClass.classLoader }
+                .firstOrNull { loader -> loader != null && !loader.javaClass.name.contains("BootClassLoader") }
 
-        val state = param.savedInstanceState as? Bundle
-        if (state?.containsKey(STATE_STATUS_BAR_TEXT_COLOR) == true) {
-            StatusBarTextColorHooker.restoreTextColor(
-                state.getInt(STATE_STATUS_BAR_TEXT_COLOR)
-            )
-        }
-        if (state?.getBoolean(STATE_RUNTIME_READY) == true) {
-            findCurrentApplication()?.let { app ->
-                Handler(Looper.getMainLooper()).post { initializeSystemEnvironment(app) }
-            } ?: HookLogger.w(
+        try {
+            if (state?.systemUiLoaded == true && classLoader == null) {
+                error("SystemUI ClassLoader unavailable after hot reload")
+            }
+            if (classLoader != null) {
+                systemUiClassLoader = classLoader
+                systemUiLoaded = true
+                installHotReloadSuperIslandHooks(classLoader)
+            }
+
+            // Package callbacks are not replayed. Re-enter every already-loaded Super Island
+            // plugin classloader; the registry excludes media-card handles by capability.
+            val pluginClassLoaders = param.oldHookHandles.asSequence()
+                .map { it.executable.declaringClass.classLoader }
+                .filterNotNull()
+                .filterNot { it.javaClass.name.contains("BootClassLoader") }
+                .toMutableSet()
+            classLoader?.let(pluginClassLoaders::add)
+            pluginClassLoaders.forEach { pluginClassLoader ->
+                UnlockIslandWhitelist.doHookInClassLoader(pluginClassLoader)
+                UnlockFocusWhitelist.doHookInClassLoader(pluginClassLoader)
+            }
+            superIslandHotReloadCoordinator.installPluginHooks(this, pluginClassLoaders)
+
+            val unmatchedBeforeFinish = HookRuntimeRegistry.unmatched(this)
+            if (unmatchedBeforeFinish.isNotEmpty()) {
+                error(
+                    "reloadable hook was not reinstalled: " +
+                            unmatchedBeforeFinish.joinToString {
+                                it.declaringClass.name + "." + it.name
+                            }
+                )
+            }
+
+            val reconcile = HookRuntimeRegistry.finishHotReload(this)
+            if (!reconcile.succeeded) {
+                throw IllegalStateException("hook replacement failed", reconcile.failure)
+            }
+
+            if (state != null) {
+                superIslandHotReloadCoordinator.restoreStatusBarAfterHotReload(
+                    textColor = state.statusBarTextColor,
+                    dispatcher = state.dispatcher,
+                )
+            }
+
+            if (app != null) {
+                val currentApp = app
+                if (!initializeSystemEnvironment(currentApp)) {
+                    error("runtime reinitialization returned failure")
+                }
+
+                val restoredSnapshot = if (state?.runtimeReady == true) {
+                    restoreSuperLyricSnapshotIfNeeded(state.snapshot)
+                } else {
+                    false
+                }
+                val adopted = state?.let {
+                    superIslandHotReloadCoordinator.adoptHotReloadHosts(it.transfers)
+                } ?: 0
+                if (state != null && state.transfers.isNotEmpty() && adopted == 0 && restoredSnapshot) {
+                    HookLogger.w(TAG, "热重载后未接管任何现有超级岛宿主，已保持原生展示")
+                }
+                if (restoredSnapshot) {
+                    superIslandHotReloadCoordinator.refreshRestoredPresentation()
+                }
+            } else if (state?.runtimeReady == true) {
+                error("Application unavailable for runtime reinitialization")
+            }
+
+            HookLogger.i(
                 TAG,
-                "热重载后未取得当前 Application，等待 Application.onCreate"
+                "超级岛热重载完成: replaced=${reconcile.replaced}, " +
+                        "added=${reconcile.added}, removed=${reconcile.removed.size}"
+            )
+        } catch (error: Throwable) {
+            val hooksQuiescent = HookRuntimeRegistry.abortAndAwait(this, 2500L, TimeUnit.MILLISECONDS)
+            if (!hooksQuiescent) {
+                HookLogger.e(TAG, "热重载失败代际仍有 Hook 回调未退出")
+            }
+            val runtimeCleaned = runCatching { cleanupRuntime() }.getOrElse {
+                HookLogger.e(TAG, "热重载失败代际的歌词运行时清理异常", it)
+                false
+            }
+            val islandCleaned = superIslandHotReloadCoordinator.cleanupFailedGeneration()
+            val islandWhitelistCleaned = runCatching {
+                UnlockIslandWhitelist.prepareForHotReload()
+            }.getOrDefault(false)
+            val focusWhitelistCleaned = runCatching {
+                UnlockFocusWhitelist.prepareForHotReload()
+            }.getOrDefault(false)
+            val cleanupComplete = hooksQuiescent && runtimeCleaned && islandCleaned &&
+                    islandWhitelistCleaned && focusWhitelistCleaned
+            HookLogger.e(
+                TAG,
+                if (cleanupComplete) {
+                    "超级岛热重载失败，已清理新运行时并恢复原生展示"
+                } else {
+                    "超级岛热重载失败，部分清理未确认完成，已尽力恢复原生展示"
+                },
+                error
             )
         }
-        HookLogger.i(
-            TAG,
-            "超级岛歌词热重载完成: replaced=$replacedCount, " +
-                    "skipped=$skippedCount"
-        )
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
@@ -227,95 +371,154 @@ class HookEntry : XposedModule() {
         val packageName = param.packageName
 
         if (packageName == "com.android.systemui") {
-            StatusBarTextColorHooker.setFollowStatusBarEnabled(
-                LyricTextColorStylePolicy.followsStatusBar(
-                    LyricTextColorStylePolicy.read(prefs)
-                )
-            )
-            StatusBarTextColorHooker.setTextColorChangedListener {
-                BaseIslandRenderer.updateTextColors()
-            }
-            StatusBarTextColorHooker.hook(this, param.defaultClassLoader)
-            MediaCardRuntimeConfig.load(prefs)
-            MediaCardConfigurationRefreshHooker.hook(this, param.defaultClassLoader)
-            MediaProgressStyleHooker.hook(this, param.defaultClassLoader)
-            MediaCardElementBehaviorHooker.hook(this, param.defaultClassLoader)
-            IslandExpandedMediaAmbientFlowHooker.hook(this, param.defaultClassLoader)
-            IslandExpandedMediaLayoutHooker.hook(this, param.defaultClassLoader)
-            NotificationMediaAmbientFlowHooker.hook(this, param.defaultClassLoader)
-            NotificationMediaCoverStyleHooker.hook(this, param.defaultClassLoader)
-            if (MediaCardRuntimeConfig.current.notification.cardSwitcherEnabled) {
-                NotificationMediaSingleCardSwitcherHooker.hook(this, param.defaultClassLoader)
-            } else {
-                HookLogger.d(TAG, "通知中心多媒体卡片切换功能未启用，跳过媒体卡片切换 Hook")
-            }
-            try {
-                UnlockIslandWhitelist.hook(this, param.defaultClassLoader)
-            } catch (e: Exception) {
-                if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                HookLogger.w(TAG, "此系统版本不支持超级岛下拉小窗白名单")
-                } else {
-                    HookLogger.e(TAG, "超级岛下拉小窗白名单注入失败", e)
-                }
-            }
-            try {
-                UnlockFocusWhitelist.hook(this, param.defaultClassLoader)
-            } catch (e: Exception) {
-                if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                HookLogger.w(TAG, "此系统版本不支持解锁焦点通知白名单")
-                } else {
-                    HookLogger.e(TAG, "焦点通知白名单注入失败", e)
-                }
-            }
-
-            activeMode = prefs.getInt(
-                RootConstants.KEY_HOOK_LYRIC_MODE,
-                RootConstants.DEFAULT_HOOK_LYRIC_MODE
-            )
-
-            // 劫持 Application.onCreate 以初始化 Lyricon Receiver 所需的环境
-            try {
-                val appClass = param.defaultClassLoader.loadClass("android.app.Application")
-                val onCreateMethod = appClass.getDeclaredMethod("onCreate")
-                deoptimize(onCreateMethod)
-                hook(onCreateMethod).intercept(AppCreateHooker())
-            } catch (e: Exception) {
-                if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    HookLogger.w(TAG, "跳过生命周期 Hook: target=Application.onCreate")
-                } else {
-                    HookLogger.e(
-                        TAG,
-                        "安装生命周期 Hook 失败: target=Application.onCreate",
-                        e
-                    )
-                }
-            }
-
-            // 核心：拦截 ClassLoader 构造，以捕捉 miui.systemui.plugin 等动态加载的插件
-            try {
-                val clClass = Class.forName("dalvik.system.BaseDexClassLoader")
-                for (constructor in clClass.declaredConstructors) {
-                    deoptimize(constructor)
-                    hook(constructor).intercept(ClassLoaderHooker())
-                }
-            } catch (e: Exception) {
-                if (e is ClassNotFoundException || e is NoSuchMethodException) {
-                    HookLogger.w(TAG, "跳过插件加载 Hook: target=BaseDexClassLoader")
-                } else {
-                    HookLogger.e(
-                        TAG,
-                        "安装插件加载 Hook 失败: target=BaseDexClassLoader",
-                        e
-                    )
-                }
-            }
+            systemUiClassLoader = param.defaultClassLoader
+            systemUiLoaded = true
+            installSystemUiHooks(param.defaultClassLoader)
 
         } else if (packageName == "miui.systemui.plugin") {
             SystemUIHookRegistry.hook(this, param.defaultClassLoader)
         }
     }
 
-    private fun initializeSystemEnvironment(app: Application) {
+    /** Cold-start installer: the media-card surface is intentionally added only here. */
+    private fun installSystemUiHooks(classLoader: ClassLoader) {
+        installSuperIslandStatusBarHooks(classLoader)
+        installMediaCardHooks(classLoader)
+        installSuperIslandLifecycleHooks(classLoader, hotReload = false)
+    }
+
+    private fun installSuperIslandStatusBarHooks(classLoader: ClassLoader) {
+        StatusBarTextColorHooker.setFollowStatusBarEnabled(
+            LyricTextColorStylePolicy.followsStatusBar(
+                LyricTextColorStylePolicy.read(prefs)
+            )
+        )
+        StatusBarTextColorHooker.setTextColorChangedListener {
+            BaseIslandRenderer.updateTextColors()
+        }
+        StatusBarTextColorHooker.hook(this, classLoader)
+    }
+
+    private fun installMediaCardHooks(classLoader: ClassLoader) {
+        MediaCardRuntimeConfig.load(prefs)
+        MediaCardConfigurationRefreshHooker.hook(this, classLoader)
+        MediaProgressStyleHooker.hook(this, classLoader)
+        MediaCardElementBehaviorHooker.hook(this, classLoader)
+        IslandExpandedMediaAmbientFlowHooker.hook(this, classLoader)
+        IslandExpandedMediaLayoutHooker.hook(this, classLoader)
+        NotificationMediaAmbientFlowHooker.hook(this, classLoader)
+        NotificationMediaCoverStyleHooker.hook(this, classLoader)
+        if (MediaCardRuntimeConfig.current.notification.cardSwitcherEnabled) {
+            NotificationMediaSingleCardSwitcherHooker.hook(this, classLoader)
+        } else {
+            HookLogger.d(TAG, "通知中心多媒体卡片切换功能未启用，跳过媒体卡片切换 Hook")
+        }
+    }
+
+    private fun installSuperIslandLifecycleHooks(classLoader: ClassLoader, hotReload: Boolean) {
+        try {
+            UnlockIslandWhitelist.hook(this, classLoader)
+        } catch (e: Exception) {
+            if (e is ClassNotFoundException || e is NoSuchMethodException) {
+                HookLogger.w(
+                    TAG,
+                    if (hotReload) "热重载跳过不支持的超级岛下拉小窗白名单"
+                    else "此系统版本不支持超级岛下拉小窗白名单"
+                )
+            } else {
+                HookLogger.e(
+                    TAG,
+                    if (hotReload) "热重载安装超级岛下拉小窗白名单失败"
+                    else "超级岛下拉小窗白名单注入失败",
+                    e
+                )
+            }
+        }
+        try {
+            UnlockFocusWhitelist.hook(this, classLoader)
+        } catch (e: Exception) {
+            if (e is ClassNotFoundException || e is NoSuchMethodException) {
+                HookLogger.w(
+                    TAG,
+                    if (hotReload) "热重载跳过不支持的解锁焦点通知白名单"
+                    else "此系统版本不支持解锁焦点通知白名单"
+                )
+            } else {
+                HookLogger.e(
+                    TAG,
+                    if (hotReload) "热重载安装解锁焦点白名单失败"
+                    else "焦点通知白名单注入失败",
+                    e
+                )
+            }
+        }
+
+        if (!hotReload) {
+            activeMode = prefs.getInt(
+                RootConstants.KEY_HOOK_LYRIC_MODE,
+                RootConstants.DEFAULT_HOOK_LYRIC_MODE
+            )
+        }
+
+        runCatching {
+            val appClass = classLoader.loadClass("android.app.Application")
+            val onCreateMethod = appClass.getDeclaredMethod("onCreate")
+            managedHook(
+                executable = onCreateMethod,
+                capability = "lifecycle.application.on_create",
+                hooker = AppCreateHooker(),
+            )
+        }.onFailure { error ->
+            if (error is ClassNotFoundException || error is NoSuchMethodException) {
+                HookLogger.w(
+                    TAG,
+                    if (hotReload) "热重载跳过生命周期 Hook: target=Application.onCreate"
+                    else "跳过生命周期 Hook: target=Application.onCreate"
+                )
+            } else {
+                HookLogger.e(
+                    TAG,
+                    if (hotReload) "热重载安装生命周期 Hook 失败: target=Application.onCreate"
+                    else "安装生命周期 Hook 失败: target=Application.onCreate",
+                    error
+                )
+            }
+        }
+
+        runCatching {
+            val clClass = Class.forName("dalvik.system.BaseDexClassLoader")
+            clClass.declaredConstructors.forEach { constructor ->
+                managedHook(
+                    executable = constructor,
+                    capability = "lifecycle.base_dex_constructor",
+                    hooker = ClassLoaderHooker(),
+                )
+            }
+        }.onFailure { error ->
+            if (error is ClassNotFoundException || error is NoSuchMethodException) {
+                HookLogger.w(
+                    TAG,
+                    if (hotReload) "跳过热重载插件加载 Hook: target=BaseDexClassLoader"
+                    else "跳过插件加载 Hook: target=BaseDexClassLoader"
+                )
+            } else {
+                HookLogger.e(
+                    TAG,
+                    if (hotReload) "安装热重载插件加载 Hook 失败: target=BaseDexClassLoader"
+                    else "安装插件加载 Hook 失败: target=BaseDexClassLoader",
+                    error
+                )
+            }
+        }
+    }
+
+    /** Reinstall the Super Island support surface; media-card hooks stay in the old generation. */
+    private fun installHotReloadSuperIslandHooks(classLoader: ClassLoader) {
+        installSuperIslandStatusBarHooks(classLoader)
+        installSuperIslandLifecycleHooks(classLoader, hotReload = true)
+    }
+
+    private fun initializeSystemEnvironment(app: Application): Boolean {
         try {
             cleanupRuntime()
             runtimeApp = app
@@ -482,8 +685,10 @@ class HookEntry : XposedModule() {
                         "source=${sourceManager?.getActiveSource()?.displayName ?: "inactive"}, " +
                         "mode=$activeMode"
             )
+            return true
         } catch (e: Exception) {
             HookLogger.e(TAG, "系统环境初始化失败", e)
+            return false
         }
     }
 
@@ -503,25 +708,194 @@ class HookEntry : XposedModule() {
         HookLogger.i(TAG, "更新系统界面增强状态: enabled=$enabled")
     }
 
-    private fun cleanupRuntime(preserveMediaHooks: Boolean = false) {
-        IslandNativeRefreshCoordinator.clear()
-        if (!preserveMediaHooks) {
-            IslandAlbumCoverStyleHooker.cleanup()
-            IslandMusicWaveColorHooker.cleanup()
+    private fun restoreSuperIslandWhitelistListeners(
+        restoreIsland: Boolean = true,
+        restoreFocus: Boolean = true,
+    ) {
+        val classLoader = systemUiClassLoader ?: return
+        if (restoreIsland) {
+            runCatching { UnlockIslandWhitelist.hook(this, classLoader) }
+                .onFailure { HookLogger.w(TAG, "恢复超级岛下拉白名单监听失败", it) }
+        }
+        if (restoreFocus) {
+            runCatching { UnlockFocusWhitelist.hook(this, classLoader) }
+                .onFailure { HookLogger.w(TAG, "恢复焦点白名单监听失败", it) }
+        }
+    }
+
+    private fun cleanupRuntime(): Boolean {
+        var succeeded = true
+        val manager = sourceManager
+        manager?.let {
+            runCatching { it.stop() }.onFailure { error ->
+                succeeded = false
+                HookLogger.e(TAG, "歌词源停止失败", error)
+            }
         }
         prefListener?.let {
             runCatching { prefs.unregisterOnSharedPreferenceChangeListener(it) }
+                .onFailure { error ->
+                    succeeded = false
+                    HookLogger.e(TAG, "注销歌词偏好监听失败", error)
+                }
         }
         prefListener = null
-        runCatching { lyricEnhancementCoordinator?.close() }
+        val enhancement = lyricEnhancementCoordinator
+        if (enhancement != null && !runCatching { enhancement.closeAndAwait() }.getOrElse {
+                succeeded = false
+                HookLogger.e(TAG, "歌词增强任务清理失败", it)
+                false
+            }
+        ) {
+            succeeded = false
+        }
         lyricEnhancementCoordinator = null
-        runCatching { sourceManager?.stop() }
         sourceManager = null
-        runCatching { rootLyricSink?.close() }
+        runCatching {
+            runOnMainAndWait { rootLyricSink?.close() }
+        }.onFailure {
+            succeeded = false
+            HookLogger.e(TAG, "歌词接收端主线程清理失败", it)
+        }
         rootLyricSink = null
         lyricInfoSource = null
         runtimeApp = null
+        LyriconDataBridge.clearState()
+        return succeeded
     }
+
+    private fun encodeHotReloadState(
+        runtimeReady: Boolean,
+        systemUiLoaded: Boolean,
+        snapshot: Bundle?,
+        statusBarTextColor: Int,
+        dispatcher: Any?,
+        transfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
+    ): Any {
+        val meta = Bundle().apply {
+            putBoolean(STATE_RUNTIME_READY, runtimeReady)
+            putBoolean(STATE_SYSTEM_UI_LOADED, systemUiLoaded)
+            putInt(STATE_STATUS_BAR_TEXT_COLOR, statusBarTextColor)
+            snapshot?.let { putBundle(STATE_SNAPSHOT, it) }
+        }
+        val hosts = ArrayList<Any?>(transfers.size * 4)
+        transfers.forEach { transfer ->
+            // The ArrayList/Bundle containers are framework objects.  The only non-container
+            // reference is the native host ViewGroup, after removeInjectedViewsForHotReload has
+            // removed every HyperLyric View, tag and listener-owned child from its tree.
+            hosts += transfer.root
+            hosts += transfer.packageName
+            hosts += transfer.kind.name
+            hosts += transfer.moduleType
+        }
+        return ArrayList<Any?>(4).apply {
+            add(HOT_RELOAD_TRANSFER_VERSION)
+            add(meta)
+            add(dispatcher)
+            add(hosts)
+        }
+    }
+
+    private fun decodeHotReloadState(raw: Any?): HotReloadState? {
+        val transfer = raw as? ArrayList<*> ?: return null
+        if (transfer.firstOrNull() != HOT_RELOAD_TRANSFER_VERSION) return null
+        val meta = transfer.getOrNull(1) as? Bundle ?: return null
+        val hosts = transfer.getOrNull(3) as? ArrayList<*> ?: return null
+        val restoredHosts = mutableListOf<IslandPresentationCoordinator.HotReloadHostTransfer>()
+        var index = 0
+        while (index + 3 < hosts.size) {
+            val root = hosts[index] as? ViewGroup
+            val packageName = hosts[index + 1] as? String
+            val kind = (hosts[index + 2] as? String)?.let {
+                runCatching { IslandViewRegistry.HostKind.valueOf(it) }.getOrNull()
+            }
+            val moduleType = hosts[index + 3] as? String
+            if (root != null && packageName != null && kind != null) {
+                restoredHosts += IslandPresentationCoordinator.HotReloadHostTransfer(
+                    root = root,
+                    packageName = packageName,
+                    kind = kind,
+                    moduleType = moduleType,
+                )
+            }
+            index += 4
+        }
+        return HotReloadState(
+            runtimeReady = meta.getBoolean(STATE_RUNTIME_READY, false),
+            systemUiLoaded = meta.getBoolean(STATE_SYSTEM_UI_LOADED, false),
+            statusBarTextColor = meta.getInt(STATE_STATUS_BAR_TEXT_COLOR),
+            snapshot = meta.getBundle(STATE_SNAPSHOT),
+            dispatcher = transfer.getOrNull(2),
+            transfers = restoredHosts,
+        )
+    }
+
+    private fun restoreSuperLyricSnapshotIfNeeded(snapshot: Bundle?): Boolean {
+        if (snapshot == null || sourceManager?.getActiveSource()?.id != superLyricSource.id) {
+            return false
+        }
+        if (
+            LyriconDataBridge.currentSong != null ||
+            LyriconDataBridge.currentLyricLine != null ||
+            LyriconDataBridge.currentLyric != null
+        ) {
+            return false
+        }
+        val packageName = snapshot.getString("package")?.takeIf { it.isNotBlank() }
+            ?: return false
+        val currentPackage = LyriconDataBridge.currentLyricPackageName
+        if (!currentPackage.isNullOrBlank() && currentPackage != packageName) {
+            HookLogger.w(
+                TAG,
+                "丢弃过期 SuperLyric 快照: snapshotPackage=$packageName, " +
+                        "currentPackage=$currentPackage"
+            )
+            return false
+        }
+        val sourceId = snapshot.getString("source")
+        if (sourceId != null && sourceId != superLyricSource.id) return false
+
+        // SuperLyric has no query API.  Its publisher package is the session identity available
+        // to this source; restore only a complete publisher/song snapshot and let the next
+        // publisher callback replace it if that identity changes.
+        val restored = LyriconDataBridge.restoreHotReloadSnapshot(snapshot)
+        if (restored) {
+            HookLogger.i(TAG, "已恢复 SuperLyric 中立热重载快照: package=$packageName")
+        }
+        return restored
+    }
+
+    private fun <T> runOnMainAndWait(block: () -> T): T {
+        if (Looper.myLooper() == Looper.getMainLooper()) return block()
+
+        val latch = CountDownLatch(1)
+        var value: T? = null
+        var error: Throwable? = null
+        Handler(Looper.getMainLooper()).post {
+            try {
+                value = block()
+            } catch (throwable: Throwable) {
+                error = throwable
+            } finally {
+                latch.countDown()
+            }
+        }
+        if (!latch.await(2_500L, TimeUnit.MILLISECONDS)) {
+            throw TimeoutException("main-thread hot reload handoff timed out")
+        }
+        error?.let { throw it }
+        @Suppress("UNCHECKED_CAST")
+        return value as T
+    }
+
+    private data class HotReloadState(
+        val runtimeReady: Boolean,
+        val systemUiLoaded: Boolean,
+        val statusBarTextColor: Int,
+        val snapshot: Bundle?,
+        val dispatcher: Any?,
+        val transfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
+    )
 
     private fun findCurrentApplication(): Application? {
         return runCatching {
@@ -531,46 +905,15 @@ class HookEntry : XposedModule() {
         }.getOrNull()
     }
 
-    private fun createLyricReplacementHooker(executable: Executable): Hooker? {
-        val owner = executable.declaringClass.name
-        if (executable is Constructor<*> && owner == "dalvik.system.BaseDexClassLoader") {
-            return ClassLoaderHooker(lyricsOnly = true)
-        }
-        if (executable is Constructor<*>) {
-            return StatusBarTextColorHooker.createReplacement(executable)
-        }
-        if (executable !is Method) return null
-
-        return when (executable.name) {
-            "onCreate" -> AppCreateHooker().takeIf { owner == "android.app.Application" }
-            "updateBigIslandView" -> RealIslandHooker.UpdateBigIslandViewHook()
-            "bindData" -> IslandModuleRestoreHooker.AdapterBindDataHook()
-                .takeIf { owner.endsWith("IslandModuleViewHolderAdapter") }
-
-            "updateView" -> IslandModuleRestoreHooker.AdapterUpdateViewHook()
-                .takeIf { owner.endsWith("IslandModuleViewHolderAdapter") }
-
-            "onLongPressed" -> IslandLyricShareHooker.LongPressedHook()
-                .takeIf { owner.endsWith("DynamicIslandBaseContentViewController") }
-
-            "updateTemplate" -> HookIslandGlow.UpdateTemplateHook()
-                .takeIf { owner.endsWith("DynamicIslandBaseContentView") }
-
-            else -> StatusBarTextColorHooker.createReplacement(executable)
-        }
-    }
-
     /**
      * 动态类加载器劫持
      */
-    inner class ClassLoaderHooker(
-        private val lyricsOnly: Boolean = false
-    ) : Hooker {
+    inner class ClassLoaderHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
             val cl = chain.thisObject as? ClassLoader ?: return result
             try {
-                SystemUIHookRegistry.hook(this@HookEntry, cl, lyricsOnly = lyricsOnly)
+                SystemUIHookRegistry.hook(this@HookEntry, cl)
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {
                 } else {

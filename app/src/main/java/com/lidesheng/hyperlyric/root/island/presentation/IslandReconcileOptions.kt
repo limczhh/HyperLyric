@@ -53,6 +53,12 @@ internal object IslandReconcileOptions {
                     content = IslandInjectionReconciler.ContentMode.NONE
                 )
 
+            IslandReconcileReason.HOT_RELOAD_TAKEOVER ->
+                IslandInjectionReconciler.ShowOptions(
+                    structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
+                    content = IslandInjectionReconciler.ContentMode.NONE
+                )
+
             IslandReconcileReason.MODULE_FIRST_BIND,
             IslandReconcileReason.MODULE_UPDATED ->
                 error("Unsupported real-root reason: $reason")
@@ -89,7 +95,8 @@ internal object IslandReconcileOptions {
                 )
 
             IslandReconcileReason.LYRIC_SELF_HEAL,
-            IslandReconcileReason.PLAYBACK_RESUME ->
+            IslandReconcileReason.PLAYBACK_RESUME,
+            IslandReconcileReason.HOT_RELOAD_TAKEOVER ->
                 IslandInjectionReconciler.ShowOptions(
                     structure = IslandInjectionReconciler.StructureMode.RESTORE_OR_ENSURE,
                     content = IslandInjectionReconciler.ContentMode.NONE

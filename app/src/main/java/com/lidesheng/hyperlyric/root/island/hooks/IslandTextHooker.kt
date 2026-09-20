@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandTextHookerSupport
 import io.github.libxposed.api.XposedModule
 
@@ -42,8 +43,11 @@ internal object IslandTextHooker {
             val contentViewClass = cl.loadClass(CONTENT_VIEW_CLASS)
 
             contentViewClass.methods.filter { it.name == "updateBigIslandView" }.forEach { method ->
-                module.deoptimize(method)
-                module.hook(method).intercept(RealIslandHooker.UpdateBigIslandViewHook())
+                module.managedHook(
+                    executable = method,
+                    capability = "island.real.update_big_island_view",
+                    hooker = RealIslandHooker.UpdateBigIslandViewHook(),
+                )
             }
         }
 
@@ -56,9 +60,10 @@ internal object IslandTextHooker {
                             it.declaringClass.name == FAKE_CONTENT_VIEW_CLASS
                 }
                 .forEach { method ->
-                    module.deoptimize(method)
-                    module.hook(method).intercept(
-                        FakeIslandTransitionHooker.VisibilityHook()
+                    module.managedHook(
+                        executable = method,
+                        capability = "island.fake.visibility",
+                        hooker = FakeIslandTransitionHooker.VisibilityHook(),
                     )
                 }
 
@@ -75,9 +80,10 @@ internal object IslandTextHooker {
                 }
                 .forEach { method ->
                     method.isAccessible = true
-                    module.deoptimize(method)
-                    module.hook(method).intercept(
-                        FakeIslandTransitionHooker.ExpandedViewTransitionHook()
+                    module.managedHook(
+                        executable = method,
+                        capability = "island.fake.expanded_transition",
+                        hooker = FakeIslandTransitionHooker.ExpandedViewTransitionHook(),
                     )
                 }
 
@@ -90,9 +96,10 @@ internal object IslandTextHooker {
                 }
                 .forEach { method ->
                     method.isAccessible = true
-                    module.deoptimize(method)
-                    module.hook(method).intercept(
-                        FakeIslandTransitionHooker.FreeformFakeViewCallbackHook()
+                    module.managedHook(
+                        executable = method,
+                        capability = "island.fake.freeform_callback",
+                        hooker = FakeIslandTransitionHooker.FreeformFakeViewCallbackHook(),
                     )
                 }
 
@@ -109,8 +116,11 @@ internal object IslandTextHooker {
                 }
                 .forEach { method ->
                     method.isAccessible = true
-                    module.deoptimize(method)
-                    module.hook(method).intercept(IslandModuleRestoreHooker.AdapterBindDataHook())
+                    module.managedHook(
+                        executable = method,
+                        capability = "island.adapter.bind_data",
+                        hooker = IslandModuleRestoreHooker.AdapterBindDataHook(),
+                    )
                 }
         }
 
@@ -119,12 +129,14 @@ internal object IslandTextHooker {
                 .filter { it.name == "updateView" && it.parameterTypes.size == 3 }
                 .forEach { method ->
                     method.isAccessible = true
-                    module.deoptimize(method)
-                    module.hook(method).intercept(IslandModuleRestoreHooker.AdapterUpdateViewHook())
+                    module.managedHook(
+                        executable = method,
+                        capability = "island.adapter.update_view",
+                        hooker = IslandModuleRestoreHooker.AdapterUpdateViewHook(),
+                    )
                 }
         }
     }
-
 
     private inline fun installFeature(name: String, block: () -> Unit) {
         try {

@@ -6,6 +6,7 @@ import android.media.session.MediaSession
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import android.view.ViewGroup
+import android.view.View
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
 
 internal object IslandProbeUtils {
@@ -62,6 +63,15 @@ internal object IslandProbeUtils {
 
     fun getCurrentIslandData(contentView: Any?): Any? {
         return contentView.callGetter("getCurrentIslandData")
+    }
+
+    fun getCurrentIslandDataForHost(root: ViewGroup): Any? {
+        var current: View? = root
+        while (current != null) {
+            getCurrentIslandData(current)?.let { return it }
+            current = current.parent as? View
+        }
+        return null
     }
 
     fun getHolder(adapter: Any?, moduleType: String?): Any? {

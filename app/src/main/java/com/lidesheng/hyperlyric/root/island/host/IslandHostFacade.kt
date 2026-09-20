@@ -77,6 +77,12 @@ internal object IslandHostFacade {
         return changed
     }
 
+    fun removeInjectedViewsForHotReload(rootView: ViewGroup): Boolean {
+        val changed = IslandViewHelper.removeInjectedViews(rootView)
+        IslandProgressGlowController.clear(rootView)
+        return changed
+    }
+
     fun triggerSystemRelayout(rootView: ViewGroup) {
         IslandViewHelper.triggerSystemRelayout(rootView)
     }

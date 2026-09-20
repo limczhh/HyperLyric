@@ -7,10 +7,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Choreographer
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
-import java.lang.reflect.Constructor
 import java.lang.reflect.Executable
 import java.lang.reflect.Field
 import java.lang.reflect.Method
@@ -108,21 +108,53 @@ internal object StatusBarTextColorHooker {
 
     fun currentTextColor(): Int = textColor
 
+    /**
+     * Returns the native dispatcher only for the API 102 handoff.  Its old receiver is removed
+     * before this object is passed across generations, so the dispatcher does not retain a module
+     * proxy from the old classloader.
+     */
+    fun dispatcherForHotReload(): Any? = activeDispatcher?.get()
+
     fun restoreTextColor(color: Int) {
         textColor = color
         dispatchedTextColor = color
     }
 
-    fun createReplacement(constructor: Constructor<*>): Hooker? {
-        return if (constructor.declaringClass.name == DISPATCHER_CLASS) {
-            DispatcherConstructorHooker()
-        } else {
-            null
-        }
+    fun restoreDispatcherAfterHotReload(dispatcher: Any?) {
+        if (dispatcher == null) return
+        registerReceiver(dispatcher)
+        captureDispatcher(dispatcher)
     }
 
-    fun createReplacement(method: Method): Hooker? {
-        return DispatcherApplyHooker().takeIf { isDispatcherApply(method) }
+    /** Release the DarkIconDispatcher receiver and all frame callbacks owned by this generation. */
+    fun cleanupForHotReload(): Boolean {
+        val dispatcher = activeDispatcher?.get()
+        val registeredReceiver = receiver
+        if (dispatcher != null && registeredReceiver != null) {
+            val removeMethod = dispatcher.javaClass.methods.firstOrNull {
+                it.name == "removeDarkReceiver" && it.parameterCount == 1
+            } ?: run {
+                HookLogger.w(TAG, "注销 DarkReceiver 失败: removeDarkReceiver unavailable")
+                return false
+            }
+            val removed = runCatching {
+                removeMethod.isAccessible = true
+                removeMethod.invoke(dispatcher, registeredReceiver)
+            }.onFailure { error ->
+                HookLogger.w(TAG, "注销 DarkReceiver 失败", error)
+            }.isSuccess
+            if (!removed) return false
+        }
+        followStatusBarEnabled = false
+        textColorChangedListener = null
+        mainHandler.removeCallbacksAndMessages(null)
+        runCatching { Choreographer.getInstance().removeFrameCallback(frameCallback) }
+        frameScheduled.set(false)
+        activeDispatcher = null
+        receiver = null
+        receiverRegistered = false
+        hookedDispatcherClasses.clear()
+        return true
     }
 
     private fun hookDispatcher(module: XposedModule, classLoader: ClassLoader): Boolean {
@@ -144,8 +176,11 @@ internal object StatusBarTextColorHooker {
     private fun install(module: XposedModule, executable: Executable, hooker: Hooker): Boolean {
         return try {
             executable.isAccessible = true
-            module.deoptimize(executable)
-            module.hook(executable).intercept(hooker)
+            module.managedHook(
+                executable = executable,
+                capability = "status_bar.text_color.${executable.name}",
+                hooker = hooker,
+            )
             true
         } catch (_: Exception) {
             false

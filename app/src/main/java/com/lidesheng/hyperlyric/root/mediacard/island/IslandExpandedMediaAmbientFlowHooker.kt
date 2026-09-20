@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.root.HookRuntimeRegistry
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.mediacard.MediaAmbientFlowPalette
@@ -50,6 +51,7 @@ import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPalette
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPaletteResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -115,10 +117,13 @@ object IslandExpandedMediaAmbientFlowHooker {
         val installedHandles = mutableListOf<HookHandle>()
         api.hookMethods.forEach { method ->
             runCatching {
-                xposedModule.deoptimize(method)
                 val hooker = hookerFor(method)
                     ?: error("No hooker for ${method.declaringClass.name}.${method.name}")
-                installedHandles += xposedModule.hook(method).intercept(hooker)
+                installedHandles += xposedModule.managedHook(
+                    executable = method,
+                    capability = "media.island.ambient.${method.name}",
+                    hooker = hooker,
+                )
             }.onFailure { error ->
                 HookLogger.e(
                     TAG,
@@ -129,7 +134,10 @@ object IslandExpandedMediaAmbientFlowHooker {
         }
 
         if (installedHandles.size != api.hookMethods.size) {
-            installedHandles.forEach(HookHandle::unhook)
+            installedHandles.forEach { handle ->
+                HookRuntimeRegistry.forget(xposedModule, handle)
+                runCatching { handle.unhook() }
+            }
             hookedClassLoaders.remove(classLoader)
             HookLogger.w(TAG, "展开态媒体流光 Hook 不完整，已移除全部 Hook")
         } else {
@@ -465,8 +473,11 @@ object IslandExpandedMediaAmbientFlowHooker {
             } ?: return@runCatching
             emit.isAccessible = true
             dummyHolder.isAccessible = true
-            module.deoptimize(emit)
-            module.hook(emit).intercept(MiniBarTrackingHook(dummyHolder))
+            module.managedHook(
+                executable = emit,
+                capability = "media.island.ambient.minibar_emit",
+                hooker = MiniBarTrackingHook(dummyHolder),
+            )
         }.onFailure { error ->
             HookLogger.w(TAG, "跳过展开态媒体 MiniBar collector Hook: reason=${error.message}")
         }

@@ -5,6 +5,7 @@ import android.content.res.Resources
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -54,6 +55,11 @@ internal object IslandWidthLimitHooker {
      */
     private val activePhoneCalculation = ThreadLocal<View>()
 
+    fun prepareForHotReload() {
+        hookedClassLoaders.clear()
+        activePhoneCalculation.remove()
+    }
+
     fun hook(module: XposedModule, cl: ClassLoader) {
         if (!hookedClassLoaders.add(cl)) return
 
@@ -71,9 +77,10 @@ internal object IslandWidthLimitHooker {
             }
             if (calculateBigIslandWidth != null) {
                 calculateBigIslandWidth.isAccessible = true
-                module.deoptimize(calculateBigIslandWidth)
-                module.hook(calculateBigIslandWidth).intercept(
-                    PhoneCalculationScopeHook(variantDetector)
+                module.managedHook(
+                    executable = calculateBigIslandWidth,
+                    capability = "island.width.phone_scope",
+                    hooker = PhoneCalculationScopeHook(variantDetector),
                 )
                 installed++
                 installedCapabilities += "phone-scope"
@@ -98,13 +105,14 @@ internal object IslandWidthLimitHooker {
                 .orEmpty()
             screenWidthMethods.forEach { method ->
                 method.isAccessible = true
-                module.deoptimize(method)
-                module.hook(method).intercept(
-                    NativeScreenWidthHook(
+                module.managedHook(
+                    executable = method,
+                    capability = "island.width.${method.name}",
+                    hooker = NativeScreenWidthHook(
                         widthProvider = widthProvider,
                         variantDetector = variantDetector,
                         allowUnscopedPhoneFallback = calculateBigIslandWidth == null
-                    )
+                    ),
                 )
                 installed++
                 installedCapabilities += method.name
@@ -121,12 +129,13 @@ internal object IslandWidthLimitHooker {
             }
             if (getMaxWidth != null) {
                 getMaxWidth.isAccessible = true
-                module.deoptimize(getMaxWidth)
-                module.hook(getMaxWidth).intercept(
-                    GetMaxWidthHook(
+                module.managedHook(
+                    executable = getMaxWidth,
+                    capability = "island.width.get_max_width",
+                    hooker = GetMaxWidthHook(
                         widthProvider = widthProvider,
                         variantDetector = variantDetector
-                    )
+                    ),
                 )
                 installed++
                 installedCapabilities += "getMaxWidth"
@@ -143,13 +152,14 @@ internal object IslandWidthLimitHooker {
             }
             if (calculateMaxWidthWithSmall != null) {
                 calculateMaxWidthWithSmall.isAccessible = true
-                module.deoptimize(calculateMaxWidthWithSmall)
-                module.hook(calculateMaxWidthWithSmall).intercept(
-                    CalculateMaxWidthWithSmallHook(
+                module.managedHook(
+                    executable = calculateMaxWidthWithSmall,
+                    capability = "island.width.phone_small",
+                    hooker = CalculateMaxWidthWithSmallHook(
                         calculationMethod = calculateMaxWidthWithSmall,
                         widthProvider = widthProvider,
                         variantDetector = variantDetector
-                    )
+                    ),
                 )
                 installed++
                 installedCapabilities += "phone-small"

@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.root.mediacard
 
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -34,14 +35,22 @@ internal object MediaCardElementBehaviorHooker {
             ?.declaredMethods
             ?.filter { it.name == "applyViewShadowForMediaAlbum" }
             ?.forEach { method ->
-                installed += xposedModule.hookSafely(method, AlbumShadowHook())
+            installed += xposedModule.hookSafely(
+                method,
+                "media.card.album_shadow",
+                AlbumShadowHook()
+            )
             }
 
         classLoader.loadClassOrNull(ALBUM_ANIMATION_UTIL_CLASS)
             ?.declaredMethods
             ?.filter { it.name == "startFlipAnimation" }
             ?.forEach { method ->
-                installed += xposedModule.hookSafely(method, AlbumFlipHook())
+            installed += xposedModule.hookSafely(
+                method,
+                "media.card.album_flip",
+                AlbumFlipHook()
+            )
             }
 
         if (installed == 0) {
@@ -97,11 +106,18 @@ internal object MediaCardElementBehaviorHooker {
         }
     }
 
-    private fun XposedModule.hookSafely(method: Method, hooker: Hooker): Int {
+    private fun XposedModule.hookSafely(
+        method: Method,
+        capability: String,
+        hooker: Hooker,
+    ): Int {
         return runCatching {
             method.isAccessible = true
-            deoptimize(method)
-            hook(method).intercept(hooker)
+            managedHook(
+                executable = method,
+                capability = capability,
+                hooker = hooker,
+            )
             1
         }.onFailure { error ->
             HookLogger.w(

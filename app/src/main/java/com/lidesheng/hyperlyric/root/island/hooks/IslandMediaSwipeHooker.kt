@@ -6,6 +6,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -46,6 +47,13 @@ internal object IslandMediaSwipeHooker {
     @Volatile
     private var nativeThresholdOverrideInstalled = false
 
+    fun prepareForHotReload() {
+        synchronized(gestures) { gestures.clear() }
+        synchronized(overriddenThresholdFlows) { overriddenThresholdFlows.clear() }
+        activeSwipeThresholdOverride.remove()
+        nativeThresholdOverrideInstalled = false
+    }
+
     fun hook(module: XposedModule, cl: ClassLoader) {
         try {
             val touchInteractorClass = cl.loadClass(TOUCH_INTERACTOR_CLASS)
@@ -73,10 +81,17 @@ internal object IslandMediaSwipeHooker {
 
             listOf(onInterceptTouchEvent, onTouchEvent).forEach { method ->
                 method.isAccessible = true
-                module.deoptimize(method)
             }
-            module.hook(onInterceptTouchEvent).intercept(InterceptTouchHook())
-            module.hook(onTouchEvent).intercept(TouchEventHook())
+            module.managedHook(
+                executable = onInterceptTouchEvent,
+                capability = "island.swipe.intercept_touch",
+                hooker = InterceptTouchHook(),
+            )
+            module.managedHook(
+                executable = onTouchEvent,
+                capability = "island.swipe.touch",
+                hooker = TouchEventHook(),
+            )
 
             HookLogger.i(
                 TAG,
@@ -106,9 +121,10 @@ internal object IslandMediaSwipeHooker {
             )
 
             getSwipeThreshold.isAccessible = true
-            module.deoptimize(getSwipeThreshold)
-            module.hook(getSwipeThreshold).intercept(
-                SwipeThresholdHook(getSwipeThreshold.returnType)
+            module.managedHook(
+                executable = getSwipeThreshold,
+                capability = "island.swipe.threshold",
+                hooker = SwipeThresholdHook(getSwipeThreshold.returnType),
             )
             true
         } catch (e: ClassNotFoundException) {

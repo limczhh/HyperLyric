@@ -11,6 +11,7 @@ import android.graphics.Shader
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -48,8 +49,11 @@ internal object IslandProgressGlowHooker {
                         it.parameterTypes.contentEquals(arrayOf(Canvas::class.java))
             } ?: throw NoSuchMethodException("$BACKGROUND_VIEW_CLASS.onDraw")
             onDrawMethod.isAccessible = true
-            module.deoptimize(onDrawMethod)
-            module.hook(onDrawMethod).intercept(BackgroundDrawHook())
+            module.managedHook(
+                executable = onDrawMethod,
+                capability = "island.progress_glow.draw",
+                hooker = BackgroundDrawHook(),
+            )
             HookLogger.d(TAG, "边缘光效进度条 Hook 已初始化")
         } catch (e: Throwable) {
             hookedClassLoaders.remove(classLoader)
@@ -112,6 +116,12 @@ internal object IslandProgressGlowHooker {
             stateByBackgroundView.keys.toList().also { stateByBackgroundView.clear() }
         }
         views.forEach(View::invalidate)
+    }
+
+    fun cleanupForHotReload() {
+        clearAllMediaProgress()
+        hookedClassLoaders.clear()
+        module = null
     }
 
     class BackgroundDrawHook : Hooker {

@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -50,8 +51,11 @@ internal object MediaCardConfigurationRefreshHooker {
 
         runCatching {
             method.isAccessible = true
-            xposedModule.deoptimize(method)
-            xposedModule.hook(method).intercept(ConfigurationChangedHook())
+            xposedModule.managedHook(
+                executable = method,
+                capability = "media.card.configuration_changed",
+                hooker = ConfigurationChangedHook(),
+            )
         }.onSuccess {
             HookLogger.d(TAG, "媒体卡片主题刷新 Hook 已初始化")
         }.onFailure { error ->

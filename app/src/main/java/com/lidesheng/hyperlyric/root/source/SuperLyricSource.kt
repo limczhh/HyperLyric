@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -28,10 +29,11 @@ class SuperLyricSource : LyricSource {
     override val displayName = "SuperLyric"
 
     private var app: android.app.Application? = null
+    @Volatile
     private var sink: LyricSink? = null
     private var receiver: ISuperLyricReceiver? = null
     private var positionJob: Job? = null
-    private val positionScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var positionScope: CoroutineScope? = null
 
     @Volatile
     private var lastKnownPosition: Long = -1L
@@ -63,6 +65,8 @@ class SuperLyricSource : LyricSource {
 
     override fun start(sink: LyricSink) {
         this.sink = sink
+        positionScope?.cancel()
+        positionScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         stopPositionPolling()
         activePublisher = null
         playbackStarted = false
@@ -121,6 +125,8 @@ class SuperLyricSource : LyricSource {
 
     override fun stop() {
         stopPositionPolling()
+        positionScope?.cancel()
+        positionScope = null
         receiver?.let {
             try {
                 SuperLyricHelper.unregisterReceiver(it)
@@ -308,7 +314,8 @@ class SuperLyricSource : LyricSource {
         positionPublisher = publisher
         val generation = streamGeneration.incrementAndGet()
         val context = app ?: return
-        positionJob = positionScope.launch {
+        val scope = positionScope ?: return
+        positionJob = scope.launch {
             while (isActive && activePublisher == publisher &&
                 streamGeneration.get() == generation
             ) {

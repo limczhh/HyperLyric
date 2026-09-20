@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.root.HookRuntimeRegistry
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.MediaCoverRotationController
 import com.lidesheng.hyperlyric.root.mediacard.notification.aod.NotificationMediaFullAodAnimatedHeightHook
@@ -21,6 +22,7 @@ import com.lidesheng.hyperlyric.root.mediacard.notification.layout.pixel.Notific
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaCoverStyler
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.HookHandle
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -77,10 +79,13 @@ object NotificationMediaCoverStyleHooker {
         val handles = mutableListOf<HookHandle>()
         methods.forEach { method ->
             runCatching {
-                xposedModule.deoptimize(method)
                 val hooker = hookerFor(method)
                     ?: error("No hooker for ${method.declaringClass.name}.${method.name}")
-                handles += xposedModule.hook(method).intercept(hooker)
+                handles += xposedModule.managedHook(
+                    executable = method,
+                    capability = "media.notification.cover.${method.name}",
+                    hooker = hooker,
+                )
             }.onFailure { error ->
                 HookLogger.e(
                     TAG,
@@ -92,7 +97,10 @@ object NotificationMediaCoverStyleHooker {
         }
 
         if (handles.size != methods.size) {
-            handles.forEach(HookHandle::unhook)
+            handles.forEach { handle ->
+                HookRuntimeRegistry.forget(xposedModule, handle)
+                runCatching { handle.unhook() }
+            }
             hookedClassLoaders.remove(classLoader)
             HookLogger.w(TAG, "通知中心媒体卡片 Hook 安装不完整")
         } else {

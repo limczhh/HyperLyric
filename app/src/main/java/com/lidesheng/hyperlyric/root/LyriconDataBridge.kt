@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root
 
+import android.os.Bundle
 import android.os.SystemClock
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
@@ -13,8 +14,29 @@ import com.lidesheng.hyperlyric.lyric.view.SongPreprocessor
 import com.lidesheng.hyperlyric.lyric.view.TimedLine
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 object LyriconDataBridge {
+
+    private const val HOT_RELOAD_STATE_VERSION = 1
+    private const val HOT_RELOAD_VERSION = "version"
+    private const val HOT_RELOAD_SOURCE = "source"
+    private const val HOT_RELOAD_PACKAGE = "package"
+    private const val HOT_RELOAD_SONG = "song"
+    private const val HOT_RELOAD_LINE = "line"
+    private const val HOT_RELOAD_TEXT = "text"
+    private const val HOT_RELOAD_TEXT_MODE = "textMode"
+    private const val HOT_RELOAD_POSITION = "position"
+    private const val HOT_RELOAD_SPEED = "speed"
+    private const val HOT_RELOAD_PLAYING = "playing"
+    private const val HOT_RELOAD_SONG_ID = "songId"
+    private const val HOT_RELOAD_TITLE = "title"
+    private const val HOT_RELOAD_ARTIST = "artist"
+    private const val HOT_RELOAD_ALBUM = "album"
+    private const val HOT_RELOAD_DURATION = "duration"
+    private val hotReloadJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     private const val TAG = "LyriconDataBridge"
 
@@ -176,6 +198,87 @@ object LyriconDataBridge {
     fun currentPlaybackClock(
         uptimeMs: Long = SystemClock.uptimeMillis()
     ): PlaybackClockReading = playbackClock.readAt(uptimeMs)
+
+    fun isPlaybackActive(): Boolean = playbackClock.isPlaying
+
+    /**
+     * Exports only JSON/primitives for an API 102 generation handoff.  No Song, lyric line,
+     * MediaSession token, renderer, view, callback or module-class object crosses the boundary.
+     */
+    fun exportHotReloadSnapshot(): Bundle? {
+        val song = currentSong ?: return null
+        val metadata = currentLyricMediaMetadata
+        val clock = currentPlaybackClock()
+        return Bundle().apply {
+            putInt(HOT_RELOAD_VERSION, HOT_RELOAD_STATE_VERSION)
+            putString(HOT_RELOAD_SOURCE, metadata?.sourceId)
+            putString(HOT_RELOAD_PACKAGE, currentLyricPackageName)
+            putString(HOT_RELOAD_SONG, hotReloadJson.encodeToString(song.deepCopy()))
+            currentLyricLine?.let { line ->
+                putString(
+                    HOT_RELOAD_LINE,
+                    hotReloadJson.encodeToString(line.toNeutralRichLine())
+                )
+            }
+            putString(HOT_RELOAD_TEXT, currentLyric)
+            putBoolean(HOT_RELOAD_TEXT_MODE, isTextMode)
+            putLong(HOT_RELOAD_POSITION, clock.positionMs)
+            putFloat(HOT_RELOAD_SPEED, clock.playbackSpeed)
+            putBoolean(HOT_RELOAD_PLAYING, isPlaybackActive())
+            putString(HOT_RELOAD_SONG_ID, metadata?.songId)
+            putString(HOT_RELOAD_TITLE, metadata?.title)
+            putString(HOT_RELOAD_ARTIST, metadata?.artist)
+            putString(HOT_RELOAD_ALBUM, metadata?.album)
+            metadata?.duration?.let { putLong(HOT_RELOAD_DURATION, it) }
+        }
+    }
+
+    /**
+     * Restores the neutral fallback after the new source has had a chance to re-subscribe.  This
+     * is intentionally a no-op for a malformed or stale snapshot; normal source events remain the
+     * authoritative state path.
+     */
+    fun restoreHotReloadSnapshot(snapshot: Bundle): Boolean {
+        if (snapshot.getInt(HOT_RELOAD_VERSION, -1) != HOT_RELOAD_STATE_VERSION) return false
+        val songJson = snapshot.getString(HOT_RELOAD_SONG) ?: return false
+        val song = runCatching {
+            hotReloadJson.decodeFromString<Song>(songJson)
+        }.getOrNull() ?: return false
+
+        updateSong(song)
+        updateMediaMetadata(
+            LyricMediaMetadata(
+                sourceId = snapshot.getString(HOT_RELOAD_SOURCE).orEmpty(),
+                packageName = snapshot.getString(HOT_RELOAD_PACKAGE),
+                songId = snapshot.getString(HOT_RELOAD_SONG_ID),
+                title = snapshot.getString(HOT_RELOAD_TITLE),
+                artist = snapshot.getString(HOT_RELOAD_ARTIST),
+                album = snapshot.getString(HOT_RELOAD_ALBUM),
+                duration = if (snapshot.containsKey(HOT_RELOAD_DURATION)) {
+                    snapshot.getLong(HOT_RELOAD_DURATION)
+                } else {
+                    null
+                },
+            )
+        )
+        updateLyricPackage(snapshot.getString(HOT_RELOAD_PACKAGE))
+
+        val position = snapshot.getLong(HOT_RELOAD_POSITION, 0L).coerceAtLeast(0L)
+        val speed = snapshot.getFloat(HOT_RELOAD_SPEED, 1f)
+        val playing = snapshot.getBoolean(HOT_RELOAD_PLAYING, false)
+        resetPlaybackClock(position, playing, speed)
+        if (snapshot.getBoolean(HOT_RELOAD_TEXT_MODE, false)) {
+            updateLyric(snapshot.getString(HOT_RELOAD_TEXT))
+        } else {
+            snapshot.getString(HOT_RELOAD_LINE)?.let { lineJson ->
+                runCatching {
+                    hotReloadJson.decodeFromString<RichLyricLine>(lineJson)
+                }.getOrNull()?.let(::updateLyricLine)
+            }
+            updatePosition(position)
+        }
+        return true
+    }
 
     fun currentPlainTextMarqueeOriginActiveTimeMs(): Long =
         plainTextMarqueeOriginActiveTimeMs
@@ -500,6 +603,21 @@ object LyriconDataBridge {
 
     private fun String?.orMissingText(fallback: String): String? =
         this?.takeIf { it.isNotBlank() } ?: fallback.takeIf { it.isNotBlank() }
+
+    private fun IRichLyricLine.toNeutralRichLine(): RichLyricLine = RichLyricLine(
+        begin = begin,
+        end = end,
+        duration = duration,
+        isAlignedRight = isAlignedRight,
+        metadata = metadata,
+        text = text,
+        words = words,
+        secondary = secondary,
+        secondaryWords = secondaryWords,
+        translation = translation,
+        translationWords = translationWords,
+        roma = roma,
+    )
 
 }
 

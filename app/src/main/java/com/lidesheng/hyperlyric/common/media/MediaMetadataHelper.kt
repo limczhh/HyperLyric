@@ -265,7 +265,11 @@ object MediaMetadataHelper {
             activeControllers = runCatching { manager.getActiveSessions(null) }.getOrDefault(emptyList())
             val registerListener: () -> Unit = {
                 runCatching {
-                    manager.addOnActiveSessionsChangedListener(activeSessionsListener, null)
+                    manager.addOnActiveSessionsChangedListener(
+                        activeSessionsListener,
+                        null,
+                        mainHandler
+                    )
                 }
                 Unit
             }

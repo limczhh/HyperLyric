@@ -14,6 +14,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedModule
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal class LyricEnhancementCoordinator(
     private val module: XposedModule,
@@ -140,14 +143,44 @@ internal class LyricEnhancementCoordinator(
     }
 
     override fun close() {
-        if (!closed.compareAndSet(false, true)) return
+        closeAndAwait()
+    }
+
+    fun closeAndAwait(): Boolean {
+        if (!closed.compareAndSet(false, true)) return true
+        var succeeded = true
         cacheCommandListener.close()
+        val job = activeJob
         cancelActiveProcessing()
+        if (job != null) {
+            val joined = runCatching {
+                runBlocking {
+                    withTimeoutOrNull(2_000L) {
+                        job.join()
+                    } != null
+                }
+            }.getOrElse {
+                HookLogger.w(LOG_TAG, "等待歌词增强协程退出失败", it)
+                false
+            }
+            if (!joined) {
+                succeeded = false
+                HookLogger.w(LOG_TAG, "歌词增强协程未在截止时间内退出")
+            }
+        }
         amllFeature?.close()
         aiTranslationFeature?.close()
         enhancementExecutor.shutdownNow()
+        val executorStopped = runCatching {
+                enhancementExecutor.awaitTermination(2L, TimeUnit.SECONDS)
+            }.getOrDefault(false)
+        if (!executorStopped) {
+            succeeded = false
+            HookLogger.w(LOG_TAG, "歌词增强执行器未在截止时间内退出")
+        }
         scope.cancel()
         configChangedListener = null
+        return succeeded
     }
 
     private fun clearFeatureCache(featureId: String): Boolean {

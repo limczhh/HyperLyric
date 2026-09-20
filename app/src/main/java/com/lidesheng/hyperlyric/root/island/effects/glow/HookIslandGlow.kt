@@ -8,6 +8,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
@@ -27,17 +28,26 @@ object HookIslandGlow {
     private const val DATA_CLASS =
         "com.android.systemui.plugins.miui.dynamicisland.DynamicIslandData"
 
-    private lateinit var module: XposedModule
+    private var module: XposedModule? = null
     private val hookedClassLoaders = java.util.Collections.synchronizedSet(
         java.util.Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     )
     private val lastGlowEnabledByView = WeakHashMap<View, Boolean>()
 
     private val prefs: SharedPreferences?
-        get() = if (::module.isInitialized) (module as? HookEntry)?.prefs else null
+        get() = (module as? HookEntry)?.prefs
 
     fun initialize(xposedModule: XposedModule) {
         module = xposedModule
+    }
+
+    fun cleanupForHotReload() {
+        synchronized(lastGlowEnabledByView) {
+            lastGlowEnabledByView.keys.toList().forEach(::clearViewHighlightColor)
+            lastGlowEnabledByView.clear()
+        }
+        hookedClassLoaders.clear()
+        module = null
     }
 
     fun init(xposedModule: XposedModule, cl: ClassLoader) {
@@ -55,8 +65,11 @@ object HookIslandGlow {
 
             if (updateTemplateMethod != null) {
                 updateTemplateMethod.isAccessible = true
-                module.deoptimize(updateTemplateMethod)
-                module.hook(updateTemplateMethod).intercept(UpdateTemplateHook())
+                xposedModule.managedHook(
+                    executable = updateTemplateMethod,
+                    capability = "island.glow.update_template",
+                    hooker = UpdateTemplateHook(),
+                )
                 HookLogger.d(TAG, "媒体岛光效 Hook 已初始化: method=updateTemplate")
             } else {
                 HookLogger.w(TAG, "未找到 updateTemplate，跳过媒体岛光效 Hook")
