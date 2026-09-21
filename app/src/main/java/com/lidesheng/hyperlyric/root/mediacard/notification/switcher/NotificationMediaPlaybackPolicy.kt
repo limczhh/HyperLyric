@@ -146,12 +146,6 @@ internal class NotificationMediaPlaybackPolicy(
         }
     }
 
-    /**
-     * Returns the canonical page order. Currently playing sessions are always
-     * ahead of paused active sessions; among sessions in the same state, the
-     * most recent activity transition wins, with native order as a stable
-     * fallback. The returned list only contains keys known to this policy.
-     */
     fun orderedKeys(nativeKeys: List<String>): List<String> {
         val nativePositions = nativeKeys.withIndex().associate { it.value to it.index }
         val candidates = LinkedHashSet<String>().apply {
@@ -161,8 +155,10 @@ internal class NotificationMediaPlaybackPolicy(
         return candidates
             .filter { it in dataByKey }
             .sortedWith(
-                compareByDescending<String> { isPlaying(it) }
-                    .thenByDescending { activitySequenceByKey[it] ?: Long.MIN_VALUE }
+                compareByDescending<String> {
+                    activitySequenceByKey[it] ?: Long.MIN_VALUE
+                }
+                    .thenByDescending { isPlaying(it) }
                     .thenBy { nativePositions[it] ?: Int.MAX_VALUE }
                     .thenBy { insertionSequenceByKey[it] ?: Long.MAX_VALUE }
             )
