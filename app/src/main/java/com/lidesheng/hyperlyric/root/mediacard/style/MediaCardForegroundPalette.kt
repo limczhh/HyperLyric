@@ -16,6 +16,11 @@ internal data class MediaCardForegroundPalette(
     val progressTrack: Int
 )
 
+internal data class MediaCardForegroundColors(
+    val primary: Int,
+    val secondary: Int
+)
+
 internal object MediaCardForegroundPaletteResolver {
     /**
      * Resolves colors only from the explicit tone of an active custom

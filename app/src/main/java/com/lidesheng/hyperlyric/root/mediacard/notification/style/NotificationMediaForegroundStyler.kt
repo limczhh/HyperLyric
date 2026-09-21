@@ -12,6 +12,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColors
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPalette
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPaletteResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -90,9 +91,20 @@ internal object NotificationMediaForegroundStyler {
 
     fun hasAppliedPalette(controller: Any): Boolean = appliedPalettes.containsKey(controller)
 
-    /** Returns the foreground currently visible on the card. */
+    /** Returns the semantic foreground roles currently visible on the card. */
+    fun foregroundColors(controller: Any): MediaCardForegroundColors? {
+        appliedPalettes[controller]?.let { colors ->
+            return MediaCardForegroundColors(
+                primary = colors.primary,
+                secondary = colors.secondary
+            )
+        }
+        return nativeForegroundColors(controller)
+    }
+
+    /** Returns the primary foreground currently visible on the card. */
     fun foregroundColor(controller: Any): Int? {
-        return appliedPalettes[controller]?.primary
+        return foregroundColors(controller)?.primary
     }
 
     /** Resolves and applies the shared progress foreground and track. */
@@ -100,7 +112,14 @@ internal object NotificationMediaForegroundStyler {
         controller: Any,
         seekBar: SeekBar
     ) {
-        val colors = appliedPalettes[controller] ?: return
+        val colors = appliedPalettes[controller]
+        if (colors == null) {
+            nativeForegroundColor(controller)?.let { color ->
+                applyProgressForegroundColor(seekBar, color)
+            }
+            return
+        }
+
         val tint = ColorStateList.valueOf(colors.primary)
         seekBar.thumbTintList = tint
         seekBar.progressTintList = tint
@@ -171,6 +190,40 @@ internal object NotificationMediaForegroundStyler {
         applySeekBarForegroundColor(seekBar, colors.primary)
         applySeekBarTrackColor(seekBar, colors.progressTrack)
         seekBar.invalidate()
+    }
+
+    /**
+     * Uses the foreground already resolved by native SystemUI when the card
+     * has no custom background palette. This is needed for replacement views
+     * such as the native glow SeekBar: copying the old View's initial tint can
+     * otherwise leave the replacement white after SystemUI turns the card
+     * foreground black.
+     */
+    private fun nativeForegroundColors(controller: Any): MediaCardForegroundColors? {
+        val holder = readField(controller, "holder") ?: return null
+        val primary = foregroundIconFields.asSequence()
+            .mapNotNull { fieldName ->
+                (readField(holder, fieldName) as? ImageView)?.imageTintList?.defaultColor
+            }
+            .firstOrNull()
+            ?: (readField(holder, "titleText") as? TextView)?.currentTextColor
+            ?: (readField(holder, "artistText") as? TextView)?.currentTextColor
+            ?: return null
+        val secondary = (readField(holder, "artistText") as? TextView)?.currentTextColor
+            ?: primary
+        return MediaCardForegroundColors(primary = primary, secondary = secondary)
+    }
+
+    private fun nativeForegroundColor(controller: Any): Int? {
+        return nativeForegroundColors(controller)?.primary
+    }
+
+    private fun applyProgressForegroundColor(view: SeekBar, color: Int) {
+        val tint = ColorStateList.valueOf(color)
+        view.thumbTintList = tint
+        view.progressTintList = tint
+        applySeekBarForegroundColor(view, color)
+        view.invalidate()
     }
 
     private fun applySeekBarTrackColor(view: SeekBar, color: Int) {

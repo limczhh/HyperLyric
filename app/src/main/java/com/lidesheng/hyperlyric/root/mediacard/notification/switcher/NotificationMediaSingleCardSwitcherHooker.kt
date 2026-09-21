@@ -13,6 +13,7 @@ import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHos
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaCoverStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColors
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.managedHook
 import io.github.libxposed.api.XposedInterface.Chain
@@ -1294,7 +1295,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             }
             runOnMain {
                 if (isSwitcherUsable()) {
-                    pageIndicator.updateTint(resolveIndicatorColor())
+                    pageIndicator.updateColors(resolveIndicatorColors())
                 }
             }
         }
@@ -1317,12 +1318,12 @@ internal object NotificationMediaSingleCardSwitcherHooker {
 
         fun extraCardControllers(): Set<Any> = multiCardRenderer.extraCardControllers()
 
-        private fun resolveIndicatorColor(): Int? {
+        private fun resolveIndicatorColors(): MediaCardForegroundColors? {
             if (multiCardRenderer.isActive) {
-                multiCardRenderer.foregroundColor(pageSnapshot().selectedIndex)
+                multiCardRenderer.foregroundColors(pageSnapshot().selectedIndex)
                     ?.let { return it }
             }
-            return viewControllerRef.get()?.let(NotificationMediaForegroundStyler::foregroundColor)
+            return viewControllerRef.get()?.let(NotificationMediaForegroundStyler::foregroundColors)
         }
 
         private fun syncMultiCards(forceRebindKeys: Set<String> = emptySet()) {
@@ -1482,7 +1483,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             val snapshot = pageSnapshot()
             val pageCount = snapshot.entries.size
             val selectedIndex = snapshot.selectedIndex
-            pageIndicator.updateTint(resolveIndicatorColor())
+            pageIndicator.updateColors(resolveIndicatorColors())
             if (!force && !pageIndicatorNeedsSync &&
                 pageCount == lastIndicatorPageCount &&
                 selectedIndex == lastIndicatorSelectedIndex

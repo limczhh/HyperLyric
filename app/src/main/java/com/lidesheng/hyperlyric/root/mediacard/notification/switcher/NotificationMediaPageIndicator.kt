@@ -7,6 +7,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColors
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Method
 import kotlin.math.roundToInt
@@ -31,7 +33,10 @@ internal class NotificationMediaPageIndicator {
     private var setLocation: Method? = null
     private var setTintListMethod: Method? = null
     private var configuredPageCount = -1
-    private var tintColor: Int? = null
+    private var foregroundColors: MediaCardForegroundColors? = null
+    private var primaryTintList: ColorStateList? = null
+    private var secondaryTintList: ColorStateList? = null
+    private var currentIndex = -1
 
     fun attach(player: View) {
         val parent = player.parent as? ViewGroup ?: run {
@@ -72,21 +77,28 @@ internal class NotificationMediaPageIndicator {
                 View.IMPORTANT_FOR_ACCESSIBILITY_NO
             frameParent.addView(nativeIndicator, layoutParams)
             indicator = nativeIndicator
-            applyTint(nativeIndicator)
+            applyColors(nativeIndicator)
         }.onFailure { error ->
             warnOnce("挂载媒体圆点指示器失败", error)
         }
     }
 
     /**
-     * Keeps the native PageIndicator dot appearance for ordinary page movement.
-     * The native implementation lowers the alpha of unselected dots, so only
-     * the base tint needs to be supplied by the module.
+     * Uses the shared media foreground roles for the native PageIndicator.
+     * SystemUI stores one base tint and copies it to every child ImageView;
+     * update each child after the native position update so the selected dot
+     * uses primary and all other dots use secondary. Native alpha and drawable
+     * transitions remain owned by PageIndicator.
      */
-    fun updateTint(color: Int?) {
-        if (tintColor == color) return
-        tintColor = color
-        indicator?.let(::applyTint)
+    fun updateColors(colors: MediaCardForegroundColors?) {
+        if (foregroundColors == colors) {
+            indicator?.let(::applyColors)
+            return
+        }
+        foregroundColors = colors
+        primaryTintList = colors?.primary?.let(ColorStateList::valueOf)
+        secondaryTintList = colors?.secondary?.let(ColorStateList::valueOf)
+        indicator?.let(::applyColors)
     }
 
     fun update(pageCount: Int, selectedIndex: Int, enabled: Boolean) {
@@ -135,8 +147,14 @@ internal class NotificationMediaPageIndicator {
         val targetIndex = location
             .coerceIn(0f, (count - 1).toFloat())
             .roundToInt()
+        val method = setLocation ?: return
+        val previousIndex = currentIndex
         runCatching {
-            setLocation?.invoke(view, targetIndex.toFloat())
+            method.invoke(view, targetIndex.toFloat())
+            currentIndex = targetIndex
+            if (previousIndex != targetIndex) {
+                applyChildColors(view)
+            }
         }.onFailure { error ->
             warnOnce("更新媒体圆点位置失败", error)
         }
@@ -158,6 +176,7 @@ internal class NotificationMediaPageIndicator {
         setLocation = null
         setTintListMethod = null
         configuredPageCount = -1
+        currentIndex = -1
     }
 
     private fun createNativeIndicator(player: View): View? {
@@ -196,14 +215,30 @@ internal class NotificationMediaPageIndicator {
         }.getOrNull()
     }
 
-    private fun applyTint(view: View) {
-        val color = tintColor ?: return
-        val method = setTintListMethod ?: return
-        runCatching {
-            method.invoke(view, ColorStateList.valueOf(color))
-        }.onFailure { error ->
-            warnOnce("更新媒体圆点颜色失败", error)
+    private fun applyColors(view: View) {
+        if (foregroundColors == null) return
+        primaryTintList?.let { tint ->
+            setTintListMethod?.let { method ->
+                runCatching {
+                    method.invoke(view, tint)
+                }.onFailure { error ->
+                    warnOnce("更新媒体圆点基础颜色失败", error)
+                }
+            }
         }
+
+        applyChildColors(view)
+    }
+
+    private fun applyChildColors(view: View) {
+        val parent = view as? ViewGroup ?: return
+        val selectedTint = primaryTintList ?: return
+        val unselectedTint = secondaryTintList ?: return
+        for (index in 0 until parent.childCount) {
+            (parent.getChildAt(index) as? ImageView)?.imageTintList =
+                if (index == currentIndex) selectedTint else unselectedTint
+        }
+        view.invalidate()
     }
 
     private fun invokeNumPages(view: View, count: Int): Boolean {
@@ -218,6 +253,7 @@ internal class NotificationMediaPageIndicator {
         if (configuredPageCount == count) return true
         if (!invokeNumPages(view, count)) return false
         configuredPageCount = count
+        applyChildColors(view)
         return true
     }
 

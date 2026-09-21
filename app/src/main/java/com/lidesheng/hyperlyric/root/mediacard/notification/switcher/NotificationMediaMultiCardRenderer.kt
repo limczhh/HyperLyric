@@ -19,6 +19,7 @@ import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHos
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.SpringInterpolator
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColors
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
@@ -464,9 +465,9 @@ internal class NotificationMediaMultiCardRenderer(
     val pageCount: Int
         get() = cards.size
 
-    fun foregroundColor(index: Int): Int? {
+    fun foregroundColors(index: Int): MediaCardForegroundColors? {
         val card = cards.values.elementAtOrNull(index) ?: return null
-        return NotificationMediaForegroundStyler.foregroundColor(card.controller)
+        return NotificationMediaForegroundStyler.foregroundColors(card.controller)
     }
 
     fun ownsController(controller: Any): Boolean {

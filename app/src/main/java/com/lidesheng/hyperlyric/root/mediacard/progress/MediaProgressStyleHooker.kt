@@ -629,7 +629,10 @@ object MediaProgressStyleHooker {
         }
 
         fun attachNativeGlow(controller: Any) {
-            getHolder(controller)?.let { holder -> replaceWithNativeGlow(holder) }
+            getHolder(controller)?.let { holder ->
+                replaceWithNativeGlow(holder)
+                updateProgressColor(controller)
+            }
         }
 
         fun detachProgress(controller: Any) {
