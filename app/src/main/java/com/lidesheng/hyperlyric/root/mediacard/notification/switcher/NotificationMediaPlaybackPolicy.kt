@@ -168,6 +168,17 @@ internal class NotificationMediaPlaybackPolicy(
             )
     }
 
+    /**
+     * Low-version SystemUI has no media slide-menu icon. Its media header is
+     * dismissible only when every active session is paused; keep that rule
+     * separate from the high-version native-menu capability.
+     */
+    fun areAllPaused(): Boolean {
+        return dataByKey.isNotEmpty() && dataByKey.keys.all { key ->
+            playbackState(key) == false
+        }
+    }
+
     fun onDetached() {
         dataByKey.clear()
         activitySequenceByKey.clear()
@@ -178,9 +189,12 @@ internal class NotificationMediaPlaybackPolicy(
     }
 
     private fun isPlaying(key: String): Boolean {
+        return playbackState(key) == true
+    }
+
+    private fun playbackState(key: String): Boolean? {
         return playbackSignalByKey[key]
-            ?: dataByKey[key]?.let { accessor.isPlaying(it) == true }
-            ?: false
+            ?: dataByKey[key]?.let(accessor::isPlaying)
     }
 
     private fun isPlaying(data: Any): Boolean {

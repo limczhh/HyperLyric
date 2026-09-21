@@ -51,9 +51,22 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         "com.android.systemui.media.controls.domain.pipeline.MediaDataManager"
     private const val MEDIA_DATA_MANAGER_LISTENER =
         "com.android.systemui.media.controls.domain.pipeline.MediaDataManager\$Listener"
+    private const val MEDIA_SLIDE_MENU_ROW =
+        "com.android.systemui.statusbar.notification.row.MiuiMediaNotificationSlideMenuRow"
+
+    private data class NativeSlideMenuHookCapability(
+        val shouldShowHookInstalled: Boolean,
+        val lifecycleHookInstalled: Boolean
+    ) {
+        val supported: Boolean
+            get() = shouldShowHookInstalled && lifecycleHookInstalled
+    }
 
     private val hookedClassLoaders = Collections.synchronizedSet(
         Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
+    )
+    private val nativeSlideMenuCapabilities = Collections.synchronizedMap(
+        WeakHashMap<ClassLoader, NativeSlideMenuHookCapability>()
     )
     private val layoutStates = Collections.synchronizedMap(
         WeakHashMap<Any, ControllerState>()
@@ -108,6 +121,25 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                     it.returnType == Float::class.javaPrimitiveType
             }
         }
+        val slideMenuClass = loadClass(classLoader, MEDIA_SLIDE_MENU_ROW)
+        val slideMenuShouldShow = slideMenuClass?.let {
+            findMethod(it, "shouldShowMenu") {
+                it.parameterCount == 0 &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            }
+        }
+        val slideMenuSnapClosed = slideMenuClass?.let {
+            findMethod(it, "onSnapClosed") {
+                it.parameterCount == 0
+            }
+        }
+        val slideMenuReset = slideMenuClass?.let {
+            findMethod(it, "resetMenu") {
+                it.parameterCount == 0
+            }
+        }
+        var nativeShouldShowHookInstalled = false
+        var nativeLifecycleHookInstalled = false
         val installedHandles = mutableListOf<HookHandle>()
         var installed = false
         try {
@@ -179,12 +211,57 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                 ) ?: error("header getTranslation hook failed")
                 installedHandles += handle
             }
+            slideMenuShouldShow?.let { method ->
+                val handle = install(
+                    xposedModule,
+                    method,
+                    NativeSlideMenuShouldShowHook()
+                )
+                if (handle != null) {
+                    installedHandles += handle
+                    nativeShouldShowHookInstalled = true
+                }
+            }
+            slideMenuSnapClosed?.let { method ->
+                val handle = install(
+                    xposedModule,
+                    method,
+                    NativeSlideMenuSnapClosedHook()
+                )
+                if (handle != null) {
+                    installedHandles += handle
+                    nativeLifecycleHookInstalled = true
+                }
+            }
+            slideMenuReset?.let { method ->
+                val handle = install(
+                    xposedModule,
+                    method,
+                    NativeSlideMenuResetHook()
+                )
+                if (handle != null) {
+                    installedHandles += handle
+                    nativeLifecycleHookInstalled = true
+                }
+            }
+            val nativeCapability = NativeSlideMenuHookCapability(
+                shouldShowHookInstalled = nativeShouldShowHookInstalled,
+                lifecycleHookInstalled = nativeLifecycleHookInstalled
+            )
+            nativeSlideMenuCapabilities[classLoader] = nativeCapability
+            if (!nativeCapability.supported) {
+                HookLogger.w(
+                    TAG,
+                    "原生媒体边缘菜单 Hook 能力不完整，运行时使用无图标边缘清除降级"
+                )
+            }
             installed = true
         } catch (error: Exception) {
             HookLogger.e(TAG, "单卡片横滑 Hook 安装失败，准备回滚", error)
         } finally {
             if (!installed) {
                 rollbackHooks(xposedModule, installedHandles)
+                nativeSlideMenuCapabilities.remove(classLoader)
                 hookedClassLoaders.remove(classLoader)
             }
         }
@@ -253,7 +330,8 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             mediaDataManager = mediaDataManager,
             sortUtils = sortUtils,
             bindMethod = bindMethod,
-            accessor = ReflectedMediaDataAccessor()
+            accessor = ReflectedMediaDataAccessor(),
+            nativeEdgeMenuSupported = nativeSlideMenuCapabilities[classLoader]?.supported == true
         )
         layoutStates[controller] = state
         viewStates[viewController] = state
@@ -565,6 +643,53 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         }
     }
 
+    /**
+     * The target row normally exposes its menu while the media is playing.
+     * For the multi-card contract, any edge handoff may expose it regardless
+     * of playback state. Keep the native row hidden until the carousel has
+     * classified the gesture, then return true directly for that handoff.
+     * This avoids changing touchDownMediaState and avoids re-running a
+     * playback-dependent native predicate after the optional capability has
+     * already been validated.
+     */
+    private class NativeSlideMenuShouldShowHook : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val row = chain.thisObject ?: return chain.proceed()
+            val header = readField(row, "mMediaHeaderView") as? View
+                ?: return chain.proceed()
+            val state = headerStates[header]
+                ?: return chain.proceed()
+            val forced = state.nativeSlideMenuShouldShow(row)
+                ?: return chain.proceed()
+            if (!forced) return false
+            return true
+        }
+    }
+
+    private class NativeSlideMenuSnapClosedHook : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val row = chain.thisObject
+            val result = chain.proceed()
+            if (row != null) {
+                val header = readField(row, "mMediaHeaderView") as? View
+                header?.let { headerStates[it]?.onNativeEdgeMenuClosed(row) }
+            }
+            return result
+        }
+    }
+
+    private class NativeSlideMenuResetHook : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val row = chain.thisObject
+            val result = chain.proceed()
+            if (row != null) {
+                val header = readField(row, "mMediaHeaderView") as? View
+                header?.let { headerStates[it]?.onNativeEdgeMenuClosed(row) }
+            }
+            return result
+        }
+    }
+
     private fun attachPlayer(state: ControllerState, holder: Any) {
         val player = state.attach(holder) ?: run {
             state.disableForFailure("原生媒体卡片 View 不可用")
@@ -589,7 +714,8 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         val mediaDataManager: Any,
         sortUtils: Any,
         private val bindMethod: Method,
-        val accessor: ReflectedMediaDataAccessor
+        val accessor: ReflectedMediaDataAccessor,
+        private val nativeEdgeMenuSupported: Boolean
     ) {
         private val layoutControllerRef = WeakReference(layoutController)
         private val viewControllerRef = WeakReference(viewController)
@@ -650,7 +776,23 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             onPageOrderChanged = ::onRendererPageOrderChanged,
             onCardMediaChanged = ::onAdditionalCardMediaChanged,
             onCardPlaybackChanged = ::onAdditionalCardPlaybackChanged,
-            shouldIgnoreScrollTouch = ::isAnySeekBarTouch
+            shouldIgnoreScrollTouch = ::isAnySeekBarTouch,
+            canShowEdgeAction = {
+                selection.size >= 2
+            },
+            canUseNativeEdgeMenu = {
+                nativeEdgeMenuSupported
+            },
+            canDirectDismissEdge = {
+                playbackPolicy.areAllPaused()
+            },
+            isNativeEdgeMenuShowing = ::isNativeEdgeMenuShowing,
+            onNativeEdgeGestureRequested = ::onNativeEdgeGestureRequested,
+            onNativeEdgeGestureCancelled = ::onNativeEdgeGestureCancelled,
+            onClearAllRequested = ::onClearAllMediaCards,
+            onEdgeActionTranslationChanged = { translation ->
+                pageIndicator.setTranslationX(translation)
+            }
         )
 
         private val nativeGestureBlocker = NotificationMediaNativeGestureBlocker(
@@ -661,6 +803,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             isCarouselActive = {
                 isSwitcherUsable() && selection.size >= 2
             },
+            isNativeEdgeMenuShowing = ::isNativeEdgeMenuShowing,
             headerParent = { mediaHeader?.get()?.parent }
         )
 
@@ -1001,6 +1144,33 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             }
         }
 
+        /**
+         * Keep the same bulk-clear semantics as Xiaomi's native media slide
+         * menu. Calling the manager entry point lets SystemUI mark every
+         * active media entry inactive and dismiss the matching notifications;
+         * removing only our cloned pages would leave the native data source
+         * and the notification shade out of sync.
+         */
+        private fun onClearAllMediaCards() {
+            runOnMain {
+                if (!isSwitcherUsable() || selection.size < 2) {
+                    return@runOnMain
+                }
+                val clearMethod = NotificationMediaSingleCardSwitcherHooker.findMethod(
+                    mediaDataManager.javaClass,
+                    "onSwipeToDismiss"
+                ) { it.parameterCount == 0 }
+                if (clearMethod == null) {
+                    HookLogger.w(TAG, "多媒体卡片批量清理入口不可用")
+                    return@runOnMain
+                }
+                runCatching { clearMethod.invoke(mediaDataManager) }
+                    .onFailure { error ->
+                        HookLogger.w(TAG, "调用多媒体卡片批量清理失败", error)
+                    }
+            }
+        }
+
         private fun onNativeMediaChanged(controller: MediaController) {
             val currentController = NotificationMediaSingleCardSwitcherHooker.readField(
                 viewControllerRef.get(),
@@ -1226,6 +1396,38 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             pageIndicatorOrderLockGeneration = null
         }
 
+        private fun onNativeEdgeGestureRequested(
+            side: NotificationMediaMultiCardRenderer.EdgeActionSide
+        ): Boolean {
+            if (!isSwitcherUsable() || selection.size < 2) {
+                return false
+            }
+            val prepared = multiCardRenderer.prepareNativeEdgeGesture(side)
+            if (prepared) {
+                // The player dispatch hook locks the notification parent on
+                // ACTION_DOWN so the carousel can decide the direction. Once
+                // the renderer has classified an outward edge pull, that
+                // lock must be removed before native SwipeHelper can receive
+                // the next MOVE.
+                nativeGestureBlocker.releaseForNativeGesture()
+            }
+            return prepared
+        }
+
+        private fun onNativeEdgeGestureCancelled() {
+            multiCardRenderer.cancelNativeEdgeGesture()
+        }
+
+        private fun isNativeEdgeMenuShowing(): Boolean =
+            multiCardRenderer.isNativeEdgeMenuShowing()
+
+        fun nativeSlideMenuShouldShow(row: Any): Boolean? =
+            multiCardRenderer.nativeSlideMenuShouldShow(row)
+
+        fun onNativeEdgeMenuClosed(row: Any) {
+            multiCardRenderer.onNativeEdgeMenuClosed(row)
+        }
+
         private fun onRendererPageOrderChanged(generation: Int) {
             pageIndicatorOrderLockGeneration = generation
         }
@@ -1247,7 +1449,9 @@ internal object NotificationMediaSingleCardSwitcherHooker {
 
         fun setHeaderTranslation(translation: Float) {
             multiCardRenderer.setHeaderTranslation(translation)
-            pageIndicator.setTranslationX(translation)
+            pageIndicator.setTranslationX(
+                multiCardRenderer.headerTranslation() ?: translation
+            )
         }
 
         fun headerTranslation(): Float? = multiCardRenderer.headerTranslation()

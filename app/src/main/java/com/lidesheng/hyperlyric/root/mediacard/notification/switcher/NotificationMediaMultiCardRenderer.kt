@@ -1,5 +1,8 @@
 package com.lidesheng.hyperlyric.root.mediacard.notification.switcher
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.media.session.MediaController
 import android.view.LayoutInflater
@@ -7,17 +10,20 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.VelocityTracker
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostApi
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostClasses
+import com.lidesheng.hyperlyric.root.mediacard.progress.view.SpringInterpolator
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import java.util.LinkedHashMap
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -55,7 +61,15 @@ internal class NotificationMediaMultiCardRenderer(
     private val onPageOrderChanged: (Int) -> Unit,
     private val onCardMediaChanged: (String) -> Unit,
     private val onCardPlaybackChanged: (String, Boolean) -> Unit,
-    private val shouldIgnoreScrollTouch: (MotionEvent) -> Boolean
+    private val shouldIgnoreScrollTouch: (MotionEvent) -> Boolean,
+    private val canShowEdgeAction: () -> Boolean,
+    private val canUseNativeEdgeMenu: () -> Boolean,
+    private val canDirectDismissEdge: () -> Boolean,
+    private val isNativeEdgeMenuShowing: () -> Boolean,
+    private val onNativeEdgeGestureRequested: (EdgeActionSide) -> Boolean,
+    private val onNativeEdgeGestureCancelled: () -> Unit,
+    private val onClearAllRequested: () -> Unit,
+    private val onEdgeActionTranslationChanged: (Float) -> Unit
 ) {
     private companion object {
         const val TAG = "NotificationMediaMultiCardRenderer"
@@ -67,6 +81,10 @@ internal class NotificationMediaMultiCardRenderer(
         const val PLAYER_LAYOUT = "miui_media_session"
         const val SIDE_PADDING_DIMEN = "notification_side_paddings"
         const val FALLBACK_SIDE_PADDING_DP = 12f
+        const val FALLBACK_EDGE_DISMISS_DP = 48f
+        const val EDGE_DISMISS_FRACTION = 0.6f
+        const val EDGE_MENU_SPRING_DAMPING = 0.75f
+        const val EDGE_MENU_SPRING_RESPONSE = 0.44f
         const val SYSTEMUI_PACKAGE = "com.android.systemui"
         const val SYSTEMUI_LAYOUT_CLASS = "com.android.systemui.R\$layout"
         val CONTROLLER_DEPENDENCIES = listOf(
@@ -105,25 +123,61 @@ internal class NotificationMediaMultiCardRenderer(
      * the child card's dispatch hook for the seek bar and let this view own
      * horizontal motion, then snap to a child on release.
      */
+    internal enum class EdgeActionSide {
+        LEFT,
+        RIGHT
+    }
+
     private class PageScrollView(
         context: Context,
         private val shouldIgnoreTouch: (MotionEvent) -> Boolean,
         private val onScrollPositionChanged: (Int) -> Unit,
         private val onGestureReleased: (Float) -> Unit,
-        private val onGestureStarted: () -> Unit
+        private val onGestureStarted: () -> Unit,
+        private val edgeSideForGesture: (Float) -> EdgeActionSide?,
+        private val isNativeEdgeMenuShowing: () -> Boolean,
+        private val onNativeEdgeGestureRequested: (EdgeActionSide) -> Boolean,
+        private val onNativeEdgeGestureCancelled: () -> Unit,
+        private val onEdgeDragged: (EdgeActionSide, Float) -> Unit,
+        private val onEdgeReleased: (EdgeActionSide, Float) -> Unit,
+        private val onEdgeCancelled: () -> Unit
     ) : HorizontalScrollView(context) {
+        private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         private var velocityTracker: VelocityTracker? = null
         private var ignoredGesture = false
         private var handlingGesture = false
+        private var edgeGesture = false
+        private var edgeSide: EdgeActionSide? = null
+        private var nativeGesturePassthrough = false
+        private var nativeGestureHandoff = false
+        private var verticalGesture = false
+        private var parentInterceptDisallowed = false
+        private var touchDownX = 0f
+        private var touchDownY = 0f
 
         override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     finishGesture(snap = false)
+                    touchDownX = event.x
+                    touchDownY = event.y
                     ignoredGesture = shouldIgnoreTouch(event)
                     if (!ignoredGesture) {
                         velocityTracker = VelocityTracker.obtain()
                         velocityTracker?.addMovement(event)
+                        if (isNativeEdgeMenuShowing()) {
+                            // A previously opened native menu must keep the
+                            // complete touch sequence with SwipeHelper. Do
+                            // not let the carousel re-lock its parent.
+                            nativeGesturePassthrough = true
+                            parent?.requestDisallowInterceptTouchEvent(false)
+                        } else {
+                            // Give the carousel first ownership of the
+                            // gesture. The parent is released only after the
+                            // child proves this is an outward edge gesture.
+                            parent?.requestDisallowInterceptTouchEvent(true)
+                            parentInterceptDisallowed = true
+                        }
                     }
                 }
 
@@ -141,6 +195,66 @@ internal class NotificationMediaMultiCardRenderer(
                     finishGesture(snap = false)
                 }
                 return false
+            }
+
+            if (nativeGesturePassthrough) {
+                // An already-open native menu owns the whole media header,
+                // not only the visible icon. If the user starts dragging on
+                // the card body, intercept once the direction is clear so
+                // the player is cancelled and SwipeHelper can close the menu.
+                if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                    val dx = event.x - touchDownX
+                    val dy = event.y - touchDownY
+                    if (abs(dx) > touchSlop && abs(dx) > abs(dy)) {
+                        nativeGestureHandoff = true
+                        return true
+                    }
+                }
+                return false
+            }
+
+            if (nativeGestureHandoff || verticalGesture) {
+                return false
+            }
+
+            if (edgeGesture) return true
+
+            if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                val dx = event.x - touchDownX
+                val dy = event.y - touchDownY
+                if (abs(dx) > touchSlop && abs(dx) > abs(dy)) {
+                    val side = edgeSideForGesture(dx)
+                    if (side != null) {
+                        onGestureStarted()
+                        if (onNativeEdgeGestureRequested(side)) {
+                            // The target SystemUI already has a native
+                            // MiuiMediaHeaderView -> SwipeHelper path. Once
+                            // the carousel has proved that this is an edge
+                            // pull, release the parent and let that path own
+                            // the remainder of the gesture. Intercept this
+                            // MOVE locally first so the active player gets
+                            // ACTION_CANCEL instead of turning the swipe into
+                            // a click when the outer helper needs one more
+                            // MOVE to become swiping.
+                            nativeGestureHandoff = true
+                            parent?.requestDisallowInterceptTouchEvent(false)
+                            parentInterceptDisallowed = false
+                            return true
+                        }
+                        edgeSide = side
+                        edgeGesture = true
+                        return true
+                    }
+                } else if (abs(event.y - touchDownY) > touchSlop &&
+                    abs(event.y - touchDownY) > abs(dx)
+                ) {
+                    // A vertical gesture belongs to the notification stack;
+                    // do not keep it locked behind the horizontal carousel.
+                    verticalGesture = true
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                    parentInterceptDisallowed = false
+                    return false
+                }
             }
 
             val intercepted = super.onInterceptTouchEvent(event)
@@ -173,6 +287,44 @@ internal class NotificationMediaMultiCardRenderer(
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
             if (ignoredGesture) return false
+            if (nativeGesturePassthrough || nativeGestureHandoff) {
+                if (event.actionMasked == MotionEvent.ACTION_UP) {
+                    // If the parent never intercepted after the handoff, the
+                    // preparation was speculative and must be rolled back.
+                    finishGesture(snap = nativeGestureHandoff)
+                } else if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                    // ACTION_CANCEL normally means SwipeHelper has taken
+                    // over. Do not reset its native menu state here.
+                    finishGesture(snap = false)
+                }
+                // Consume the sequence while waiting for the outer native
+                // helper. This prevents the player below from receiving the
+                // final ACTION_UP and launching its app on a failed/slow
+                // handoff.
+                return true
+            }
+            if (verticalGesture) return false
+            if (edgeGesture) {
+                velocityTracker?.addMovement(event)
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_MOVE -> {
+                        edgeSide?.let { side ->
+                            val distance = when (side) {
+                                // Match MiuiMediaNotificationSlideMenuRow:
+                                // positive translation exposes the left menu,
+                                // negative translation exposes the right one.
+                                EdgeActionSide.LEFT -> event.x - touchDownX
+                                EdgeActionSide.RIGHT -> touchDownX - event.x
+                            }
+                            onEdgeDragged(side, distance)
+                        }
+                    }
+
+                    MotionEvent.ACTION_UP -> finishGesture(snap = true)
+                    MotionEvent.ACTION_CANCEL -> finishGesture(snap = false)
+                }
+                return true
+            }
             if (event.actionMasked == MotionEvent.ACTION_DOWN &&
                 velocityTracker == null
             ) {
@@ -199,16 +351,39 @@ internal class NotificationMediaMultiCardRenderer(
         }
 
         private fun finishGesture(snap: Boolean) {
-            if (snap && handlingGesture) {
+            if (nativeGestureHandoff) {
+                if (snap) onNativeEdgeGestureCancelled()
+            } else if (edgeGesture) {
+                val side = edgeSide
+                if (side != null) {
+                    val tracker = velocityTracker
+                    tracker?.computeCurrentVelocity(1000)
+                    if (snap) {
+                        onEdgeReleased(side, tracker?.xVelocity ?: 0f)
+                    } else {
+                        onEdgeCancelled()
+                    }
+                }
+            } else if (snap && handlingGesture) {
                 val tracker = velocityTracker
                 tracker?.computeCurrentVelocity(1000)
                 onGestureReleased(tracker?.xVelocity ?: 0f)
             }
-            parent?.requestDisallowInterceptTouchEvent(false)
+            if (parentInterceptDisallowed) {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
             velocityTracker?.recycle()
             velocityTracker = null
             ignoredGesture = false
             handlingGesture = false
+            edgeGesture = false
+            edgeSide = null
+            nativeGesturePassthrough = false
+            nativeGestureHandoff = false
+            verticalGesture = false
+            parentInterceptDisallowed = false
+            touchDownX = 0f
+            touchDownY = 0f
         }
     }
 
@@ -244,6 +419,16 @@ internal class NotificationMediaMultiCardRenderer(
     private var header: ViewGroup? = null
     private var scrollView: PageScrollView? = null
     private var pageContainer: LinearLayout? = null
+    private var edgeOverscrollAnimator: ValueAnimator? = null
+    private var edgeActionSide: EdgeActionSide? = null
+    private var edgeActionDistance = 0f
+    private var directEdgeDismiss = false
+    private var edgeClearPending = false
+    private var nativeEdgeMenuRow: Any? = null
+    private var nativeEdgeMenuShowing = false
+    /** True only after the current edge gesture was accepted by native SystemUI. */
+    private var nativeEdgeGestureAccepted = false
+    private var hostTranslation = 0f
     private var originalLayoutParams: FrameLayout.LayoutParams? = null
     private var originalCard: Card? = null
     private var pageWidthPx = 0
@@ -321,6 +506,10 @@ internal class NotificationMediaMultiCardRenderer(
         forceRebindKeys: Set<String> = emptySet()
     ): NotificationMediaMultiCardSyncResult {
         originalCard ?: return NotificationMediaMultiCardSyncResult.NOT_READY
+        if (!canShowEdgeAction()) {
+            closeNativeEdgeMenu()
+            closeEdgeOverscroll(animated = true)
+        }
         if (entries.size < 2) {
             if (isActive) disableMultiView()
             return NotificationMediaMultiCardSyncResult.SUCCESS
@@ -369,6 +558,9 @@ internal class NotificationMediaMultiCardRenderer(
             nextCards.values.map { it.player }
         val orderChanged = oldOrder != nextOrder || viewOrderChanged
         if (orderChanged) {
+            // A reorder or page removal changes the edge's semantic owner.
+            // Never leave a revealed action attached to the old page.
+            closeEdgeOverscroll(animated = false)
             rebuildPageOrder()
             // A page reorder changes the meaning of every child index. Move
             // the viewport to the same canonical selected key immediately;
@@ -395,10 +587,145 @@ internal class NotificationMediaMultiCardRenderer(
     }
 
     fun setHeaderTranslation(translation: Float) {
-        scrollView?.translationX = translation
+        hostTranslation = translation
+        val cardTranslation = hostTranslation + edgeActionTranslation()
+        // Keep native/header translation on the scroll container. The custom
+        // edge overscroll belongs to the page content, so HorizontalScrollView
+        // never competes with it for its own scroll position.
+        scrollView?.translationX = hostTranslation
+        pageContainer?.translationX = edgeActionTranslation()
+        onEdgeActionTranslationChanged(cardTranslation)
     }
 
-    fun headerTranslation(): Float? = scrollView?.translationX
+    fun headerTranslation(): Float? = scrollView?.let {
+        it.translationX
+    }
+
+    /**
+     * Lets the target SystemUI's own MiuiMediaNotificationSlideMenuRow own
+     * the edge gesture. The native row is already attached to the same
+     * MiuiMediaHeaderView; our header translation hook moves this carousel
+     * together with the native row.
+     */
+    fun prepareNativeEdgeGesture(side: EdgeActionSide): Boolean {
+        nativeEdgeGestureAccepted = false
+        if (!isActive || cards.size < 2 || !canShowEdgeAction() ||
+            !canUseNativeEdgeMenu()
+        ) return false
+        val host = header ?: return false
+        val row = readField(host, "slideMenu") ?: return false
+        val menuContainer = readField(row, "mMenuContainer") as? ViewGroup
+        if (menuContainer == null || menuContainer.parent == null ||
+            !hasNativeMenuAction(row, menuContainer) ||
+            readField(row, "mMediaData") == null ||
+            readField(row, "mShouldShowMenu") != true ||
+            findMethod(row.javaClass, "shouldShowMenu") {
+                it.parameterCount == 0 &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            } == null
+        ) {
+            warn("原生媒体滑动菜单能力不完整，改用无图标边缘清除降级")
+            return false
+        }
+        placeCarouselBelowNativeMenu(host, menuContainer)
+
+        // A previous native swipe can leave the reused row with its old
+        // slide-menu state until the closing animation finishes. Clear that
+        // state before assigning the new edge, otherwise the next gesture can
+        // reuse the previous left/right menu location.
+        if (!nativeEdgeMenuShowing) {
+            findMethod(row.javaClass, "resetMenu") {
+                it.parameterCount == 0
+            }?.let { reset ->
+                runCatching { reset.invoke(row) }
+                    .onFailure { warn("重置原生媒体边缘菜单状态失败", it) }
+            }
+        }
+
+        if (nativeEdgeMenuRow !== row) {
+            restoreNativeEdgeMenuState()
+            nativeEdgeMenuRow = row
+        }
+        // Do not mutate touchDownMediaState. It is native gesture state and
+        // older rows may not even have the field. The optional shouldShowMenu
+        // hook returns true only while this handoff is active, which keeps
+        // the native translation/overscroll path without changing the row's
+        // own playback semantics.
+        nativeEdgeMenuShowing = true
+        nativeEdgeGestureAccepted = true
+
+        HookLogger.d(TAG, "多卡片边缘手势已交给 SystemUI 原生媒体滑动菜单: $side")
+        return true
+    }
+
+    /**
+     * MiuiMediaHeaderView inserts its native menu container below the card
+     * content. Our carousel is another direct child of that header, so keep it
+     * below the native menu as well; otherwise the card paints over the native
+     * icon's reveal animation.
+     */
+    private fun placeCarouselBelowNativeMenu(
+        host: ViewGroup,
+        menuContainer: ViewGroup
+    ) {
+        val scroller = scrollView ?: return
+        if (menuContainer.parent !== host) return
+        val scrollerIndex = host.indexOfChild(scroller)
+        val menuIndex = host.indexOfChild(menuContainer)
+        if (scrollerIndex < 0 || menuIndex < 0 || scrollerIndex >= menuIndex) return
+
+        val layoutParams = scroller.layoutParams ?: return
+        host.removeViewAt(scrollerIndex)
+        val targetIndex = (host.indexOfChild(menuContainer) + 1)
+            .coerceAtMost(host.childCount)
+        host.addView(scroller, targetIndex, layoutParams)
+    }
+
+    fun isNativeEdgeMenuShowing(): Boolean = nativeEdgeMenuShowing
+
+    fun cancelNativeEdgeGesture() {
+        closeNativeEdgeMenu()
+    }
+
+    /** Returns null when the row does not belong to this renderer. */
+    fun nativeSlideMenuShouldShow(row: Any): Boolean? {
+        if (!isActive || cards.size < 2) return null
+        val host = header ?: return false
+        if (readField(host, "slideMenu") !== row) return false
+        if (!nativeEdgeMenuShowing || !canShowEdgeAction() ||
+            !canUseNativeEdgeMenu()
+        ) return false
+        val menuContainer = readField(row, "mMenuContainer") as? ViewGroup
+        if (menuContainer == null || menuContainer.parent == null ||
+            !hasNativeMenuAction(row, menuContainer) || readField(row, "mMediaData") == null ||
+            readField(row, "mShouldShowMenu") != true
+        ) return false
+        return true
+    }
+
+    fun onNativeEdgeMenuClosed(row: Any) {
+        if (nativeEdgeMenuRow !== row) return
+        restoreNativeEdgeMenuState()
+    }
+
+    private fun restoreNativeEdgeMenuState() {
+        nativeEdgeMenuRow = null
+        nativeEdgeMenuShowing = false
+        nativeEdgeGestureAccepted = false
+    }
+
+    private fun closeNativeEdgeMenu() {
+        if (!nativeEdgeMenuShowing) return
+        val host = header
+        if (host != null) {
+            val reset = findMethod(host.javaClass, "resetTranslation") {
+                it.parameterCount == 0
+            }
+            runCatching { reset?.invoke(host) }
+                .onFailure { warn("关闭原生媒体边缘菜单失败", it) }
+        }
+        restoreNativeEdgeMenuState()
+    }
 
     private fun currentPageIndex(): Int {
         val count = cards.size
@@ -456,6 +783,8 @@ internal class NotificationMediaMultiCardRenderer(
         val original = originalCard
         cards.values.filter { !it.original }.forEach(::destroyExtraCard)
         cards.clear()
+        closeNativeEdgeMenu()
+        resetEdgeOverscroll()
         removeHostLayoutListener()
 
         val container = scrollView
@@ -480,6 +809,7 @@ internal class NotificationMediaMultiCardRenderer(
         pageWidthPx = 0
         sidePaddingPx = 0
         pageGapPx = 0
+        hostTranslation = 0f
         compactAodActive = false
         originalVisibility = View.VISIBLE
         originalAlpha = 1f
@@ -525,7 +855,14 @@ internal class NotificationMediaMultiCardRenderer(
             onGestureReleased = ::onGestureReleased,
             onGestureStarted = {
                 onGestureStarted()
-            }
+            },
+            edgeSideForGesture = ::edgeSideForGesture,
+            isNativeEdgeMenuShowing = isNativeEdgeMenuShowing,
+            onNativeEdgeGestureRequested = onNativeEdgeGestureRequested,
+            onNativeEdgeGestureCancelled = onNativeEdgeGestureCancelled,
+            onEdgeDragged = ::onEdgeDragged,
+            onEdgeReleased = ::onEdgeReleased,
+            onEdgeCancelled = ::onEdgeCancelled
         ).apply {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
@@ -588,6 +925,36 @@ internal class NotificationMediaMultiCardRenderer(
             pageGapPx = 0
             warn("创建媒体横向容器失败", error)
         }.getOrDefault(false)
+    }
+
+    /**
+     * The native row creates its menu child lazily. In the initial hidden
+     * state the container is attached but empty; the first native translation
+     * changes the side and only then calls populateMenuViews(). Treat an
+     * initialized menu definition plus the native placement methods as enough
+     * for the handoff. Keep the clickable-child check as the fast path for
+     * rows that have already been populated.
+     */
+    private fun hasNativeMenuAction(row: Any, menuContainer: ViewGroup): Boolean {
+        for (index in 0 until menuContainer.childCount) {
+            if (menuContainer.getChildAt(index)?.isClickable == true) return true
+        }
+
+        val dismissItem = readField(row, "mDismissItem")
+        val ongoingItem = readField(row, "mOngoingItem")
+        val leftItems = readField(row, "mLeftMenuItems") as? Collection<*>
+        val rightItems = readField(row, "mRightMenuItems") as? Collection<*>
+        val hasInitializedItem = dismissItem != null || ongoingItem != null ||
+            !leftItems.isNullOrEmpty() || !rightItems.isNullOrEmpty()
+        if (!hasInitializedItem) return false
+
+        val canPopulate = findMethod(row.javaClass, "populateMenuViews") {
+            it.parameterCount == 0
+        } != null
+        val canPlace = findMethod(row.javaClass, "setMenuLocation") {
+            it.parameterCount == 0
+        } != null
+        return canPopulate && canPlace
     }
 
     private fun createCard(key: String, data: Any): Card? {
@@ -692,6 +1059,8 @@ internal class NotificationMediaMultiCardRenderer(
         val original = originalCard ?: return
         cards.values.filter { !it.original }.forEach(::destroyExtraCard)
         cards.clear()
+        closeNativeEdgeMenu()
+        resetEdgeOverscroll()
 
         val host = header
         val container = scrollView
@@ -718,6 +1087,7 @@ internal class NotificationMediaMultiCardRenderer(
         pageWidthPx = 0
         sidePaddingPx = 0
         pageGapPx = 0
+        hostTranslation = 0f
         originalVisibility = View.VISIBLE
         originalAlpha = 1f
     }
@@ -990,6 +1360,214 @@ internal class NotificationMediaMultiCardRenderer(
     private fun onScrollPositionChanged(scrollX: Int) {
         val location = pageLocation(scrollX)
         onPageScrolled(location, pageOrderGeneration)
+    }
+
+    /**
+     * Xiaomi's media menu is exposed only when the card is pulled outwards at
+     * a carousel edge. The side is a visual side: in LTR the first page owns
+     * the left action and the last page owns the right action; RTL mirrors it.
+     * The card moves away from that side, just like Xiaomi's native row:
+     * positive translation reveals the left action and negative translation
+     * reveals the right action.
+     */
+    private fun edgeSideForGesture(deltaX: Float): EdgeActionSide? {
+        // The edge action is either rendered by SystemUI's native slide-menu
+        // row or handled as a direct no-icon dismissal on older builds.
+        if (cards.size < 2 || !canShowEdgeAction()) {
+            return null
+        }
+
+        // Once the action is exposed, a horizontal gesture keeps owning the
+        // same side so that dragging back closes it instead of starting a
+        // carousel page gesture.
+        edgeActionSide?.let { side ->
+            if (edgeActionDistance > 0.5f || edgeOverscrollAnimator != null) {
+                return side
+            }
+        }
+
+        val scroller = scrollView ?: return null
+        val location = pageLocation(scroller.scrollX)
+        val lastPage = (cards.size - 1).coerceAtLeast(0)
+        val side = when {
+            location <= 0.01f -> if (isLayoutRtl()) {
+                EdgeActionSide.RIGHT
+            } else {
+                EdgeActionSide.LEFT
+            }
+
+            location >= lastPage - 0.01f -> if (isLayoutRtl()) {
+                EdgeActionSide.LEFT
+            } else {
+                EdgeActionSide.RIGHT
+            }
+
+            else -> return null
+        }
+        val outward = when (side) {
+            EdgeActionSide.LEFT -> deltaX > 0f
+            EdgeActionSide.RIGHT -> deltaX < 0f
+        }
+        return side.takeIf { outward }
+    }
+
+    private fun onEdgeDragged(side: EdgeActionSide, distance: Float) {
+        if (!canShowEdgeAction()) {
+            closeEdgeOverscroll(animated = true)
+            return
+        }
+        edgeOverscrollAnimator?.cancel()
+        edgeOverscrollAnimator = null
+        if (edgeActionSide != side) {
+            edgeActionSide = side
+        }
+        // If the native row is unavailable, the low-version behavior is a
+        // direct media-header dismissal. There is deliberately no local icon
+        // or click target in this mode.
+        // Native capability is a process-level fact. It does not mean that
+        // this particular gesture was accepted: the row may still reject the
+        // handoff because its runtime data/menu state is incomplete. In that
+        // case the current custom edge gesture must use the low-version
+        // paused-media fallback instead of silently springing back.
+        directEdgeDismiss = !nativeEdgeGestureAccepted && canDirectDismissEdge()
+        setEdgeOverscrollDistance(distance.coerceAtLeast(0f))
+    }
+
+    private fun onEdgeReleased(side: EdgeActionSide, _velocityX: Float) {
+        if (edgeActionSide != side || !canShowEdgeAction()) {
+            closeEdgeOverscroll(animated = true)
+            return
+        }
+
+        if (directEdgeDismiss && edgeActionDistance >= edgeDismissThreshold()) {
+            startDirectEdgeDismiss()
+        } else {
+            closeEdgeOverscroll(animated = true)
+        }
+    }
+
+    private fun onEdgeCancelled() {
+        closeEdgeOverscroll(animated = true)
+    }
+
+    private fun startDirectEdgeDismiss() {
+        if (edgeClearPending) return
+        edgeClearPending = true
+        val dismissDistance = maxOf(
+            edgeActionDistance,
+            (header?.width ?: pageWidthPx).coerceAtLeast(1).toFloat()
+        )
+        // Start the real MediaData dismissal at release time. The remaining
+        // overscroll animation is visual only; a lifecycle refresh must not
+        // be able to cancel the clear operation before it is dispatched.
+        onClearAllRequested()
+        animateEdgeOverscroll(dismissDistance) {
+            if (!edgeClearPending) return@animateEdgeOverscroll
+            edgeClearPending = false
+            resetEdgeOverscroll()
+        }
+    }
+
+    private fun animateEdgeOverscroll(
+        targetDistance: Float,
+        onEnd: (() -> Unit)? = null
+    ) {
+        edgeOverscrollAnimator?.cancel()
+        edgeOverscrollAnimator = null
+
+        if (edgeActionSide == null) {
+            onEnd?.invoke()
+            return
+        }
+        val target = targetDistance.coerceAtLeast(0f)
+        val start = edgeActionDistance
+        if (abs(start - target) <= 0.5f) {
+            setEdgeOverscrollDistance(target)
+            if (target <= 0f) {
+                resetEdgeOverscroll()
+            }
+            onEnd?.invoke()
+            return
+        }
+
+        val spring = SpringInterpolator(
+            damping = EDGE_MENU_SPRING_DAMPING,
+            response = EDGE_MENU_SPRING_RESPONSE
+        )
+        val animator = ValueAnimator.ofFloat(start, target).apply {
+            duration = spring.duration.coerceIn(180L, 600L)
+            interpolator = spring
+            addUpdateListener { update ->
+                setEdgeOverscrollDistance(update.animatedValue as Float)
+            }
+        }
+        animator.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (edgeOverscrollAnimator !== animator) return
+                edgeOverscrollAnimator = null
+                setEdgeOverscrollDistance(target)
+                if (target <= 0f) {
+                    resetEdgeOverscroll()
+                }
+                onEnd?.invoke()
+            }
+        })
+        edgeOverscrollAnimator = animator
+        animator.start()
+    }
+
+    private fun setEdgeOverscrollDistance(distance: Float) {
+        val side = edgeActionSide ?: return
+        val safeDistance = distance.coerceAtLeast(0f)
+        edgeActionDistance = safeDistance
+        val cardTranslation = hostTranslation + edgeActionTranslation()
+        scrollView?.translationX = hostTranslation
+        pageContainer?.translationX = edgeActionTranslation()
+        onEdgeActionTranslationChanged(cardTranslation)
+    }
+
+    private fun edgeActionTranslation(): Float {
+        val distance = edgeActionDistance
+        return when (edgeActionSide) {
+            EdgeActionSide.LEFT -> distance
+            EdgeActionSide.RIGHT -> -distance
+            null -> 0f
+        }
+    }
+
+    private fun edgeDismissThreshold(): Float {
+        val density = header?.resources?.displayMetrics?.density ?: 1f
+        val width = header?.width?.takeIf { it > 0 } ?: pageWidthPx
+        return maxOf(
+            width * EDGE_DISMISS_FRACTION,
+            FALLBACK_EDGE_DISMISS_DP * density
+        )
+    }
+
+    private fun closeEdgeOverscroll(animated: Boolean) {
+        if (animated && edgeActionDistance > 0.5f && !edgeClearPending) {
+            animateEdgeOverscroll(targetDistance = 0f)
+        } else {
+            resetEdgeOverscroll()
+        }
+    }
+
+    private fun resetEdgeOverscroll() {
+        edgeOverscrollAnimator?.cancel()
+        edgeOverscrollAnimator = null
+        edgeActionSide = null
+        edgeActionDistance = 0f
+        directEdgeDismiss = false
+        edgeClearPending = false
+        pageContainer?.translationX = 0f
+        onEdgeActionTranslationChanged(hostTranslation)
+    }
+
+    private fun findResourceId(context: Context, name: String, type: String): Int {
+        return sequenceOf(context.packageName, SYSTEMUI_PACKAGE)
+            .map { packageName -> context.resources.getIdentifier(name, type, packageName) }
+            .firstOrNull { it != 0 }
+            ?: 0
     }
 
     private fun onGestureReleased(velocityX: Float) {

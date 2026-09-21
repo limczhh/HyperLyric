@@ -13,12 +13,13 @@ import android.view.ViewParent
  */
 internal class NotificationMediaNativeGestureBlocker(
     private val isCarouselActive: () -> Boolean,
+    private val isNativeEdgeMenuShowing: () -> Boolean,
     private val headerParent: () -> ViewParent?
 ) {
     private var parentInterceptDisallowed = false
 
     fun onDown(view: View, seekBarTouch: Boolean) {
-        if (seekBarTouch || isCarouselActive()) {
+        if (seekBarTouch || (isCarouselActive() && !isNativeEdgeMenuShowing())) {
             disallow(view, seekBarTouch)
         }
     }
@@ -46,6 +47,20 @@ internal class NotificationMediaNativeGestureBlocker(
         if (!parentInterceptDisallowed) return
         runCatching {
             view.parent?.requestDisallowInterceptTouchEvent(false)
+        }
+        parentInterceptDisallowed = false
+    }
+
+    /**
+     * PageScrollView has already classified this sequence as an outward edge
+     * pull. Release the same parent that was locked on ACTION_DOWN so the
+     * native notification SwipeHelper can intercept the next MOVE.
+     */
+    fun releaseForNativeGesture() {
+        if (!parentInterceptDisallowed) return
+        runCatching {
+            (headerParent() ?: return@runCatching)
+                .requestDisallowInterceptTouchEvent(false)
         }
         parentInterceptDisallowed = false
     }
