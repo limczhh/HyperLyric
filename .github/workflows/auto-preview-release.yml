@@ -288,7 +288,7 @@ jobs:
       - name: 同步 Preview 到 Telegram Send Preview to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_PREVIEW_CHAT_ID }}
           RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
           RELEASE_URL: ${{ steps.metadata.outputs.release_url }}
           ANNOUNCEMENT_HEADER: 自动构建的最新预览版
