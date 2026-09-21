@@ -14,9 +14,7 @@ internal data class NotificationMediaSelectionSnapshot(
  * Reflection-independent view of the target SystemUI MediaData model.
  *
  * The concrete MediaData class belongs to SystemUI, so the module must not put
- * that private class in its own compile-time API. Keeping this small contract
- * separate also leaves a reusable data/selection layer for a future carousel
- * renderer.
+ * that private class in its own compile-time API.
  */
 internal interface NotificationMediaDataAccessor {
     fun notificationKey(data: Any): String?
@@ -33,19 +31,16 @@ internal interface NotificationMediaDataAccessor {
 }
 
 /**
- * Owns the multi-session list and the currently selected item.
+ * Owns the media entries, their canonical page order, and the selected key.
  *
- * This class deliberately knows nothing about Views or Xposed. The renderer
- * calls [bindSelected] when the selected entry changes; single-card mode binds
- * the original controller, while a multi-card renderer moves its viewport and
- * keeps each native controller independently bound.
+ * The order provider is the only ordering authority. The coordinator never
+ * freezes its own copy of the order for a playing session; this keeps the
+ * renderer and the indicator on the same page model after an activity change.
  */
 internal class NotificationMediaSelectionCoordinator(
     private val accessor: NotificationMediaDataAccessor,
-    private val nativeOrder: () -> List<String>,
-    private val nativeTopKey: () -> String?,
+    private val orderedKeyProvider: () -> List<String>,
     private val bindSelected: (Any) -> Unit,
-    private val shouldPreserveNativeOrder: () -> Boolean = { false },
     private val maxPageCount: Int = Int.MAX_VALUE
 ) {
     private data class Entry(
@@ -64,31 +59,15 @@ internal class NotificationMediaSelectionCoordinator(
     val size: Int
         get() = orderedKeys.size
 
-    /**
-     * The currently selected position in [orderedKeys]. This deliberately
-     * lives outside the native card View, matching MIUI 14's carousel state.
-     * A missing selection is exposed as -1 until the native top item or the
-     * first available entry has been adopted.
-     */
     val selectedIndex: Int
         get() = selectedKey?.let(orderedKeys::indexOf)?.takeIf { it >= 0 } ?: -1
 
     /**
-     * Returns the page set for the renderer. The coordinator retains every
-     * active MediaData entry, but the renderer may request a bounded snapshot
-     * to avoid creating one native ViewController/Holder for every session.
-     *
-     * Selection policy when the bound is exceeded:
-     * 1. keep the currently selected session;
-     * 2. keep currently playing sessions in native order;
-     * 3. fill remaining slots from native order.
-     *
-     * The final list is filtered back to native order, so the page layout stays
-     * stable while the selected session is guaranteed not to disappear.
-     * Selection methods use the same bounded page set, so gestures and page
-     * indicators cannot navigate to an entry that is not rendered.
+     * Returns the bounded page model. If the user has not manually selected a
+     * page, page zero follows the canonical activity order automatically.
      */
     fun snapshot(maxEntries: Int = Int.MAX_VALUE): NotificationMediaSelectionSnapshot {
+        reconcileAutomaticSelection()
         val allEntries = orderedKeys.mapNotNull { key ->
             entries[key]?.let { key to it.data }
         }
@@ -99,10 +78,8 @@ internal class NotificationMediaSelectionCoordinator(
         val limit = maxEntries.coerceAtLeast(1)
         val priorityKeys = LinkedHashSet<String>()
         selectedKey?.takeIf { it in entries }?.let(priorityKeys::add)
-        orderedKeys.forEach { key ->
-            val data = entries[key]?.data ?: return@forEach
-            if (accessor.isPlaying(data) == true) priorityKeys += key
-        }
+        // orderedKeys already contains the policy's direct playback signals;
+        // do not re-read the possibly stale MediaData boolean here.
         orderedKeys.forEach { key -> priorityKeys += key }
 
         val keptKeys = priorityKeys.take(limit).toHashSet()
@@ -115,13 +92,17 @@ internal class NotificationMediaSelectionCoordinator(
 
     fun seed(initialEntries: List<Pair<String, Any>>) {
         entries.clear()
+        orderedKeys.clear()
+        selectedKey = null
+        selectedToken = null
+        selectedByUser = false
         initialEntries.forEach { (key, data) ->
             if (key.isNotEmpty() && accessor.isActive(data)) {
                 entries[key] = Entry(key, data, accessor.sessionToken(data))
             }
         }
         reorder()
-        adoptNativeSelectionIfNeeded()
+        adoptFirstSelection()
     }
 
     fun onMediaDataLoaded(key: String, oldKey: String?, data: Any) {
@@ -139,55 +120,58 @@ internal class NotificationMediaSelectionCoordinator(
             entries.remove(key)
         }
 
-        reorder(preserveCurrentOrder = selectedByUser || shouldPreserveNativeOrder())
+        reorder()
         if (selectedKey == null || selectedKey !in entries) {
             selectedByUser = false
-            adoptNativeSelectionIfNeeded()
-            if (previousSelectedKey != null) {
+            adoptFirstSelection()
+            if (previousSelectedKey != null) bindCurrentSelection()
+            return
+        }
+
+        updateSelectedToken()
+        var selectionChanged = false
+        if (!selectedByUser) {
+            val firstKey = orderedKeys.firstOrNull()
+            if (firstKey != null && firstKey != selectedKey) {
+                selectedKey = firstKey
+                updateSelectedToken()
                 bindCurrentSelection()
+                selectionChanged = true
             }
-        } else {
-            updateSelectedToken()
-            // A selected non-top session still needs to receive metadata/action
-            // updates because native SystemUI will bind only its current top.
-            // Native top binding already replays unchanged selections; only
-            // bind again when this callback actually replaced the selected
-            // entry.
-            val selectedDataChanged = selectedKey?.let { entries[it]?.data } !== previousSelectedData
-            if ((selectedByUser || shouldPreserveNativeOrder() || selectedKey == key) &&
-                (selectedKey != previousSelectedKey || selectedDataChanged)
-            ) {
-                bindCurrentSelection()
-            }
+        }
+
+        val selectedDataChanged = selectedKey?.let { entries[it]?.data } !== previousSelectedData
+        if (!selectionChanged && (selectedByUser || selectedKey == key) &&
+            (selectedKey != previousSelectedKey || selectedDataChanged)
+        ) {
+            bindCurrentSelection()
         }
     }
 
     fun onMediaDataRemoved(key: String) {
         val previousSelectedKey = selectedKey
         entries.remove(key)
-        reorder(
-            preserveCurrentOrder = shouldPreserveNativeOrder() ||
-                (selectedByUser && selectedKey != key)
-        )
+        reorder()
         if (selectedKey == key || selectedKey !in entries) {
             selectedByUser = false
-            adoptNativeSelectionIfNeeded()
-            if (previousSelectedKey != null) {
-                // Native SystemUI may keep the same top MediaData when a
-                // user-selected secondary session disappears. Rebind the
-                // selected entry explicitly so the single card cannot retain
-                // the removed session's title, artwork, or actions.
-                bindCurrentSelection()
-            }
+            adoptFirstSelection()
+            if (previousSelectedKey != null) bindCurrentSelection()
         } else {
             updateSelectedToken()
+            if (!selectedByUser) {
+                val firstKey = orderedKeys.firstOrNull()
+                if (firstKey != null && firstKey != selectedKey) {
+                    selectedKey = firstKey
+                    updateSelectedToken()
+                    bindCurrentSelection()
+                }
+            }
         }
     }
 
     /**
-     * Observes the native one-card binder. Native top updates must not erase a
-     * user-selected secondary session, but a new native top becomes the
-     * default when the user has not selected a page yet.
+     * Observes the native one-card binder. A synthetic bind issued by this
+     * coordinator is a content refresh, not a new ordering signal.
      */
     fun onNativeBind(data: Any?, synthetic: Boolean = false) {
         if (data == null) {
@@ -200,87 +184,59 @@ internal class NotificationMediaSelectionCoordinator(
         val knownToken = key?.let { entries[it]?.sessionToken }
         val tokenChangedBeforeMediaDataUpdate = knownToken != null &&
             incomingToken != null && knownToken != incomingToken
+
+        reorder()
         val userSelection = selectedKey?.takeIf { selectedByUser && it in entries }
         if (userSelection != null) {
             if (key == userSelection && tokenChangedBeforeMediaDataUpdate) {
-                // MediaSortUtils can bind a newly-created session before its
-                // MediaData.Listener callback replaces the coordinator entry.
-                // Do not let that transient bind overwrite the selected card;
-                // the later MediaData callback will perform the real refresh.
                 if (!synthetic) bindCurrentSelection()
                 return
             }
             if (key != userSelection) {
-                // A native bind for the former top card may arrive after the
-                // user selected a secondary page. It must not reorder the
-                // user's page back to the middle. Single-card mode replays
-                // the selected data; multi-card mode keeps its own viewport.
                 if (!synthetic) bindCurrentSelection()
                 return
             }
-
             if (synthetic) {
-                // bindMediaData() was explicitly issued by this coordinator.
-                // Treat it as a content refresh, not as evidence that the
-                // SystemUI sort order promoted this session.
                 updateSelectedToken()
                 return
             }
-
-            if (shouldPreserveNativeOrder()) {
-                // Multiple sessions are allowed to remain playing. A native
-                // bind is only a content update in this mode; it must not
-                // move the selected card or the page indicator.
-                updateSelectedToken()
-                return
-            }
-
-            // The selected session itself became the native top item (usually
-            // after the user pressed Play). Promote it to page zero while the
-            // renderer preserves the card's current screen position.
-            reorder(preserveCurrentOrder = true)
-            promoteToFront(userSelection)
             updateSelectedToken()
             return
         }
 
-        // Playing a secondary session can reorder MediaSortUtils and bind it
-        // as native top without producing a new MediaData object. The native
-        // bind is therefore also a list-order signal; otherwise selected B
-        // remains at its old index behind A.
-        reorder(preserveCurrentOrder = shouldPreserveNativeOrder())
-        if (!synthetic && !shouldPreserveNativeOrder() && key != null && key in entries) {
-            // During the same pipeline turn MediaSortUtils can still expose
-            // its old list while topMediaData already identifies B. The
-            // actual native bind is the stronger signal for the first page.
-            promoteToFront(key)
-        }
-        if ((!selectedByUser && !shouldPreserveNativeOrder()) ||
-            selectedKey == null ||
-            selectedKey !in entries
-        ) {
-            selectedKey = key ?: orderedKeys.firstOrNull()
-            selectedToken = key?.let { entries[it]?.sessionToken } ?: incomingToken
+        if (!synthetic) {
+            val nextSelectedKey = orderedKeys.firstOrNull()
+                ?: key?.takeIf { it in entries }
+            val shouldBindSelected = nextSelectedKey != null && nextSelectedKey != key
+            selectedKey = nextSelectedKey
+            selectedToken = selectedKey?.let { entries[it]?.sessionToken } ?: incomingToken
             selectedByUser = false
+            if (shouldBindSelected) bindCurrentSelection()
             return
         }
 
         if (tokenChangedBeforeMediaDataUpdate) {
-            // The same notification key is allowed to recreate its
-            // MediaSession. Treat a native bind with the new token as stale
-            // until the corresponding MediaData object is visible to the
-            // listener; otherwise a reused native controller can display the
-            // wrong session's artwork and application identity.
             bindCurrentSelection()
             return
         }
+        selectedKey = orderedKeys.firstOrNull()
+            ?: key?.takeIf { it in entries }
+        updateSelectedToken()
+    }
 
-        if (key != selectedKey) {
-            // The original controller just rebound the native top card. Replay
-            // the selected item after it finishes so our state remains stable.
-            bindCurrentSelection()
-        } else {
-            selectedToken = key?.let { entries[it]?.sessionToken } ?: incomingToken
+    /** Rebuilds the page model after a direct MediaController activity signal. */
+    fun onActivityOrderChanged() {
+        val previousSelectedKey = selectedKey
+        reorder()
+        if (!selectedByUser) {
+            val firstKey = orderedKeys.firstOrNull()
+            if (firstKey == null) {
+                resetSelection()
+            } else if (firstKey != selectedKey) {
+                selectedKey = firstKey
+                updateSelectedToken()
+                if (previousSelectedKey != null) bindCurrentSelection()
+            }
         }
     }
 
@@ -292,11 +248,6 @@ internal class NotificationMediaSelectionCoordinator(
         selectIndex(currentPageIndex + step)
     }
 
-    /**
-     * Selects a page without making the renderer know about notification keys.
-     * A multi-panel renderer can use the same index as its child View position;
-     * single-card mode keeps bindMediaData() as its own selected-card path.
-     */
     fun selectIndex(index: Int) {
         val pageKeys = visiblePageKeys()
         if (pageKeys.isEmpty()) return
@@ -318,15 +269,13 @@ internal class NotificationMediaSelectionCoordinator(
 
     fun onDetached() {
         resetSelection()
+        entries.clear()
+        orderedKeys.clear()
     }
 
     private fun bindCurrentSelection() {
         val key = selectedKey ?: return
         val entry = entries[key] ?: return
-
-        // Compare the session identity when both sides expose a token. The
-        // notification key is the list key; MediaSession.Token is the actual
-        // media-session identity used to protect selection state.
         if (selectedToken != null && entry.sessionToken != null &&
             selectedToken != entry.sessionToken
         ) {
@@ -335,15 +284,24 @@ internal class NotificationMediaSelectionCoordinator(
         bindSelected(entry.data)
     }
 
-    private fun adoptNativeSelectionIfNeeded() {
+    private fun adoptFirstSelection() {
         if (orderedKeys.isEmpty()) {
             resetSelection()
             return
         }
-
-        val nativeKey = nativeTopKey()
-        selectedKey = nativeKey?.takeIf { it in entries } ?: orderedKeys.first()
+        selectedKey = orderedKeys.first()
         updateSelectedToken()
+    }
+
+    private fun reconcileAutomaticSelection() {
+        if (selectedByUser) return
+        val firstKey = orderedKeys.firstOrNull()
+        if (firstKey == null) {
+            resetSelection()
+        } else if (selectedKey != firstKey) {
+            selectedKey = firstKey
+            updateSelectedToken()
+        }
     }
 
     private fun updateSelectedToken() {
@@ -360,36 +318,15 @@ internal class NotificationMediaSelectionCoordinator(
         selectedByUser = false
     }
 
-    private fun reorder(preserveCurrentOrder: Boolean = false) {
-        val nativeKeys = runCatching { nativeOrder() }.getOrDefault(emptyList())
-        if (preserveCurrentOrder) {
-            val currentKeys = orderedKeys.filter { it in entries }
-            orderedKeys.clear()
-            currentKeys.forEach { key ->
-                if (key !in orderedKeys) orderedKeys += key
-            }
-            nativeKeys.forEach { key ->
-                if (key in entries && key !in orderedKeys) orderedKeys += key
-            }
-            entries.keys.forEach { key ->
-                if (key !in orderedKeys) orderedKeys += key
-            }
-            return
-        }
-
+    private fun reorder() {
+        val preferredKeys = runCatching { orderedKeyProvider() }
+            .getOrDefault(emptyList())
         orderedKeys.clear()
-
-        nativeKeys.forEach { key ->
+        preferredKeys.forEach { key ->
             if (key in entries && key !in orderedKeys) orderedKeys += key
         }
         entries.keys.forEach { key ->
             if (key !in orderedKeys) orderedKeys += key
         }
-    }
-
-    private fun promoteToFront(key: String) {
-        if (key !in entries) return
-        orderedKeys.remove(key)
-        orderedKeys.add(0, key)
     }
 }

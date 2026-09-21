@@ -54,6 +54,7 @@ internal class NotificationMediaMultiCardRenderer(
     private val onGestureStarted: () -> Unit,
     private val onPageOrderChanged: (Int) -> Unit,
     private val onCardMediaChanged: (String) -> Unit,
+    private val onCardPlaybackChanged: (String, Boolean) -> Unit,
     private val shouldIgnoreScrollTouch: (MotionEvent) -> Boolean
 ) {
     private companion object {
@@ -330,7 +331,6 @@ internal class NotificationMediaMultiCardRenderer(
 
         val oldCards = cards.values.toList()
         val oldOrder = oldCards.map { it.key }
-        val visualAnchor = captureVisualAnchor(oldCards)
         val oldByKey = oldCards.associateBy { it.key }
         val nextCards = LinkedHashMap<String, Card>()
         val createdCards = mutableListOf<Card>()
@@ -370,15 +370,17 @@ internal class NotificationMediaMultiCardRenderer(
         val orderChanged = oldOrder != nextOrder || viewOrderChanged
         if (orderChanged) {
             rebuildPageOrder()
-            val anchor = visualAnchor?.takeIf { it.key in nextCards }
-            if (anchor != null) {
-                restoreVisualAnchor(anchor, selectedIndex)
-            } else {
-                // Invalidate a previously posted anchor restore when the
-                // anchor itself was removed by this update.
-                pageOrderGeneration++
-                onPageOrderChanged(pageOrderGeneration)
-                scrollToPage(selectedIndex, animate = false)
+            // A page reorder changes the meaning of every child index. Move
+            // the viewport to the same canonical selected key immediately;
+            // preserving the old physical scroll position would show one key
+            // while the indicator highlights another index for a frame.
+            val generation = ++pageOrderGeneration
+            onPageOrderChanged(generation)
+            scrollToPage(selectedIndex, animate = false, generation = generation)
+            pageContainer?.post {
+                if (generation == pageOrderGeneration) {
+                    onScrollPositionChanged(scrollView?.scrollX ?: 0)
+                }
             }
         } else {
             // Metadata/action updates must not tear down the child Views or
@@ -390,70 +392,6 @@ internal class NotificationMediaMultiCardRenderer(
         }
         if (compactAodActive) applyAodPresentation()
         return NotificationMediaMultiCardSyncResult.SUCCESS
-    }
-
-    private data class VisualAnchor(
-        val key: String,
-        val screenLeft: Int
-    )
-
-    /**
-     * The native top MediaData may change the logical order while the user is
-     * looking at a secondary page. Preserve that page's screen coordinate;
-     * only its logical index and the indicator should change.
-     */
-    private fun captureVisualAnchor(oldCards: List<Card>): VisualAnchor? {
-        val scroller = scrollView ?: return null
-        if (oldCards.isEmpty()) return null
-        val oldIndex = pageLocation(scroller.scrollX)
-            .roundToInt()
-            .coerceIn(0, oldCards.lastIndex)
-        val card = oldCards.getOrNull(oldIndex) ?: return null
-        return VisualAnchor(
-            key = card.key,
-            screenLeft = card.player.left - scroller.scrollX
-        )
-    }
-
-    private fun restoreVisualAnchor(anchor: VisualAnchor, fallbackIndex: Int) {
-        val scroller = scrollView ?: return
-        val pages = pageContainer ?: return
-        val generation = ++pageOrderGeneration
-        // scrollTo() synchronously dispatches onScrollChanged(). Notify the
-        // owner before touching scrollX, otherwise PageIndicator receives an
-        // intermediate position before ControllerState can force the target.
-        onPageOrderChanged(generation)
-        val anchorIndex = cards.keys.indexOf(anchor.key)
-        if (anchorIndex < 0 || pageWidthPx <= 0) {
-            scrollToPage(fallbackIndex, animate = false)
-            return
-        }
-
-        // Reordering the children schedules a layout pass. Do not wait for
-        // that pass before correcting scrollX: the old scrollX would expose
-        // the former page for one frame (A flashes over the selected B).
-        val stride = pageWidthPx + pageGapPx
-        val anchorLeft = if (isLayoutRtl()) {
-            sidePaddingPx + (cards.size - 1 - anchorIndex) * stride
-        } else {
-            sidePaddingPx + anchorIndex * stride
-        }
-        val contentWidth = sidePaddingPx * 2 + cards.size * pageWidthPx +
-            (cards.size - 1).coerceAtLeast(0) * pageGapPx
-        val viewportWidth = scroller.width.takeIf { it > 0 }
-            ?: pageWidthPx + sidePaddingPx * 2
-        val maxScroll = (contentWidth - viewportWidth).coerceAtLeast(0)
-        val target = (anchorLeft - anchor.screenLeft).coerceIn(0, maxScroll)
-        scroller.scrollTo(target, 0)
-        pages.requestLayout()
-
-        // Child.left is reliable after layout; only defer the fractional dot
-        // refresh, never the visual page position itself.
-        pages.post {
-            if (generation == pageOrderGeneration && scrollView === scroller) {
-                onScrollPositionChanged(scroller.scrollX)
-            }
-        }
     }
 
     fun setHeaderTranslation(translation: Float) {
@@ -727,9 +665,16 @@ internal class NotificationMediaMultiCardRenderer(
             card.playbackObserver = null
             return
         }
-        val observer = card.playbackObserver ?: NotificationMediaPlaybackObserver {
-            if (cards[card.key] === card) onCardMediaChanged(card.key)
-        }.also { card.playbackObserver = it }
+        val observer = card.playbackObserver ?: NotificationMediaPlaybackObserver(
+            onMediaChanged = { _ ->
+                if (cards[card.key] === card) onCardMediaChanged(card.key)
+            },
+            onPlaybackStateChanged = { _, playing ->
+                if (cards[card.key] === card) {
+                    onCardPlaybackChanged(card.key, playing)
+                }
+            }
+        ).also { card.playbackObserver = it }
         observer.bind(mediaController)
     }
 
@@ -1154,31 +1099,25 @@ internal class NotificationMediaMultiCardRenderer(
         val count = cards.size
         if (count == 0) return
         val target = index.coerceIn(0, count - 1)
-        val targetView = pages.getChildAt(target)
-        val firstView = pages.getChildAt(0)
-        val x = if (targetView != null && firstView != null) {
-            val distanceFromFirst = if (isLayoutRtl()) {
-                firstView.left - targetView.left
-            } else {
-                targetView.left - firstView.left
-            }
-            if (isLayoutRtl()) {
-                scrollRange(scroller) - distanceFromFirst
-            } else {
-                distanceFromFirst
-            }
-        } else {
-            0
-        }
-        if (targetView == null || firstView == null ||
-            (target > 0 && targetView.left == 0 && pages.width == 0)
-        ) {
+        if (pageWidthPx <= 0 || (target > 0 && pages.width == 0)) {
             scroller.post {
                 if (generation == pageOrderGeneration && scrollView === scroller) {
                     scrollToPage(target, animate, generation)
                 }
             }
             return
+        }
+        val stride = pageWidthPx + pageGapPx
+        val contentWidth = sidePaddingPx * 2 + count * pageWidthPx +
+            (count - 1).coerceAtLeast(0) * pageGapPx
+        val viewportWidth = scroller.width.takeIf { it > 0 }
+            ?: pageWidthPx + sidePaddingPx * 2
+        val maxScroll = (contentWidth - viewportWidth).coerceAtLeast(0)
+        val distanceFromFirst = target * stride
+        val x = if (isLayoutRtl()) {
+            (maxScroll - distanceFromFirst).coerceIn(0, maxScroll)
+        } else {
+            distanceFromFirst.coerceIn(0, maxScroll)
         }
         if (animate) {
             scroller.smoothScrollTo(x, 0)

@@ -14,7 +14,8 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
  * rebind itself.
  */
 internal class NotificationMediaPlaybackObserver(
-    private val onMediaChanged: () -> Unit
+    private val onMediaChanged: (MediaController) -> Unit,
+    private val onPlaybackStateChanged: (MediaController, Boolean) -> Unit = { _, _ -> }
 ) {
     private companion object {
         const val TAG = "NotificationMediaPlaybackObserver"
@@ -39,28 +40,39 @@ internal class NotificationMediaPlaybackObserver(
                 val nextState = state?.state
                 if (nextState == lastPlaybackState) return
                 lastPlaybackState = nextState
-                notifyChanged()
+                if (nextState != null) {
+                    runCatching {
+                        onPlaybackStateChanged(
+                            controller,
+                            nextState == PlaybackState.STATE_PLAYING
+                        )
+                    }.onFailure { error ->
+                        HookLogger.w(TAG, "媒体会话播放状态回调失败", error)
+                    }
+                }
+                notifyChanged(controller)
             }
 
             override fun onMetadataChanged(metadata: MediaMetadata?) {
-                if (isCurrent(currentGeneration)) notifyChanged()
+                if (isCurrent(currentGeneration)) notifyChanged(controller)
             }
 
             override fun onSessionDestroyed() {
-                if (isCurrent(currentGeneration)) notifyChanged()
+                if (isCurrent(currentGeneration)) notifyChanged(controller)
             }
         }
 
         mediaController = controller
         callback = observerCallback
         lastPlaybackState = runCatching { controller.playbackState?.state }.getOrNull()
-        runCatching { controller.registerCallback(observerCallback) }
+        val registered = runCatching { controller.registerCallback(observerCallback) }
             .onFailure { error ->
                 mediaController = null
                 callback = null
                 HookLogger.w(TAG, "注册媒体会话状态观察失败", error)
             }
-        acceptingCallbacks = true
+            .isSuccess
+        acceptingCallbacks = registered
     }
 
     fun clear() {
@@ -83,8 +95,8 @@ internal class NotificationMediaPlaybackObserver(
         return acceptingCallbacks && callbackGeneration == generation
     }
 
-    private fun notifyChanged() {
-        runCatching(onMediaChanged)
+    private fun notifyChanged(controller: MediaController) {
+        runCatching { onMediaChanged(controller) }
             .onFailure { error -> HookLogger.w(TAG, "媒体会话状态回调失败", error) }
     }
 }

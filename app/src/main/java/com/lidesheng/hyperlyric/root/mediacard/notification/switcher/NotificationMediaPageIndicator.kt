@@ -8,8 +8,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.lidesheng.hyperlyric.root.utils.HookLogger
-import java.lang.reflect.Constructor
-import java.lang.reflect.Field
 import java.lang.reflect.Method
 import kotlin.math.roundToInt
 
@@ -18,8 +16,8 @@ import kotlin.math.roundToInt
  *
  * HyperOS 3 still contains [com.android.systemui.qs.PageIndicator] for the
  * regular QS media carousel, but the notification media path no longer adds
- * one to [MiuiMediaHeaderView]. Reusing that class keeps the dot drawable,
- * tint and page transition animation consistent with SystemUI.
+ * one to [MiuiMediaHeaderView]. Reusing that class keeps the native dot
+ * drawable and tint consistent with SystemUI.
  */
 internal class NotificationMediaPageIndicator {
     private companion object {
@@ -31,12 +29,9 @@ internal class NotificationMediaPageIndicator {
     private var indicator: View? = null
     private var setNumPages: Method? = null
     private var setLocation: Method? = null
-    private var setIndex: Method? = null
     private var setTintListMethod: Method? = null
-    private var animatingField: Field? = null
-    private var positionField: Field? = null
-    private var queuedPositionsField: Field? = null
     private var configuredPageCount = -1
+    private var tintColor: Int? = null
 
     fun attach(player: View) {
         val parent = player.parent as? ViewGroup ?: run {
@@ -59,7 +54,6 @@ internal class NotificationMediaPageIndicator {
             return
         }
         detach()
-
         val nativeIndicator = createNativeIndicator(frameParent) ?: return
         val density = frameParent.resources.displayMetrics.density
         val layoutParams = FrameLayout.LayoutParams(
@@ -85,10 +79,9 @@ internal class NotificationMediaPageIndicator {
     }
 
     /**
-     * Keeps the native PageIndicator animation and only changes its base
-     * foreground color. The native implementation already lowers the alpha of
-     * unselected dots, so selected/unselected colors stay visually consistent
-     * with SystemUI's own page indicator.
+     * Keeps the native PageIndicator dot appearance for ordinary page movement.
+     * The native implementation lowers the alpha of unselected dots, so only
+     * the base tint needs to be supplied by the module.
      */
     fun updateTint(color: Int?) {
         if (tintColor == color) return
@@ -105,33 +98,28 @@ internal class NotificationMediaPageIndicator {
     }
 
     /**
-     * Applies a logical page reorder without feeding the old scroll animation
-     * back through HyperOS' PageIndicator queue. The target PageIndicator keeps
-     * mQueuedPositions and mAnimating as public fields, but older builds may
-     * not expose the same implementation; in that case fall back to the
-     * regular animated path.
+     * Recreates the native indicator after the page key order changes. A
+     * PageIndicator owns an internal AnimatedVectorDrawable queue; reusing it
+     * across a semantic reorder lets an animation for the old page mapping
+     * finish against the new mapping. A fresh instance keeps reorder atomic,
+     * while ordinary finger movement is still updated as a direct page state.
      */
-    fun forceUpdate(pageCount: Int, selectedIndex: Int, enabled: Boolean) {
-        val view = indicator ?: return
-        val count = pageCount.coerceAtLeast(0)
-        if (!enabled || count <= 1) {
-            updateLocation(pageCount, selectedIndex.toFloat(), enabled)
-            return
-        }
-
-        if (!ensurePageCount(view, count)) return
-        view.visibility = View.VISIBLE
-        val target = selectedIndex.coerceIn(0, count - 1)
-        if (!forceSetPosition(view, target)) {
-            updateLocation(count, target.toFloat(), enabled = true)
-        }
+    fun resetForPageOrder(pageCount: Int, selectedIndex: Int, enabled: Boolean) {
+        val parent = indicator?.parent as? ViewGroup ?: return
+        val translation = indicator?.translationX ?: 0f
+        detach()
+        attachTo(parent)
+        indicator?.translationX = translation
+        update(pageCount, selectedIndex, enabled)
     }
 
     /**
-     * MIUI14 updates PageIndicator with a fractional location while the
-     * MediaScrollView is being dragged. Keeping this separate from the
-     * coordinator's integer selectedIndex makes the indicator follow the
-     * neighboring native card during a real carousel gesture.
+     * Updates the native location while the custom carousel is being dragged.
+     * The renderer supplies a fractional logical location, but the indicator
+     * deliberately rounds it to a page before calling setLocation(). AOSP's
+     * PageIndicator encodes fractional positions as adjacent transition states;
+     * integer positions are two steps apart and therefore switch the selected
+     * dot directly without the two-dot fill/morph animation.
      */
     fun updateLocation(pageCount: Int, location: Float, enabled: Boolean) {
         val view = indicator ?: return
@@ -144,8 +132,11 @@ internal class NotificationMediaPageIndicator {
 
         if (!ensurePageCount(view, count)) return
         view.visibility = View.VISIBLE
+        val targetIndex = location
+            .coerceIn(0f, (count - 1).toFloat())
+            .roundToInt()
         runCatching {
-            setLocation?.invoke(view, location.coerceIn(0f, (count - 1).toFloat()))
+            setLocation?.invoke(view, targetIndex.toFloat())
         }.onFailure { error ->
             warnOnce("更新媒体圆点位置失败", error)
         }
@@ -165,11 +156,7 @@ internal class NotificationMediaPageIndicator {
         indicator = null
         setNumPages = null
         setLocation = null
-        setIndex = null
         setTintListMethod = null
-        animatingField = null
-        positionField = null
-        queuedPositionsField = null
         configuredPageCount = -1
     }
 
@@ -199,30 +186,15 @@ internal class NotificationMediaPageIndicator {
                 "setLocation",
                 Float::class.javaPrimitiveType
             ).apply { isAccessible = true }
-            setIndex = findMethod(indicatorClass, "setIndex") {
-                it.parameterCount == 1 &&
-                    it.parameterTypes[0] == Int::class.javaPrimitiveType
-            }
             setTintListMethod = findMethod(indicatorClass, "setTintList") {
                 it.parameterCount == 1 &&
                     it.parameterTypes[0] == ColorStateList::class.java
-            }
-            animatingField = findField(indicatorClass, "mAnimating") {
-                it.type == Boolean::class.javaPrimitiveType
-            }
-            positionField = findField(indicatorClass, "mPosition") {
-                it.type == Int::class.javaPrimitiveType
-            }
-            queuedPositionsField = findField(indicatorClass, "mQueuedPositions") {
-                List::class.java.isAssignableFrom(it.type)
             }
             pageIndicator
         }.onFailure { error ->
             warnOnce("SystemUI 原生 PageIndicator 不可用", error)
         }.getOrNull()
     }
-
-    private var tintColor: Int? = null
 
     private fun applyTint(view: View) {
         val color = tintColor ?: return
@@ -256,24 +228,6 @@ internal class NotificationMediaPageIndicator {
         }
     }
 
-    private fun forceSetPosition(view: View, index: Int): Boolean {
-        val setIndexMethod = setIndex ?: return false
-        val animating = animatingField ?: return false
-        val position = positionField ?: return false
-        val queuedPositions = queuedPositionsField ?: return false
-        return runCatching {
-            val queue = queuedPositions.get(view) as? MutableList<*>
-                ?: error("PageIndicator.mQueuedPositions 类型不匹配")
-            queue.clear()
-            animating.setBoolean(view, false)
-            setIndexMethod.invoke(view, index)
-            position.setInt(view, index shl 1)
-            animating.setBoolean(view, false)
-        }.onFailure { error ->
-            warnOnce("强制同步媒体圆点位置失败", error)
-        }.isSuccess
-    }
-
     private fun findMethod(
         clazz: Class<*>,
         name: String,
@@ -283,23 +237,6 @@ internal class NotificationMediaPageIndicator {
         while (current != null) {
             current.declaredMethods.firstOrNull { it.name == name && predicate(it) }
                 ?.apply { isAccessible = true }
-                ?.let { return it }
-            current = current.superclass
-        }
-        return null
-    }
-
-    private fun findField(
-        clazz: Class<*>,
-        name: String,
-        predicate: (Field) -> Boolean
-    ): Field? {
-        var current: Class<*>? = clazz
-        while (current != null) {
-            runCatching { current.getDeclaredField(name) }
-                .onSuccess { field -> field.isAccessible = true }
-                .getOrNull()
-                ?.takeIf(predicate)
                 ?.let { return it }
             current = current.superclass
         }

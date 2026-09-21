@@ -36,9 +36,10 @@ import kotlin.math.abs
  * native card implementation. The renderer keeps the stock card as page zero
  * and creates independent native card/controller pairs for additional pages.
  *
- * The selection store still mirrors MediaSortUtils and remains independent of
- * Views. Single-card mode uses MiuiMediaViewControllerImpl.bindMediaData(
- * MediaData); multi-card mode keeps each independently bound native page.
+ * The selection store remains independent of Views; its order is supplied by
+ * the activity policy, with MediaSortUtils only providing a stable fallback.
+ * Single-card mode uses MiuiMediaViewControllerImpl.bindMediaData(MediaData);
+ * multi-card mode keeps each independently bound native page.
  */
 internal object NotificationMediaSingleCardSwitcherHooker {
     private const val TAG = "NotificationMediaSingleCardSwitcher"
@@ -596,7 +597,8 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         private val mainHandler = Handler(Looper.getMainLooper())
         private val bindLock = Any()
         private val nativePlaybackObserver = NotificationMediaPlaybackObserver(
-            ::onNativeMediaChanged
+            onMediaChanged = ::onNativeMediaChanged,
+            onPlaybackStateChanged = ::onNativePlaybackChanged
         )
         private val pendingMediaRefreshes = LinkedHashMap<String, Int>()
         private var bindingSelected = false
@@ -627,17 +629,12 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         private val pageCountLimit =
             MediaCardRuntimeConfig.current.notification.cardSwitcherMaxCount
 
-        private val playbackPolicy = NotificationMediaPlaybackPolicy(
-            accessor = accessor,
-            onStableModeChanged = ::onPlaybackPolicySettled
-        )
+        private val playbackPolicy = NotificationMediaPlaybackPolicy(accessor)
 
         private val selection = NotificationMediaSelectionCoordinator(
             accessor = accessor,
-            nativeOrder = ::nativeOrder,
-            nativeTopKey = ::nativeTopKey,
+            orderedKeyProvider = { playbackPolicy.orderedKeys(nativeOrder()) },
             bindSelected = ::bindSelected,
-            shouldPreserveNativeOrder = { playbackPolicy.shouldPreserveNativeOrder },
             maxPageCount = pageCountLimit
         )
 
@@ -652,6 +649,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             onGestureStarted = ::onRendererGestureStarted,
             onPageOrderChanged = ::onRendererPageOrderChanged,
             onCardMediaChanged = ::onAdditionalCardMediaChanged,
+            onCardPlaybackChanged = ::onAdditionalCardPlaybackChanged,
             shouldIgnoreScrollTouch = ::isAnySeekBarTouch
         )
 
@@ -750,14 +748,6 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                 // has no meaningful position while that presentation is active.
                 updatePageIndicator(force = true)
             }
-        }
-
-        private fun onPlaybackPolicySettled() {
-            if (!isSwitcherUsable()) return
-            val data = playbackPolicy.preferredPlayingData() ?: nativeTopData() ?: return
-            selection.onNativeBind(data)
-            syncMultiCards()
-            updatePageIndicator()
         }
 
         fun attach(holder: Any): View? {
@@ -1001,10 +991,42 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             scheduleMediaDataRefresh(key)
         }
 
-        private fun onNativeMediaChanged() {
+        private fun onAdditionalCardPlaybackChanged(key: String, playing: Boolean) {
+            runOnMain {
+                if (!isSwitcherUsable()) return@runOnMain
+                playbackPolicy.onPlaybackSignal(key, playing)
+                selection.onActivityOrderChanged()
+                syncMultiCards()
+                updatePageIndicator()
+            }
+        }
+
+        private fun onNativeMediaChanged(controller: MediaController) {
+            val currentController = NotificationMediaSingleCardSwitcherHooker.readField(
+                viewControllerRef.get(),
+                "mediaController"
+            ) as? MediaController
+            if (currentController !== controller) return
             val data = nativeTopData() ?: return
             val key = accessor.notificationKey(data) ?: return
             scheduleMediaDataRefresh(key)
+        }
+
+        private fun onNativePlaybackChanged(controller: MediaController, playing: Boolean) {
+            runOnMain {
+                if (!isSwitcherUsable()) return@runOnMain
+                val currentController = NotificationMediaSingleCardSwitcherHooker.readField(
+                    viewControllerRef.get(),
+                    "mediaController"
+                ) as? MediaController
+                if (currentController !== controller) return@runOnMain
+                val data = nativeTopData() ?: return@runOnMain
+                val key = accessor.notificationKey(data) ?: return@runOnMain
+                playbackPolicy.onPlaybackSignal(key, playing)
+                selection.onActivityOrderChanged()
+                syncMultiCards()
+                updatePageIndicator()
+            }
         }
 
         private fun observeNativePlayback() {
@@ -1164,15 +1186,17 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                     NotificationMediaMultiCardSyncResult.SUCCESS -> {
                         val currentGeneration = multiCardRenderer.currentPageOrderGeneration
                         if (currentGeneration != previousGeneration) {
-                            // The renderer has synchronously corrected the card
-                            // position. Ignore delayed scroll callbacks from the
-                            // previous order until the next user gesture.
+                            // A new page order is a new semantic mapping for
+                            // every dot. Recreate the indicator so an old
+                            // AnimatedVectorDrawable queue cannot finish
+                            // against the new mapping.
                             pageIndicatorOrderLockGeneration = currentGeneration
-                            pageIndicator.forceUpdate(
+                            pageIndicator.resetForPageOrder(
                                 pageCount = entries.size,
                                 selectedIndex = snapshot.selectedIndex,
                                 enabled = isPageIndicatorEnabled()
                             )
+                            pageIndicatorOrderLockGeneration = null
                             lastIndicatorPageCount = entries.size
                             lastIndicatorSelectedIndex = snapshot.selectedIndex
                             pageIndicatorNeedsSync = false
