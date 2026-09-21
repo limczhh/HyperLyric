@@ -178,6 +178,7 @@ internal object NotificationMediaForegroundStyler {
             (readField(holder, fieldName) as? ImageView)?.let { icon ->
                 state.captureIcon(icon)
                 icon.imageTintList = ColorStateList.valueOf(colors.primary)
+                icon.invalidate()
             }
         }
         listOf("elapsedTimeView", "totalTimeView").forEach { fieldName ->

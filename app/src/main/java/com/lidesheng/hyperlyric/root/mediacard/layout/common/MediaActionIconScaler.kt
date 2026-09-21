@@ -77,6 +77,7 @@ internal object MediaActionIconScaler {
                 scaledDrawable = ScaledActionIconDrawable(source, scale)
                 currentImageView.setImageDrawable(scaledDrawable)
             }
+            scaledDrawable?.attachSourceCallback()
         }
 
         fun restore() {
@@ -105,7 +106,7 @@ internal object MediaActionIconScaler {
             }
         }
 
-        init {
+        fun attachSourceCallback() {
             source.callback = sourceCallback
         }
 
