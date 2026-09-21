@@ -562,7 +562,9 @@ object NotificationMediaAmbientFlowHooker {
             } else {
                 NotificationMediaForegroundStyler.apply(
                     controller = controller,
-                    backgroundIsDark = backgroundIsDark
+                    backgroundIsDark = backgroundIsDark,
+                    foregroundSource =
+                        NotificationMediaBackgroundController.currentForegroundSource(controller)
                 )
             }
             return

@@ -30,13 +30,15 @@ import com.lidesheng.hyperlyric.common.color.ColorExtractor
 import com.lidesheng.hyperlyric.root.mediacard.background.MediaFlowTone
 import com.lidesheng.hyperlyric.root.mediacard.background.MediaSoftArtworkFactory
 import com.lidesheng.hyperlyric.root.mediacard.background.MediaSoftPaletteExtractor
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColorSource
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 
 internal data class NotificationMediaColorConfig(
     /** Tone measured from the final rendered background bitmap. */
-    val backgroundIsDark: Boolean
+    val backgroundIsDark: Boolean,
+    val foregroundSource: MediaCardForegroundColorSource? = null
 )
 
 private data class BaseBackgroundColors(
@@ -181,7 +183,35 @@ internal class NotificationMediaBackgroundRenderer(
         source.recycle()
         result ?: return null
         val colors = NotificationMediaColorConfig(
-            backgroundIsDark = result.brightness() < 192f
+            backgroundIsDark = result.brightness() < 192f,
+            foregroundSource = when (style) {
+                1 -> MediaCardForegroundColorSource.Monet(
+                    primary = profile.palette.accent1[2]
+                )
+
+                2 -> MediaCardForegroundColorSource.Monet(
+                    primary = profile.palette.neutral1[1],
+                    secondary = profile.palette.neutral2[3]
+                )
+
+                3 -> MediaCardForegroundColorSource.Monet(
+                    primary = profile.palette.neutral1[1],
+                    secondary = profile.palette.neutral2[3]
+                )
+
+                4 -> {
+                    val reverse = autoInvert && profile.brightness >= 192f
+                    MediaCardForegroundColorSource.Monet(
+                        primary = profile.palette.accent1[if (reverse) 8 else 2]
+                    )
+                }
+
+                5 -> MediaCardForegroundColorSource.Soft(
+                    colors = MediaSoftPaletteExtractor.fromColors(profile.rawColors).asList()
+                )
+
+                else -> null
+            }
         )
         cacheBackground(cacheKey, result, colors)
         return RenderedNotificationMediaBackground(result, colors, fingerprint)
@@ -302,20 +332,34 @@ internal class NotificationMediaBackgroundRenderer(
         width: Int,
         height: Int
     ): Bitmap {
-        val base = artwork.centerCrop(max(width, height), max(width, height))
+        val base = createBitmap(artwork.width, artwork.height)
         val canvas = Canvas(base)
+        canvas.drawColor(colors.backgroundStart)
+        canvas.drawBitmap(artwork, 0f, 0f, null)
         canvas.drawCircleGradient(
             colors.backgroundStart,
             colors.backgroundEnd,
-            centerXFraction = 0.42f,
-            startAlpha = 48,
-            endAlpha = 225,
-            radiusScale = 0.9f
+            startAlpha = 64,
+            endAlpha = 255,
+            radiusScale = 1.0f
         )
         val blurred = base.hardwareBlur(height * blurAmount.coerceIn(1, 20) / 100f)
         base.recycle()
-        val result = blurred.centerCrop(width, height)
+
+        val squareSize = max(blurred.width, blurred.height)
+        val square = createBitmap(squareSize, squareSize)
+        Canvas(square).apply {
+            drawColor(colors.backgroundStart)
+            drawBitmap(
+                blurred,
+                (squareSize - blurred.width) / 2f,
+                (squareSize - blurred.height) / 2f,
+                null
+            )
+        }
         blurred.recycle()
+        val result = square.centerCrop(width, height)
+        square.recycle()
         return result
     }
 
@@ -325,15 +369,25 @@ internal class NotificationMediaBackgroundRenderer(
         width: Int,
         height: Int
     ): Bitmap {
-        val result = artwork.centerCrop(width, height)
-        Canvas(result).drawCircleGradient(
+        val squareSize = max(width, height)
+        val result = createBitmap(squareSize, squareSize)
+        val canvas = Canvas(result)
+        canvas.drawSquareArtwork(
+            artwork = artwork,
+            squareSize = squareSize,
+            fill = false,
+            backgroundColor = colors.backgroundEnd
+        )
+        canvas.drawCircleGradient(
             colors.backgroundStart,
             colors.backgroundEnd,
-            startAlpha = 32,
-            endAlpha = 235,
-            radiusScale = 0.8f
+            startAlpha = 64,
+            endAlpha = 255,
+            radiusScale = 1.0f
         )
-        return result
+        val cropped = result.centerCrop(width, height)
+        result.recycle()
+        return cropped
     }
 
     private fun renderLinearGradient(
@@ -347,17 +401,16 @@ internal class NotificationMediaBackgroundRenderer(
         canvas.drawColor(colors.backgroundStart)
         val coverSize = min(width, height)
         val coverLeft = width - coverSize
-        val cover = artwork.fitCenter(coverSize, coverSize)
+        val cover = artwork.centerCrop(coverSize, coverSize)
         canvas.drawBitmap(cover, coverLeft.toFloat(), 0f, null)
         cover.recycle()
         val shader = LinearGradient(
             coverLeft.toFloat(), 0f, width.toFloat(), 0f,
             intArrayOf(
                 colors.backgroundStart,
-                colors.backgroundStart.withAlpha(144),
-                colors.backgroundStart.withAlpha(24)
+                colors.backgroundStart.withAlpha(51)
             ),
-            floatArrayOf(0f, 0.45f, 1f),
+            null,
             Shader.TileMode.CLAMP
         )
         canvas.drawRect(coverLeft.toFloat(), 0f, width.toFloat(), height.toFloat(), Paint().apply {
@@ -366,20 +419,28 @@ internal class NotificationMediaBackgroundRenderer(
         return result
     }
 
-    private fun Bitmap.fitCenter(targetWidth: Int, targetHeight: Int): Bitmap {
-        val scale = min(targetWidth / width.toFloat(), targetHeight / height.toFloat())
-        val scaledWidth = width * scale
-        val scaledHeight = height * scale
-        val left = (targetWidth - scaledWidth) / 2f
-        val top = (targetHeight - scaledHeight) / 2f
-        return createBitmap(targetWidth, targetHeight).also { result ->
-            Canvas(result).drawBitmap(
-                this,
-                null,
-                RectF(left, top, left + scaledWidth, top + scaledHeight),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
+    private fun Canvas.drawSquareArtwork(
+        artwork: Bitmap,
+        squareSize: Int,
+        fill: Boolean,
+        backgroundColor: Int
+    ) {
+        drawColor(backgroundColor)
+        val scale = if (fill) {
+            max(squareSize / artwork.width.toFloat(), squareSize / artwork.height.toFloat())
+        } else {
+            min(squareSize / artwork.width.toFloat(), squareSize / artwork.height.toFloat())
         }
+        val scaledWidth = artwork.width * scale
+        val scaledHeight = artwork.height * scale
+        val left = (squareSize - scaledWidth) / 2f
+        val top = (squareSize - scaledHeight) / 2f
+        drawBitmap(
+            artwork,
+            null,
+            RectF(left, top, left + scaledWidth, top + scaledHeight),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
     }
 
     private fun renderSoftCover(
@@ -420,12 +481,16 @@ internal class NotificationMediaBackgroundRenderer(
             profileCache.get(fingerprint)?.let { return it }
         }
         val extracted = ColorExtractor.extractThemePalette(bitmap, 3).rawColors
-        if (extracted.isEmpty()) return null
-        val wallpaperColors = WallpaperColors(
-            Color.valueOf(extracted[0]),
-            extracted.getOrNull(1)?.let { Color.valueOf(it) },
-            extracted.getOrNull(2)?.let { Color.valueOf(it) }
-        )
+        val wallpaperColors = runCatching {
+            WallpaperColors.fromBitmap(bitmap)
+        }.getOrElse {
+            if (extracted.isEmpty()) return null
+            WallpaperColors(
+                Color.valueOf(extracted[0]),
+                extracted.getOrNull(1)?.let { Color.valueOf(it) },
+                extracted.getOrNull(2)?.let { Color.valueOf(it) }
+            )
+        }
         val palette = monet.palette(wallpaperColors) ?: return null
         val profile = ArtworkProfile(palette, bitmap.brightness(), extracted.toList())
         synchronized(cacheLock) {
@@ -597,6 +662,8 @@ internal class NotificationMediaBackgroundRenderer(
     )
 
     private data class MonetPalette(
+        val neutral1: List<Int>,
+        val neutral2: List<Int>,
         val accent1: List<Int>,
         val accent2: List<Int>
     )
@@ -605,6 +672,8 @@ internal class NotificationMediaBackgroundRenderer(
         private val constructor: java.lang.reflect.Constructor<*>,
         private val styleContent: Any,
         private val allShadesField: java.lang.reflect.Field,
+        private val neutral1Field: java.lang.reflect.Field?,
+        private val neutral2Field: java.lang.reflect.Field?,
         private val accent1Field: java.lang.reflect.Field,
         private val accent2Field: java.lang.reflect.Field
     ) {
@@ -615,11 +684,21 @@ internal class NotificationMediaBackgroundRenderer(
             } else {
                 constructor.newInstance(colors, styleContent)
             }
+            val neutral1 = shades(neutral1Field ?: accent1Field, scheme)
+            val neutral2 = shades(neutral2Field ?: accent2Field, scheme)
+            val accent1 = shades(accent1Field, scheme)
+            val accent2 = shades(accent2Field, scheme)
             MonetPalette(
-                allShadesField.get(accent1Field.get(scheme)) as List<Int>,
-                allShadesField.get(accent2Field.get(scheme)) as List<Int>
+                neutral1 = neutral1,
+                neutral2 = neutral2,
+                accent1 = accent1,
+                accent2 = accent2
             )
         }.getOrNull()
+
+        @Suppress("UNCHECKED_CAST")
+        private fun shades(field: java.lang.reflect.Field, scheme: Any): List<Int> =
+            allShadesField.get(field.get(scheme)) as List<Int>
 
         companion object {
             fun create(classLoader: ClassLoader): MonetApi {
@@ -637,6 +716,8 @@ internal class NotificationMediaBackgroundRenderer(
                     constructor,
                     valueOf.invoke(null, "CONTENT") ?: error("Monet CONTENT style is unavailable"),
                     paletteClass.requiredField("allShades"),
+                    schemeClass.optionalField("mNeutral1", "neutral1"),
+                    schemeClass.optionalField("mNeutral2", "neutral2"),
                     schemeClass.requiredField("mAccent1", "accent1"),
                     schemeClass.requiredField("mAccent2", "accent2")
                 )
@@ -650,6 +731,18 @@ internal class NotificationMediaBackgroundRenderer(
                     }
                 }
                 error("Missing field ${names.joinToString()} in $name")
+            }
+
+            private fun Class<*>.optionalField(
+                vararg names: String
+            ): java.lang.reflect.Field? {
+                names.forEach { name ->
+                    runCatching { getDeclaredField(name) }.getOrNull()?.let {
+                        it.isAccessible = true
+                        return it
+                    }
+                }
+                return null
             }
         }
     }

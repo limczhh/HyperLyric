@@ -13,6 +13,7 @@ import android.widget.TextView
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.SquigglySeekBar
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColors
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColorSource
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPalette
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundPaletteResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -56,16 +57,26 @@ internal object NotificationMediaForegroundStyler {
         foregroundColorsAppliedListeners.addIfAbsent(listener)
     }
 
-    fun apply(controller: Any, backgroundIsDark: Boolean) {
+    fun apply(
+        controller: Any,
+        backgroundIsDark: Boolean,
+        foregroundSource: MediaCardForegroundColorSource? = null
+    ) {
         val holder = readField(controller, "holder") ?: return
-        apply(controller, holder, backgroundIsDark)
+        apply(controller, holder, backgroundIsDark, foregroundSource)
     }
 
-    fun apply(controller: Any, holder: Any, backgroundIsDark: Boolean) {
+    fun apply(
+        controller: Any,
+        holder: Any,
+        backgroundIsDark: Boolean,
+        foregroundSource: MediaCardForegroundColorSource? = null
+    ) {
         val context = readField(controller, "context") as? Context
         val colors = MediaCardForegroundPaletteResolver.resolve(
             context = context,
-            backgroundIsDark = backgroundIsDark
+            backgroundIsDark = backgroundIsDark,
+            foregroundSource = foregroundSource
         ) ?: run {
             clear(controller)
             return
@@ -112,23 +123,23 @@ internal object NotificationMediaForegroundStyler {
         controller: Any,
         seekBar: SeekBar
     ) {
-        val colors = appliedPalettes[controller]
-        if (colors == null) {
-            nativeForegroundColor(controller)?.let { color ->
-                applyProgressForegroundColor(seekBar, color)
-            }
-            return
-        }
+        val colors = appliedPalettes[controller]?.let { palette ->
+            MediaCardForegroundColors(
+                primary = palette.primary,
+                secondary = palette.secondary
+            )
+        } ?: nativeForegroundColors(controller) ?: return
 
         val tint = ColorStateList.valueOf(colors.primary)
         seekBar.thumbTintList = tint
         seekBar.progressTintList = tint
-        seekBar.progressBackgroundTintList = ColorStateList.valueOf(colors.progressTrack)
+        seekBar.progressBackgroundTintList = ColorStateList.valueOf(colors.secondary)
         if (seekBar is SquigglySeekBar) {
-            seekBar.setWaveColors(colors.primary, colors.progressTrack)
+            seekBar.setWaveColors(colors.primary, colors.secondary)
         }
+        seekBarColors[seekBar] = SeekBarColorState(colors.primary, colors.secondary)
         applySeekBarForegroundColor(seekBar, colors.primary)
-        applySeekBarTrackColor(seekBar, colors.progressTrack)
+        applySeekBarTrackColor(seekBar, colors.secondary)
         seekBar.invalidate()
     }
 
@@ -172,7 +183,7 @@ internal object NotificationMediaForegroundStyler {
         listOf("elapsedTimeView", "totalTimeView").forEach { fieldName ->
             (readField(holder, fieldName) as? TextView)?.let { time ->
                 state.captureText(time)
-                time.setTextColor(colors.duration)
+                time.setTextColor(colors.secondary)
             }
         }
 
@@ -182,13 +193,13 @@ internal object NotificationMediaForegroundStyler {
         val tint = ColorStateList.valueOf(colors.primary)
         seekBar.thumbTintList = tint
         seekBar.progressTintList = tint
-        seekBar.progressBackgroundTintList = ColorStateList.valueOf(colors.progressTrack)
+        seekBar.progressBackgroundTintList = ColorStateList.valueOf(colors.secondary)
         if (seekBar is SquigglySeekBar) {
-            seekBar.setWaveColors(colors.primary, colors.progressTrack)
+            seekBar.setWaveColors(colors.primary, colors.secondary)
         }
-        seekBarColors[seekBar] = SeekBarColorState(colors.primary, colors.progressTrack)
+        seekBarColors[seekBar] = SeekBarColorState(colors.primary, colors.secondary)
         applySeekBarForegroundColor(seekBar, colors.primary)
-        applySeekBarTrackColor(seekBar, colors.progressTrack)
+        applySeekBarTrackColor(seekBar, colors.secondary)
         seekBar.invalidate()
     }
 
@@ -212,18 +223,6 @@ internal object NotificationMediaForegroundStyler {
         val secondary = (readField(holder, "artistText") as? TextView)?.currentTextColor
             ?: primary
         return MediaCardForegroundColors(primary = primary, secondary = secondary)
-    }
-
-    private fun nativeForegroundColor(controller: Any): Int? {
-        return nativeForegroundColors(controller)?.primary
-    }
-
-    private fun applyProgressForegroundColor(view: SeekBar, color: Int) {
-        val tint = ColorStateList.valueOf(color)
-        view.thumbTintList = tint
-        view.progressTintList = tint
-        applySeekBarForegroundColor(view, color)
-        view.invalidate()
     }
 
     private fun applySeekBarTrackColor(view: SeekBar, color: Int) {

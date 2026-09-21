@@ -13,6 +13,7 @@ import com.lidesheng.hyperlyric.common.media.MediaCardTonePolicy
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaDataIdentity
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
+import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColorSource
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Field
 import java.util.Collections
@@ -41,6 +42,9 @@ internal object NotificationMediaBackgroundController {
     fun currentBackgroundIsDark(controller: Any): Boolean? =
         states[controller]?.backgroundIsDark
 
+    fun currentForegroundSource(controller: Any): MediaCardForegroundColorSource? =
+        states[controller]?.foregroundSource
+
     fun setNativeHooksAvailable(classLoader: ClassLoader, available: Boolean) {
         if (available) supportedLoaders.add(classLoader) else supportedLoaders.remove(classLoader)
     }
@@ -56,6 +60,7 @@ internal object NotificationMediaBackgroundController {
             state.customApplied = false
             state.renderPending = false
             state.backgroundIsDark = null
+            state.foregroundSource = null
             state.lastMediaData = null
             return
         }
@@ -142,6 +147,7 @@ internal object NotificationMediaBackgroundController {
                     state.customApplied = false
                     state.renderPending = false
                     state.backgroundIsDark = null
+                    state.foregroundSource = null
                     state.token = null
                     state.appliedRenderKey = null
                     state.lastMediaData?.let { latest -> onBind(controller, latest) }
@@ -162,10 +168,12 @@ internal object NotificationMediaBackgroundController {
                     NotificationMediaForegroundStyler.apply(
                         controller = controller,
                         holder = holder,
-                        backgroundIsDark = rendered.colors.backgroundIsDark
+                        backgroundIsDark = rendered.colors.backgroundIsDark,
+                        foregroundSource = rendered.colors.foregroundSource
                     )
                     rendered.bitmap.recycle()
                     state.backgroundIsDark = rendered.colors.backgroundIsDark
+                    state.foregroundSource = rendered.colors.foregroundSource
                     state.renderPending = false
                     return@post
                 }
@@ -177,11 +185,13 @@ internal object NotificationMediaBackgroundController {
                 NotificationMediaForegroundStyler.apply(
                     controller = controller,
                     holder = holder,
-                    backgroundIsDark = rendered.colors.backgroundIsDark
+                    backgroundIsDark = rendered.colors.backgroundIsDark,
+                    foregroundSource = rendered.colors.foregroundSource
                 )
                 state.customApplied = true
                 state.appliedRenderKey = renderKey
                 state.backgroundIsDark = rendered.colors.backgroundIsDark
+                state.foregroundSource = rendered.colors.foregroundSource
                 state.renderPending = false
             }
         }
@@ -300,6 +310,7 @@ internal object NotificationMediaBackgroundController {
         NotificationMediaForegroundStyler.clear(controller)
         state.customApplied = false
         state.backgroundIsDark = null
+        state.foregroundSource = null
         state.appliedRenderKey = null
     }
 
@@ -379,6 +390,7 @@ internal object NotificationMediaBackgroundController {
         var customApplied: Boolean = false,
         var renderPending: Boolean = false,
         var backgroundIsDark: Boolean? = null,
+        var foregroundSource: MediaCardForegroundColorSource? = null,
         var mediaBg: ImageView? = null,
         var originalDrawable: Drawable? = null,
         var originalScaleType: ImageView.ScaleType? = null,

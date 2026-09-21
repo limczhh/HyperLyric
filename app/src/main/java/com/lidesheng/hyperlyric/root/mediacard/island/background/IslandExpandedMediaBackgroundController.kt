@@ -654,7 +654,8 @@ internal object IslandExpandedMediaBackgroundController {
     ): Boolean {
         val palette = MediaCardForegroundPaletteResolver.resolve(
             context = api.getContext(binder),
-            backgroundIsDark = colors.backgroundIsDark
+            backgroundIsDark = colors.backgroundIsDark,
+            foregroundSource = colors.foregroundSource
         ) ?: run {
             foregroundColors.remove(holder)
             api.restoreCustomForeground(binder, holder)

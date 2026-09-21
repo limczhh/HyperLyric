@@ -65,8 +65,8 @@ internal object IslandExpandedMediaForegroundStyler {
         }
         access.getTitleText(holder).setTextColor(colors.primary)
         access.getArtistText(holder).setTextColor(colors.secondary)
-        access.getElapsedTime(holder).setTextColor(colors.duration)
-        access.getTotalTime(holder).setTextColor(colors.duration)
+        access.getElapsedTime(holder).setTextColor(colors.secondary)
+        access.getTotalTime(holder).setTextColor(colors.secondary)
 
         access.getSeamlessIcon(holder).imageTintList =
             ColorStateList.valueOf(colors.primary)
@@ -77,7 +77,7 @@ internal object IslandExpandedMediaForegroundStyler {
         }
 
         access.setSeekBarForeground(seekBar, colors.primary)
-        access.setSeekBarBackground(seekBar, colors.progressTrack)
+        access.setSeekBarBackground(seekBar, colors.secondary)
         access.setSeekBarShaderColorFilter(
             seekBar,
             BlendModeColorFilter(colors.primary, BlendMode.SRC_IN)
@@ -100,8 +100,8 @@ internal object IslandExpandedMediaForegroundStyler {
         }
         access.getTitleText(holder).setTextColor(colors.primary)
         access.getArtistText(holder).setTextColor(colors.secondary)
-        access.getElapsedTime(holder).setTextColor(colors.duration)
-        access.getTotalTime(holder).setTextColor(colors.duration)
+        access.getElapsedTime(holder).setTextColor(colors.secondary)
+        access.getTotalTime(holder).setTextColor(colors.secondary)
 
         val tint = ColorStateList.valueOf(colors.primary)
         access.getSeamlessIcon(holder).imageTintList = tint
@@ -111,7 +111,7 @@ internal object IslandExpandedMediaForegroundStyler {
         }
 
         access.setSeekBarForeground(seekBar, colors.primary)
-        access.setSeekBarBackground(seekBar, colors.progressTrack)
+        access.setSeekBarBackground(seekBar, colors.secondary)
         access.setSeekBarShaderColorFilter(
             seekBar,
             BlendModeColorFilter(colors.primary, BlendMode.SRC_IN)
