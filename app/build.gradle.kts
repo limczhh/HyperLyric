@@ -99,8 +99,6 @@ dependencies {
 
     // --- 调试工具 ---
     debugImplementation(libs.androidx.compose.ui.tooling)
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
 
     // --- 网络与序列化 (在线歌词) ---
     implementation(libs.kotlinx.serialization.json)
