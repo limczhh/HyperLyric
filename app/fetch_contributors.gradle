@@ -1,18 +1,84 @@
 import groovy.json.JsonSlurper
-import java.net.URL
 import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Locale
 
 tasks.register("generateContributors") {
     doLast {
         try {
-            def url = new URL("https://api.github.com/repos/limczhh/HyperLyric/contributors")
-            def connection = url.openConnection()
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-            def response = connection.getInputStream().getText("UTF-8")
-            
             def jsonParser = new JsonSlurper()
-            def contributors = jsonParser.parseText(response)
-            
+            def fetchJson = { String endpoint ->
+                HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection()
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+                connection.setRequestProperty("User-Agent", "HyperLyric-build")
+                connection.setConnectTimeout(15_000)
+                connection.setReadTimeout(30_000)
+                try {
+                    def status = connection.responseCode
+                    if (status == HttpURLConnection.HTTP_ACCEPTED) {
+                        return [status: status, body: null]
+                    }
+                    if (status != HttpURLConnection.HTTP_OK) {
+                        throw new IOException("GitHub API returned HTTP ${status} for ${endpoint}")
+                    }
+                    def response = connection.inputStream.getText("UTF-8")
+                    return [status: status, body: jsonParser.parseText(response)]
+                } finally {
+                    connection.disconnect()
+                }
+            }
+
+            def stats = null
+            def statsUrl = "https://api.github.com/repos/limczhh/HyperLyric/stats/contributors"
+            for (int attempt = 1; attempt <= 5; attempt++) {
+                def result = fetchJson(statsUrl)
+                if (result.status == HttpURLConnection.HTTP_OK) {
+                    stats = result.body
+                    break
+                }
+                if (attempt < 5) {
+                    println("GitHub is preparing contributor statistics; retrying (${attempt}/5)...")
+                    Thread.sleep(2_000L)
+                }
+            }
+            if (!(stats instanceof List)) {
+                throw new IOException("GitHub contributor statistics are not ready after 5 attempts")
+            }
+
+            def contributorsByLogin = [:]
+            for (entry in stats) {
+                def user = entry?.author
+                def login = user?.login?.toString()
+                if (!login || login.endsWith("[bot]")) continue
+
+                def key = login.toLowerCase(Locale.ROOT)
+                if (!contributorsByLogin.containsKey(key)) {
+                    contributorsByLogin[key] = [
+                        login: login,
+                        htmlUrl: user.html_url?.toString() ?: "https://github.com/${login}",
+                        avatarUrl: user.avatar_url?.toString()
+                    ]
+                }
+            }
+
+            def contributors = contributorsByLogin.values().toList().sort { left, right ->
+                left.login.toLowerCase(Locale.ROOT) <=> right.login.toLowerCase(Locale.ROOT)
+            }
+            if (contributors.isEmpty()) {
+                throw new IOException("GitHub returned no named contributors")
+            }
+
+            def escapeKotlinString = { value ->
+                value.toString()
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\r", "\\r")
+                    .replace("\n", "\\n")
+            }
+
             def content = """package com.lidesheng.hyperlyric.ui.utils
 
 data class ContributorItem(
@@ -25,51 +91,57 @@ data class ContributorItem(
 object ContributorsProvider {
     val list = listOf(
 """
-            for (user in contributors) {
-                def login = user.login
-                def htmlUrl = user.html_url
-                // GitHub 头像 URL 默认带有 ?v=4 等参数，我们直接追加 &s=120 限制分辨率为 120x120
-                def avatarUrl = user.avatar_url + "&s=120"
-                if (login.endsWith("[bot]")) continue
-                
-                def safeLogin = login.toLowerCase().replace("-", "_")
+
+            for (contributor in contributors) {
+                def login = contributor.login
+                def htmlUrl = contributor.htmlUrl
+                def avatarUrl = contributor.avatarUrl
+                def safeLogin = login.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_")
                 def drawableName = "contributor_" + safeLogin
-                
-                try {
-                    def imgBytes = new URL(avatarUrl).getBytes()
-                    def ext = ".png"
-                    if (imgBytes.length >= 2 && imgBytes[0] == (byte) 0xFF && imgBytes[1] == (byte) 0xD8) {
-                        ext = ".jpg"
-                    } else if (imgBytes.length >= 4 && imgBytes[0] == (byte) 0x52 && imgBytes[1] == (byte) 0x49 && imgBytes[2] == (byte) 0x46 && imgBytes[3] == (byte) 0x46) {
-                        ext = ".webp"
-                    } else if (imgBytes.length >= 3 && imgBytes[0] == (byte) 0x47 && imgBytes[1] == (byte) 0x49 && imgBytes[2] == (byte) 0x46) {
-                        ext = ".gif"
+
+                if (avatarUrl) {
+                    def resizedAvatarUrl = avatarUrl + (avatarUrl.contains("?") ? "&s=120" : "?s=120")
+                    try {
+                        def avatarConnection = (HttpURLConnection) new URL(resizedAvatarUrl).openConnection()
+                        avatarConnection.setRequestProperty("User-Agent", "HyperLyric-build")
+                        avatarConnection.setConnectTimeout(15_000)
+                        avatarConnection.setReadTimeout(30_000)
+                        try {
+                            def imgBytes = avatarConnection.inputStream.bytes
+                            def ext = ".png"
+                            if (imgBytes.length >= 2 && imgBytes[0] == (byte) 0xFF && imgBytes[1] == (byte) 0xD8) {
+                                ext = ".jpg"
+                            } else if (imgBytes.length >= 4 && imgBytes[0] == (byte) 0x52 && imgBytes[1] == (byte) 0x49 && imgBytes[2] == (byte) 0x46 && imgBytes[3] == (byte) 0x46) {
+                                ext = ".webp"
+                            } else if (imgBytes.length >= 3 && imgBytes[0] == (byte) 0x47 && imgBytes[1] == (byte) 0x49 && imgBytes[2] == (byte) 0x46) {
+                                ext = ".gif"
+                            }
+                            new File(projectDir, "src/main/res/drawable/" + drawableName + ext).bytes = imgBytes
+                        } finally {
+                            avatarConnection.disconnect()
+                        }
+                    } catch (Exception e) {
+                        println("Failed to download avatar for " + login)
                     }
-                    new File(projectDir, "src/main/res/drawable/" + drawableName + ext).bytes = imgBytes
-                } catch(Exception e) {
-                    println("Failed to download avatar for " + login)
                 }
-                
+
                 def name = login
                 try {
-                    def userUrl = new URL("https://api.github.com/users/" + login)
-                    def userConn = userUrl.openConnection()
-                    userConn.setRequestProperty("User-Agent", "Mozilla/5.0")
-                    def userResp = userConn.getInputStream().getText("UTF-8")
-                    def userDetail = jsonParser.parseText(userResp)
-                    if (userDetail.name) {
-                        name = userDetail.name
+                    def userResult = fetchJson("https://api.github.com/users/" + login)
+                    def userDetail = userResult.body
+                    if (userResult.status == HttpURLConnection.HTTP_OK && userDetail?.name) {
+                        name = userDetail.name.toString()
                     }
-                } catch(Exception e) {
+                } catch (Exception e) {
                     // Fallback to login
                 }
-                
-                content += "        ContributorItem(\"" + name + "\", \"@" + login + "\", \"" + htmlUrl + "\", com.lidesheng.hyperlyric.R.drawable." + drawableName + "),\n"
+
+                content += "        ContributorItem(\"" + escapeKotlinString(name) + "\", \"@" + escapeKotlinString(login) + "\", \"" + escapeKotlinString(htmlUrl) + "\", com.lidesheng.hyperlyric.R.drawable." + drawableName + "),\n"
             }
             content += "    )\n}\n"
-            
+
             def file = new File(projectDir, "src/main/java/com/lidesheng/hyperlyric/ui/utils/ContributorsProvider.kt")
-            file.text = content
+            file.setText(content, "UTF-8")
             println("ContributorsProvider.kt generated.")
         } catch (Exception e) {
             println("Failed to fetch contributors: " + e.message)
