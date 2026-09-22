@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
+import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /**
  * Resolves the MediaController represented by the visible Super Island.
@@ -19,6 +20,8 @@ import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolic
  * several unresolved sessions is deliberately rejected instead of controlling an arbitrary one.
     */
 internal object IslandPlaybackControllerResolver {
+    private const val TAG = "IslandPlaybackResolver"
+    private const val SYSTEM_UI_PACKAGE = "com.android.systemui"
 
     fun resolve(
         context: Context,
@@ -51,28 +54,41 @@ internal object IslandPlaybackControllerResolver {
             return null
         }
 
-        val manager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
-            as? MediaSessionManager
+        val sessionContext = resolveSessionContext(context) ?: return null
+        val manager = runCatching {
+            sessionContext.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+        }.onFailure { error ->
+            HookLogger.w(TAG, "获取 MediaSessionManager 失败", error)
+        }.getOrNull() ?: return null
+        val allControllers = runCatching { manager.getActiveSessions(null) }
+            .onFailure { error ->
+                HookLogger.w(TAG, "获取 active sessions 失败", error)
+            }.getOrNull()
             ?: return null
-        val controllers = runCatching { manager.getActiveSessions(null) }
-            .getOrNull()
-            .orEmpty()
-            .filter { it.packageName == islandInfo.packageName }
+        val controllers = allControllers.filter { it.packageName == islandInfo.packageName }
         if (controllers.isEmpty()) return null
 
         val preferredToken = notificationToken ?: sourceToken
         if (preferredToken != null) {
-            return controllers.firstOrNull { controller ->
+            val resolved = controllers.firstOrNull { controller ->
                 controller.sessionToken == preferredToken &&
                         matchesSourceMedia(controller, matchingSourceMetadata)
             }
+            if (resolved != null) {
+                return resolved
+            }
+            return null
         }
 
         val sourceMediaId = matchingSourceMetadata?.mediaId
         if (sourceMediaId != null) {
-            return controllers.singleOrNull { controller ->
+            val resolved = controllers.singleOrNull { controller ->
                 controllerMediaId(controller) == sourceMediaId
             }
+            if (resolved != null) {
+                return resolved
+            }
+            return null
         }
 
         return controllers.singleOrNull()
@@ -98,26 +114,49 @@ internal object IslandPlaybackControllerResolver {
             return null
         }
 
-        val manager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
-            as? MediaSessionManager
+        val sessionContext = resolveSessionContext(context) ?: return null
+
+        val manager = runCatching {
+            sessionContext.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+        }.onFailure { error ->
+            HookLogger.w(TAG, "获取 MediaSessionManager 失败", error)
+        }.getOrNull() ?: return null
+        val allControllers = runCatching { manager.getActiveSessions(null) }
+            .onFailure { error ->
+                HookLogger.w(TAG, "获取 active sessions 失败", error)
+            }.getOrNull()
             ?: return null
-        val controllers = runCatching { manager.getActiveSessions(null) }
-            .getOrNull()
-            .orEmpty()
-            .filter { it.packageName == islandInfo.packageName }
+        val controllers = allControllers.filter { it.packageName == islandInfo.packageName }
+        if (controllers.isEmpty()) return null
 
         // A notification token remains stable when the player changes tracks, while the media id
         // is expected to change. Prefer it even if the source bridge is stale during that update.
-        IslandProbeUtils.extractMediaSessionToken(data)?.let { notificationToken ->
-            resolveToken(context, islandInfo.packageName, controllers, notificationToken)?.let {
+        val notificationToken = IslandProbeUtils.extractMediaSessionToken(data)
+        if (notificationToken != null) {
+            // MediaController carries the caller package into MediaSessionService. A Dynamic
+            // Island view may be created with the plugin package context even though the process
+            // UID belongs to SystemUI; use the host package context for both paths.
+            resolveToken(
+                sessionContext,
+                islandInfo.packageName,
+                controllers,
+                notificationToken
+            )?.let {
                 return it
             }
         }
 
         // Some notifications do not expose EXTRA_MEDIA_SESSION. A source token is still an exact
         // session identity, but it is only used as a fallback when the notification has no token.
-        LyriconDataBridge.currentLyricMediaMetadata?.sessionToken?.let { sourceToken ->
-            resolveToken(context, islandInfo.packageName, controllers, sourceToken)?.let {
+        val sourceMetadata = LyriconDataBridge.currentLyricMediaMetadata
+        val sourceToken = sourceMetadata?.sessionToken
+        if (sourceToken != null) {
+            resolveToken(
+                sessionContext,
+                islandInfo.packageName,
+                controllers,
+                sourceToken
+            )?.let {
                 return it
             }
         }
@@ -127,6 +166,25 @@ internal object IslandPlaybackControllerResolver {
         return controllers.singleOrNull()
     }
 
+    private fun resolveSessionContext(
+        context: Context
+    ): Context? {
+        val sourcePackage = runCatching { context.packageName }.getOrNull()
+        if (sourcePackage == SYSTEM_UI_PACKAGE) return context
+        return runCatching {
+            context.createPackageContext(
+                SYSTEM_UI_PACKAGE,
+                Context.CONTEXT_IGNORE_SECURITY
+            )
+        }.onFailure { error ->
+            HookLogger.w(
+                TAG,
+                "创建 SystemUI Context 失败: sourcePackage=$sourcePackage",
+                error
+            )
+        }.getOrNull()
+    }
+
     private fun resolveToken(
         context: Context,
         packageName: String,
@@ -134,9 +192,15 @@ internal object IslandPlaybackControllerResolver {
         token: MediaSession.Token
     ): MediaController? {
         controllers.firstOrNull { it.sessionToken == token }?.let { return it }
-        return runCatching { MediaController(context, token) }
-            .getOrNull()
-            ?.takeIf { it.packageName == packageName }
+        val constructed = runCatching { MediaController(context, token) }
+            .onFailure { error ->
+                HookLogger.w(TAG, "MediaController(token) 构造失败", error)
+            }.getOrNull()
+            ?: return null
+        if (constructed.packageName != packageName) {
+            return null
+        }
+        return constructed
     }
 
     private fun matchesSourceMedia(
@@ -154,4 +218,5 @@ internal object IslandPlaybackControllerResolver {
                 ?.takeIf(String::isNotEmpty)
         }.getOrNull()
     }
+
 }

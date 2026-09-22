@@ -146,9 +146,7 @@ internal object IslandLyricShareHooker {
         ): Any? {
             // Keep Xiaomi's own state/lock-screen/Control Center guards. If the host shape is
             // not the verified collapsed island, its original long-press path remains intact.
-            if (!NativeLongPressSupport.canIntercept(systemUiView)) {
-                return chain.proceed()
-            }
+            if (!NativeLongPressSupport.canIntercept(systemUiView)) return chain.proceed()
 
             val controller = runCatching {
                 IslandPlaybackControllerResolver.resolve(
@@ -160,23 +158,9 @@ internal object IslandLyricShareHooker {
                 HookLogger.w(TAG, "解析当前超级岛媒体会话失败，保留原生行为", error)
             }.getOrNull() ?: return chain.proceed()
 
-            if (!PlaybackToggle.perform(controller)) {
-                val state = controller.playbackState
-                HookLogger.d(
-                    TAG,
-                    "长按切换播放状态失败，保留原生拖拽分享: " +
-                            "package=${controller.packageName}, " +
-                            "state=${state?.state}, actions=${state?.actions}"
-                )
-                return chain.proceed()
-            }
+            if (!PlaybackToggle.perform(controller)) return chain.proceed()
 
             NativeLongPressSupport.dispatchLongPressedEvent(systemUiView)
-            HookLogger.d(
-                TAG,
-                "长按切换播放状态: package=${controller.packageName}, " +
-                        "state=${controller.playbackState?.state}"
-            )
             // Do not proceed: Xiaomi's original implementation would start drag-and-drop here.
             return null
         }
@@ -199,7 +183,11 @@ internal object IslandLyricShareHooker {
 
     private object PlaybackToggle {
         fun perform(controller: MediaController): Boolean {
-            val state = controller.playbackState ?: return false
+            val state = runCatching { controller.playbackState }
+                .onFailure { error ->
+                    HookLogger.w(TAG, "读取播放状态失败", error)
+                }.getOrNull()
+                ?: return false
             val shouldPause = when (state.state) {
                 PlaybackState.STATE_PLAYING,
                 PlaybackState.STATE_BUFFERING -> true
@@ -211,14 +199,23 @@ internal object IslandLyricShareHooker {
                 else -> return false
             }
 
-            return runCatching {
+            val command = if (shouldPause) "pause" else "play"
+            return try {
                 if (shouldPause) {
                     controller.transportControls.pause()
                 } else {
                     controller.transportControls.play()
                 }
+                HookLogger.d(TAG, "长按播放命令已调用: command=$command")
                 true
-            }.getOrDefault(false)
+            } catch (error: Throwable) {
+                HookLogger.w(
+                    TAG,
+                    "长按播放命令抛异常: command=$command",
+                    error
+                )
+                false
+            }
         }
     }
 
@@ -240,20 +237,23 @@ internal object IslandLyricShareHooker {
 
             val eventCoordinator = callNoArg(view, "getDynamicIslandEventCoordinator")
                 ?: return false
-            val windowView = callNoArg(eventCoordinator, "getWindowView") ?: return false
+            val windowView = callNoArg(eventCoordinator, "getWindowView")
+                ?: return false
             val windowController = callNoArg(windowView, "getWindowViewController")
                 ?: return false
-            val windowState = callNoArg(windowController, "getWindowState") ?: return false
-            val miPlayShowState = callNoArg(windowState, "getMiPlayShow") ?: return false
+            val windowState = callNoArg(windowController, "getWindowState")
+                ?: return false
+            val miPlayShowState = callNoArg(windowState, "getMiPlayShow")
+                ?: return false
             val miPlayShow = callNoArg(miPlayShowState, "getValue") as? Boolean
                 ?: return false
             return !miPlayShow
         }
 
         fun dispatchLongPressedEvent(view: Any) {
-            runCatching {
+            try {
                 val eventCoordinator = callNoArg(view, "getDynamicIslandEventCoordinator")
-                    ?: return@runCatching
+                    ?: return
                 val eventClass = Class.forName(
                     LONG_PRESSED_EVENT_CLASS,
                     true,
@@ -264,21 +264,22 @@ internal object IslandLyricShareHooker {
                 }.get(null)
                 val dispatchMethod = eventCoordinator.javaClass.methods.firstOrNull {
                     it.name == "dispatchEvent" && it.parameterTypes.size == 2
-                } ?: return@runCatching
+                }
+                    ?: return
                 dispatchMethod.isAccessible = true
                 dispatchMethod.invoke(eventCoordinator, event, null)
-            }.onFailure { error ->
+            } catch (error: Throwable) {
                 HookLogger.w(TAG, "同步小米长按事件失败", error)
             }
         }
 
         private fun callNoArg(receiver: Any?, name: String): Any? {
             val target = receiver ?: return null
-            return runCatching {
-                target.javaClass.methods.firstOrNull {
-                    it.name == name && it.parameterTypes.isEmpty()
-                }?.invoke(target)
-            }.getOrNull()
+            val method = target.javaClass.methods.firstOrNull {
+                it.name == name && it.parameterTypes.isEmpty()
+            } ?: return null
+            method.isAccessible = true
+            return runCatching { method.invoke(target) }.getOrNull()
         }
     }
 
@@ -533,4 +534,5 @@ internal object IslandLyricShareHooker {
             }
         }
     }
+
 }
