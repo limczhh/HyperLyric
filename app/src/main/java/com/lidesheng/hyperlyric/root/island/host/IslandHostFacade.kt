@@ -87,6 +87,9 @@ internal object IslandHostFacade {
         IslandViewHelper.triggerSystemRelayout(rootView)
     }
 
+    fun hasDedicatedWidthRefresh(rootView: ViewGroup): Boolean =
+        IslandViewHelper.hasDedicatedWidthRefresh(rootView)
+
     fun updateHostGlow(rootView: ViewGroup, prefs: SharedPreferences) {
         HookIslandGlow.updateMusicGlow(rootView, prefs)
     }

@@ -306,6 +306,10 @@ internal object IslandDynamicWidthCoordinator {
                 when (hostToken.kind) {
                     IslandViewRegistry.HostKind.REAL -> {
                         if (!IslandPresentationCoordinator.isPlaybackActive()) return@post
+                        if (IslandHostFacade.hasDedicatedWidthRefresh(rootView)) {
+                            IslandHostFacade.triggerSystemRelayout(rootView)
+                            return@post
+                        }
                         IslandNativeRefreshCoordinator.request(
                             onComplete = { refreshedRoot ->
                                 // Xiaomi rebuilds the module hierarchy during the native update.
@@ -313,12 +317,10 @@ internal object IslandDynamicWidthCoordinator {
                                 // replaced the injected wrapper or applied a newer lyric line.
                                 requestRefresh(refreshedRoot)
                             },
-                            targetRoot = rootView,
+                            targetToken = hostToken,
                             onUnavailable = {
-                                val currentToken = IslandViewRegistry.tokenFor(rootView)
-                                if (currentToken != null &&
-                                    currentToken.kind == IslandViewRegistry.HostKind.REAL &&
-                                    IslandPresentationCoordinator.isCurrentHost(currentToken) &&
+                                if (rootView.isAttachedToWindow &&
+                                    IslandPresentationCoordinator.isCurrentHost(hostToken) &&
                                     IslandPresentationCoordinator.isPlaybackActive()
                                 ) {
                                     IslandHostFacade.triggerSystemRelayout(rootView)

@@ -287,7 +287,7 @@ internal object IslandSlotStructureInjector {
         container.addView(
             wrapperView,
             FrameLayout.LayoutParams(
-                wrapperLayoutWidth(config, wrapperView.fillExactParentWidth),
+                wrapperLayoutWidth(config, wrapperView),
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -409,14 +409,7 @@ internal object IslandSlotStructureInjector {
             changed = true
         }
         val layoutParams = wrapper.layoutParams
-        val expectedWidth = if (config.geometry.isDynamicWidth &&
-            !wrapper.fillExactParentWidth &&
-            wrapper.desiredWidthPx > 0
-        ) {
-            wrapper.desiredWidthPx
-        } else {
-            wrapperLayoutWidth(config, wrapper.fillExactParentWidth)
-        }
+        val expectedWidth = wrapperLayoutWidth(config, wrapper)
         if (layoutParams != null && (layoutParams.width != expectedWidth || layoutParams.height != FrameLayout.LayoutParams.MATCH_PARENT)) {
             layoutParams.width = expectedWidth
             layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT
@@ -497,7 +490,7 @@ internal object IslandSlotStructureInjector {
         }
 
         val layoutParams = wrapper.layoutParams
-        val expectedWidth = wrapperLayoutWidth(config, fillParentWidth)
+        val expectedWidth = wrapperLayoutWidth(config, wrapper)
         if (layoutParams != null && layoutParams.width != expectedWidth) {
             layoutParams.width = expectedWidth
             wrapper.layoutParams = layoutParams
@@ -510,9 +503,13 @@ internal object IslandSlotStructureInjector {
 
     private fun wrapperLayoutWidth(
         config: IslandSlotRuntimeConfig,
-        fillExactParentWidth: Boolean
+        wrapper: MaxWidthFrameLayout
     ): Int {
-        return if (fillExactParentWidth || !config.isSplitMode) {
+        return if (wrapper.fillExactParentWidth) {
+            FrameLayout.LayoutParams.MATCH_PARENT
+        } else if (config.geometry.isDynamicWidth && wrapper.desiredWidthPx > 0) {
+            wrapper.desiredWidthPx
+        } else if (!config.isSplitMode) {
             FrameLayout.LayoutParams.MATCH_PARENT
         } else {
             FrameLayout.LayoutParams.WRAP_CONTENT

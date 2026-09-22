@@ -23,8 +23,14 @@ internal object IslandNativeRefreshCoordinator {
     private const val NATIVE_SETTLE_TIMEOUT_MS = 160L
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var pendingRequest: RefreshRequest? = null
+    private enum class RequestKind { SETTINGS, WIDTH }
+
+    // Coalesce only the same purpose for the same host generation. Settings and width callbacks
+    // are independent; work arriving during a native update belongs to the next update.
+    private val pendingRequests = linkedMapOf<IslandViewRegistry.HostToken,
+            MutableMap<RequestKind, RefreshRequest>>()
     private val activeRefreshes = WeakHashMap<ViewGroup, ActiveRefresh>()
+    private val nativeUpdateMethods = mutableMapOf<Class<*>, List<Method>>()
 
     private val requestRunnable = Runnable {
         performPendingRequest()
@@ -32,16 +38,29 @@ internal object IslandNativeRefreshCoordinator {
 
     fun request(
         onComplete: (ViewGroup) -> Unit,
-        targetRoot: ViewGroup? = null,
+        targetToken: IslandViewRegistry.HostToken? = null,
         onUnavailable: (() -> Unit)? = null
     ) {
         runOnMain {
-            pendingRequest = RefreshRequest(
-                onComplete = onComplete,
-                targetRoot = targetRoot,
-                onUnavailable = onUnavailable
-            )
-            mainHandler.removeCallbacks(requestRunnable)
+            val kind = if (targetToken == null) RequestKind.SETTINGS else RequestKind.WIDTH
+            val request = RefreshRequest(onComplete, onUnavailable)
+            val tokens = targetToken?.let(::listOf)
+                ?: IslandPresentationCoordinator.snapshotAttachedRealHosts()
+            if (tokens.isEmpty()) {
+                notifyUnavailable(request)
+                return@runOnMain
+            }
+            tokens.forEach { token ->
+                if (isEligibleHost(token)) {
+                    pendingRequests.getOrPut(token) { linkedMapOf() }[kind] = request
+                }
+            }
+            schedulePendingRequests()
+        }
+    }
+
+    private fun schedulePendingRequests() {
+        if (pendingRequests.isNotEmpty() && !mainHandler.hasCallbacks(requestRunnable)) {
             mainHandler.postDelayed(requestRunnable, REQUEST_DEBOUNCE_MS)
         }
     }
@@ -59,43 +78,44 @@ internal object IslandNativeRefreshCoordinator {
 
     fun clear() {
         runOnMain {
-            mainHandler.removeCallbacks(requestRunnable)
-            pendingRequest = null
+            mainHandler.removeCallbacksAndMessages(null)
+            pendingRequests.clear()
+            nativeUpdateMethods.clear()
             activeRefreshes.values.forEach { it.settleRunnable?.let(mainHandler::removeCallbacks) }
             activeRefreshes.clear()
         }
     }
 
     private fun performPendingRequest() {
-        val request = pendingRequest ?: return
-        pendingRequest = null
-
-        var accepted = false
-        IslandPresentationCoordinator.snapshotAttachedRealHosts()
-            .filter { token -> request.targetRoot == null || token.root === request.targetRoot }
-            .forEach { token ->
-                if (!isEligibleHost(token)) return@forEach
-
-                val target = resolveTarget(token) ?: return@forEach
-                val existing = activeRefreshes[token.root]
-                if (existing != null) {
-                    existing.request = request
-                    accepted = true
-                    return@forEach
-                }
-
-                val active = ActiveRefresh(token, request)
-                activeRefreshes[token.root] = active
-                if (invokeNativeUpdate(target, active)) {
-                    accepted = true
-                } else if (activeRefreshes[token.root] === active) {
-                    activeRefreshes.remove(token.root)
-                }
+        // Snapshot keys only: a synchronous native callback can enqueue newer work. Do not remove
+        // that work while draining this batch, nor treat an in-flight measurement as its refresh.
+        pendingRequests.keys.toList().forEach { token ->
+            if (!isEligibleHost(token)) {
+                pendingRequests.remove(token)
+                return@forEach
             }
-
-        if (!accepted) {
-            HookLogger.d(TAG, "未找到可执行小米原生超级岛刷新的当前媒体岛")
-            notifyUnavailable(request)
+            val existing = activeRefreshes[token.root]
+            if (existing != null && existing.token == token) return@forEach
+            if (existing != null) {
+                existing.settleRunnable?.let(mainHandler::removeCallbacks)
+                activeRefreshes.remove(token.root)
+            }
+            val requests = pendingRequests.remove(token)?.filterKeys { kind ->
+                kind != RequestKind.WIDTH || IslandPresentationCoordinator.isPlaybackActive()
+            } ?: return@forEach
+            if (requests.isEmpty()) return@forEach
+            val target = resolveTarget(token)
+            if (target == null) {
+                requests.values.forEach(::notifyUnavailable)
+                return@forEach
+            }
+            val active = ActiveRefresh(token, requests.values.toList())
+            activeRefreshes[token.root] = active
+            if (!invokeNativeUpdate(target, active)) {
+                if (activeRefreshes[token.root] === active) activeRefreshes.remove(token.root)
+                if (isEligibleHost(token)) requests.values.forEach(::notifyUnavailable)
+                schedulePendingRequests()
+            }
         }
     }
 
@@ -107,7 +127,9 @@ internal object IslandNativeRefreshCoordinator {
     }
 
     private fun isEligibleHost(token: IslandViewRegistry.HostToken): Boolean {
-        if (!IslandPresentationCoordinator.isCurrentHost(token)) {
+        if (token.kind != IslandViewRegistry.HostKind.REAL || !token.root.isAttachedToWindow ||
+            !IslandPresentationCoordinator.isCurrentHost(token)
+        ) {
             return false
         }
         val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(
@@ -138,9 +160,12 @@ internal object IslandNativeRefreshCoordinator {
         val maxWidth = (controller.let {
             IslandTextHookerSupport.callNoArgMethodResult(it, "getIslandMaxWidth")
         } as? Number)?.toFloat() ?: return null
-        val updateMethod = windowView.javaClass.methods.firstOrNull(::isNativeUpdateMethod)
-            ?: run {
-                val candidates = windowView.javaClass.methods
+        val methods = nativeUpdateMethods.getOrPut(windowView.javaClass) {
+            val allMethods = windowView.javaClass.methods
+            val matches = allMethods.filter(::isNativeUpdateMethod)
+                .sortedByDescending { it.parameterCount }
+            if (matches.isEmpty()) {
+                val candidates = allMethods
                     .filter { it.name.contains("DynamicIsland", ignoreCase = true) }
                     .joinToString(separator = ";") { method ->
                         "${method.name}(${method.parameterTypes.joinToString(",") { it.name }})"
@@ -150,8 +175,11 @@ internal object IslandNativeRefreshCoordinator {
                     "小米超级岛原生刷新接口不可用: target=updateDynamicIslandView, " +
                             "window=${windowView.javaClass.name}, candidates=$candidates"
                 )
-                return null
             }
+            matches
+        }
+        val updateMethod = methods.firstOrNull { it.parameterTypes[0].isInstance(data) }
+            ?: return null
 
         return NativeTarget(
             root = token.root,
@@ -166,9 +194,9 @@ internal object IslandNativeRefreshCoordinator {
     private fun invokeNativeUpdate(target: NativeTarget, active: ActiveRefresh): Boolean {
         return runCatching {
             val arguments = when (target.updateMethod.parameterTypes.size) {
-                // HyperOS 3 removed the trailing transition flag from this API.
+                // Plugin 16.5.3.43.0 / 17.0.2.11.1.
                 3 -> arrayOf(target.data, false, target.maxWidth)
-                // Keep compatibility with older HyperOS releases.
+                // Plugin 17.1.4.26.0 adds the reInflated flag.
                 4 -> arrayOf(target.data, false, target.maxWidth, false)
                 else -> error("unexpected updateDynamicIslandView signature")
             }
@@ -204,10 +232,9 @@ internal object IslandNativeRefreshCoordinator {
         if (activeRefreshes[root] !== active) return
         activeRefreshes.remove(root)
         active.settleRunnable?.let(mainHandler::removeCallbacks)
+        schedulePendingRequests()
 
-        if (!IslandPresentationCoordinator.isCurrentHost(active.token) ||
-            !isCurrentMediaHost(active.token)
-        ) {
+        if (!isEligibleHost(active.token)) {
             HookLogger.d(
                 TAG,
                 "忽略过期的原生超级岛刷新完成: root=${System.identityHashCode(root)}, reason=$reason"
@@ -215,16 +242,21 @@ internal object IslandNativeRefreshCoordinator {
             return
         }
 
-        runCatching { active.request.onComplete(root) }
-            .onFailure { error ->
-                HookLogger.e(TAG, "原生超级岛刷新后的配置对账失败", error)
-            }
+        active.requests.forEach { request ->
+            if (!isEligibleHost(active.token)) return@forEach
+            runCatching { request.onComplete(root) }
+                .onFailure { error ->
+                    HookLogger.e(TAG, "原生超级岛刷新后的配置对账失败", error)
+                }
+        }
     }
 
     private fun isNativeUpdateMethod(method: Method): Boolean {
         val types = method.parameterTypes
         if (method.name != "updateDynamicIslandView" ||
+            method.returnType != Void.TYPE ||
             (types.size != 3 && types.size != 4) ||
+            types[0].name != "com.android.systemui.plugins.miui.dynamicisland.DynamicIslandData" ||
             types[1] != Boolean::class.javaPrimitiveType ||
             types[2] != Float::class.javaPrimitiveType
         ) {
@@ -241,22 +273,14 @@ internal object IslandNativeRefreshCoordinator {
         }
     }
 
-    private fun isCurrentMediaHost(token: IslandViewRegistry.HostToken): Boolean {
-        val mediaInfo = IslandProbeUtils.extractMediaIslandInfo(
-            IslandProbeUtils.getCurrentIslandData(token.root)
-        ) ?: return false
-        return mediaInfo.packageName == token.packageName
-    }
-
     private data class RefreshRequest(
         val onComplete: (ViewGroup) -> Unit,
-        val targetRoot: ViewGroup?,
         val onUnavailable: (() -> Unit)?
     )
 
     private class ActiveRefresh(
         val token: IslandViewRegistry.HostToken,
-        var request: RefreshRequest,
+        val requests: List<RefreshRequest>,
         var settleRunnable: Runnable? = null
     )
 

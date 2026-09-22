@@ -50,18 +50,21 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
             return
         }
 
-        val requestedWidth = when {
-            desiredWidthPx > 0 -> desiredWidthPx
-            maxWidthPx > 0 -> maxWidthPx
-            else -> -1
-        }
-
-        if (requestedWidth <= 0) {
-            // Preserve normal FrameLayout measurement when no explicit width is configured.
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        if (desiredWidthPx <= 0) {
+            // A cap alone must not become a requested fixed width. Preserve the existing
+            // content measurement for fixed-width and split slots outside dynamic mode.
+            if (maxWidthPx <= 0) {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                return
+            }
+            val givenWidth = MeasureSpec.getSize(widthMeasureSpec)
+            val width = if (givenWidth == 0 || givenWidth > maxWidthPx) maxWidthPx else givenWidth
+            super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), heightMeasureSpec)
+            if (measuredWidth > maxWidthPx) setMeasuredDimension(maxWidthPx, measuredHeight)
             return
         }
 
+        val requestedWidth = desiredWidthPx
         val widthLimit = maxWidthPx.takeIf { it > 0 } ?: requestedWidth
         val boundedWidth = requestedWidth.coerceAtMost(widthLimit)
         val parentMode = MeasureSpec.getMode(widthMeasureSpec)

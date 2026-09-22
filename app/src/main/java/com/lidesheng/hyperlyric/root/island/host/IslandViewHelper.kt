@@ -22,6 +22,25 @@ object IslandViewHelper {
     private val originalVisibilities = WeakHashMap<View, Int>()
     private val isRelayouting = ThreadLocal.withInitial { false }
 
+    private data class RelayoutMethods(
+        val updateWidth: java.lang.reflect.Method?,
+        val calculateWidth: java.lang.reflect.Method?
+    )
+
+    private val relayoutMethods = java.util.concurrent.ConcurrentHashMap<Class<*>, RelayoutMethods>()
+
+    private fun relayoutMethods(type: Class<*>): RelayoutMethods =
+        relayoutMethods.getOrPut(type) {
+            fun find(name: String) = type.methods.firstOrNull {
+                it.name == name && it.parameterCount == 0 &&
+                        it.returnType == Void.TYPE
+            }
+            RelayoutMethods(find("updateBigIslandViewWidth"), find("calculateBigIslandWidth"))
+        }
+
+    fun hasDedicatedWidthRefresh(islandView: ViewGroup): Boolean =
+        relayoutMethods(islandView.javaClass).updateWidth != null
+
     /**
      * 切换超级岛内部容器（如图标、文本容器）的可见性
      */
@@ -278,17 +297,8 @@ object IslandViewHelper {
         isRelayouting.set(true)
         try {
             runCatching {
-                val viewClass = islandView.javaClass
-                // 优先尝试 updateBigIslandViewWidth
-                val updateWidthMethod =
-                    viewClass.methods.find { it.name == "updateBigIslandViewWidth" }
-                if (updateWidthMethod != null) {
-                    updateWidthMethod.invoke(islandView)
-                } else {
-                    // 兜底尝试 calculateBigIslandWidth
-                    viewClass.methods.find { it.name == "calculateBigIslandWidth" }
-                        ?.invoke(islandView)
-                }
+                val methods = relayoutMethods(islandView.javaClass)
+                (methods.updateWidth ?: methods.calculateWidth)?.invoke(islandView)
             }.onFailure { e ->
                 HookLogger.e(TAG, "超级岛布局刷新失败", e)
             }
