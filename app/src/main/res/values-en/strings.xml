@@ -334,8 +334,8 @@
     <string name="title_word_motion_cjk_wave">CJK Wavelength Coefficient</string>
     <string name="title_word_motion_latin_lift">Latin Lift Coefficient</string>
     <string name="title_word_motion_latin_wave">Latin Wavelength Coefficient</string>
-    <string name="label_word_motion_lift_range">Range: 0 ~ 0.2</string>
-    <string name="label_word_motion_wave_range">Range: 0 ~ 8</string>
+    <string name="label_word_motion_lift_range">Range: 0 ~ 0.20</string>
+    <string name="label_word_motion_wave_range">Range: 0 ~ 2.00</string>
     <string name="title_custom_font">Font</string>
     <string name="summary_default_font">Default</string>
     <string name="title_verbatim_lyric">Verbatim Lyrics</string>

@@ -132,8 +132,8 @@ internal class TextDrawer {
         } else {
             0f
         }
-        val contentHeight = (viewHeight.toFloat() - motionPadding).coerceAtLeast(0f)
-        val y = contentHeight / 2f + baselineOffset
+        val y = viewHeight / 2f + baselineOffset
+        val motionClipBottom = viewHeight.toFloat() + motionPadding
         canvas.withSave {
             val xOffset = when {
                 isOverflow -> scrollX
@@ -170,7 +170,7 @@ internal class TextDrawer {
                     highlightWidth,
                     max(bgClipStart, visibleStart),
                     visibleEnd,
-                    viewHeight,
+                    motionClipBottom,
                     y,
                     bgPaint
                 )
@@ -197,7 +197,12 @@ internal class TextDrawer {
                     min(model.width, highlightWidth)
                 }
                 canvas.withSave {
-                    canvas.clipRect(0f, 0f, highlightClipEnd, viewHeight.toFloat())
+                    val clipBottom = if (charMotionEnabled) {
+                        motionClipBottom
+                    } else {
+                        viewHeight.toFloat()
+                    }
+                    canvas.clipRect(0f, 0f, highlightClipEnd, clipBottom)
 
                     if (hasFeather) {
                         val baseShader = if (isRainbowHl) {
@@ -236,7 +241,7 @@ internal class TextDrawer {
                             highlightWidth,
                             visibleStart,
                             min(highlightClipEnd, visibleEnd),
-                            viewHeight,
+                            motionClipBottom,
                             y,
                             hlPaint
                         )
@@ -254,7 +259,7 @@ internal class TextDrawer {
         highlightWidth: Float,
         clipStart: Float,
         clipEnd: Float,
-        viewHeight: Int,
+        clipBottom: Float,
         baselineY: Float,
         paint: TextPaint
     ) {
@@ -274,7 +279,7 @@ internal class TextDrawer {
                     highlightWidth = highlightWidth,
                     clipStart = clipStart,
                     clipEnd = clipEnd,
-                    viewHeight = viewHeight,
+                    clipBottom = clipBottom,
                     baselineY = baselineY,
                     paint = paint,
                     motionSpec = motionSpec
@@ -313,7 +318,7 @@ internal class TextDrawer {
                     highlightWidth = highlightWidth,
                     clipStart = clipStart,
                     clipEnd = clipEnd,
-                    viewHeight = viewHeight,
+                    clipBottom = clipBottom,
                     baselineY = baselineY,
                     paint = paint,
                     motionSpec = motionSpec
@@ -335,7 +340,7 @@ internal class TextDrawer {
         highlightWidth: Float,
         clipStart: Float,
         clipEnd: Float,
-        viewHeight: Int,
+        clipBottom: Float,
         baselineY: Float,
         paint: TextPaint,
         motionSpec: MotionSpec
@@ -353,7 +358,7 @@ internal class TextDrawer {
         )
 
         canvas.withSave {
-            clipRect(visibleLeft, 0f, visibleRight, viewHeight.toFloat())
+            clipRect(visibleLeft, 0f, visibleRight, clipBottom)
             drawText(text, start, end, drawX, baselineY + liftY, paint)
         }
     }
@@ -365,21 +370,22 @@ internal class TextDrawer {
         textSize: Float,
         motionSpec: MotionSpec
     ): Float {
-        if (motionSpec.liftFactor <= 0f || motionSpec.waveFactor <= 0f) return 0f
+        if (motionSpec.liftFactor <= 0f || textSize <= 0f) return 0f
         val maxOffset = textSize * motionSpec.liftFactor
-        val unitCenter = (unitStart + unitEnd) / 2f
-        val waveLength = textSize * motionSpec.waveFactor
-        val phase = ((highlightWidth - unitCenter) / waveLength).coerceIn(0f, 1f)
-        return maxOffset * (1f - easeOutQuint(phase))
+        if (highlightWidth <= 0f) return maxOffset
+
+        val waveLength = textSize * motionSpec.waveFactor.coerceAtLeast(0f)
+        val transitionStart = max(0f, unitStart - waveLength)
+        val transitionLength = unitEnd - transitionStart
+        if (transitionLength <= 0f) return 0f
+
+        val phase = ((highlightWidth - transitionStart) / transitionLength)
+            .coerceIn(0f, 1f)
+        return maxOffset * (1f - phase)
     }
 
     private fun WordModel.motionSpec(): MotionSpec =
         if (containsCjk) cjkMotionSpec else latinMotionSpec
-
-    private fun easeOutQuint(value: Float): Float {
-        val inverse = 1f - value
-        return 1f - inverse * inverse * inverse * inverse * inverse
-    }
 
     private class MotionSpec(
         var animateByChar: Boolean,
@@ -388,7 +394,7 @@ internal class TextDrawer {
         var waveFactor: Float
     ) {
         fun effectiveOffset(textSize: Float): Float =
-            if (waveFactor > 0f && liftFactor > 0f) textSize * liftFactor else 0f
+            if (liftFactor > 0f) textSize * liftFactor else 0f
     }
 
     private fun getOrCreateRainbowShader(
@@ -480,10 +486,10 @@ internal class TextDrawer {
             1f
         )
 
-        const val DEFAULT_CJK_LIFT_FACTOR = 0.055f
-        const val DEFAULT_CJK_WAVE_FACTOR = 2.8f
-        const val DEFAULT_LATIN_LIFT_FACTOR = 0.08f
-        const val DEFAULT_LATIN_WAVE_FACTOR = 2.0f
+        const val DEFAULT_CJK_LIFT_FACTOR = 0.12f
+        const val DEFAULT_CJK_WAVE_FACTOR = 0.9f
+        const val DEFAULT_LATIN_LIFT_FACTOR = 0.12f
+        const val DEFAULT_LATIN_WAVE_FACTOR = 0.8f
     }
 }
 

@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter
 import com.lidesheng.hyperlyric.common.ServiceConstants
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
 import com.lidesheng.hyperlyric.common.UIConstants
+import com.lidesheng.hyperlyric.common.WordMotionPreferencePolicy
 
 object BackupRestoreManager {
     private const val BACKUP_VERSION = 1
@@ -62,6 +63,12 @@ object BackupRestoreManager {
         return JSONObject().apply {
             prefs.all.forEach { (key, value) ->
                 if (isSensitivePreferenceKey(key)) return@forEach
+                if (WordMotionPreferencePolicy.isBoundedFloatKey(key)) {
+                    WordMotionPreferencePolicy.normalizeStoredFloat(key, value)?.let {
+                        put(key, it.toDouble())
+                    }
+                    return@forEach
+                }
                 when (value) {
                     is Boolean -> put(key, value)
                     is Int -> put(key, value)
@@ -124,6 +131,12 @@ object BackupRestoreManager {
                     val maxTokens = (value as? Number)?.toLong()
                         ?: value.toString().toLongOrNull()
                     if (maxTokens != null) putLong(key, maxTokens)
+                    continue
+                }
+                if (WordMotionPreferencePolicy.isBoundedFloatKey(key)) {
+                    WordMotionPreferencePolicy.normalizeStoredFloat(key, value)?.let {
+                        putFloat(key, it)
+                    }
                     continue
                 }
                 when (value) {

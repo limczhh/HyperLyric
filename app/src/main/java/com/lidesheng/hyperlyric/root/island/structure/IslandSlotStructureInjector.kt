@@ -224,6 +224,7 @@ internal object IslandSlotStructureInjector {
         }
         if (existingWrapper != null) {
             existingWrapper.keepVisible = true
+            existingWrapper.clipChildren = false
             var changed = updateFakeDynamicWidthChain(
                 rootView,
                 parent,
@@ -273,7 +274,7 @@ internal object IslandSlotStructureInjector {
 
         val wrapperView = MaxWidthFrameLayout(rootView.context).apply {
             tag = wrapperTag
-            clipChildren = true
+            clipChildren = false
             maxWidthPx = widthPx
             keepVisible = true
         }
@@ -381,6 +382,10 @@ internal object IslandSlotStructureInjector {
         parentName: String
     ): Boolean {
         var changed = false
+        if (wrapper.clipChildren) {
+            wrapper.clipChildren = false
+            changed = true
+        }
         val paddingLeft = config.geometry.paddingLeftPx(wrapper, parentName)
         val paddingRight = config.geometry.paddingRightPx(wrapper, parentName)
         if (wrapper.paddingLeft != paddingLeft || wrapper.paddingRight != paddingRight) {

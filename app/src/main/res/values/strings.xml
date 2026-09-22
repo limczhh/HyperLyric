@@ -338,8 +338,8 @@
     <string name="title_word_motion_cjk_wave">中日韩波长系数</string>
     <string name="title_word_motion_latin_lift">拉丁文字上浮系数</string>
     <string name="title_word_motion_latin_wave">拉丁文字波长系数</string>
-    <string name="label_word_motion_lift_range">范围：0 ~ 0.2</string>
-    <string name="label_word_motion_wave_range">范围：0 ~ 8</string>
+    <string name="label_word_motion_lift_range">范围：0 ~ 0.20</string>
+    <string name="label_word_motion_wave_range">范围：0 ~ 2.00</string>
     <string name="title_custom_font">字体</string>
     <string name="summary_default_font">默认</string>
     <string name="title_verbatim_lyric">逐字歌词</string>

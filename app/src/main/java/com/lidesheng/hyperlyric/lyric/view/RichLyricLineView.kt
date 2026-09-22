@@ -139,6 +139,7 @@ class RichLyricLineView(
     init {
         orientation = VERTICAL
         gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        clipChildren = false
         addView(main, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         addView(secondary, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         updateLayoutTransitionX()

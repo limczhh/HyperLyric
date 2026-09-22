@@ -313,7 +313,7 @@
   <string name="title_word_motion_latin_lift">معامل رفع النص اللاتيني</string>
   <string name="title_word_motion_latin_wave">معامل طول موجة النص اللاتيني</string>
   <string name="label_word_motion_lift_range">النطاق: 0 ~ 0.2</string>
-  <string name="label_word_motion_wave_range">النطاق: 0 ~ 8</string>
+  <string name="label_word_motion_wave_range">النطاق: 0 ~ 2.00</string>
   <string name="title_custom_font">الخط</string>
   <string name="summary_default_font">افتراضي</string>
   <string name="title_verbatim_lyric">الكلمات الحرفية</string>

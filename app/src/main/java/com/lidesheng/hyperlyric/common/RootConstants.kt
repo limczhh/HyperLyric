@@ -251,6 +251,10 @@ object RootConstants {
     const val KEY_HOOK_WORD_MOTION_LATIN_WAVE = "key_hook_word_motion_latin_wave"
 
     // ================= DEFAULTS =================
+    const val MIN_HOOK_WORD_MOTION_LIFT = 0f
+    const val MAX_HOOK_WORD_MOTION_LIFT = 0.20f
+    const val MIN_HOOK_WORD_MOTION_WAVE = 0f
+    const val MAX_HOOK_WORD_MOTION_WAVE = 2f
     const val DEFAULT_HOOK_LYRIC_MODE = 0
     const val DEFAULT_HOOK_LYRICON_PROVIDER_DELAY = 0
     const val MIN_HOOK_LYRICON_PROVIDER_DELAY = -5000
@@ -548,9 +552,9 @@ object RootConstants {
     const val ISLAND_PROGRESS_STYLE_BOTTOM_BIDIRECTIONAL = 6
     const val DEFAULT_HOOK_ISLAND_PROGRESS_STYLE = ISLAND_PROGRESS_STYLE_TOP_CLOCKWISE
     const val DEFAULT_HOOK_WORD_MOTION_ENABLED = false
-    const val DEFAULT_HOOK_WORD_MOTION_CJK_LIFT = 0.05f
-    const val DEFAULT_HOOK_WORD_MOTION_CJK_WAVE = 2.8f
+    const val DEFAULT_HOOK_WORD_MOTION_CJK_LIFT = 0.12f
+    const val DEFAULT_HOOK_WORD_MOTION_CJK_WAVE = 0.9f
     const val DEFAULT_HOOK_WORD_MOTION_LATIN_BY_CHARACTER = false
-    const val DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT = 0.08f
-    const val DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE = 2.0f
+    const val DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT = 0.12f
+    const val DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE = 0.8f
 }
