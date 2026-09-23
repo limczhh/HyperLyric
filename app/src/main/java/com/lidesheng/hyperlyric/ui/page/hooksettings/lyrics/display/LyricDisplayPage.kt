@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.display
 
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -18,8 +19,21 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookC
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookPrefs
 
 @Composable
-fun LyricDisplayPage() {
-    val prefs = rememberHookPrefs()
+fun LyricDisplayPage(statusBarLyrics: Boolean = false) {
+    LyricDisplaySettings(statusBarLyrics) { sections ->
+        XposedLyricSettingPage(
+            title = stringResource(id = R.string.title_text),
+            content = sections,
+        )
+    }
+}
+
+@Composable
+internal fun LyricDisplaySettings(
+    statusBarLyrics: Boolean,
+    content: @Composable (LazyListScope.() -> Unit) -> Unit,
+) {
+    val prefs = rememberHookPrefs(statusBarLyrics)
     val saveConfig = rememberHookConfigSaver(prefs)
 
     var textSize by remember {
@@ -153,7 +167,7 @@ fun LyricDisplayPage() {
         }
     )
 
-    XposedLyricSettingPage(title = stringResource(id = R.string.title_text)) {
+    content {
         lyricDisplaySections(
             textSize = textSize,
             onTextSizeClick = { showTextSizeDialog = true },
@@ -179,7 +193,8 @@ fun LyricDisplayPage() {
             onNarrowLatinFontChange = {
                 narrowLatinFont = it
                 saveConfig(RootConstants.KEY_HOOK_NARROW_LATIN_FONT, it)
-            }
+            },
+            statusBarLyrics = statusBarLyrics,
         )
     }
 }

@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root
 import android.app.Application
 import android.content.Context
 import com.lidesheng.hyperlyric.common.PrefsBridge
+import com.lidesheng.hyperlyric.common.LyricOutputTargetPreferencePolicy
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.ui.utils.AppUtils
@@ -21,6 +22,7 @@ class RootApplication : Application() {
         LogManager.init(this)
         PrefsBridge.init(this)
         SyllablePreferencePolicy.normalizeInPlace(PrefsBridge.getPrefs())
+        LyricOutputTargetPreferencePolicy.normalizeInPlace(PrefsBridge.getPrefs())
         appContext = this
 
         XposedServiceHelper.registerListener(object : XposedServiceHelper.OnServiceListener {
@@ -66,6 +68,24 @@ class RootApplication : Application() {
         }
 
         @JvmStatic
+        fun syncBooleanPreferences(group: String, values: Map<String, Boolean>) {
+            val remotePrefs = try {
+                xposedService?.getRemotePreferences(group)
+            } catch (_: Exception) {
+                null
+            } ?: return
+
+            runCatching {
+                remotePrefs.edit().apply {
+                    values.forEach { (key, value) -> putBoolean(key, value) }
+                    apply()
+                }
+            }.onFailure { error ->
+                LogManager.w(TAG, "同步互斥歌词输出开关失败", error)
+            }
+        }
+
+        @JvmStatic
         private fun syncAllPreferences(
             context: Context,
             service: XposedService? = xposedService,
@@ -81,6 +101,7 @@ class RootApplication : Application() {
 
             val localPrefs = context.getSharedPreferences(UIConstants.PREF_NAME, MODE_PRIVATE)
             SyllablePreferencePolicy.normalizeInPlace(localPrefs)
+            LyricOutputTargetPreferencePolicy.normalizeInPlace(localPrefs)
             val hostSynced = try {
                 val editor = remotePrefs.edit()
                 // LSPosed's RemotePreferences service persists the explicit delete set; its
@@ -99,6 +120,9 @@ class RootApplication : Application() {
                             value as Set<String>
                         )
                     }
+                }
+                LyricOutputTargetPreferencePolicy.read(localPrefs).forEach { (key, value) ->
+                    editor.putBoolean(key, value)
                 }
                 editor.commit()
             } catch (e: Exception) {

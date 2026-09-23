@@ -5,7 +5,7 @@ import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
-import com.lidesheng.hyperlyric.root.island.renderer.IslandRenderer
+import com.lidesheng.hyperlyric.root.island.renderer.LyricRenderer
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
  * those details do not become another concern of the source sink.
  */
 internal class LyricEnhancementController(
-    private val renderer: IslandRenderer,
+    private val renderer: LyricRenderer,
     private val mainHandler: Handler,
     private val coordinator: LyricEnhancementCoordinator?,
 ) : AutoCloseable {

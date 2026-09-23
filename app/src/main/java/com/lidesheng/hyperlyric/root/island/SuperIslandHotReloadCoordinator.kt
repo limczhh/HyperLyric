@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.island
 
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
@@ -13,7 +14,9 @@ import com.lidesheng.hyperlyric.root.island.hooks.SystemUIHookRegistry
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
+import com.lidesheng.hyperlyric.root.island.renderer.SystemUiLyricRenderer
 import com.lidesheng.hyperlyric.root.island.sizing.IslandDynamicWidthCoordinator
+import com.lidesheng.hyperlyric.root.statusbar.StatusBarLyricRenderer
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedModule
 
@@ -27,10 +30,10 @@ import io.github.libxposed.api.XposedModule
 internal class SuperIslandHotReloadCoordinator(
     private val mainThread: MainThreadExecutor,
 ) {
-    fun prepareForHotReload(): List<IslandPresentationCoordinator.HotReloadHostTransfer> {
+    fun prepareForHotReload(): HotReloadTransfers {
         val transfers = mainThread.execute {
             BaseIslandRenderer.prepareForHotReload()
-            val prepared = IslandPresentationCoordinator.prepareForHotReload()
+            val islandHosts = IslandPresentationCoordinator.prepareForHotReload()
             IslandDynamicWidthCoordinator.prepareForHotReload()
             check(StatusBarTextColorHooker.cleanupForHotReload()) {
                 "DarkIconDispatcher receiver could not be detached"
@@ -42,7 +45,12 @@ internal class SuperIslandHotReloadCoordinator(
             IslandMusicWaveColorHooker.cleanup()
             IslandMediaSwipeHooker.prepareForHotReload()
             IslandNativeRefreshCoordinator.clear()
-            prepared
+            // Strip status-bar module views only after the other fallible cleanup checks pass.
+            val statusBarRoots = StatusBarLyricRenderer.prepareForHotReload()
+            HotReloadTransfers(
+                islandHosts = islandHosts,
+                statusBarRoots = statusBarRoots,
+            )
         }
 
         // These registries contain class-loader and hooker-local state.  Clear them only after the
@@ -71,16 +79,20 @@ internal class SuperIslandHotReloadCoordinator(
         IslandPresentationCoordinator.adoptHotReloadHosts(transfers)
     }
 
+    fun adoptStatusBarRoots(roots: List<ViewGroup>): Int = mainThread.execute {
+        StatusBarLyricRenderer.adoptHotReloadRoots(roots)
+    }
+
     fun refreshRestoredPresentation() {
         mainThread.execute {
-            BaseIslandRenderer.updateLyricLine()
-            BaseIslandRenderer.updateMetadata()
-            BaseIslandRenderer.onPlaybackStateChanged(
+            SystemUiLyricRenderer.updateLyricLine()
+            SystemUiLyricRenderer.updateMetadata()
+            SystemUiLyricRenderer.onPlaybackStateChanged(
                 LyriconDataBridge.isPlaybackActive()
             )
             val clock = LyriconDataBridge.currentPlaybackClock()
-            BaseIslandRenderer.updatePosition(clock.positionMs, clock.playbackSpeed)
-            BaseIslandRenderer.refreshActiveIsland()
+            SystemUiLyricRenderer.updatePosition(clock.positionMs, clock.playbackSpeed)
+            SystemUiLyricRenderer.refreshActiveIsland()
         }
     }
 
@@ -93,6 +105,7 @@ internal class SuperIslandHotReloadCoordinator(
         val mainCleanupSucceeded = runCatching {
             mainThread.execute {
                 var succeeded = StatusBarTextColorHooker.cleanupForHotReload()
+                StatusBarLyricRenderer.cleanupForHotReload()
                 HookIslandGlow.cleanupForHotReload()
                 IslandProgressGlowHooker.cleanupForHotReload()
                 IslandAlbumCoverStyleHooker.cleanup()
@@ -115,6 +128,11 @@ internal class SuperIslandHotReloadCoordinator(
     internal interface MainThreadExecutor {
         fun <T> execute(block: () -> T): T
     }
+
+    internal data class HotReloadTransfers(
+        val islandHosts: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
+        val statusBarRoots: List<ViewGroup>,
+    )
 
     private companion object {
         private const val TAG = "SuperIslandHotReloadCoordinator"

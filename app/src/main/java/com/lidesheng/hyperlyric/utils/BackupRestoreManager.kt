@@ -14,6 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.LyricOutputTargetPreferencePolicy
+import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
 import com.lidesheng.hyperlyric.root.RootApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -148,6 +150,24 @@ object BackupRestoreManager {
                 }
             }
         }
+        val restoredIslandEnabled = config.optBoolean(
+            RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
+            false,
+        )
+        val restoredStatusBarEnabled = config.optBoolean(
+            StatusBarLyricPreferences.KEY_ENABLED,
+            false,
+        )
+        val preferredEnabledTarget = when {
+            restoredIslandEnabled && !restoredStatusBarEnabled ->
+                RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND
+
+            restoredStatusBarEnabled && !restoredIslandEnabled ->
+                StatusBarLyricPreferences.KEY_ENABLED
+
+            else -> null
+        }
+        LyricOutputTargetPreferencePolicy.normalizeInPlace(prefs, preferredEnabledTarget)
         val syllableSettings = SyllablePreferencePolicy.read(prefs)
         val syllableEditor = prefs.edit()
         SyllablePreferencePolicy.write(syllableEditor, syllableSettings)

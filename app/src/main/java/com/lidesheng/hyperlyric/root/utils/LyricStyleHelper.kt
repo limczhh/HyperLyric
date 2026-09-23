@@ -30,7 +30,8 @@ object LyricStyleHelper {
         mode: Int,
         colorSession: CoverColorHelper.ColorSession? = null,
         artworkRequest: CoverColorHelper.ArtworkRequest? = null,
-        textColorOverride: Int? = null
+        textColorOverride: Int? = null,
+        lyricAlignmentOverride: Int? = null
     ): LyricViewStyle {
         val syllableSettings = SyllablePreferencePolicy.read(prefs)
         val fontSize =
@@ -54,18 +55,17 @@ object LyricStyleHelper {
 
         val isLyricMode = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
         val contentAlignment = RootConstants.normalizeHookContentAlignment(
-            prefs.getInt(
-                if (isLyricMode) {
-                    RootConstants.KEY_HOOK_LYRIC_ALIGNMENT
-                } else {
-                    RootConstants.KEY_HOOK_MUSIC_INFO_ALIGNMENT
-                },
-                if (isLyricMode) {
+            if (isLyricMode) {
+                lyricAlignmentOverride ?: prefs.getInt(
+                    RootConstants.KEY_HOOK_LYRIC_ALIGNMENT,
                     RootConstants.DEFAULT_HOOK_LYRIC_ALIGNMENT
-                } else {
+                )
+            } else {
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_MUSIC_INFO_ALIGNMENT,
                     RootConstants.DEFAULT_HOOK_MUSIC_INFO_ALIGNMENT
-                }
-            )
+                )
+            }
         )
         val centerIfPossible = contentAlignment == RootConstants.CONTENT_ALIGNMENT_CENTER
         val rightIfPossible = contentAlignment == RootConstants.CONTENT_ALIGNMENT_RIGHT

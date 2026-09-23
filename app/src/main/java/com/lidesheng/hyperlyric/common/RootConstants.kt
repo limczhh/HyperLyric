@@ -4,6 +4,35 @@ object RootConstants {
     // ================= HOOK & SUPER ISLAND KEYS =================
     const val KEY_HOOK_ENABLE_SUPER_ISLAND = "key_hook_enable_super_island"
     const val KEY_HOOK_ENABLE_DYNAMIC_ISLAND = "key_hook_enable_dynamic_island"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ENABLED = "key_hook_status_bar_lyric_enabled"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_CONFIG_INITIALIZED =
+        "key_hook_status_bar_lyric_config_initialized"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_INSERTION_ORDER =
+        "key_hook_status_bar_lyric_insertion_order"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH =
+        "key_hook_status_bar_lyric_portrait_dynamic_max_width"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_LANDSCAPE_DYNAMIC_MAX_WIDTH =
+        "key_hook_status_bar_lyric_landscape_dynamic_max_width"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_PADDING_LEFT_DP =
+        "key_hook_status_bar_lyric_padding_left_dp"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_PADDING_RIGHT_DP =
+        "key_hook_status_bar_lyric_padding_right_dp"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR =
+        "key_hook_status_bar_lyric_clock_hide_behavior"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ISLAND_HIDE_BEHAVIOR =
+        "key_hook_status_bar_lyric_island_hide_behavior"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ADJUST_WIDTH_FOR_SUPER_ISLAND =
+        "key_hook_status_bar_lyric_adjust_width_for_super_island"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN =
+        "key_hook_status_bar_lyric_hide_on_lock_screen"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_DOUBLE_TAP_ACTION =
+        "key_hook_status_bar_lyric_double_tap_action"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_LONG_PRESS_ACTION =
+        "key_hook_status_bar_lyric_long_press_action"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_SWIPE_LEFT_ACTION =
+        "key_hook_status_bar_lyric_swipe_left_action"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_SWIPE_RIGHT_ACTION =
+        "key_hook_status_bar_lyric_swipe_right_action"
     const val KEY_HOOK_LYRIC_MODE = "key_hook_lyric_mode"
     const val KEY_HOOK_LYRIC_SOURCE = "key_hook_lyric_source"
     const val DEFAULT_HOOK_LYRIC_SOURCE = "lyricon"
@@ -262,6 +291,46 @@ object RootConstants {
 
     const val DEFAULT_HOOK_ENABLE_SUPER_ISLAND = false
     const val DEFAULT_HOOK_ENABLE_DYNAMIC_ISLAND = false
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ENABLED = true
+    const val STATUS_BAR_LYRIC_INSERTION_BEFORE_CLOCK = 0
+    const val STATUS_BAR_LYRIC_INSERTION_AFTER_CLOCK = 1
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_INSERTION_ORDER =
+        STATUS_BAR_LYRIC_INSERTION_AFTER_CLOCK
+    const val STATUS_BAR_LYRIC_PORTRAIT_MAX_WIDTH_DP = 200
+    const val STATUS_BAR_LYRIC_LANDSCAPE_MAX_WIDTH_DP = 400
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH = 150
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_LANDSCAPE_DYNAMIC_MAX_WIDTH = 200
+    const val DEFAULT_STATUS_BAR_LYRIC_TEXT_SIZE_SP = 13
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_PADDING_DP = 0f
+    const val MIN_HOOK_STATUS_BAR_LYRIC_PADDING_DP = -32f
+    const val MAX_HOOK_STATUS_BAR_LYRIC_PADDING_DP = 32f
+    const val STATUS_BAR_LYRIC_CLOCK_HIDE_NONE = 0
+    const val STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING = 1
+    const val STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT = 2
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR =
+        STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING
+    const val STATUS_BAR_LYRIC_ISLAND_HIDE_NONE = 0
+    const val STATUS_BAR_LYRIC_ISLAND_HIDE_WHILE_PLAYING = 1
+    const val STATUS_BAR_LYRIC_ISLAND_HIDE_ALWAYS = 2
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ISLAND_HIDE_BEHAVIOR =
+        STATUS_BAR_LYRIC_ISLAND_HIDE_NONE
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ADJUST_WIDTH_FOR_SUPER_ISLAND = true
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN = true
+    const val STATUS_BAR_LYRIC_GESTURE_ACTION_NONE = 0
+    const val STATUS_BAR_LYRIC_GESTURE_ACTION_TOGGLE_PLAYBACK = 1
+    const val STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_CLOCK = 2
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_DOUBLE_TAP_ACTION =
+        STATUS_BAR_LYRIC_GESTURE_ACTION_NONE
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_LONG_PRESS_ACTION =
+        STATUS_BAR_LYRIC_GESTURE_ACTION_TOGGLE_PLAYBACK
+    const val STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE = 0
+    const val STATUS_BAR_LYRIC_GESTURE_SWIPE_PREVIOUS = 1
+    const val STATUS_BAR_LYRIC_GESTURE_SWIPE_NEXT = 2
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_SWIPE_LEFT_ACTION =
+        STATUS_BAR_LYRIC_GESTURE_SWIPE_NEXT
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_SWIPE_RIGHT_ACTION =
+        STATUS_BAR_LYRIC_GESTURE_SWIPE_PREVIOUS
+    const val STATUS_BAR_LYRIC_GESTURE_SWIPE_THRESHOLD_DP = 50
     const val ISLAND_ALBUM_COVER_STYLE_DEFAULT = 0
     const val ISLAND_ALBUM_COVER_STYLE_CIRCLE = 1
     const val ISLAND_ALBUM_COVER_STYLE_APP_ICON = 2

@@ -38,7 +38,8 @@ fun LazyListScope.lyricScrollSections(
     marqueeMetadataInfinite: Boolean,
     onMarqueeMetadataInfiniteChange: (Boolean) -> Unit,
     marqueeMetadataLoopDelay: Int,
-    onMarqueeMetadataLoopClick: () -> Unit
+    onMarqueeMetadataLoopClick: () -> Unit,
+    includeMetadata: Boolean = true
 ) {
     item(key = "lyric_scroll") {
         Column {
@@ -106,7 +107,7 @@ fun LazyListScope.lyricScrollSections(
                     )
                 }
             }
-            if (lyricMode == 0) {
+            if (includeMetadata && lyricMode == 0) {
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp)

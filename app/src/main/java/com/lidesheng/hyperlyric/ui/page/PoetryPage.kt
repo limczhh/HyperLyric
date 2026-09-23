@@ -7,10 +7,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -35,6 +38,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lidesheng.hyperlyric.R
@@ -43,17 +47,19 @@ import com.lidesheng.hyperlyric.ui.component.SearchBox
 import com.lidesheng.hyperlyric.ui.component.SearchPager
 import com.lidesheng.hyperlyric.ui.component.SearchStatus
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
+import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.QuotesData
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.basic.FloatingActionButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.VerticalScrollBar
@@ -67,6 +73,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun PoetryPage() {
     val navigator = LocalNavigator.current
+    val openStatusBarLyricSettings = remember(navigator) {
+        { navigator.navigate(Route.StatusBarLyricSettings) }
+    }
     val searchLabel = stringResource(R.string.search)
     var searchStatus by remember { mutableStateOf(SearchStatus(label = searchLabel)) }
 
@@ -131,19 +140,35 @@ fun PoetryPage() {
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
-                FloatingActionButton(onClick = {
-                    coroutineScope.launch {
-                        listState.animateScrollToItem(
-                            0
+                Surface(
+                    shape = CircleShape,
+                    color = MiuixTheme.colorScheme.primary,
+                    shadowElevation = FloatingActionButtonDefaults.ShadowElevation,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .defaultMinSize(
+                                minWidth = FloatingActionButtonDefaults.MinWidth,
+                                minHeight = FloatingActionButtonDefaults.MinHeight,
+                            )
+                            .combinedClickable(
+                                role = Role.Button,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(0)
+                                    }
+                                },
+                                onLongClick = openStatusBarLyricSettings,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Back,
+                            contentDescription = stringResource(R.string.back_to_top),
+                            modifier = Modifier.rotate(90f),
+                            tint = Color.White
                         )
                     }
-                }) {
-                    Icon(
-                        imageVector = MiuixIcons.Back,
-                        contentDescription = stringResource(R.string.back_to_top),
-                        modifier = Modifier.rotate(90f),
-                        tint = Color.White
-                    )
                 }
             }
         },

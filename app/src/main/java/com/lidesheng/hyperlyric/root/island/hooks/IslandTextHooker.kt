@@ -31,6 +31,10 @@ internal object IslandTextHooker {
         "miui.systemui.dynamicisland.module.IslandModuleViewHolderAdapter"
 
     fun hook(module: XposedModule, cl: ClassLoader) {
+        installFeature("状态栏歌词隐藏原生媒体岛") {
+            StatusBarLyricMediaIslandHooker.hook(module, cl)
+        }
+
         installFeature("超级岛长按行为") {
             IslandLyricShareHooker.hook(module, cl)
         }

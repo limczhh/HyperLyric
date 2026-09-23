@@ -14,7 +14,7 @@ import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
-import com.lidesheng.hyperlyric.root.island.renderer.IslandRenderer
+import com.lidesheng.hyperlyric.root.island.renderer.LyricRenderer
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.media.LyricColorBindingCoordinator
 import com.lidesheng.hyperlyric.root.media.LyricColorBindingUpdate
@@ -24,7 +24,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlin.math.abs
 
 internal class RootLyricSink(
-    private val renderer: IslandRenderer,
+    private val renderer: LyricRenderer,
     private val context: Context,
     private val prefs: SharedPreferences? = null,
     private val lyricEnhancementCoordinator: LyricEnhancementCoordinator? = null

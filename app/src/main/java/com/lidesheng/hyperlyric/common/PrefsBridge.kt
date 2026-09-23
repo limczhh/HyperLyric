@@ -23,8 +23,19 @@ object PrefsBridge {
     fun getStringSet(key: String, default: Set<String>? = null): Set<String>? = getPrefs().getStringSet(key, default)
 
     fun putBoolean(key: String, value: Boolean) {
-        getPrefs().edit().putBoolean(key, value).apply()
-        RootApplication.syncPreference(PreferenceKeys.PREF_NAME, key, value)
+        val preferences = getPrefs()
+        val targetUpdates = LyricOutputTargetPreferencePolicy.updatesFor(key, value)
+        if (targetUpdates != null) {
+            preferences.edit().apply {
+                targetUpdates.forEach { (targetKey, targetEnabled) ->
+                    putBoolean(targetKey, targetEnabled)
+                }
+            }.apply()
+            RootApplication.syncBooleanPreferences(PreferenceKeys.PREF_NAME, targetUpdates)
+        } else {
+            preferences.edit().putBoolean(key, value).apply()
+            RootApplication.syncPreference(PreferenceKeys.PREF_NAME, key, value)
+        }
     }
 
     fun putInt(key: String, value: Int) {

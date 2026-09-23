@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.PrefsBridge
+import com.lidesheng.hyperlyric.common.LyricOutputTargetPreferencePolicy
+import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.page.hooksettings.rememberEntryTransitionContentReady
@@ -32,6 +34,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
@@ -43,10 +46,11 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun rememberHookPrefs(): SharedPreferences {
+internal fun rememberHookPrefs(statusBarLyrics: Boolean = false): SharedPreferences {
     val context = LocalContext.current
-    return remember(context) {
-        context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE)
+    return remember(context, statusBarLyrics) {
+        val prefs = context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE)
+        if (statusBarLyrics) StatusBarLyricPreferences.scoped(prefs) else prefs
     }
 }
 
@@ -54,24 +58,29 @@ internal fun rememberHookPrefs(): SharedPreferences {
 internal fun rememberHookConfigSaver(prefs: SharedPreferences): (String, Any) -> Unit {
     return remember(prefs) {
         { key: String, value: Any ->
-            prefs.edit {
-                when (value) {
-                    is Int -> putInt(key, value)
-                    is Boolean -> putBoolean(key, value)
-                    is Float -> putFloat(key, value)
-                    is String -> putString(key, value)
-                    is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
+            val storedKey = StatusBarLyricPreferences.resolveStoredKey(prefs, key)
+            if (value is Boolean && LyricOutputTargetPreferencePolicy.isTargetKey(storedKey)) {
+                PrefsBridge.putBoolean(storedKey, value)
+            } else {
+                prefs.edit {
+                    when (value) {
+                        is Int -> putInt(key, value)
+                        is Boolean -> putBoolean(key, value)
+                        is Float -> putFloat(key, value)
+                        is String -> putString(key, value)
+                        is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
+                    }
                 }
-            }
-            when (value) {
-                is Int -> PrefsBridge.putInt(key, value)
-                is Boolean -> PrefsBridge.putBoolean(key, value)
-                is Float -> PrefsBridge.putFloat(key, value)
-                is String -> PrefsBridge.putString(key, value)
-                is Set<*> -> PrefsBridge.putStringSet(
-                    key,
-                    value.filterIsInstance<String>().toSet()
-                )
+                when (value) {
+                    is Int -> PrefsBridge.putInt(storedKey, value)
+                    is Boolean -> PrefsBridge.putBoolean(storedKey, value)
+                    is Float -> PrefsBridge.putFloat(storedKey, value)
+                    is String -> PrefsBridge.putString(storedKey, value)
+                    is Set<*> -> PrefsBridge.putStringSet(
+                        storedKey,
+                        value.filterIsInstance<String>().toSet()
+                    )
+                }
             }
         }
     }
@@ -82,10 +91,12 @@ internal fun XposedLyricSettingPage(
     title: String,
     snackbarHostState: SnackbarHostState? = null,
     topBarActions: @Composable RowScope.() -> Unit = {},
+    topBarBottomContent: @Composable () -> Unit = {},
+    pageContent: (@Composable (PaddingValues, ScrollBehavior) -> Unit)? = null,
     isInitialLoading: Boolean = false,
     isRefreshing: Boolean = false,
     onRefresh: (() -> Unit)? = null,
-    content: LazyListScope.() -> Unit
+    content: LazyListScope.() -> Unit = {}
 ) {
     val navigator = LocalNavigator.current
     val backdrop = rememberBlurBackdrop()
@@ -111,7 +122,8 @@ internal fun XposedLyricSettingPage(
                             )
                         }
                     },
-                    actions = topBarActions
+                    actions = topBarActions,
+                    bottomContent = topBarBottomContent,
                 )
             }
         }
@@ -152,7 +164,9 @@ internal fun XposedLyricSettingPage(
             }
         } else {
             Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
-                if (onRefresh == null) {
+                if (pageContent != null) {
+                    pageContent(contentPadding, topAppBarScrollBehavior)
+                } else if (onRefresh == null) {
                     LazyColumn(
                         state = lazyListState,
                         modifier = Modifier.pageScrollModifiers(

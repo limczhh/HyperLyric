@@ -166,6 +166,43 @@ internal object IslandPlaybackControllerResolver {
         return controllers.singleOrNull()
     }
 
+    /** Resolves the session attached to the currently rendered status-bar lyric source. */
+    fun resolveForCurrentLyric(context: Context): MediaController? {
+        val sourceMetadata = LyriconDataBridge.currentLyricMediaMetadata ?: return null
+        val packageName = LyriconDataBridge.currentLyricPackageName
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: sourceMetadata.packageName
+            ?: return null
+        if (sourceMetadata.packageName?.let { it != packageName } == true) return null
+
+        val sessionContext = resolveSessionContext(context) ?: return null
+        val manager = runCatching {
+            sessionContext.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+        }.onFailure { error ->
+            HookLogger.w(TAG, "获取状态栏歌词 MediaSessionManager 失败", error)
+        }.getOrNull() ?: return null
+        val controllers = runCatching { manager.getActiveSessions(null) }
+            .onFailure { error ->
+                HookLogger.w(TAG, "读取状态栏歌词 active sessions 失败", error)
+            }.getOrNull()
+            ?.filter { it.packageName == packageName }
+            .orEmpty()
+        if (controllers.isEmpty()) return null
+
+        sourceMetadata.sessionToken?.let { token ->
+            resolveToken(sessionContext, packageName, controllers, token)?.let { return it }
+            return null
+        }
+
+        sourceMetadata.mediaId?.let { mediaId ->
+            return controllers.singleOrNull { controller ->
+                controllerMediaId(controller) == mediaId
+            }
+        }
+        return controllers.singleOrNull()
+    }
+
     private fun resolveSessionContext(
         context: Context
     ): Context? {

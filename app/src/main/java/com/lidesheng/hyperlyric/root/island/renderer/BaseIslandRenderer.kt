@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
  * visible; a visibility handoff is therefore not a lyric lifecycle event and performs no copy,
  * freeze, seek, or recovery work.
  */
-object BaseIslandRenderer : IslandRenderer {
+object BaseIslandRenderer : LyricRenderer {
 
     private const val REFRESH_DEBOUNCE_MS = 32L
     private val mainHandler = Handler(Looper.getMainLooper())

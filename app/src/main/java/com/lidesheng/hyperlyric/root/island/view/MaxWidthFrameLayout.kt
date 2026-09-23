@@ -17,6 +17,9 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
      */
     var maxWidthPx: Int = -1
 
+    /** Interpret a zero maximum as a zero-width viewport instead of the unbounded sentinel. */
+    var allowZeroWidth: Boolean = false
+
     /**
      * Requested content width（像素）。设置为 -1（默认）时回退到 [maxWidthPx] 或父级规格。
      */
@@ -47,6 +50,14 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         if (fillExactParentWidth && MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            return
+        }
+
+        if (allowZeroWidth && (maxWidthPx == 0 || desiredWidthPx == 0)) {
+            super.onMeasure(
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.EXACTLY),
+                heightMeasureSpec,
+            )
             return
         }
 

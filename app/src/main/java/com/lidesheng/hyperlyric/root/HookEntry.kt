@@ -5,8 +5,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
-import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.source.SourceManager
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
@@ -19,6 +19,7 @@ import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
 import com.lidesheng.hyperlyric.root.island.renderer.IslandSettingsRefreshCoordinator
+import com.lidesheng.hyperlyric.root.island.renderer.SystemUiLyricRenderer
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardConfigurationRefreshHooker
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardElementBehaviorHooker
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
@@ -33,6 +34,8 @@ import com.lidesheng.hyperlyric.root.source.LyricInfoSource
 import com.lidesheng.hyperlyric.root.source.LyriconSource
 import com.lidesheng.hyperlyric.root.source.RootLyricSink
 import com.lidesheng.hyperlyric.root.source.SuperLyricSource
+import com.lidesheng.hyperlyric.root.statusbar.StatusBarLyricHooker
+import com.lidesheng.hyperlyric.root.statusbar.StatusBarLyricRenderer
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -220,6 +223,11 @@ class HookEntry : XposedModule() {
         if (!cleanupSucceeded) {
             HookRuntimeRegistry.activate(this)
             restoreSuperIslandWhitelistListeners()
+            runCatching {
+                superIslandHotReloadCoordinator.adoptStatusBarRoots(transfers.statusBarRoots)
+            }.onFailure { error ->
+                HookLogger.e(TAG, "恢复被拒绝热重载前的状态栏歌词宿主失败", error)
+            }
             HookLogger.e(TAG, "拒绝热重载: 旧运行时仍有异步任务未退出")
             return false
         }
@@ -236,7 +244,8 @@ class HookEntry : XposedModule() {
         )
         HookLogger.d(
             TAG,
-            "超级岛热重载准备完成: hosts=${transfers.size}, " +
+            "SystemUI 热重载准备完成: islandHosts=${transfers.islandHosts.size}, " +
+                    "statusBarRoots=${transfers.statusBarRoots.size}, " +
                     "snapshot=${snapshot != null}, runtimeReady=$runtimeReady"
         )
         HookLogger.module = null
@@ -315,10 +324,16 @@ class HookEntry : XposedModule() {
                     false
                 }
                 val adopted = state?.let {
-                    superIslandHotReloadCoordinator.adoptHotReloadHosts(it.transfers)
+                    superIslandHotReloadCoordinator.adoptHotReloadHosts(it.islandTransfers)
                 } ?: 0
-                if (state != null && state.transfers.isNotEmpty() && adopted == 0 && restoredSnapshot) {
+                val statusBarAdopted = state?.let {
+                    superIslandHotReloadCoordinator.adoptStatusBarRoots(it.statusBarRoots)
+                } ?: 0
+                if (state != null && state.islandTransfers.isNotEmpty() && adopted == 0 && restoredSnapshot) {
                     HookLogger.w(TAG, "热重载后未接管任何现有超级岛宿主，已保持原生展示")
+                }
+                if (state != null && state.statusBarRoots.isNotEmpty() && statusBarAdopted == 0) {
+                    HookLogger.w(TAG, "热重载后未接管现有状态栏根节点，歌词将等待状态栏重新创建")
                 }
                 if (restoredSnapshot) {
                     superIslandHotReloadCoordinator.refreshRestoredPresentation()
@@ -389,14 +404,13 @@ class HookEntry : XposedModule() {
 
     private fun installSuperIslandStatusBarHooks(classLoader: ClassLoader) {
         StatusBarTextColorHooker.setFollowStatusBarEnabled(
-            LyricTextColorStylePolicy.followsStatusBar(
-                LyricTextColorStylePolicy.read(prefs)
-            )
+            StatusBarLyricPreferences.shouldFollowStatusBarTextColor(prefs)
         )
         StatusBarTextColorHooker.setTextColorChangedListener {
-            BaseIslandRenderer.updateTextColors()
+            SystemUiLyricRenderer.updateTextColors()
         }
         StatusBarTextColorHooker.hook(this, classLoader)
+        StatusBarLyricHooker.hook(this, classLoader)
     }
 
     private fun installMediaCardHooks(classLoader: ClassLoader) {
@@ -523,7 +537,7 @@ class HookEntry : XposedModule() {
             cleanupRuntime()
             runtimeApp = app
 
-            val renderer = BaseIslandRenderer
+            val renderer = SystemUiLyricRenderer
             lyricEnhancementCoordinator = runCatching {
                 LyricEnhancementCoordinator(this, app)
             }.onFailure { error ->
@@ -548,9 +562,10 @@ class HookEntry : XposedModule() {
                 RootConstants.KEY_HOOK_LYRIC_MODE,
                 RootConstants.DEFAULT_HOOK_LYRIC_MODE
             )
-            if (SystemUiEnhancementGate.isEnabled()) {
+            if (shouldRunLyricSource()) {
                 sourceManager?.start()
             }
+            renderer.updateLyricLine()
 
             prefListener =
                 android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -562,15 +577,27 @@ class HookEntry : XposedModule() {
                     if (key?.startsWith(RootConstants.KEY_HOOK_LYRICON_PROVIDER_DELAY_PREFIX) == true) {
                         lyriconSource.onPreferenceChanged(key)
                     }
+                    if (StatusBarLyricPreferences.isStatusBarPreferenceKey(key)) {
+                        StatusBarTextColorHooker.setFollowStatusBarEnabled(
+                            StatusBarLyricPreferences.shouldFollowStatusBarTextColor(prefs)
+                        )
+                        Handler(Looper.getMainLooper()).post {
+                            if (key == StatusBarLyricPreferences.KEY_ENABLED) {
+                                updateLyricSourceRuntime()
+                            }
+                            StatusBarLyricRenderer.onPreferenceChanged()
+                        }
+                        return@OnSharedPreferenceChangeListener
+                    }
                     when (key) {
                         RootConstants.KEY_HOOK_LYRIC_SOURCE -> {
                             val newSourceId =
                                 prefs.getString(key, RootConstants.DEFAULT_HOOK_LYRIC_SOURCE)
                                     ?: RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
-                            if (!SystemUiEnhancementGate.isEnabled()) {
+                            if (!shouldRunLyricSource()) {
                                 HookLogger.d(
                                     TAG,
-                                    "配置未生效: key=$key, reason=system_ui_enhancement_disabled"
+                                    "配置未生效: key=$key, reason=lyric_targets_disabled"
                                 )
                                 return@OnSharedPreferenceChangeListener
                             }
@@ -608,9 +635,9 @@ class HookEntry : XposedModule() {
                             Handler(Looper.getMainLooper()).post {
                                 val changed = LyriconDataBridge.updatePlaceholderFormat(format)
                                 if (changed) {
-                                    BaseIslandRenderer.updateLyricLine()
+                                    SystemUiLyricRenderer.updateLyricLine()
                                     val playbackClock = LyriconDataBridge.currentPlaybackClock()
-                                    BaseIslandRenderer.updatePosition(
+                                    SystemUiLyricRenderer.updatePosition(
                                         playbackClock.positionMs,
                                         playbackClock.playbackSpeed
                                     )
@@ -653,24 +680,23 @@ class HookEntry : XposedModule() {
 
                         RootConstants.KEY_HOOK_ISLAND_MUSIC_INFO_HIDE_TITLE_ALIAS -> {
                             Handler(Looper.getMainLooper()).post {
-                                BaseIslandRenderer.updateMetadata()
+                                SystemUiLyricRenderer.updateMetadata()
                             }
                         }
 
                         RootConstants.KEY_HOOK_TEXT_COLOR_STYLE -> {
                             StatusBarTextColorHooker.setFollowStatusBarEnabled(
-                                LyricTextColorStylePolicy.followsStatusBar(
-                                    LyricTextColorStylePolicy.read(prefs)
-                                )
+                                StatusBarLyricPreferences.shouldFollowStatusBarTextColor(prefs)
                             )
                             Handler(Looper.getMainLooper()).post {
-                                BaseIslandRenderer.updateTextColors()
+                                SystemUiLyricRenderer.updateTextColors()
                             }
                         }
 
                         in SUPER_ISLAND_RUNTIME_REFRESH_KEYS -> {
                             Handler(Looper.getMainLooper()).post {
                                 IslandSettingsRefreshCoordinator.request()
+                                StatusBarLyricRenderer.updateLyricLine()
                             }
                         }
                     }
@@ -693,19 +719,36 @@ class HookEntry : XposedModule() {
     }
 
     private fun updateSystemUiEnhancements(enabled: Boolean) {
+        updateLyricSourceRuntime()
         if (enabled) {
-            sourceManager?.start()
             IslandMusicWaveColorHooker.refresh()
             IslandSettingsRefreshCoordinator.request()
         } else {
-            sourceManager?.stop()
-            LyriconDataBridge.clearState()
             BaseIslandRenderer.clearAllViews()
             IslandProgressGlowController.clearAll()
             IslandAlbumCoverStyleHooker.refresh()
             IslandMusicWaveColorHooker.refresh()
         }
+        StatusBarLyricRenderer.updateLyricLine()
         HookLogger.d(TAG, "更新系统界面增强状态: enabled=$enabled")
+    }
+
+    private fun shouldRunLyricSource(): Boolean =
+        prefs.getBoolean(
+            RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
+            RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND,
+        ) || prefs.getBoolean(
+            StatusBarLyricPreferences.KEY_ENABLED,
+            StatusBarLyricPreferences.DEFAULT_ENABLED,
+        )
+
+    private fun updateLyricSourceRuntime() {
+        if (shouldRunLyricSource()) {
+            sourceManager?.start()
+        } else {
+            sourceManager?.stop()
+            LyriconDataBridge.clearState()
+        }
     }
 
     private fun restoreSuperIslandWhitelistListeners(
@@ -770,7 +813,7 @@ class HookEntry : XposedModule() {
         snapshot: Bundle?,
         statusBarTextColor: Int,
         dispatcher: Any?,
-        transfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
+        transfers: SuperIslandHotReloadCoordinator.HotReloadTransfers,
     ): Any {
         val meta = Bundle().apply {
             putBoolean(STATE_RUNTIME_READY, runtimeReady)
@@ -778,8 +821,8 @@ class HookEntry : XposedModule() {
             putInt(STATE_STATUS_BAR_TEXT_COLOR, statusBarTextColor)
             snapshot?.let { putBundle(STATE_SNAPSHOT, it) }
         }
-        val hosts = ArrayList<Any?>(transfers.size * 4)
-        transfers.forEach { transfer ->
+        val hosts = ArrayList<Any?>(transfers.islandHosts.size * 4)
+        transfers.islandHosts.forEach { transfer ->
             // The ArrayList/Bundle containers are framework objects.  The only non-container
             // reference is the native host ViewGroup, after removeInjectedViewsForHotReload has
             // removed every HyperLyric View, tag and listener-owned child from its tree.
@@ -788,11 +831,12 @@ class HookEntry : XposedModule() {
             hosts += transfer.kind.name
             hosts += transfer.moduleType
         }
-        return ArrayList<Any?>(4).apply {
+        return ArrayList<Any?>(5).apply {
             add(HOT_RELOAD_TRANSFER_VERSION)
             add(meta)
             add(dispatcher)
             add(hosts)
+            add(ArrayList(transfers.statusBarRoots))
         }
     }
 
@@ -826,7 +870,10 @@ class HookEntry : XposedModule() {
             statusBarTextColor = meta.getInt(STATE_STATUS_BAR_TEXT_COLOR),
             snapshot = meta.getBundle(STATE_SNAPSHOT),
             dispatcher = transfer.getOrNull(2),
-            transfers = restoredHosts,
+            islandTransfers = restoredHosts,
+            statusBarRoots = (transfer.getOrNull(4) as? ArrayList<*>)
+                ?.filterIsInstance<ViewGroup>()
+                .orEmpty(),
         )
     }
 
@@ -894,7 +941,8 @@ class HookEntry : XposedModule() {
         val statusBarTextColor: Int,
         val snapshot: Bundle?,
         val dispatcher: Any?,
-        val transfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
+        val islandTransfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
+        val statusBarRoots: List<ViewGroup>,
     )
 
     private fun findCurrentApplication(): Application? {

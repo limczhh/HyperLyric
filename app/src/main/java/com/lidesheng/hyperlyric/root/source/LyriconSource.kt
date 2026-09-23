@@ -6,7 +6,7 @@ import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.lyric.source.LyricSource
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
-import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
+import com.lidesheng.hyperlyric.root.island.renderer.SystemUiLyricRenderer
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.proify.lyricon.lyric.model.Song
 import io.github.proify.lyricon.subscriber.ActivePlayerListener
@@ -169,7 +169,7 @@ class LyriconSource : LyricSource {
                     )
                 }
             )
-            BaseIslandRenderer.refreshActiveIsland()
+            SystemUiLyricRenderer.refreshActiveIsland()
         }
 
         override fun onPlaybackStateChanged(isPlaying: Boolean) {

@@ -33,18 +33,33 @@ fun LazyListScope.lyricDisplaySections(
     fontItalic: Boolean,
     onFontItalicChange: (Boolean) -> Unit,
     narrowLatinFont: Boolean,
-    onNarrowLatinFontChange: (Boolean) -> Unit
+    onNarrowLatinFontChange: (Boolean) -> Unit,
+    statusBarLyrics: Boolean = false,
 ) {
     item(key = "basic_style_title") {
         SmallTitle(text = stringResource(id = R.string.title_basic_style))
     }
     item(key = "basic_style_content") {
-        val textColorOptions = listOf(
-            stringResource(id = R.string.option_text_color_default),
-            stringResource(id = R.string.option_text_color_cover_color),
-            stringResource(id = R.string.option_text_color_cover_gradient),
-            stringResource(id = R.string.option_text_color_follow_status_bar)
-        )
+        val textColorOptions = buildList {
+            add(stringResource(id = R.string.option_text_color_default))
+            add(stringResource(id = R.string.option_text_color_cover_color))
+            add(stringResource(id = R.string.option_text_color_cover_gradient))
+            if (!statusBarLyrics) {
+                add(stringResource(id = R.string.option_text_color_follow_status_bar))
+            }
+        }
+        val selectedTextColorIndex = if (statusBarLyrics) {
+            when (textColorStyle) {
+                RootConstants.TEXT_COLOR_STYLE_COVER_COLOR -> 1
+                RootConstants.TEXT_COLOR_STYLE_COVER_GRADIENT -> 2
+                else -> 0
+            }
+        } else {
+            textColorStyle.coerceIn(
+                RootConstants.TEXT_COLOR_STYLE_DEFAULT,
+                RootConstants.TEXT_COLOR_STYLE_FOLLOW_STATUS_BAR,
+            )
+        }
         Card(
             modifier = Modifier
                 .padding(horizontal = 12.dp)
@@ -91,11 +106,19 @@ fun LazyListScope.lyricDisplaySections(
                 OverlayDropdownPreference(
                     title = stringResource(id = R.string.title_text_color),
                     items = textColorOptions,
-                    selectedIndex = textColorStyle.coerceIn(
-                        RootConstants.TEXT_COLOR_STYLE_DEFAULT,
-                        RootConstants.TEXT_COLOR_STYLE_FOLLOW_STATUS_BAR
-                    ),
-                    onSelectedIndexChange = onTextColorStyleChange
+                    selectedIndex = selectedTextColorIndex,
+                    onSelectedIndexChange = { index ->
+                        val style = if (statusBarLyrics) {
+                            when (index) {
+                                1 -> RootConstants.TEXT_COLOR_STYLE_COVER_COLOR
+                                2 -> RootConstants.TEXT_COLOR_STYLE_COVER_GRADIENT
+                                else -> RootConstants.TEXT_COLOR_STYLE_DEFAULT
+                            }
+                        } else {
+                            index
+                        }
+                        onTextColorStyleChange(style)
+                    }
                 )
             }
         }

@@ -413,7 +413,7 @@ object LyriconDataBridge {
         if (placeholderFormat == normalizedFormat) return false
         placeholderFormat = normalizedFormat
 
-        val song = currentSong ?: return false
+        val song = currentSong ?: return true
         rebuildTimeline(song, selectCurrentPosition = true)
         return true
     }
@@ -539,6 +539,17 @@ object LyriconDataBridge {
                 artist = metadata.artist
             )
         )
+    }
+
+    fun hasNoLyricsPlaceholderForPresentation(): Boolean {
+        val metadata = currentLyricMediaMetadata ?: return false
+        return when (placeholderFormat) {
+            RootConstants.PLACEHOLDER_FORMAT_NONE -> false
+            RootConstants.PLACEHOLDER_FORMAT_TITLE_ARTIST,
+            RootConstants.PLACEHOLDER_FORMAT_TITLE -> !metadata.title.isNullOrBlank()
+            RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN -> hasMusicInfoForPresentation()
+            else -> false
+        }
     }
 
     private fun hasRenderableLine(line: IRichLyricLine?): Boolean {

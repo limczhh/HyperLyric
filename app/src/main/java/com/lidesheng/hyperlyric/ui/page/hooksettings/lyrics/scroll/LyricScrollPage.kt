@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.scroll
 
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -18,8 +19,21 @@ private const val MAX_LYRIC_MARQUEE_DELAY_MS = 10_000
 private const val MAX_METADATA_MARQUEE_DELAY_MS = 20_000
 
 @Composable
-fun LyricScrollPage() {
-    val prefs = rememberHookPrefs()
+fun LyricScrollPage(statusBarLyrics: Boolean = false) {
+    LyricScrollSettings(statusBarLyrics) { sections ->
+        XposedLyricSettingPage(
+            title = stringResource(id = R.string.title_marquee),
+            content = sections,
+        )
+    }
+}
+
+@Composable
+internal fun LyricScrollSettings(
+    statusBarLyrics: Boolean,
+    content: @Composable (LazyListScope.() -> Unit) -> Unit,
+) {
+    val prefs = rememberHookPrefs(statusBarLyrics)
     val saveConfig = rememberHookConfigSaver(prefs)
 
     val lyricMode by remember {
@@ -205,7 +219,7 @@ fun LyricScrollPage() {
         }
     )
 
-    XposedLyricSettingPage(title = stringResource(id = R.string.title_marquee)) {
+    content {
         lyricScrollSections(
             lyricMode = lyricMode,
             marqueeMode = marqueeMode,
@@ -244,7 +258,8 @@ fun LyricScrollPage() {
                 saveConfig(RootConstants.KEY_HOOK_MARQUEE_METADATA_INFINITE, it)
             },
             marqueeMetadataLoopDelay = marqueeMetadataLoopDelay,
-            onMarqueeMetadataLoopClick = { showMarqueeMetadataLoopDialog = true }
+            onMarqueeMetadataLoopClick = { showMarqueeMetadataLoopDialog = true },
+            includeMetadata = !statusBarLyrics
         )
     }
 }

@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
@@ -83,6 +82,14 @@ fun HookSettingsPage() {
             )
         )
     }
+    var hookEnabled by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
+                RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND
+            )
+        )
+    }
     DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
             when (key) {
@@ -100,6 +107,13 @@ fun HookSettingsPage() {
                     ).coerceIn(
                         RootConstants.ISLAND_WIDTH_MODE_FIXED,
                         RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
+                    )
+                }
+
+                RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND -> {
+                    hookEnabled = sharedPreferences.getBoolean(
+                        RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
+                        RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND
                     )
                 }
             }
@@ -120,14 +134,6 @@ fun HookSettingsPage() {
         stringResource(R.string.option_super_island_width_dynamic)
     } else {
         stringResource(R.string.option_super_island_width_fixed)
-    }
-    var hookEnabled by remember {
-        mutableStateOf(
-            prefs.getBoolean(
-                RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
-                RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND
-            )
-        )
     }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -179,12 +185,6 @@ fun HookSettingsPage() {
                         if (enabled) {
                             if (RootApplication.xposedService != null) {
                                 hookEnabled = true
-                                prefs.edit {
-                                    putBoolean(
-                                        RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
-                                        true
-                                    )
-                                }
                                 PrefsBridge.putBoolean(
                                     RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
                                     true
@@ -199,12 +199,6 @@ fun HookSettingsPage() {
                             }
                         } else {
                             hookEnabled = false
-                            prefs.edit {
-                                putBoolean(
-                                    RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
-                                    false
-                                )
-                            }
                             PrefsBridge.putBoolean(
                                 RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
                                 false

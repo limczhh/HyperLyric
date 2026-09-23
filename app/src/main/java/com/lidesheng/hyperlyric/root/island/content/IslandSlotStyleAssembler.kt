@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.island.content
 
 import android.content.SharedPreferences
 import android.view.View
+import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
@@ -72,7 +73,10 @@ internal object IslandSlotStyleAssembler {
             mode = mode,
             colorSession = colorSession,
             artworkRequest = artworkRequest,
-            textColorOverride = statusBarTextColor
+            textColorOverride = statusBarTextColor,
+            lyricAlignmentOverride = config.lyricAlignment.takeIf {
+                mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
+            }
         )
         when (view) {
             is RichLyricLineView -> {

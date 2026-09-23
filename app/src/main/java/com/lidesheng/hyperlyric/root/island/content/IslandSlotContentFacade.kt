@@ -73,7 +73,9 @@ internal object IslandSlotContentFacade {
         playbackDuration: Long = mediaInfo.duration,
         onLineWillApply: ((Float) -> Boolean)? = null,
         onLineApplied: (() -> Unit)? = null,
-        onLineCancelled: (() -> Unit)? = null
+        onLineCancelled: (() -> Unit)? = null,
+        forceUnsplit: Boolean = false,
+        forceNoLyricsPlaceholder: Boolean = false
     ): Boolean {
         configureView(view, prefs, config, mode, mediaInfo, force)
         return if (mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
@@ -90,7 +92,9 @@ internal object IslandSlotContentFacade {
                 suppressAnimation = suppressAnimation,
                 onLineWillApply = onLineWillApply,
                 onLineApplied = onLineApplied,
-                onLineCancelled = onLineCancelled
+                onLineCancelled = onLineCancelled,
+                forceUnsplit = forceUnsplit,
+                forceNoLyricsPlaceholder = forceNoLyricsPlaceholder
             )
         } else {
             val changed = IslandMetadataContentAssembler.apply(

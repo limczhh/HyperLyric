@@ -38,10 +38,19 @@ internal object IslandLyricContentAssembler {
         suppressAnimation: Boolean,
         onLineWillApply: ((Float) -> Boolean)?,
         onLineApplied: (() -> Unit)?,
-        onLineCancelled: (() -> Unit)?
+        onLineCancelled: (() -> Unit)?,
+        forceUnsplit: Boolean = false,
+        forceNoLyricsPlaceholder: Boolean = false
     ): Boolean {
         val targetPresentation = if (lineOverride != null || secondaryLineOverride != null) {
             LyricPresentation(lineOverride, secondaryLineOverride)
+        } else if (forceUnsplit) {
+            processedPresentation(
+                prefs = prefs,
+                config = config,
+                allowNoLyricsPlaceholder = forceNoLyricsPlaceholder,
+                ignoreNoLyricsBehavior = forceNoLyricsPlaceholder
+            )
         } else {
             buildSlotLyricPresentation(
                 view = view,
@@ -295,10 +304,14 @@ internal object IslandLyricContentAssembler {
 
     fun processedPresentation(
         prefs: SharedPreferences,
-        config: IslandSlotRuntimeConfig? = null
+        config: IslandSlotRuntimeConfig? = null,
+        allowNoLyricsPlaceholder: Boolean = true,
+        ignoreNoLyricsBehavior: Boolean = false
     ): LyricPresentation {
         if (!LyriconDataBridge.hasLyricsForPresentation()) {
-            return if (shouldUseNoLyricsPlaceholder(prefs)) {
+            return if (allowNoLyricsPlaceholder &&
+                (ignoreNoLyricsBehavior || shouldUseNoLyricsPlaceholder(prefs))
+            ) {
                 LyriconDataBridge.noLyricsPlaceholderLine()?.let { line ->
                     LyricPresentation(primary = line)
                 } ?: LyricPresentation(null)

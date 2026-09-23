@@ -61,6 +61,15 @@ sealed interface Route : NavKey {
     data object LyricDisplay : Route
 
     @Serializable
+    data object StatusBarLyricSettings : Route
+
+    @Serializable
+    data object StatusBarLyricDisplay : Route
+
+    @Serializable
+    data object StatusBarLyricScroll : Route
+
+    @Serializable
     data object LyricScroll : Route
 
     @Serializable
