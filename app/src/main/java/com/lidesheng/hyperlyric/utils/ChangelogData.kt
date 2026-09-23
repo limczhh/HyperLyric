@@ -10,6 +10,13 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "7.6-1940",
+                title = "优化了一些体验",
+                summary = "- 修复超级岛交互手势失效的问题\n" +
+                        "- 优化逐字歌词上浮动画效果\n" +
+                        "- miuix 提升到 0.9.4"
+            ),
+            ChangelogItem(
                 version = "7.6-1939",
                 title = "优化了一些体验",
                 summary = "- 新增歌词切换动画速度选项\n" +
