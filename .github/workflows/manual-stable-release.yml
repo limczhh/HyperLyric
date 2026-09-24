@@ -180,6 +180,9 @@ jobs:
           done
 
       - name: 构建 APK Build APK
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew assembleRelease --build-cache
 
       - name: 对齐、签名并校验 APK Sign and Verify APK
