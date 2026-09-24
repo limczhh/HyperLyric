@@ -10,11 +10,16 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
-                version = "7.6-1940",
+                version = "7.7-1940",
                 title = "优化了一些体验",
-                summary = "- 修复超级岛交互手势失效的问题\n" +
+                summary = "- 新增 AI 翻译模型搜索功能\n" +
+                        "- 修复 AI 翻译自动跳过指定语言为空时不生效的问题\n" +
+                        "- 新增状态栏歌词\n" +
+                        "- 修复超级岛交互手势失效的问题\n" +
+                        "- 修复逐字歌词上浮动画在特殊情况下被裁切的问题\n" +
                         "- 优化逐字歌词上浮动画效果\n" +
-                        "- miuix 提升到 0.9.4"
+                        "- miuix 提升到 0.9.4\n" +
+                        "- 移除超级岛歌词和歌词源页面受总开关的限制"
             ),
             ChangelogItem(
                 version = "7.6-1939",
