@@ -681,6 +681,12 @@
     <string name="title_ai_translation_target_language">目标语言</string>
     <string name="title_ai_translation_api_key">API Key</string>
     <string name="title_ai_translation_model">模型名称</string>
+    <string name="content_description_ai_translation_search_models">获取可用模型</string>
+    <string name="toast_ai_translation_models_api_key_required">请先填写 API Key</string>
+    <string name="toast_ai_translation_models_base_url_required">请先填写 OpenAI API 地址</string>
+    <string name="toast_ai_translation_models_fetch_failed">获取模型失败，请检查地址、密钥和网络</string>
+    <string name="toast_ai_translation_models_fetch_http_failed">获取模型失败（HTTP %1$d）</string>
+    <string name="toast_ai_translation_models_empty">服务未返回可用模型</string>
     <string name="title_ai_translation_base_url">OpenAI API 地址</string>
     <string name="title_ai_translation_prompt">自定义提示词</string>
     <string name="title_ai_translation_temperature">temperature</string>

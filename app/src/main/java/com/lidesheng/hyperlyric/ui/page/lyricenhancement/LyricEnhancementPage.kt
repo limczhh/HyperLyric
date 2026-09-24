@@ -232,14 +232,16 @@ private fun OpenAiTranslationSettingsPage() {
             saveConfig(AI_KEY_API_KEY, it)
         }
     )
-    TextInputDialog(
+    AiTranslationModelDialog(
         show = showModelDialog,
-        title = stringResource(R.string.title_ai_translation_model),
-        initialValue = model,
+        currentModel = model,
+        baseUrl = baseUrl,
+        apiKey = apiKey,
         onDismiss = { showModelDialog = false },
         onConfirm = {
             model = it
             saveConfig(AI_KEY_MODEL, it)
+            showModelDialog = false
         }
     )
     TextInputDialog(

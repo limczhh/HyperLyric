@@ -672,6 +672,12 @@
     <string name="title_ai_translation_target_language">Target Language</string>
     <string name="title_ai_translation_api_key">API Key</string>
     <string name="title_ai_translation_model">Model Name</string>
+    <string name="content_description_ai_translation_search_models">Load available models</string>
+    <string name="toast_ai_translation_models_api_key_required">Enter an API key first</string>
+    <string name="toast_ai_translation_models_base_url_required">Enter an API base URL first</string>
+    <string name="toast_ai_translation_models_fetch_failed">Failed to load models. Check the URL, key, and network.</string>
+    <string name="toast_ai_translation_models_fetch_http_failed">Failed to load models (HTTP %1$d)</string>
+    <string name="toast_ai_translation_models_empty">The service returned no available models</string>
     <string name="title_ai_translation_base_url">API Base URL</string>
     <string name="title_ai_translation_prompt">Custom Prompt</string>
     <string name="title_ai_translation_temperature">temperature</string>
