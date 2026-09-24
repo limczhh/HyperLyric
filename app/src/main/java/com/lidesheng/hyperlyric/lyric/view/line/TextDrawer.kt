@@ -272,8 +272,8 @@ internal class TextDrawer {
                     start = 0,
                     end = word.text.length,
                     drawX = word.startPosition,
-                    unitStart = word.startPosition,
-                    unitEnd = word.endPosition,
+                    inkStart = word.startPosition + word.inkStartOffset,
+                    inkEnd = word.startPosition + word.inkEndOffset,
                     motionStart = word.startPosition,
                     motionEnd = word.endPosition,
                     highlightWidth = highlightWidth,
@@ -311,8 +311,8 @@ internal class TextDrawer {
                     start = i,
                     end = i + 1,
                     drawX = charStart,
-                    unitStart = charStart,
-                    unitEnd = charEnd,
+                    inkStart = charStart + word.charInkStartOffsets[i],
+                    inkEnd = charStart + word.charInkEndOffsets[i],
                     motionStart = motionStart,
                     motionEnd = motionEnd,
                     highlightWidth = highlightWidth,
@@ -333,8 +333,8 @@ internal class TextDrawer {
         start: Int,
         end: Int,
         drawX: Float,
-        unitStart: Float,
-        unitEnd: Float,
+        inkStart: Float,
+        inkEnd: Float,
         motionStart: Float,
         motionEnd: Float,
         highlightWidth: Float,
@@ -345,10 +345,10 @@ internal class TextDrawer {
         paint: TextPaint,
         motionSpec: MotionSpec
     ) {
-        if (unitEnd <= clipStart || unitStart >= clipEnd) return
+        if (inkEnd <= clipStart || inkStart >= clipEnd) return
 
-        val visibleLeft = unitStart.coerceAtLeast(clipStart)
-        val visibleRight = unitEnd.coerceAtMost(clipEnd)
+        val visibleLeft = inkStart.coerceAtLeast(clipStart)
+        val visibleRight = inkEnd.coerceAtMost(clipEnd)
         val liftY = computeUnitLift(
             highlightWidth,
             motionStart,
