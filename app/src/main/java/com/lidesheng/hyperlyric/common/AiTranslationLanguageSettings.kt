@@ -18,7 +18,13 @@ object AiTranslationLanguageSettings {
             )
         }.getOrNull().orEmpty()
 
-        return storedLanguages.mapNotNullTo(linkedSetOf(), ::normalizeLanguageCode)
+        val normalizedLanguages = storedLanguages
+            .mapNotNullTo(linkedSetOf(), ::normalizeLanguageCode)
+        val enabled = prefs.getBoolean(
+            RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES_ENABLED,
+            false
+        )
+        return if (enabled) normalizedLanguages else emptySet()
     }
 
     private fun normalizeLanguageCode(languageCode: String): String? {

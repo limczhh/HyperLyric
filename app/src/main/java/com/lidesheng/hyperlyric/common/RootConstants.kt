@@ -242,6 +242,8 @@ object RootConstants {
     // ================= LYRIC ENHANCEMENT KEYS =================
     const val KEY_HOOK_AI_TRANS_ENABLE = "key_hook_ai_trans_enable"
     const val KEY_HOOK_AI_TRANS_SKIP_LANGUAGES = "key_hook_ai_trans_skip_languages"
+    const val KEY_HOOK_AI_TRANS_SKIP_LANGUAGES_ENABLED =
+        "key_hook_ai_trans_skip_languages_enabled"
     const val KEY_HOOK_AI_TRANS_SKIP_EXISTING_TRANSLATION =
         "key_hook_ai_trans_skip_existing_translation"
     const val KEY_HOOK_AI_TRANS_FORCE_OVERRIDE = "key_hook_ai_trans_force_override"

@@ -40,6 +40,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val AI_KEY_ENABLED = RootConstants.KEY_HOOK_AI_TRANS_ENABLE
 private const val AI_KEY_SKIP_LANGUAGES = RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES
+private const val AI_KEY_SKIP_LANGUAGES_ENABLED =
+    RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES_ENABLED
 private const val AI_KEY_SKIP_EXISTING = RootConstants.KEY_HOOK_AI_TRANS_SKIP_EXISTING_TRANSLATION
 private const val AI_KEY_FORCE_OVERRIDE = RootConstants.KEY_HOOK_AI_TRANS_FORCE_OVERRIDE
 private const val AI_KEY_TARGET_LANGUAGE = RootConstants.KEY_HOOK_AI_TRANS_TARGET_LANG
@@ -209,6 +211,7 @@ private fun OpenAiTranslationSettingsPage() {
         onDismiss = { showSkipLanguagesDialog = false },
         onConfirm = {
             skipLanguages = it
+            saveConfig(AI_KEY_SKIP_LANGUAGES_ENABLED, it.isNotEmpty())
             saveConfig(AI_KEY_SKIP_LANGUAGES, it)
         }
     )

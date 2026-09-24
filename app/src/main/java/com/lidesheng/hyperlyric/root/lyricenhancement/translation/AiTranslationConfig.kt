@@ -31,6 +31,7 @@ internal data class AiTranslationConfig(
         val PREFERENCE_KEYS = setOf(
             RootConstants.KEY_HOOK_AI_TRANS_ENABLE,
             RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES,
+            RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES_ENABLED,
             RootConstants.KEY_HOOK_AI_TRANS_SKIP_EXISTING_TRANSLATION,
             RootConstants.KEY_HOOK_AI_TRANS_FORCE_OVERRIDE,
             RootConstants.KEY_HOOK_AI_TRANS_PROVIDER,
