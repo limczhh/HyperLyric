@@ -246,7 +246,6 @@ private fun LazyListScope.hookSettingsSections(
             Column {
                 ArrowPreference(
                     title = stringResource(R.string.title_lyric_source),
-                    enabled = hookEnabled,
                     endActions = {
                         Text(
                             text = lyricSourceLabel,
@@ -258,7 +257,6 @@ private fun LazyListScope.hookSettingsSections(
                 )
                 ArrowPreference(
                     title = stringResource(R.string.title_super_island),
-                    enabled = hookEnabled,
                     endActions = {
                         Text(
                             text = widthModeLabel,
@@ -270,23 +268,18 @@ private fun LazyListScope.hookSettingsSections(
                 ArrowPreference(
                     title = stringResource(R.string.title_content_layout),
                     summary = stringResource(R.string.summary_content_layout),
-                    enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.SuperIslandContentLayout) })
                 ArrowPreference(
                     title = stringResource(R.string.title_text),
-                    enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.LyricDisplay) })
                 ArrowPreference(
                     title = stringResource(R.string.title_marquee),
-                    enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.LyricScroll) })
                 ArrowPreference(
                     title = stringResource(R.string.title_verbatim_lyric),
-                    enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.VerbatimLyric) })
                 ArrowPreference(
                     title = stringResource(R.string.title_lyric_anim),
-                    enabled = hookEnabled,
                     onClick = { navigator.navigate(Route.LyricAnimation) })
                 ArrowPreference(
                     title = stringResource(R.string.title_lyric_enhancement),

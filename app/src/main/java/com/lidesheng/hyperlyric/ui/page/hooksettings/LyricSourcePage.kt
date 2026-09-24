@@ -48,10 +48,6 @@ fun LyricSourcePage() {
         stringResource(R.string.lyric_source_lyricinfo)
     )
     val sourceIds = listOf("lyricon", "superlyric", "lyricinfo")
-    val hookEnabled = prefs.getBoolean(
-        RootConstants.KEY_HOOK_ENABLE_SUPER_ISLAND,
-        RootConstants.DEFAULT_HOOK_ENABLE_SUPER_ISLAND
-    )
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
@@ -85,7 +81,6 @@ fun LyricSourcePage() {
                                 title = stringResource(R.string.title_lyric_source),
                                 items = sourceOptions,
                                 selectedIndex = selectedSourceIndex,
-                                enabled = hookEnabled,
                                 onSelectedIndexChange = { index ->
                                     sourceIds.getOrNull(index)?.let { newSource ->
                                         lyricSource = newSource
