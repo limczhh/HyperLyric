@@ -2,15 +2,18 @@ package com.lidesheng.hyperlyric.root.statusbar
 
 import android.content.SharedPreferences
 import android.content.res.Resources
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
+import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.isCountdownLine
@@ -18,6 +21,8 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
+import com.lidesheng.hyperlyric.root.island.content.IslandSlotStyleAssembler
+import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHooker
 import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import com.lidesheng.hyperlyric.root.island.view.MaxWidthFrameLayout
 import java.lang.ref.WeakReference
@@ -34,6 +39,9 @@ internal class StatusBarLyricHost(
     private var clockReference = WeakReference(clock)
     private var parentReference = WeakReference(parent)
     private var container: MaxWidthFrameLayout? = null
+    private var contentRow: LinearLayout? = null
+    private var iconView: ImageView? = null
+    private var iconController: StatusBarLyricIconController? = null
     private var lyricView: RichLyricLineView? = null
     private var gestureController: StatusBarLyricGestureController? = null
     private var clockGestureController: StatusBarLyricGestureController? = null
@@ -43,6 +51,7 @@ internal class StatusBarLyricHost(
     private var shouldKeepClockHidden = false
     private var layoutConfig: StatusBarLyricLayoutConfig? = null
     private var latestContentWidthPx = 0f
+    private var iconWidthPx = 0
     private val wrapperLocationInWindow = IntArray(2)
     private var islandSpacingResources: Resources? = null
     private var islandSpacingDensityDpi = 0
@@ -149,6 +158,7 @@ internal class StatusBarLyricHost(
         val widthLimitChanged = wrapper.maxWidthPx != effectiveWidthLimitPx
         wrapper.maxWidthPx = effectiveWidthLimitPx
         if (widthLimitChanged) wrapper.requestLayout()
+        iconWidthPx = updateIcon(lyrics, layoutConfig, effectiveWidthLimitPx)
         wrapper.visibility = View.VISIBLE
 
         IslandSlotContentFacade.applySlotContent(
@@ -164,7 +174,10 @@ internal class StatusBarLyricHost(
             forceNoLyricsPlaceholder = true,
             onLineWillApply = { candidateContentWidth ->
                 latestContentWidthPx = candidateContentWidth
-                val desiredWidth = layoutConfig.desiredWidthPx(candidateContentWidth)
+                val desiredWidth = layoutConfig.desiredWidthPx(
+                    contentWidthPx = candidateContentWidth,
+                    iconWidthPx = iconWidthPx,
+                )
                     .coerceAtMost(effectiveWidthLimitPx)
                 val changed = wrapper.desiredWidthPx != desiredWidth
                 wrapper.desiredWidthPx = desiredWidth
@@ -175,6 +188,7 @@ internal class StatusBarLyricHost(
                 updateVisibility(wrapper, lyrics)
             },
         )
+        updateIconTint(lyrics)
         updateVisibility(wrapper, lyrics)
     }
 
@@ -197,6 +211,7 @@ internal class StatusBarLyricHost(
             mode = RootConstants.ISLAND_CONTENT_MODE_LYRIC,
             force = true,
         )
+        updateIconTint(lyrics)
         root.requestLayout()
     }
 
@@ -216,7 +231,7 @@ internal class StatusBarLyricHost(
         )
     }
 
-    /** Reapplies only the viewport width after native island or host geometry changes. */
+    /** Reapplies the viewport width after native island or host geometry changes. */
     fun refreshIslandWidth() {
         val wrapper = container ?: return
         if (wrapper.parent == null) return
@@ -230,7 +245,12 @@ internal class StatusBarLyricHost(
         wrapper.maxWidthPx = effectiveWidthLimitPx
 
         val requestedWidth = latestContentWidthPx.takeIf { it > 0f }
-            ?.let(config::desiredWidthPx)
+            ?.let { contentWidthPx ->
+                config.desiredWidthPx(
+                    contentWidthPx = contentWidthPx,
+                    iconWidthPx = iconWidthPx,
+                )
+            }
             ?.coerceAtMost(effectiveWidthLimitPx)
         if (requestedWidth != null && wrapper.desiredWidthPx != requestedWidth) {
             wrapper.desiredWidthPx = requestedWidth
@@ -242,6 +262,7 @@ internal class StatusBarLyricHost(
     fun clearLyrics() {
         val oldView = lyricView
         val oldContainer = container
+        iconController?.clear()
         gestureController?.release()
         oldView?.setOnTouchListener(null)
         gestureController = null
@@ -250,9 +271,13 @@ internal class StatusBarLyricHost(
         (oldContainer?.parent as? ViewGroup)?.removeView(oldContainer)
         oldContainer?.removeAllViews()
         lyricView = null
+        contentRow = null
+        iconView = null
+        iconController = null
         container = null
         layoutConfig = null
         latestContentWidthPx = 0f
+        iconWidthPx = 0
     }
 
     fun releaseForHotReload() {
@@ -272,8 +297,10 @@ internal class StatusBarLyricHost(
         insertionOrder: Int,
     ): Pair<MaxWidthFrameLayout, RichLyricLineView> {
         var wrapper = container
+        var row = contentRow
+        var icon = iconView
         var lyrics = lyricView
-        if (wrapper == null || lyrics == null) {
+        if (wrapper == null || row == null || icon == null || lyrics == null) {
             wrapper = MaxWidthFrameLayout(root.context).apply {
                 // This wrapper is the status-bar lyric viewport. Keep the scrolling text and
                 // child animations inside its measured content area and breathing padding.
@@ -284,14 +311,35 @@ internal class StatusBarLyricHost(
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 addOnLayoutChangeListener(lyricContainerLayoutListener)
             }
+            row = LinearLayout(root.context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_LTR
+                clipChildren = true
+                clipToPadding = true
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            icon = ImageView(root.context).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
             lyrics = RichLyricLineView(root.context).apply {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 IslandLyricViewController.configureProjection(this)
                 gestureController = StatusBarLyricGestureController(this)
                 setOnTouchListener(gestureController)
             }
-            wrapper.addView(
+            row.addView(icon, LinearLayout.LayoutParams(0, 0))
+            row.addView(
                 lyrics,
+                LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    1f,
+                ),
+            )
+            wrapper.addView(
+                row,
                 FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -299,6 +347,9 @@ internal class StatusBarLyricHost(
                 )
             )
             container = wrapper
+            contentRow = row
+            iconView = icon
+            iconController = StatusBarLyricIconController(row, icon)
             lyricView = lyrics
         }
 
@@ -325,6 +376,54 @@ internal class StatusBarLyricHost(
             )
         }
         return wrapper to lyrics
+    }
+
+    private fun updateIcon(
+        lyrics: RichLyricLineView,
+        config: StatusBarLyricLayoutConfig,
+        effectiveWidthLimitPx: Int,
+    ): Int {
+        val controller = iconController ?: return 0
+        val mediaInfo = LyriconDataBridge.currentResolvedMediaInfo
+        val mediaPackage = LyriconDataBridge.currentLyricPackageName
+            ?: mediaInfo?.identity?.packageName
+        val artwork = resolveCurrentArtwork(mediaInfo)
+        val lyricColor = IslandSlotStyleAssembler.primaryTextColor(lyrics)
+            ?: StatusBarTextColorHooker.currentTextColor()
+        val contentWidthLimit = (
+                effectiveWidthLimitPx - config.paddingLeftPx - config.paddingRightPx
+                ).coerceAtLeast(0)
+        return controller.update(
+            config = config,
+            mediaPackage = mediaPackage,
+            artwork = artwork,
+            lyricColor = lyricColor,
+            isPlaying = LyriconDataBridge.isPlaybackActive(),
+            contentWidthLimitPx = contentWidthLimit,
+        )
+    }
+
+    private fun resolveCurrentArtwork(mediaInfo: MediaMetadataHelper.MediaInfo?): Bitmap? {
+        val info = mediaInfo ?: return null
+        val artwork = info.albumArt?.takeUnless { it.isRecycled } ?: return null
+        val identity = info.identity
+        val expectedPackage = LyriconDataBridge.currentLyricPackageName
+            ?.takeIf { it.isNotBlank() }
+        if (expectedPackage != null && identity.packageName != expectedPackage) return null
+
+        val source = LyriconDataBridge.currentLyricMediaMetadata
+        source?.let { metadata ->
+            if (!metadata.packageName.isNullOrBlank() &&
+                metadata.packageName != identity.packageName
+            ) return null
+            metadata.sessionToken?.let { token ->
+                if (identity.sessionToken != token) return null
+            }
+            metadata.mediaId?.let { mediaId ->
+                if (identity.mediaId != mediaId) return null
+            }
+        }
+        return artwork
     }
 
     private fun effectiveWidthLimitPx(
@@ -423,9 +522,16 @@ internal class StatusBarLyricHost(
         clockGestureReference = null
     }
 
+    private fun updateIconTint(lyrics: RichLyricLineView) {
+        val color = IslandSlotStyleAssembler.primaryTextColor(lyrics)
+            ?: StatusBarTextColorHooker.currentTextColor()
+        iconController?.updateTint(color)
+    }
+
     private fun updateVisibility(wrapper: MaxWidthFrameLayout, lyrics: RichLyricLineView) {
         val hasLine = isRenderable(lyrics.rawLine) || isRenderable(lyrics.rawSecondaryLine)
         wrapper.visibility = if (hasLine) View.VISIBLE else View.GONE
+        iconController?.setHostVisible(hasLine)
     }
 
     fun setClockHidden(shouldHide: Boolean) {

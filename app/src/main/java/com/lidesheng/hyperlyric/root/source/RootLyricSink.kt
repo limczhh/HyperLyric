@@ -20,6 +20,7 @@ import com.lidesheng.hyperlyric.root.media.LyricColorBindingCoordinator
 import com.lidesheng.hyperlyric.root.media.LyricColorBindingUpdate
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementController
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCoordinator
+import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlin.math.abs
 
@@ -54,7 +55,9 @@ internal class RootLyricSink(
             LyricColorBindingCoordinator.retry(context, playbackActive),
             reason = "delayed_retry"
         )
+        refreshResolvedMediaInfo()
         renderer.updateTextColors()
+        renderer.updateMetadata()
     }
     private val sessionBindingRefreshRunnable = Runnable {
         if (closed) return@Runnable
@@ -62,6 +65,8 @@ internal class RootLyricSink(
             LyricColorBindingCoordinator.retry(context, playbackActive),
             reason = "active_sessions_changed"
         )
+        refreshResolvedMediaInfo()
+        renderer.updateMetadata()
     }
     private val activeSessionsObserver: () -> Unit = {
         if (!closed) {
@@ -135,6 +140,9 @@ internal class RootLyricSink(
         }
         if (song == null) {
             endColorBinding()
+            LyriconDataBridge.currentResolvedMediaInfo = null
+        } else {
+            refreshResolvedMediaInfo(sourceMetadata = null)
         }
     }
 
@@ -173,6 +181,7 @@ internal class RootLyricSink(
         normalized?.packageName?.let(LyriconDataBridge::updateLyricPackage)
         if (normalized == null) {
             LyriconDataBridge.updateMediaMetadata(null)
+            LyriconDataBridge.currentResolvedMediaInfo = null
             lyricEnhancementController.onMetadataCleared()
             endColorBinding()
             renderer.updateMetadata()
@@ -194,6 +203,7 @@ internal class RootLyricSink(
                         "colorBinding=${colorBindingUpdate.reason}"
             }
             handleColorBindingUpdate(colorBindingUpdate, reason = "package_only_metadata")
+            refreshResolvedMediaInfo(sourceMetadata = normalized)
             renderer.updateMetadata()
             scheduleArtworkColorRefresh()
             return
@@ -212,6 +222,7 @@ internal class RootLyricSink(
             logger = HookLogger,
             sourceMetadata = normalized
         )
+        publishResolvedMediaInfo(mediaInfo, normalized)
         val mediaTransition = lyricEnhancementController.beforeResolvedMediaInfo(
             mediaIdentity = mediaInfo.identity,
             sourceId = normalized.sourceId,
@@ -242,6 +253,39 @@ internal class RootLyricSink(
         handleColorBindingUpdate(colorBindingUpdate, reason = "metadata_changed")
         renderer.updateMetadata()
         scheduleArtworkColorRefresh()
+    }
+
+    private fun refreshResolvedMediaInfo(
+        sourceMetadata: LyricMediaMetadata? = LyriconDataBridge.currentLyricMediaMetadata
+    ) {
+        val packageName = sourceMetadata?.packageName?.takeIf { it.isNotBlank() }
+            ?: LyriconDataBridge.currentLyricPackageName?.takeIf { it.isNotBlank() }
+        if (packageName == null) {
+            LyriconDataBridge.currentResolvedMediaInfo = null
+            return
+        }
+        val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(
+            context = context,
+            packageName = packageName,
+            logger = HookLogger,
+            sourceMetadata = sourceMetadata,
+        )
+        publishResolvedMediaInfo(mediaInfo, sourceMetadata)
+    }
+
+    private fun publishResolvedMediaInfo(
+        mediaInfo: MediaMetadataHelper.MediaInfo,
+        sourceMetadata: LyricMediaMetadata?,
+    ) {
+        val artworkAuthorized = sourceMetadata != null ||
+                CoverColorHelper.currentSession(mediaInfo) != null
+        LyriconDataBridge.currentResolvedMediaInfo = if (
+            mediaInfo.albumArt != null && !artworkAuthorized
+        ) {
+            mediaInfo.copy(albumArt = null)
+        } else {
+            mediaInfo
+        }
     }
 
     override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float) {

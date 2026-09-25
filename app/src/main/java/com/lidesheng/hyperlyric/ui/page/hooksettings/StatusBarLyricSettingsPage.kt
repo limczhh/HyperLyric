@@ -117,6 +117,47 @@ fun StatusBarLyricSettingsPage() {
             )
         )
     }
+    var iconStyle by remember(prefs) {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+            ).coerceIn(
+                RootConstants.STATUS_BAR_LYRIC_ICON_MUSIC_COVER,
+                RootConstants.STATUS_BAR_LYRIC_ICON_MONOCHROME,
+            )
+        )
+    }
+    var iconEnabled by remember(prefs) {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED,
+            )
+        )
+    }
+    var iconOrder by remember(prefs) {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ORDER,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ORDER,
+            ).coerceIn(
+                RootConstants.STATUS_BAR_LYRIC_ICON_BEFORE_LYRIC,
+                RootConstants.STATUS_BAR_LYRIC_ICON_AFTER_LYRIC,
+            )
+        )
+    }
+    var iconSizeDp by remember(prefs) {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP,
+            ).coerceIn(
+                RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP,
+                RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP,
+            )
+        )
+    }
     var portraitMaxWidth by remember(prefs, portraitWidthLimit) {
         mutableIntStateOf(
             readDynamicWidthMaxDp(
@@ -425,6 +466,34 @@ fun StatusBarLyricSettingsPage() {
                             )
                             statusBarLyricInteractionSection(interactionDropdowns)
                         } else {
+                            statusBarLyricIconSections(
+                                iconEnabled = iconEnabled,
+                                onIconEnabledChange = { enabled ->
+                                    iconEnabled = enabled
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED,
+                                        enabled,
+                                    )
+                                },
+                                iconStyle = iconStyle,
+                                onIconStyleChange = { style ->
+                                    iconStyle = style
+                                    saveConfig(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_STYLE, style)
+                                },
+                                iconOrder = iconOrder,
+                                onIconOrderChange = { order ->
+                                    iconOrder = order
+                                    saveConfig(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ORDER, order)
+                                },
+                                iconSizeDp = iconSizeDp,
+                                onIconSizeChange = { iconSizeDp = it },
+                                onIconSizeCommit = {
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP,
+                                        iconSizeDp,
+                                    )
+                                },
+                            )
                             displaySections()
                         }
                     }
@@ -477,6 +546,119 @@ fun StatusBarLyricSettingsPage() {
             paddingRightDp = right
             saveConfig(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_PADDING_LEFT_DP, left)
             saveConfig(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_PADDING_RIGHT_DP, right)
+        },
+    )
+}
+
+@Suppress("LongParameterList")
+private fun LazyListScope.statusBarLyricIconSections(
+    iconEnabled: Boolean,
+    onIconEnabledChange: (Boolean) -> Unit,
+    iconStyle: Int,
+    onIconStyleChange: (Int) -> Unit,
+    iconOrder: Int,
+    onIconOrderChange: (Int) -> Unit,
+    iconSizeDp: Int,
+    onIconSizeChange: (Int) -> Unit,
+    onIconSizeCommit: () -> Unit,
+) {
+    item(key = "status_bar_lyric_icon_title") {
+        SmallTitle(text = stringResource(R.string.title_status_bar_lyric_icon))
+    }
+    item(key = "status_bar_lyric_icon") {
+        val styles = listOf(
+            RootConstants.STATUS_BAR_LYRIC_ICON_MUSIC_COVER,
+            RootConstants.STATUS_BAR_LYRIC_ICON_CIRCLE_COVER,
+            RootConstants.STATUS_BAR_LYRIC_ICON_ROTATING_COVER,
+            RootConstants.STATUS_BAR_LYRIC_ICON_APP,
+            RootConstants.STATUS_BAR_LYRIC_ICON_MONOCHROME,
+        )
+        val styleItems = listOf(
+            stringResource(R.string.option_status_bar_lyric_icon_music_cover),
+            stringResource(R.string.option_status_bar_lyric_icon_circle_cover),
+            stringResource(R.string.option_status_bar_lyric_icon_rotating_cover),
+            stringResource(R.string.option_status_bar_lyric_icon_app),
+            stringResource(R.string.option_status_bar_lyric_icon_monochrome),
+        )
+        val orderItems = listOf(
+            stringResource(R.string.option_status_bar_lyric_icon_before_lyric),
+            stringResource(R.string.option_status_bar_lyric_icon_after_lyric),
+        )
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Column {
+                SwitchPreference(
+                    title = stringResource(R.string.title_enable),
+                    checked = iconEnabled,
+                    onCheckedChange = onIconEnabledChange,
+                )
+                OverlayDropdownPreference(
+                    title = stringResource(R.string.title_status_bar_lyric_icon_style),
+                    items = styleItems,
+                    selectedIndex = styles.indexOf(iconStyle).coerceAtLeast(0),
+                    onSelectedIndexChange = { index ->
+                        styles.getOrNull(index)?.let(onIconStyleChange)
+                    },
+                )
+                OverlayDropdownPreference(
+                    title = stringResource(R.string.title_status_bar_lyric_insertion_order),
+                    items = orderItems,
+                    selectedIndex = iconOrder.coerceIn(0, 1),
+                    onSelectedIndexChange = { index ->
+                        if (index == RootConstants.STATUS_BAR_LYRIC_ICON_BEFORE_LYRIC ||
+                            index == RootConstants.STATUS_BAR_LYRIC_ICON_AFTER_LYRIC
+                        ) onIconOrderChange(index)
+                    },
+                )
+                StatusBarLyricIconSizeControl(
+                    sizeDp = iconSizeDp,
+                    onSizeChange = onIconSizeChange,
+                    onSizeCommit = onIconSizeCommit,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusBarLyricIconSizeControl(
+    sizeDp: Int,
+    onSizeChange: (Int) -> Unit,
+    onSizeCommit: () -> Unit,
+) {
+    ArrowPreference(
+        title = stringResource(R.string.title_status_bar_lyric_icon_size),
+        endActions = {
+            Text(
+                stringResource(R.string.format_status_bar_lyric_icon_size, sizeDp),
+                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            )
+        },
+        onClick = {},
+        bottomAction = {
+            Slider(
+                value = sizeDp.coerceIn(
+                    RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP,
+                    RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP,
+                ).toFloat(),
+                onValueChange = { value ->
+                    onSizeChange(
+                        value.roundToInt().coerceIn(
+                            RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP,
+                            RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP,
+                        )
+                    )
+                },
+                valueRange = RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP.toFloat()..
+                        RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP.toFloat(),
+                steps = 0,
+                onValueChangeFinished = onSizeCommit,
+            )
         },
     )
 }

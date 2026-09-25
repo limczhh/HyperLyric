@@ -31,6 +31,10 @@ object StatusBarLyricPreferences {
 
     private val layoutKeys = setOf(
         RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_INSERTION_ORDER,
+        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED,
+        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ORDER,
+        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP,
         RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH,
         RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_LANDSCAPE_DYNAMIC_MAX_WIDTH,
         RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_PADDING_LEFT_DP,

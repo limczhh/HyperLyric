@@ -99,6 +99,17 @@
     <string name="title_status_bar_lyric_insertion_order">Insertion position</string>
     <string name="option_status_bar_lyric_before_clock">Before clock</string>
     <string name="option_status_bar_lyric_after_clock">After clock</string>
+    <string name="title_status_bar_lyric_icon">Lyric icon</string>
+    <string name="title_status_bar_lyric_icon_style">Style</string>
+    <string name="option_status_bar_lyric_icon_music_cover">Album cover</string>
+    <string name="option_status_bar_lyric_icon_circle_cover">Circular album cover</string>
+    <string name="option_status_bar_lyric_icon_rotating_cover">Rotating circular cover</string>
+    <string name="option_status_bar_lyric_icon_app">App icon</string>
+    <string name="option_status_bar_lyric_icon_monochrome">Monochrome icon</string>
+    <string name="option_status_bar_lyric_icon_before_lyric">Before lyrics</string>
+    <string name="option_status_bar_lyric_icon_after_lyric">After lyrics</string>
+    <string name="title_status_bar_lyric_icon_size">Icon size</string>
+    <string name="format_status_bar_lyric_icon_size">%1$d dp</string>
     <string name="title_status_bar_lyric_portrait_width">Maximum width in portrait</string>
     <string name="title_status_bar_lyric_landscape_width">Maximum width in landscape</string>
     <string name="format_status_bar_lyric_width_value">%1$d dp</string>

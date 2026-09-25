@@ -99,6 +99,17 @@
     <string name="title_status_bar_lyric_insertion_order">插入位置</string>
     <string name="option_status_bar_lyric_before_clock">时钟之前</string>
     <string name="option_status_bar_lyric_after_clock">时钟之后</string>
+    <string name="title_status_bar_lyric_icon">歌词图标</string>
+    <string name="title_status_bar_lyric_icon_style">样式</string>
+    <string name="option_status_bar_lyric_icon_music_cover">音乐封面</string>
+    <string name="option_status_bar_lyric_icon_circle_cover">圆形音乐封面</string>
+    <string name="option_status_bar_lyric_icon_rotating_cover">旋转圆形封面</string>
+    <string name="option_status_bar_lyric_icon_app">应用图标</string>
+    <string name="option_status_bar_lyric_icon_monochrome">单色图标</string>
+    <string name="option_status_bar_lyric_icon_before_lyric">歌词之前</string>
+    <string name="option_status_bar_lyric_icon_after_lyric">歌词之后</string>
+    <string name="title_status_bar_lyric_icon_size">图标大小</string>
+    <string name="format_status_bar_lyric_icon_size">%1$d dp</string>
     <string name="title_status_bar_lyric_portrait_width">竖屏时最大宽度</string>
     <string name="title_status_bar_lyric_landscape_width">横屏时最大宽度</string>
     <string name="format_status_bar_lyric_width_value">%1$d dp</string>

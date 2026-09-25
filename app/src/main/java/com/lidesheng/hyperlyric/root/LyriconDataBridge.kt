@@ -52,6 +52,10 @@ object LyriconDataBridge {
     @Volatile
     var currentLyricMediaMetadata: LyricMediaMetadata? = null
 
+    /** Resolved snapshot shared by root-side surfaces, including session-validated artwork. */
+    @Volatile
+    var currentResolvedMediaInfo: MediaMetadataHelper.MediaInfo? = null
+
     @Volatile
     var currentLyric: String? = null
 
@@ -295,6 +299,7 @@ object LyriconDataBridge {
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = song?.lyrics?.any(::hasRenderableLine) == true
         currentLyricMediaMetadata = null
+        currentResolvedMediaInfo = null
         currentSong = song
         currentSongName = song?.name
         currentLyric = null
@@ -490,6 +495,7 @@ object LyriconDataBridge {
         currentSong = null
         currentSongName = null
         currentLyricMediaMetadata = null
+        currentResolvedMediaInfo = null
         currentLyric = null
         currentLyricLine = null
         currentLyricLines = emptyList()

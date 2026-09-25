@@ -9,6 +9,14 @@ object RootConstants {
         "key_hook_status_bar_lyric_config_initialized"
     const val KEY_HOOK_STATUS_BAR_LYRIC_INSERTION_ORDER =
         "key_hook_status_bar_lyric_insertion_order"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED =
+        "key_hook_status_bar_lyric_icon_enabled"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ICON_STYLE =
+        "key_hook_status_bar_lyric_icon_style"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ICON_ORDER =
+        "key_hook_status_bar_lyric_icon_order"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP =
+        "key_hook_status_bar_lyric_icon_size_dp"
     const val KEY_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH =
         "key_hook_status_bar_lyric_portrait_dynamic_max_width"
     const val KEY_HOOK_STATUS_BAR_LYRIC_LANDSCAPE_DYNAMIC_MAX_WIDTH =
@@ -298,6 +306,20 @@ object RootConstants {
     const val STATUS_BAR_LYRIC_INSERTION_AFTER_CLOCK = 1
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_INSERTION_ORDER =
         STATUS_BAR_LYRIC_INSERTION_AFTER_CLOCK
+    const val STATUS_BAR_LYRIC_ICON_MUSIC_COVER = 1
+    const val STATUS_BAR_LYRIC_ICON_CIRCLE_COVER = 2
+    const val STATUS_BAR_LYRIC_ICON_ROTATING_COVER = 3
+    const val STATUS_BAR_LYRIC_ICON_APP = 4
+    const val STATUS_BAR_LYRIC_ICON_MONOCHROME = 5
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED = false
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_STYLE = STATUS_BAR_LYRIC_ICON_MUSIC_COVER
+    const val STATUS_BAR_LYRIC_ICON_BEFORE_LYRIC = 0
+    const val STATUS_BAR_LYRIC_ICON_AFTER_LYRIC = 1
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ORDER = STATUS_BAR_LYRIC_ICON_BEFORE_LYRIC
+    const val STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP = 10
+    const val STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP = 24
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP = 14
+    const val STATUS_BAR_LYRIC_ICON_SPACING_DP = 3
     const val STATUS_BAR_LYRIC_PORTRAIT_MAX_WIDTH_DP = 200
     const val STATUS_BAR_LYRIC_LANDSCAPE_MAX_WIDTH_DP = 400
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH = 150

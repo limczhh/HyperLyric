@@ -15,15 +15,20 @@ import java.util.WeakHashMap
 internal object IslandSlotStyleAssembler {
     private val lastStyleSignatures = WeakHashMap<View, String>()
     private val lastColorSignatures = WeakHashMap<View, String>()
+    private val primaryTextColors = WeakHashMap<View, Int>()
+
+    fun primaryTextColor(view: View): Int? = primaryTextColors[view]
 
     fun invalidate(view: View? = null) {
         if (view == null) {
             synchronized(lastStyleSignatures) { lastStyleSignatures.clear() }
             synchronized(lastColorSignatures) { lastColorSignatures.clear() }
+            synchronized(primaryTextColors) { primaryTextColors.clear() }
             return
         }
         synchronized(lastStyleSignatures) { lastStyleSignatures.remove(view) }
         synchronized(lastColorSignatures) { lastColorSignatures.remove(view) }
+        synchronized(primaryTextColors) { primaryTextColors.remove(view) }
     }
 
     fun configureView(
@@ -78,6 +83,7 @@ internal object IslandSlotStyleAssembler {
                 mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
             }
         )
+        primaryTextColors[view] = style.primary.color.firstOrNull() ?: android.graphics.Color.WHITE
         when (view) {
             is RichLyricLineView -> {
                 if (styleChanged) {

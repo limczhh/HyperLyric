@@ -10,6 +10,11 @@ import kotlin.math.roundToInt
 /** Status-bar-only layout options. Lyric content and style continue to use their existing scopes. */
 internal data class StatusBarLyricLayoutConfig(
     val insertionOrder: Int,
+    val iconEnabled: Boolean,
+    val iconStyle: Int,
+    val iconOrder: Int,
+    val iconSizePx: Int,
+    val iconSpacingPx: Int,
     val dynamicMaxWidthPx: Int,
     val paddingLeftPx: Int,
     val paddingRightPx: Int,
@@ -18,9 +23,9 @@ internal data class StatusBarLyricLayoutConfig(
     val widthLimitPx: Int
         get() = dynamicMaxWidthPx
 
-    fun desiredWidthPx(contentWidthPx: Float): Int {
+    fun desiredWidthPx(contentWidthPx: Float, iconWidthPx: Int = 0): Int {
         if (dynamicMaxWidthPx == 0) return 0
-        return (ceil(contentWidthPx).toInt() + paddingLeftPx + paddingRightPx)
+        return (ceil(contentWidthPx).toInt() + iconWidthPx + paddingLeftPx + paddingRightPx)
             .coerceAtMost(dynamicMaxWidthPx)
             .coerceAtLeast(1)
     }
@@ -64,6 +69,35 @@ internal data class StatusBarLyricLayoutConfig(
                     it == RootConstants.STATUS_BAR_LYRIC_INSERTION_BEFORE_CLOCK ||
                             it == RootConstants.STATUS_BAR_LYRIC_INSERTION_AFTER_CLOCK
                 } ?: RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_INSERTION_ORDER,
+                iconEnabled = prefs.getBoolean(
+                    RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED,
+                    RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED,
+                ),
+                iconStyle = prefs.getInt(
+                    RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+                    RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+                ).takeIf {
+                    it in RootConstants.STATUS_BAR_LYRIC_ICON_MUSIC_COVER..
+                            RootConstants.STATUS_BAR_LYRIC_ICON_MONOCHROME
+                } ?: RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+                iconOrder = prefs.getInt(
+                    RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ORDER,
+                    RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ORDER,
+                ).takeIf {
+                    it == RootConstants.STATUS_BAR_LYRIC_ICON_BEFORE_LYRIC ||
+                            it == RootConstants.STATUS_BAR_LYRIC_ICON_AFTER_LYRIC
+                } ?: RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_ORDER,
+                iconSizePx = dpToPx(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP,
+                        RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP,
+                    ).coerceIn(
+                        RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP,
+                        RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP,
+                    ),
+                    density,
+                ),
+                iconSpacingPx = dpToPx(RootConstants.STATUS_BAR_LYRIC_ICON_SPACING_DP, density),
                 dynamicMaxWidthPx = dpToPx(dynamicMaxDp, density),
                 paddingLeftPx = paddingPx(
                     prefs,
