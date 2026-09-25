@@ -10,11 +10,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.DpSize
@@ -29,6 +34,20 @@ import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+
+/** Attach only to the editable field in a single-input dialog. */
+@Composable
+internal fun rememberDialogInputFocusModifier(): Modifier {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(focusRequester, keyboardController) {
+        withFrameNanos { }
+        if (focusRequester.requestFocus()) keyboardController?.show()
+    }
+
+    return Modifier.focusRequester(focusRequester)
+}
 
 data class MultiSelectDialogOption(
     val key: String,
@@ -126,6 +145,7 @@ fun NumberInputDialog(
         show = true,
         onDismissRequest = onDismiss
     ) {
+        val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = inputValue,
@@ -134,7 +154,7 @@ fun NumberInputDialog(
                 },
                 label = label,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
+                modifier = inputFocusModifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 maxLines = 1
@@ -186,13 +206,14 @@ fun TextInputDialog(
         show = true,
         onDismissRequest = onDismiss
     ) {
+        val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = inputValue,
                 onValueChange = { inputValue = it },
                 label = label,
                 keyboardOptions = keyboardOptions,
-                modifier = Modifier
+                modifier = inputFocusModifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 maxLines = 15
@@ -273,6 +294,7 @@ fun FloatInputDialog(
         show = true,
         onDismissRequest = onDismiss
     ) {
+        val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = inputValue,
@@ -281,7 +303,7 @@ fun FloatInputDialog(
                 },
                 label = label,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier
+                modifier = inputFocusModifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 maxLines = 1

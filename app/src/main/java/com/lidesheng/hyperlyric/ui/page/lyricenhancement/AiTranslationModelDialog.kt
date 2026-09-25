@@ -37,6 +37,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.ui.component.rememberDialogInputFocusModifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -175,6 +176,7 @@ internal fun AiTranslationModelDialog(
         onDismissRequest = onDismiss
     ) {
         val popupWindowWidth = LocalWindowInfo.current.containerDpSize.width
+        val inputFocusModifier = rememberDialogInputFocusModifier()
         if (pendingSnackbarCount > 0) {
             Popup(
                 popupPositionProvider = snackbarPositionProvider,
@@ -203,7 +205,7 @@ internal fun AiTranslationModelDialog(
                         value = inputValue,
                         onValueChange = { inputValue = it },
                         label = stringResource(R.string.title_ai_translation_model),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = inputFocusModifier.fillMaxWidth(),
                         maxLines = 1
                     )
                 }
