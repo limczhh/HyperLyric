@@ -54,6 +54,9 @@ internal object AmllMatch {
         '）' to '（', ')' to '(', ']' to '[', '】' to '【', '》' to '《'
     )
 
+    /** ASCII 关键词按整词判定：避免 `edit` 命中 `edition` 内部这类误剥离 */
+    private val ASCII_WORD_SPLIT = Regex("[^a-z0-9]+")
+
     /**
      * 条目接受判定（搜索路径与平台探测路径共用的唯一入口）。
      *
@@ -112,11 +115,14 @@ internal object AmllMatch {
     }
 
     /**
-     * 歌名近似相等：归一化后相等，或只差尾部括号装饰 / 版本装饰关键词。
+     * 歌名近似相等：归一化后相等，或只差尾部版本装饰。
      *
      * **不能**退回 [fuzzyContains] 的双向包含：双向包含会把「同曲异版」判为同一首，
      * 而专辑名同样拦不住它（版本后缀也包含原曲名）。
-     * 反过来，歌名后缀常带真实副标题的同曲上传，剥掉尾部括号装饰后相等，因此也算近似相等。
+     * 反过来，歌名后缀常带版本标记的同曲上传，剥掉尾部装饰后相等，因此也算近似相等；
+     * 但括号内容**必须**是版本装饰关键词才剥离——括号里写的是副标题、
+     * 联名或其它版本名时保留原串，否则会把不同的歌判成同一首。
+     * 副标题形态的同曲上传由「歌名互为包含」的严格判定覆盖，不受此收紧影响。
      */
     fun isTitleNearEqual(musicName: String, title: String): Boolean {
         val a = baseTitle(musicName)
@@ -174,22 +180,48 @@ internal object AmllMatch {
     private fun normalize(value: String): String =
         value.trim().lowercase().replace(Regex("\\s+"), " ")
 
-    /** 反复剥离尾部的**任意**成对括号装饰 */
+    /** 反复剥离尾部的**版本装饰**成对括号；括号内容不是版本关键词时保留原串 */
     private fun baseTitle(value: String): String {
         var result = normalize(value)
         while (true) {
-            val next = stripTrailingBracketOnce(result) ?: return result
+            val next = stripTrailingVersionBracketOnce(result) ?: return result
             if (next.isEmpty()) return result
             result = next
         }
     }
 
-    /** 末尾是成对括号时返回去掉该括号及其内容的结果；否则返回 null */
-    private fun stripTrailingBracketOnce(value: String): String? {
+    /**
+     * 末尾是成对括号且括号内容命中 [VERSION_MARKERS] 时，返回去掉该括号及其内容的结果；
+     * 否则返回 null（调用方保留原串）。
+     *
+     * 只剥离**版本装饰**是安全边界：括号里写版本标记时剥掉才能认出同一首的其它版本；
+     * 而括号里是副标题、联名或「另一首歌」的名称时，剥掉会把不同的歌判成同一首，
+     * 故一律保留原串。副标题形态的同曲上传仍可由「歌名互为包含」的严格判定接受。
+     */
+    private fun stripTrailingVersionBracketOnce(value: String): String? {
         val opener = BRACKET_PAIRS[value.lastOrNull() ?: return null] ?: return null
         val index = value.lastIndexOf(opener)
         if (index <= 0) return null
+        val inner = value.substring(index + 1, value.length - 1).trim()
+        if (!containsVersionMarker(inner)) return null
         return value.substring(0, index).trim()
+    }
+
+    /**
+     * 文本是否含版本关键词：中文关键词按子串判定（无词边界概念），
+     * ASCII 关键词按整词判定（防止 `edit` 命中 `edition` 内部）。
+     */
+    private fun containsVersionMarker(value: String): Boolean {
+        val normalized = normalize(value)
+        if (normalized.isEmpty()) return false
+        val asciiTokens = ASCII_WORD_SPLIT.split(normalized).filter { it.isNotEmpty() }.toSet()
+        return VERSION_MARKERS.any { marker ->
+            if (marker.all { it.code < 128 }) {
+                asciiTokens.contains(marker)
+            } else {
+                normalized.contains(marker)
+            }
+        }
     }
 
     /** 末尾是版本装饰关键词时剥离一处；否则原样返回 */
