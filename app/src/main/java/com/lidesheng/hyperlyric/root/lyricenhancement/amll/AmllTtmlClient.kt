@@ -24,6 +24,19 @@ internal class ProcessingBudget(private val budgetMs: Long) {
 }
 
 /**
+ * 单次搜索请求的参数组合（多策略检索的最小单元）
+ *
+ * AMLL 服务端对 `artistName` 的判定是「库中**单个**歌手元素包含查询整串」，
+ * 既不切分分隔符也不做多值 OR —— 因此多歌手场景只能拆成单个 token 逐个请求，
+ * [artist] 为 null 表示本次不携带 `artistName`。
+ */
+internal data class AmllSearchPlan(
+    val musicName: String?,
+    val artist: String?,
+    val albumName: String?,
+)
+
+/**
  * AMLL TTML DataBase 网络客户端（自 main 分支 AmllTtmlClient 移植，OkHttp → HttpURLConnection）
  *
  * - 独立请求语义：connect 超时 5s、read 超时 8s（对齐 main 分支）
@@ -31,6 +44,7 @@ internal class ProcessingBudget(private val budgetMs: Long) {
  *   功能受 34s 处理预算约束收紧）
  * - 网络异常（超时/断网/IOException）与其余 HTTP 错误不重试，直接返回 null
  * - 每次尝试与重试前检查线程中断与剩余预算
+ * - 搜索按 [buildSearchPlans] 逐个策略请求（服务端 `artistName` 只匹配单个歌手名）
  *
  * main 分支在 systemui 混合类加载环境下 Retrofit suspend 反射不可靠的教训
  * （main 提交 938560a/3934f16，需 ProGuard 保留泛型签名）在此天然规避：
@@ -50,6 +64,14 @@ internal class AmllTtmlClient {
         private const val RETRY_BACKOFF_MULTIPLIER = 2L
         private const val MAX_RETRIES = 2
         private const val HTTP_TOO_MANY_REQUESTS = 429
+
+        /**
+         * 多策略检索的请求次数上限（含 title-only 兜底）。
+         *
+         * 服务端只认「单个歌手 token」，多歌手必须逐个 token 各发一次请求；
+         * 上限用于防超长歌手列表打满 34s 处理预算。
+         */
+        private const val MAX_SEARCH_PLANS = 8
     }
 
     @Volatile
@@ -93,9 +115,50 @@ internal class AmllTtmlClient {
     }
 
     /**
-     * 按歌名/歌手/专辑模糊搜索，返回最佳匹配条目。空字段不传，由 AMLL 服务端按 AND 交集匹配。
-     * 服务端排序不保证语义一致（翻唱/Live/串烧可能排在原版之前），而命中结果会被永久缓存，
-     * 因此客户端对返回条目做 title/artist 校验，仅接受可交叉验证的条目。
+     * 生成多策略检索的请求序列（纯函数，顺序即优先级）。
+     *
+     * 服务端把 `artistName` 当作**单个**歌手名做「库中某元素包含查询整串」判定
+     * （不切分分隔符、不做多值 OR），因此多歌手串必须拆成单个 token 逐个请求；
+     * 先试更具体（更长）的歌手 token，让不依赖歌手的 title-only 兜底排在最后
+     * （并为它保留一个名额，不被歌手策略挤掉）。
+     */
+    fun buildSearchPlans(
+        title: String?,
+        artist: String?,
+        album: String?,
+        maxPlans: Int = MAX_SEARCH_PLANS,
+    ): List<AmllSearchPlan> {
+        if (maxPlans <= 0) return emptyList()
+        val musicName = title?.takeIf { it.isNotBlank() }
+        val albumName = album?.takeIf { it.isNotBlank() }
+        val tokens = artist?.let { AmllMatch.splitArtistTokens(it) }.orEmpty()
+        val titlePlans = if (musicName != null) {
+            listOf(AmllSearchPlan(musicName, null, albumName))
+        } else {
+            emptyList()
+        }
+        val artistSlots = maxPlans - titlePlans.size
+        val artistPlans = tokens
+            .distinctBy { it.lowercase() }
+            .sortedByDescending { it.length }
+            .take(artistSlots)
+            .map { token -> AmllSearchPlan(musicName, token, albumName) }
+        return artistPlans + titlePlans
+    }
+
+    /**
+     * 按歌名/歌手/专辑模糊搜索：按 [buildSearchPlans] 的顺序逐个策略请求，
+     * **每个**候选条目都必须通过 [AmllMatch.judge] 才可能被接受（服务端排序不保证语义一致，
+     * 翻唱/Live/串烧可能排在原版之前，而命中结果会被永久缓存）。
+     *
+     * 关键在于「请求参数」与「校验依据」分离：请求里的 `artistName` 只能是单个歌手 token
+     * （服务端语义所限），但校验始终拿**完整**歌手串做交叉验证——若只拿当次 token 校验，
+     * 仅参与和声的「同曲异版」也会被判为严格命中。
+     *
+     * 同一批结果内优先取 [AmllMatchVerdict.STRICT]（歌名互为包含 + 歌手占比达标），
+     * 无严格命中时才退到 [AmllMatchVerdict.IDENTITY]（歌名近似相等 + 至少一位歌手可确认）：
+     * 库中只登记部分歌手是常态，占比不足不等于「不是这首歌」，而「同曲异版」靠歌名近似相等即可拦下。
+     * 严格命中因此不会被同一批结果里的兜底候选顶掉。
      *
      * @return 首个通过客户端校验的条目（不含 lyrics）；无结果/校验失败返回 null
      */
@@ -105,38 +168,65 @@ internal class AmllTtmlClient {
         album: String?,
         budget: ProcessingBudget
     ): SongItem? {
-        val musicName = title?.takeIf { it.isNotBlank() }
-        val artistName = artist?.takeIf { it.isNotBlank() }
-        val albumName = album?.takeIf { it.isNotBlank() }
-        if (musicName == null && artistName == null && albumName == null) {
+        val plans = buildSearchPlans(title, artist, album)
+        if (plans.isEmpty()) {
             HookLogger.d(LOG_TAG, "搜索未执行: 无搜索参数")
             return null
         }
-        val params = buildList {
-            musicName?.let { add("musicName" to it) }
-            artistName?.let { add("artistName" to it) }
-            albumName?.let { add("albumName" to it) }
+        // 校验依据：完整的歌手串；纯分隔符/空白视为「无歌手信息」（此时只认歌名近似相等）
+        val verifyArtist = artist?.takeIf {
+            it.isNotBlank() && AmllMatch.splitArtistTokens(it).isNotEmpty()
         }
-        val body = executeWithRetry(
-            requestLabel = "search",
-            url = buildUrl(SEARCH_PATH, params),
-            budget = budget
-        ) ?: return null
-        val items = AmllModels.parseSearchResponse(body) ?: return null
-        val item = items.firstOrNull { AmllMatch.isPlausibleMatch(it, musicName, artistName) }
-        if (item == null) {
-            if (items.isEmpty()) {
-                HookLogger.d(LOG_TAG, "搜索未命中: 无结果")
-            } else {
-                HookLogger.d(
-                    LOG_TAG,
-                    "搜索未命中: 结果均不匹配, total=${items.size}, " +
-                            "first=${items.firstOrNull()?.musicNames?.joinToString("/") ?: "-"}"
-                )
+        for ((index, plan) in plans.withIndex()) {
+            if (Thread.currentThread().isInterrupted) {
+                HookLogger.d(LOG_TAG, "请求被中断: request=search")
+                return null
             }
-            return null
+            if (budget.isExhausted()) {
+                HookLogger.d(LOG_TAG, "预算耗尽: phase=搜索")
+                return null
+            }
+            val body = executeWithRetry(
+                requestLabel = "search",
+                url = buildUrl(SEARCH_PATH, searchParams(plan)),
+                budget = budget
+            ) ?: continue
+            val items = AmllModels.parseSearchResponse(body) ?: continue
+            val item = pickAcceptable(items, plan, verifyArtist, index, plans.size)
+            if (item != null) return item
+            HookLogger.d(
+                LOG_TAG,
+                "搜索未命中: strategy=${index + 1}/${plans.size}, " +
+                        "items=${items.size}, artist=${plan.artist ?: "-"}"
+            )
         }
-        return item
+        return null
+    }
+
+    /** 在一批结果中挑选可接受的条目：严格命中优先，其次兜底命中；全部被拒返回 null */
+    private fun pickAcceptable(
+        items: List<SongItem>,
+        plan: AmllSearchPlan,
+        verifyArtist: String?,
+        index: Int,
+        total: Int,
+    ): SongItem? {
+        var identity: SongItem? = null
+        for (item in items) {
+            when (AmllMatch.judge(item, plan.musicName, verifyArtist)) {
+                AmllMatchVerdict.STRICT -> return item
+                AmllMatchVerdict.IDENTITY -> if (identity == null) identity = item
+                AmllMatchVerdict.REJECT -> Unit
+            }
+        }
+        return identity
+    }
+
+    /** 把检索策略转成查询参数：空字段不传，由 AMLL 服务端按 AND 交集匹配 */
+    private fun searchParams(plan: AmllSearchPlan): List<Pair<String, String>> = buildList {
+        plan.musicName?.let { add("musicName" to it) }
+        plan.artist?.let { add("artistName" to it) }
+        plan.albumName?.let { add("albumName" to it) }
     }
 
     /** 提取携带非空 lyrics 的条目；status=200 但 lyrics 为空字符串/null 视为未命中 */
