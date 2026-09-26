@@ -4,6 +4,7 @@ import com.lidesheng.hyperlyric.utils.LogManager
 import com.lidesheng.hyperlyric.common.ServiceConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.root.MonochromeAppIconAssets
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,10 +12,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.os.Bundle
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
 import androidx.core.app.NotificationCompat
 
 object NotificationBuilder {
@@ -105,6 +103,11 @@ object NotificationBuilder {
         duration: Long,
         showProgress: Boolean = true
     ): Notification {
+        val appIconBitmap = if (uiState.islandLeftIconStyle == 0) {
+            MonochromeAppIconAssets.load(context, uiState.targetPackageName)
+        } else {
+            null
+        }
         val selectedBitmap: Bitmap? = when (uiState.islandLeftIconStyle) {
             1 -> uiState.notificationAlbumBitmap?.takeIf { !it.isRecycled }
             2 -> uiState.notificationAlbumBitmapCircular?.takeIf { !it.isRecycled }
@@ -112,9 +115,11 @@ object NotificationBuilder {
         }
 
         val smallIconCompat = if (selectedBitmap != null) {
-            getLabelIcon(selectedBitmap) ?: androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
+            getLabelIcon(selectedBitmap) ?: androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.ic_media_lyric)
+        } else if (appIconBitmap != null) {
+            androidx.core.graphics.drawable.IconCompat.createWithBitmap(appIconBitmap)
         } else {
-            androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
+            androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.ic_media_lyric)
         }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -175,7 +180,14 @@ object NotificationBuilder {
     ): Notification {
         val paramIslandJson = FocusNotificationBuilder(uiState, showProgress).build()
 
-        val smallIconCompat = androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.lyrictile)
+        val appIconBitmap = if (uiState.islandLeftIconStyle == 0) {
+            MonochromeAppIconAssets.load(context, uiState.targetPackageName)
+        } else {
+            null
+        }
+        val smallIconCompat = appIconBitmap?.let {
+            androidx.core.graphics.drawable.IconCompat.createWithBitmap(it)
+        } ?: androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.ic_media_lyric)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_FOCUS)
             .setSmallIcon(smallIconCompat)
@@ -203,13 +215,14 @@ object NotificationBuilder {
             else -> uiState.notificationAlbumBitmap?.takeIf { !it.isRecycled }
         }
         val albumIcon = getAlbumIcon(albumBitmapForFocus)
-            ?: android.graphics.drawable.Icon.createWithResource(context, R.drawable.lyrictile)
+            ?: android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_media_lyric)
         picsBundle.putParcelable("miui.focus.pic_album", albumIcon)
 
         if (uiState.islandLeftIconStyle == 0) {
-            val noteBitmap = drawableToBitmap(context, R.drawable.lyrictile)
-            val noteIcon = android.graphics.drawable.Icon.createWithBitmap(noteBitmap)
-            picsBundle.putParcelable("miui.focus.pic_note", noteIcon)
+            val appIcon = appIconBitmap?.let {
+                android.graphics.drawable.Icon.createWithBitmap(it)
+            } ?: android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_media_lyric)
+            picsBundle.putParcelable("miui.focus.pic_note", appIcon)
         }
 
         extras.putBundle("miui.focus.pics", picsBundle)
@@ -297,14 +310,4 @@ object NotificationBuilder {
         }
     }
 
-    private fun drawableToBitmap(context: Context, drawableResId: Int): Bitmap {
-        val drawable = ContextCompat.getDrawable(context, drawableResId)
-            ?: return createBitmap(128, 128)
-        val size = 128
-        val bitmap = createBitmap(size, size)
-        val canvas = Canvas(bitmap)
-        drawable.setBounds(0, 0, size, size)
-        drawable.draw(canvas)
-        return bitmap
-    }
 }

@@ -72,7 +72,7 @@ class FocusNotificationBuilder(
         imageTextLeft.put("type", 1)
 
         val style = uiState.islandLeftIconStyle
-        val showPic = style in 0..2 // 0=note, 1=rounded, 2=circular all show pic; 3=none
+        val showPic = style in 0..2 // 0=app icon, 1=rounded, 2=circular all show pic; 3=none
 
         if (uiState.disableLyricSplit && showPic) {
             // 关闭分割模式：仅显示图标
@@ -106,9 +106,13 @@ class FocusNotificationBuilder(
 
     private fun buildSmallIslandArea(): JSONObject {
         val json = JSONObject()
-        // 小岛胶囊内部内容 (封面+圆形进度表)
+        // 小岛胶囊图片跟随左侧图标设置，进度环独立显示
         val combinePicInfo = JSONObject()
-        combinePicInfo.put("picInfo", buildPicInfo(1))
+        val style = uiState.islandLeftIconStyle
+        if (style in 0..2) {
+            val picKey = if (style == 0) "miui.focus.pic_note" else "miui.focus.pic_album"
+            combinePicInfo.put("picInfo", buildPicInfo(1, picKey))
+        }
         
         if (showProgress) {
             val progressInfo = JSONObject()

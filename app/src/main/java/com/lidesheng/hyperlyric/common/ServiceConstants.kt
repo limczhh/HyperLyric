@@ -35,7 +35,7 @@ object ServiceConstants {
     const val DEFAULT_NOTIFICATION_TYPE = 0
     const val DEFAULT_NOTIFICATION_FOCUS_STYLE = 0
     const val DEFAULT_NOTIFICATION_FOCUS_SHOW = true
-    const val DEFAULT_ISLAND_LEFT_ICON = 0 // 0=music note, 1=rounded album, 2=circular album, 3=none
+    const val DEFAULT_ISLAND_LEFT_ICON = 0 // 0=music app icon, 1=rounded album, 2=circular album, 3=none
     const val DEFAULT_NOTIFICATION_TITLE_STYLE = 4
     const val DEFAULT_NOTIFICATION_CLICK_ACTION = 0
 

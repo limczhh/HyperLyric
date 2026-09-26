@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.lidesheng.hyperlyric.BuildConfig
 
-/** Loads the shared, bundled monochrome music-app icons for Root/SystemUI surfaces. */
+/** Loads bundled monochrome music-app icons shared across app surfaces. */
 internal object MonochromeAppIconAssets {
     private const val DEFAULT_ASSET_PACKAGE = "com.apple.android.music"
 
