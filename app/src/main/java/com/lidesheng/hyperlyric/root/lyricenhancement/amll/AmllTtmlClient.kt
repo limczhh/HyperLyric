@@ -213,27 +213,6 @@ internal class AmllTtmlClient {
         val verifyArtist = artist?.takeIf {
             it.isNotBlank() && AmllMatch.splitArtistTokens(it).isNotEmpty()
         }
-     * 严格命中**跨策略**优先：策略循环内先接受 [AmllMatchVerdict.STRICT]，
-     * 遇到 [AmllMatchVerdict.IDENTITY] 只记下候选并继续扫描后续策略——
-     * 兜底候选不得顶掉后续策略可能给出的严格命中；全部策略都无严格命中时才返回首个兜底候选。
-     *
-     * @return 首个通过客户端校验的条目（不含 lyrics）；无结果/校验失败返回 null
-     */
-    fun searchByMetadata(
-        title: String?,
-        artist: String?,
-        album: String?,
-        budget: ProcessingBudget
-    ): SongItem? {
-        val plans = buildSearchPlans(title, artist, album)
-        if (plans.isEmpty()) {
-            HookLogger.d(LOG_TAG, "搜索未执行: 无搜索参数")
-            return null
-        }
-        // 校验依据：完整的歌手串；纯分隔符/空白视为「无歌手信息」（此时只认歌名近似相等）
-        val verifyArtist = artist?.takeIf {
-            it.isNotBlank() && AmllMatch.splitArtistTokens(it).isNotEmpty()
-        }
         var identityCandidate: SongItem? = null
         for ((index, plan) in plans.withIndex()) {
             if (Thread.currentThread().isInterrupted) {
