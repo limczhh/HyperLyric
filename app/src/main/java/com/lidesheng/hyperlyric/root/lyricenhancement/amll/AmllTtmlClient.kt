@@ -45,6 +45,7 @@ internal data class AmllSearchPlan(
  * - 网络异常（超时/断网/IOException）与其余 HTTP 错误不重试，直接返回 null
  * - 每次尝试与重试前检查线程中断与剩余预算
  * - 搜索按 [buildSearchPlans] 逐个策略请求（服务端 `artistName` 只匹配单个歌手名）
+ * - 搜索阶段为 [fetchById] 预留预算，不足则停止扩展策略，避免「搜到了却取不回正文」
  * - 日志打印实际请求 URL、items 计数与 HTTP 404 语义：404 是「该查询无歌词」，
  *   200 空数组是「搜索成功但无结果」，两者必须可区分
  *
@@ -74,6 +75,16 @@ internal class AmllTtmlClient {
          * 上限用于防超长歌手列表打满 34s 处理预算。
          */
         private const val MAX_SEARCH_PLANS = 8
+
+        /**
+         * 搜索阶段为后续「按 id 取正文」预留的预算（等于一次请求尝试的上限）。
+         *
+         * 搜索结果本身不含歌词，命中后必须再发一次 [GET_PATH] 才能拿到正文；
+         * 若搜索把预算耗尽，就会出现「搜到了却取不回正文」的本轮未命中。
+         * 故每轮搜索前要求剩余预算不少于「本次尝试的闸门 + 本余量」，
+         * 不足则停止扩展策略，把余量留给取正文。
+         */
+        private const val FETCH_RESERVE_MS = CONNECT_TIMEOUT_MS + READ_TIMEOUT_MS
 
         /**
          * 日志中 URL 的最大长度。
@@ -113,9 +124,21 @@ internal class AmllTtmlClient {
     /**
      * 按 AMLL 内部 id 精确获取歌词（search 回退路径使用）。
      *
+     * 取正文前先检查预算：搜索结果本身不含歌词，命中后必须再发一次请求才能拿到正文；
+     * 若预算不足则明确记录「因预算不足放弃取正文」，与「服务端未命中」区分开——
+     * 两者都返回 null，但修复方向完全不同（前者是本地预算问题，后者是检索问题）。
+     * 判定口径与 [executeWithRetry] 的闸门一致，不额外收紧。
+     *
      * @return 命中且 lyrics 非空时返回 [SongItem]；未命中/空 lyrics/失败返回 null
      */
     fun fetchById(id: Long, budget: ProcessingBudget): SongItem? {
+        if (!budget.hasEnoughForAttempt(CONNECT_TIMEOUT_MS.toLong())) {
+            HookLogger.d(
+                LOG_TAG,
+                "预算不足，放弃按 id 取正文: id=$id, remaining=${budget.remainingMs()}ms"
+            )
+            return null
+        }
         val body = executeWithRetry(
             requestLabel = "id_$id",
             url = buildUrl(GET_PATH, listOf("id" to id.toString())),
@@ -219,6 +242,16 @@ internal class AmllTtmlClient {
             }
             if (budget.isExhausted()) {
                 HookLogger.d(LOG_TAG, "预算耗尽: phase=搜索")
+                return identityCandidate
+            }
+            // 取正文预留：本次搜索尝试的闸门 + 后续 fetchById 的一次尝试余量
+            val needed = CONNECT_TIMEOUT_MS.toLong() + FETCH_RESERVE_MS
+            if (budget.remainingMs() < needed) {
+                HookLogger.d(
+                    LOG_TAG,
+                    "预算不足，停止扩展搜索策略: remaining=${budget.remainingMs()}ms, " +
+                            "needed=${needed}ms, strategy=${index + 1}/${plans.size}"
+                )
                 return identityCandidate
             }
             val body = executeWithRetry(
