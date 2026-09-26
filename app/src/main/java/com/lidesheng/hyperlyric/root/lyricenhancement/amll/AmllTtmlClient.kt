@@ -168,7 +168,10 @@ internal class AmllTtmlClient {
      * 同一批结果内优先取 [AmllMatchVerdict.STRICT]（歌名互为包含 + 歌手占比达标），
      * 无严格命中时才退到 [AmllMatchVerdict.IDENTITY]（歌名近似相等 + 至少一位歌手可确认）：
      * 库中只登记部分歌手是常态，占比不足不等于「不是这首歌」，而「同曲异版」靠歌名近似相等即可拦下。
-     * 严格命中因此不会被同一批结果里的兜底候选顶掉。
+     *
+     * 严格命中**跨策略**优先：策略循环内先接受 [AmllMatchVerdict.STRICT]，
+     * 遇到 [AmllMatchVerdict.IDENTITY] 只记下候选并继续扫描后续策略——
+     * 兜底候选不得顶掉后续策略可能给出的严格命中；全部策略都无严格命中时才返回首个兜底候选。
      *
      * @return 首个通过客户端校验的条目（不含 lyrics）；无结果/校验失败返回 null
      */
@@ -187,14 +190,36 @@ internal class AmllTtmlClient {
         val verifyArtist = artist?.takeIf {
             it.isNotBlank() && AmllMatch.splitArtistTokens(it).isNotEmpty()
         }
+     * 严格命中**跨策略**优先：策略循环内先接受 [AmllMatchVerdict.STRICT]，
+     * 遇到 [AmllMatchVerdict.IDENTITY] 只记下候选并继续扫描后续策略——
+     * 兜底候选不得顶掉后续策略可能给出的严格命中；全部策略都无严格命中时才返回首个兜底候选。
+     *
+     * @return 首个通过客户端校验的条目（不含 lyrics）；无结果/校验失败返回 null
+     */
+    fun searchByMetadata(
+        title: String?,
+        artist: String?,
+        album: String?,
+        budget: ProcessingBudget
+    ): SongItem? {
+        val plans = buildSearchPlans(title, artist, album)
+        if (plans.isEmpty()) {
+            HookLogger.d(LOG_TAG, "搜索未执行: 无搜索参数")
+            return null
+        }
+        // 校验依据：完整的歌手串；纯分隔符/空白视为「无歌手信息」（此时只认歌名近似相等）
+        val verifyArtist = artist?.takeIf {
+            it.isNotBlank() && AmllMatch.splitArtistTokens(it).isNotEmpty()
+        }
+        var identityCandidate: SongItem? = null
         for ((index, plan) in plans.withIndex()) {
             if (Thread.currentThread().isInterrupted) {
                 HookLogger.d(LOG_TAG, "请求被中断: request=search")
-                return null
+                return identityCandidate
             }
             if (budget.isExhausted()) {
                 HookLogger.d(LOG_TAG, "预算耗尽: phase=搜索")
-                return null
+                return identityCandidate
             }
             val body = executeWithRetry(
                 requestLabel = "search",
@@ -202,8 +227,19 @@ internal class AmllTtmlClient {
                 budget = budget
             ) ?: continue
             val items = AmllModels.parseSearchResponse(body) ?: continue
-            val item = pickAcceptable(items, plan, verifyArtist, index, plans.size)
-            if (item != null) return item
+            val verdict = pickAcceptable(items, plan, verifyArtist, index, plans.size)
+            if (verdict.item != null) {
+                if (verdict.verdict == AmllMatchVerdict.STRICT) return verdict.item
+                if (identityCandidate == null) {
+                    identityCandidate = verdict.item
+                    HookLogger.d(
+                        LOG_TAG,
+                        "搜索命中(兜底): 歌名近似相等且至少一位歌手可确认, " +
+                                "strategy=${index + 1}/${plans.size}, id=${verdict.item.id}, " +
+                                "继续扫描后续策略寻找严格命中"
+                    )
+                }
+            }
             // 区分两种未命中：items=0 是「该查询无结果」（HTTP 200 空数组），
             // items>0 是「服务端有结果但均未通过客户端交叉校验」——二者修复方向完全不同
             if (items.isEmpty()) {
@@ -212,7 +248,7 @@ internal class AmllTtmlClient {
                     "搜索未命中: strategy=${index + 1}/${plans.size}, items=0, " +
                             "artist=${plan.artist ?: "-"}"
                 )
-            } else {
+            } else if (verdict.item == null) {
                 HookLogger.d(
                     LOG_TAG,
                     "搜索未命中: 结果均不匹配, strategy=${index + 1}/${plans.size}, " +
@@ -221,8 +257,20 @@ internal class AmllTtmlClient {
                 )
             }
         }
-        return null
+        if (identityCandidate != null) {
+            HookLogger.d(
+                LOG_TAG,
+                "搜索回退取兜底候选: id=${identityCandidate.id}（全策略无严格命中）"
+            )
+        }
+        return identityCandidate
     }
+
+    /** 单批结果的挑选结论：条目 + 其判定等级（全部被拒时条目为 null） */
+    private data class SearchPick(
+        val item: SongItem?,
+        val verdict: AmllMatchVerdict?,
+    )
 
     /** 在一批结果中挑选可接受的条目：严格命中优先，其次兜底命中；全部被拒返回 null */
     private fun pickAcceptable(
@@ -231,7 +279,7 @@ internal class AmllTtmlClient {
         verifyArtist: String?,
         index: Int,
         total: Int,
-    ): SongItem? {
+    ): SearchPick {
         var identity: SongItem? = null
         for (item in items) {
             when (AmllMatch.judge(item, plan.musicName, verifyArtist)) {
@@ -241,27 +289,15 @@ internal class AmllTtmlClient {
                         "搜索命中: strategy=${index + 1}/$total, id=${item.id}, " +
                                 "artist=${plan.artist ?: "-"}"
                     )
-                    return item
+                    return SearchPick(item, AmllMatchVerdict.STRICT)
                 }
 
-                AmllMatchVerdict.IDENTITY -> {
-                    if (identity == null) {
-                        identity = item
-                        HookLogger.d(
-                            LOG_TAG,
-                            "搜索命中(兜底): 歌名近似相等且至少一位歌手可确认, " +
-                                    "strategy=${index + 1}/$total, id=${item.id}, " +
-                                    "ratio=${AmllMatch.artistMatchRatio(
-                                        AmllMatch.splitArtistTokens(verifyArtist.orEmpty()), item
-                                    )}, artist=${plan.artist ?: "-"}"
-                        )
-                    }
-                }
+                AmllMatchVerdict.IDENTITY -> if (identity == null) identity = item
 
                 AmllMatchVerdict.REJECT -> Unit
             }
         }
-        return identity
+        return SearchPick(identity, identity?.let { AmllMatchVerdict.IDENTITY })
     }
 
     /** 把检索策略转成查询参数：空字段不传，由 AMLL 服务端按 AND 交集匹配 */
