@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.statusbar
 
+import android.content.Intent
 import android.media.session.MediaController
 import android.media.session.PlaybackState
 import android.os.SystemClock
@@ -10,6 +11,7 @@ import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.hooks.IslandPlaybackControllerResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
@@ -169,6 +171,74 @@ internal class StatusBarLyricGestureController(
 
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_CLOCK ->
                 StatusBarLyricRenderer.toggleTemporaryClockReveal()
+
+            RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP ->
+                performOpenMediaApp()
+        }
+    }
+
+    private fun performOpenMediaApp() {
+        if (!LyriconDataBridge.isPlaybackActive() ||
+            !LyriconDataBridge.hasLyricsForPresentation() ||
+            StatusBarLyricHostRegistry.liveHosts().none(StatusBarLyricHost::isShowingLyric)
+        ) {
+            return
+        }
+
+        val sourceMetadata = LyriconDataBridge.currentLyricMediaMetadata
+        val sourcePackage = LyriconDataBridge.currentLyricPackageName
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+        val metadataPackage = sourceMetadata?.packageName
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+        if (sourcePackage != null && metadataPackage != null &&
+            sourcePackage != metadataPackage
+        ) {
+            HookLogger.w(TAG, "当前歌词来源与媒体应用不匹配，忽略打开应用")
+            return
+        }
+
+        val controller = IslandPlaybackControllerResolver
+            .resolveForCurrentLyric(touchView.context)
+        val packageName = sourcePackage ?: metadataPackage ?: controller?.packageName
+        if (packageName.isNullOrBlank()) {
+            HookLogger.w(TAG, "缺少当前歌词对应的媒体应用包名，忽略打开应用")
+            return
+        }
+
+        if (controller?.packageName == packageName) {
+            val sessionActivity = runCatching { controller.sessionActivity }
+                .onFailure { error ->
+                    HookLogger.w(TAG, "读取当前媒体会话启动入口失败", error)
+                }
+                .getOrNull()
+            if (sessionActivity != null) {
+                val opened = runCatching {
+                    sessionActivity.send()
+                    true
+                }.onFailure { error ->
+                    HookLogger.w(TAG, "打开当前媒体会话对应的应用失败", error)
+                }.getOrDefault(false)
+                if (opened) return
+            }
+        }
+
+        val context = touchView.context
+        val launchIntent = runCatching {
+            context.packageManager.getLaunchIntentForPackage(packageName)
+        }.onFailure { error ->
+            HookLogger.w(TAG, "查找媒体应用启动入口失败: package=$packageName", error)
+        }.getOrNull()
+        if (launchIntent == null) {
+            HookLogger.w(TAG, "媒体应用没有可用的启动入口: package=$packageName")
+            return
+        }
+        runCatching {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launchIntent)
+        }.onFailure { error ->
+            HookLogger.w(TAG, "启动媒体应用失败: package=$packageName", error)
         }
     }
 
@@ -280,6 +350,7 @@ internal class StatusBarLyricGestureController(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_NONE,
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TOGGLE_PLAYBACK,
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_CLOCK,
+            RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP,
         )
         val SWIPE_ACTIONS = setOf(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE,
