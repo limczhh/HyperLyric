@@ -45,6 +45,8 @@ internal data class AmllSearchPlan(
  * - 网络异常（超时/断网/IOException）与其余 HTTP 错误不重试，直接返回 null
  * - 每次尝试与重试前检查线程中断与剩余预算
  * - 搜索按 [buildSearchPlans] 逐个策略请求（服务端 `artistName` 只匹配单个歌手名）
+ * - 日志打印实际请求 URL、items 计数与 HTTP 404 语义：404 是「该查询无歌词」，
+ *   200 空数组是「搜索成功但无结果」，两者必须可区分
  *
  * main 分支在 systemui 混合类加载环境下 Retrofit suspend 反射不可靠的教训
  * （main 提交 938560a/3934f16，需 ProGuard 保留泛型签名）在此天然规避：
@@ -72,6 +74,14 @@ internal class AmllTtmlClient {
          * 上限用于防超长歌手列表打满 34s 处理预算。
          */
         private const val MAX_SEARCH_PLANS = 8
+
+        /**
+         * 日志中 URL 的最大长度。
+         *
+         * 客户端此前不打印 URL，导致「HTTP 200 但 items 为空」只能靠分支唯一可达性反推；
+         * 日志需要逐字看到实际查询参数，但超长 title/artist 会挤爆单行日志，故截断尾部。
+         */
+        private const val MAX_LOGGED_URL_LENGTH = 300
     }
 
     @Volatile
@@ -194,11 +204,22 @@ internal class AmllTtmlClient {
             val items = AmllModels.parseSearchResponse(body) ?: continue
             val item = pickAcceptable(items, plan, verifyArtist, index, plans.size)
             if (item != null) return item
-            HookLogger.d(
-                LOG_TAG,
-                "搜索未命中: strategy=${index + 1}/${plans.size}, " +
-                        "items=${items.size}, artist=${plan.artist ?: "-"}"
-            )
+            // 区分两种未命中：items=0 是「该查询无结果」（HTTP 200 空数组），
+            // items>0 是「服务端有结果但均未通过客户端交叉校验」——二者修复方向完全不同
+            if (items.isEmpty()) {
+                HookLogger.d(
+                    LOG_TAG,
+                    "搜索未命中: strategy=${index + 1}/${plans.size}, items=0, " +
+                            "artist=${plan.artist ?: "-"}"
+                )
+            } else {
+                HookLogger.d(
+                    LOG_TAG,
+                    "搜索未命中: 结果均不匹配, strategy=${index + 1}/${plans.size}, " +
+                            "items=${items.size}, artist=${plan.artist ?: "-"}, " +
+                            "first=${items.first().musicNames?.joinToString("/") ?: "-"}"
+                )
+            }
         }
         return null
     }
@@ -214,8 +235,29 @@ internal class AmllTtmlClient {
         var identity: SongItem? = null
         for (item in items) {
             when (AmllMatch.judge(item, plan.musicName, verifyArtist)) {
-                AmllMatchVerdict.STRICT -> return item
-                AmllMatchVerdict.IDENTITY -> if (identity == null) identity = item
+                AmllMatchVerdict.STRICT -> {
+                    HookLogger.d(
+                        LOG_TAG,
+                        "搜索命中: strategy=${index + 1}/$total, id=${item.id}, " +
+                                "artist=${plan.artist ?: "-"}"
+                    )
+                    return item
+                }
+
+                AmllMatchVerdict.IDENTITY -> {
+                    if (identity == null) {
+                        identity = item
+                        HookLogger.d(
+                            LOG_TAG,
+                            "搜索命中(兜底): 歌名近似相等且至少一位歌手可确认, " +
+                                    "strategy=${index + 1}/$total, id=${item.id}, " +
+                                    "ratio=${AmllMatch.artistMatchRatio(
+                                        AmllMatch.splitArtistTokens(verifyArtist.orEmpty()), item
+                                    )}, artist=${plan.artist ?: "-"}"
+                        )
+                    }
+                }
+
                 AmllMatchVerdict.REJECT -> Unit
             }
         }
@@ -271,13 +313,21 @@ internal class AmllTtmlClient {
                 }
                 val code = connection.responseCode
                 if (code == HttpURLConnection.HTTP_OK) {
+                    HookLogger.d(
+                        LOG_TAG,
+                        "请求成功: code=200, request=$requestLabel, url=${shorten(url)}"
+                    )
                     return connection.inputStream
                         .bufferedReader(Charsets.UTF_8)
                         .use { it.readText() }
                 }
                 val retryable = code == HTTP_TOO_MANY_REQUESTS || code in 500..599
                 if (!retryable || attempt >= MAX_RETRIES) {
-                    HookLogger.d(LOG_TAG, "请求失败: code=$code, retries=$attempt, request=$requestLabel")
+                    HookLogger.d(
+                        LOG_TAG,
+                        "请求失败: code=$code, reason=${httpReason(code)}, retries=$attempt, " +
+                                "request=$requestLabel, url=${shorten(url)}"
+                    )
                     return null
                 }
                 attempt++
@@ -319,6 +369,28 @@ internal class AmllTtmlClient {
             "$key=${URLEncoder.encode(value, "UTF-8")}"
         }
         return "$baseUrl$path?$query"
+    }
+
+    /** 日志用 URL：超长时截断并标注实际长度，避免单行日志被第三方元数据撑爆 */
+    private fun shorten(url: String): String =
+        if (url.length <= MAX_LOGGED_URL_LENGTH) {
+            url
+        } else {
+            url.take(MAX_LOGGED_URL_LENGTH) + "…(len=${url.length})"
+        }
+
+    /**
+     * HTTP 状态码的 AMLL 语义：仅用于日志，不参与控制流。
+     *
+     * AMLL 对「查询无对应歌词」返回 **404**，而对「搜索成功但没有结果」返回
+     * **200 + items 空数组** —— 两者都是正常的未命中，日志必须能区分，
+     * 否则「200 空结果」只能靠分支唯一可达性反推。
+     */
+    private fun httpReason(code: Int): String = when (code) {
+        404 -> "无该查询对应的歌词条目"
+        400 -> "查询参数非法"
+        HTTP_TOO_MANY_REQUESTS -> "请求过于频繁"
+        else -> if (code in 500..599) "服务端错误" else "未知错误"
     }
 
     private fun normalizeBaseUrl(value: String): String {
