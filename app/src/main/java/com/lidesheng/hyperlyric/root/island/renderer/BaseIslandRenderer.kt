@@ -7,6 +7,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
+import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
@@ -326,6 +327,7 @@ object BaseIslandRenderer : LyricRenderer {
         }
         IslandPlaybackStateCoordinator.markClearedByPause()
         IslandPresentationCoordinator.snapshotAttachedHosts().forEach { token ->
+            IslandAlbumCoverStyleHooker.updateLyricTextColor(token.root, null)
             IslandPresentationCoordinator.clearRegisteredHost(token, presentationRevision)
         }
     }

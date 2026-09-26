@@ -1,15 +1,13 @@
 package com.lidesheng.hyperlyric.root.statusbar
 
-import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
-import com.lidesheng.hyperlyric.BuildConfig
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.root.MonochromeAppIconAssets
 
 /** Owns the optional status-bar lyric icon and its small playback animation. */
 internal class StatusBarLyricIconController(
@@ -20,15 +18,6 @@ internal class StatusBarLyricIconController(
     private var imageStyle = -1
     private var lastArtwork: Bitmap? = null
     private var lastAppPackage: String? = null
-    private val monochromeAssetCache = mutableMapOf<String, Bitmap?>()
-    private val moduleContext by lazy(LazyThreadSafetyMode.NONE) {
-        runCatching {
-            iconView.context.createPackageContext(
-                BuildConfig.APPLICATION_ID,
-                Context.CONTEXT_IGNORE_SECURITY,
-            )
-        }.getOrNull()
-    }
     private var renderedAsTintedIcon = false
     private var lastTintColor: Int? = null
     private var currentStyle = -1
@@ -165,7 +154,6 @@ internal class StatusBarLyricIconController(
         imageStyle = -1
         lastArtwork = null
         lastAppPackage = null
-        monochromeAssetCache.clear()
         renderedAsTintedIcon = false
         lastTintColor = null
         hostVisible = false
@@ -272,15 +260,8 @@ internal class StatusBarLyricIconController(
             return iconView.drawable != null
         }
 
-        val assetName = normalizedPackage?.let(MONOCHROME_APP_ASSET_BY_PACKAGE::get)
-            ?: DEFAULT_MONOCHROME_ASSET_PACKAGE
-        val bitmap = loadMonochromeAppIcon(assetName)
-            ?: if (assetName != DEFAULT_MONOCHROME_ASSET_PACKAGE) {
-                loadMonochromeAppIcon(DEFAULT_MONOCHROME_ASSET_PACKAGE)
-            } else {
-                null
-            }
-        if (bitmap == null) return false
+        val bitmap = MonochromeAppIconAssets.load(iconView.context, normalizedPackage)
+            ?: return false
         showMonochromeIcon(normalizedPackage, bitmap)
         return true
     }
@@ -294,20 +275,6 @@ internal class StatusBarLyricIconController(
         lastArtwork = null
         lastAppPackage = packageName
         renderedAsTintedIcon = true
-    }
-
-    private fun loadMonochromeAppIcon(assetName: String): Bitmap? {
-        if (monochromeAssetCache.containsKey(assetName)) {
-            return monochromeAssetCache[assetName]
-        }
-        val bitmap = runCatching {
-            val assets = moduleContext?.assets ?: return@runCatching null
-            assets.open("monochrome_app_icons/$assetName.png").use {
-                BitmapFactory.decodeStream(it)
-            }
-        }.getOrNull()
-        monochromeAssetCache[assetName] = bitmap
-        return bitmap
     }
 
     private fun clearTintCache() {
@@ -340,20 +307,5 @@ internal class StatusBarLyricIconController(
 
     private companion object {
         const val ROTATION_DURATION_MS = 8_000L
-        private const val MONOCHROME_ASSET_PACKAGE = "com.netease.cloudmusic"
-        private const val DEFAULT_MONOCHROME_ASSET_PACKAGE = "com.apple.android.music"
-        val MONOCHROME_APP_ASSET_BY_PACKAGE = mapOf(
-            "cn.kuwo.player" to "cn.kuwo.player",
-            "cn.wenyu.bodian" to "cn.wenyu.bodian",
-            "com.apple.android.music" to "com.apple.android.music",
-            "com.hihonor.cloudmusic" to MONOCHROME_ASSET_PACKAGE,
-            "com.kugou.android" to "com.kugou.android",
-            "com.kugou.android.lite" to "com.kugou.android.lite",
-            "com.luna.music" to "com.luna.music",
-            "com.miui.player" to "com.miui.player",
-            "com.netease.cloudmusic" to MONOCHROME_ASSET_PACKAGE,
-            "com.salt.music" to "com.salt.music",
-            "com.tencent.qqmusic" to "com.tencent.qqmusic",
-        )
     }
 }

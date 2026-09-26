@@ -2,17 +2,21 @@ package com.lidesheng.hyperlyric.root.island.effects.album
 
 import android.content.SharedPreferences
 import android.graphics.Outline
+import android.graphics.PorterDuff
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.MonochromeAppIconAssets
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
 import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -35,6 +39,7 @@ internal object IslandAlbumCoverStyleHooker {
         Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     )
     private val trackedHolders = WeakHashMap<Any, TrackedHolder>()
+    private val lyricTextColorsByRoot = WeakHashMap<ViewGroup, Int>()
     private val restoringNative = ThreadLocal<Boolean>()
     private val circleOutlineProvider = object : ViewOutlineProvider() {
         override fun getOutline(view: View, outline: Outline) {
@@ -122,6 +127,40 @@ internal object IslandAlbumCoverStyleHooker {
         IslandAlbumCoverRotationController.setPlaybackActive(isPlaying)
     }
 
+    fun updateLyricTextColor(root: ViewGroup, color: Int?) {
+        synchronized(lyricTextColorsByRoot) {
+            if (color == null) {
+                lyricTextColorsByRoot.remove(root)
+            } else {
+                lyricTextColorsByRoot[root] = color
+            }
+        }
+        runOnMain {
+            val monochromeStyle = currentStyle() ==
+                RootConstants.ISLAND_ALBUM_COVER_STYLE_MONOCHROME
+            val holders = synchronized(trackedHolders) {
+                trackedHolders.mapNotNull { (holder, tracked) ->
+                    tracked.dataRef.get()?.let { Triple(holder, it, tracked.accessor) }
+                }
+            }
+            holders.forEach { (holder, data, accessor) ->
+                runCatching {
+                    if (hostRootForHolder(holder) !== root) return@runCatching
+                    val appIcon = accessor.appIconField.get(holder) as? ImageView
+                        ?: return@runCatching
+                    val shouldTint = monochromeStyle && color != null &&
+                        IslandModificationTargetPolicy.allowsCurrentScope(
+                            data = data,
+                            hostRoot = root
+                        ) && appIcon.visibility == View.VISIBLE
+                    applyMonochromeTint(appIcon, color.takeIf { shouldTint })
+                }.onFailure {
+                    HookLogger.w(TAG, "更新超级岛单色图标颜色失败: reason=${it.message}")
+                }
+            }
+        }
+    }
+
     fun releaseAll() {
         val holders = synchronized(trackedHolders) {
             trackedHolders.mapNotNull { (holder, tracked) ->
@@ -133,11 +172,17 @@ internal object IslandAlbumCoverStyleHooker {
             restoringNative.set(true)
             try {
                 holders.forEach { (holder, data, accessor) ->
-                    runCatching { accessor.setFixIconMethod.invoke(holder, data) }
-                        .onFailure { HookLogger.e(TAG, "恢复原生超级岛封面失败", it) }
+                    runCatching {
+                        val appIcon = accessor.appIconField.get(holder) as? ImageView
+                        appIcon?.clearColorFilter()
+                        accessor.setFixIconMethod.invoke(holder, data)
+                    }.onFailure { HookLogger.e(TAG, "恢复原生超级岛封面失败", it) }
                 }
             } finally {
                 restoringNative.remove()
+            }
+            synchronized(lyricTextColorsByRoot) {
+                lyricTextColorsByRoot.clear()
             }
         }
     }
@@ -153,21 +198,29 @@ internal object IslandAlbumCoverStyleHooker {
     }
 
     private fun applyStyle(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {
-        if (!isMediaAlbum(accessor, holder)) return
+        val appIcon = accessor.appIconField.get(holder) as? ImageView
+        if (!isMediaAlbum(accessor, holder)) {
+            appIcon?.clearColorFilter()
+            synchronized(trackedHolders) { trackedHolders.remove(holder) }
+            return
+        }
         synchronized(trackedHolders) {
             trackedHolders[holder] = TrackedHolder(WeakReference(dynamicIslandData), accessor)
         }
 
-        if (!IslandModificationTargetPolicy.allowsCurrentScope(
-                data = dynamicIslandData,
-                hostRoot = IslandProbeUtils.getHolderRootView(holder)
-            )
-        ) {
+        val targetAllowed = IslandModificationTargetPolicy.allowsCurrentScope(
+            data = dynamicIslandData,
+            hostRoot = IslandProbeUtils.getHolderRootView(holder)
+        )
+        val style = currentStyle()
+        if (!targetAllowed || style != RootConstants.ISLAND_ALBUM_COVER_STYLE_MONOCHROME) {
+            appIcon?.clearColorFilter()
+        }
+        if (!targetAllowed) {
             return
         }
 
         val fixIcon = accessor.fixIconField.get(holder) as? ImageView ?: return
-        val style = currentStyle()
         if (style != RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE) {
             IslandAlbumCoverRotationController.detach(fixIcon)
         }
@@ -178,7 +231,11 @@ internal object IslandAlbumCoverStyleHooker {
             }
 
             RootConstants.ISLAND_ALBUM_COVER_STYLE_APP_ICON -> {
-                showAppIcon(accessor, holder, dynamicIslandData)
+                showAppIcon(accessor, holder, dynamicIslandData, fixIcon)
+            }
+
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_MONOCHROME -> {
+                showMonochromeAppIcon(accessor, holder, dynamicIslandData, fixIcon)
             }
 
             RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE -> {
@@ -194,8 +251,12 @@ internal object IslandAlbumCoverStyleHooker {
         fixIcon.invalidateOutline()
     }
 
-    private fun showAppIcon(accessor: CoverAccessor, holder: Any, dynamicIslandData: Any) {
-        val fixIcon = accessor.fixIconField.get(holder) as? ImageView
+    private fun showAppIcon(
+        accessor: CoverAccessor,
+        holder: Any,
+        dynamicIslandData: Any,
+        fixIcon: ImageView,
+    ) {
         val method = accessor.setAppIconMethod
         if (method == null) {
             return
@@ -204,13 +265,52 @@ internal object IslandAlbumCoverStyleHooker {
         method.invoke(holder, dynamicIslandData)
         val appIcon = accessor.appIconField.get(holder) as? ImageView
         val iconContainer = accessor.iconContainerField.get(holder) as? View
+        if (appIcon != null) {
+            appIcon.clearColorFilter()
+        }
         if (appIcon?.drawable == null ||
             appIcon.visibility != View.VISIBLE ||
             iconContainer?.visibility != View.VISIBLE
         ) {
             appIcon?.visibility = View.GONE
-            fixIcon?.visibility = View.VISIBLE
+            fixIcon.visibility = View.VISIBLE
             iconContainer?.visibility = View.VISIBLE
+        }
+    }
+
+    private fun showMonochromeAppIcon(
+        accessor: CoverAccessor,
+        holder: Any,
+        dynamicIslandData: Any,
+        fixIcon: ImageView,
+    ) {
+        val mediaPackage = IslandProbeUtils.extractMediaIslandInfo(dynamicIslandData)?.packageName
+        val bitmap = MonochromeAppIconAssets.load(fixIcon.context, mediaPackage) ?: return
+
+        val method = accessor.setAppIconMethod ?: return
+        method.invoke(holder, dynamicIslandData)
+        val appIcon = accessor.appIconField.get(holder) as? ImageView ?: return
+        val iconContainer = accessor.iconContainerField.get(holder) as? View ?: return
+        appIcon.setImageBitmap(bitmap)
+        appIcon.visibility = View.VISIBLE
+        iconContainer.visibility = View.VISIBLE
+        val root = hostRootForHolder(holder)
+        val lyricTextColor = root?.let {
+            synchronized(lyricTextColorsByRoot) { lyricTextColorsByRoot[it] }
+        }
+        applyMonochromeTint(appIcon, lyricTextColor)
+    }
+
+    private fun hostRootForHolder(holder: Any): ViewGroup? {
+        val holderRoot = IslandProbeUtils.getHolderRootView(holder) ?: return null
+        return IslandViewRegistry.tokenForDescendant(holderRoot)?.root ?: holderRoot
+    }
+
+    private fun applyMonochromeTint(appIcon: ImageView, color: Int?) {
+        if (color == null) {
+            appIcon.clearColorFilter()
+        } else {
+            appIcon.setColorFilter(color, PorterDuff.Mode.SRC_IN)
         }
     }
 

@@ -11,6 +11,8 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
+import com.lidesheng.hyperlyric.root.island.content.IslandSlotStyleAssembler
+import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
@@ -76,6 +78,7 @@ internal object IslandContentUpdateCoordinator {
         if (hostKind == IslandViewRegistry.HostKind.REAL) {
             IslandMusicWaveColorHooker.refresh()
         }
+        updateMonochromeIconTextColor(view, config)
     }
 
     /**
@@ -125,6 +128,7 @@ internal object IslandContentUpdateCoordinator {
         if (hostKind == IslandViewRegistry.HostKind.REAL) {
             IslandMusicWaveColorHooker.refresh()
         }
+        updateMonochromeIconTextColor(view, config)
     }
 
     /**
@@ -199,6 +203,26 @@ internal object IslandContentUpdateCoordinator {
             config,
             mediaInfo
         )
+        updateMonochromeIconTextColor(view, config)
+    }
+
+    private fun updateMonochromeIconTextColor(
+        view: ViewGroup,
+        config: IslandSlotRuntimeConfig
+    ) {
+        val leftColor = if (config.leftMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
+            view.findViewWithTag<View>(IslandProbeUtils.LEFT_TEST_VIEW_TAG)
+                ?.let(IslandSlotStyleAssembler::primaryTextColor)
+        } else {
+            null
+        }
+        val rightColor = if (config.rightMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
+            view.findViewWithTag<View>(IslandProbeUtils.RIGHT_TEST_VIEW_TAG)
+                ?.let(IslandSlotStyleAssembler::primaryTextColor)
+        } else {
+            null
+        }
+        IslandAlbumCoverStyleHooker.updateLyricTextColor(view, leftColor ?: rightColor)
     }
 
     fun forEachActiveHost(

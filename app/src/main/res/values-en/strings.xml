@@ -496,6 +496,7 @@
     <string name="option_audio_cover_style_circle">Circular cover</string>
     <string name="option_audio_cover_style_rotating_circle">Rotating circular cover</string>
     <string name="option_audio_cover_style_app_icon">App icon</string>
+    <string name="option_audio_cover_style_monochrome">Monochrome icon</string>
     <string name="option_audio_cover_style_hidden">Hide cover</string>
     <string name="title_audio_rhythm">Audio Rhythm</string>
     <string name="option_audio_rhythm_default">Default</string>

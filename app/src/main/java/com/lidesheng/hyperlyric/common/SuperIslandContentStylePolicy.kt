@@ -9,7 +9,7 @@ object SuperIslandContentStylePolicy {
             RootConstants.DEFAULT_HOOK_ISLAND_ALBUM_COVER_STYLE
         ).coerceIn(
             RootConstants.ISLAND_ALBUM_COVER_STYLE_DEFAULT,
-            RootConstants.ISLAND_ALBUM_COVER_STYLE_HIDDEN
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_MONOCHROME
         )
     }
 

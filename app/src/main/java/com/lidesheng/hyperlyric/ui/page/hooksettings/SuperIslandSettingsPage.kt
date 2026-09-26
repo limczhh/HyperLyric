@@ -454,6 +454,7 @@ fun SuperIslandSettingsPage() {
             RootConstants.ISLAND_ALBUM_COVER_STYLE_CIRCLE,
             RootConstants.ISLAND_ALBUM_COVER_STYLE_ROTATING_CIRCLE,
             RootConstants.ISLAND_ALBUM_COVER_STYLE_APP_ICON,
+            RootConstants.ISLAND_ALBUM_COVER_STYLE_MONOCHROME,
             RootConstants.ISLAND_ALBUM_COVER_STYLE_HIDDEN
         )
     }
@@ -463,6 +464,7 @@ fun SuperIslandSettingsPage() {
             R.string.option_audio_cover_style_circle,
             R.string.option_audio_cover_style_rotating_circle,
             R.string.option_audio_cover_style_app_icon,
+            R.string.option_audio_cover_style_monochrome,
             R.string.option_island_component_hidden
         )
     }.map { stringResource(id = it) }
