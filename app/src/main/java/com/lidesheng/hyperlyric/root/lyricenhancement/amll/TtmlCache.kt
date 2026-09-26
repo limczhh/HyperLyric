@@ -34,11 +34,26 @@ internal class TtmlCache(
         fun exactKey(platform: AmllPlatformIdField, songId: String): String =
             SCHEMA_PREFIX + "|exact|" + platform.name + "|" + songId
 
+        /**
+         * 搜索缓存语义键。
+         *
+         * 归一化只折叠空白，**不重写歌手分隔符**：键由本次请求的原始 title/artist 唯一决定，
+         * 不随检索策略分支（逐个歌手 token / title-only 兜底）漂移，同一首歌始终落在同一条缓存，
+         * 也不会在策略回退时读到按其它查询条件写入的正文。
+         *
+         * 两个字段都可能来自第三方元数据，因此各自转义 `%` 与 `|`：
+         * 否则 title 与 artist 的字段边界会被分隔符吃掉，导致跨歌曲读到同一条缓存。
+         * 不含这两个字符时键逐字节不变，既有缓存不受影响。
+         */
         fun searchKey(title: String, artist: String): String {
-            val normalizedTitle = title.trim().replace(Regex("\\s+"), " ")
-            val normalizedArtist = artist.trim().replace(Regex("\\s+"), " ")
+            val normalizedTitle = escapeKeyPart(title.trim().replace(Regex("\\s+"), " "))
+            val normalizedArtist = escapeKeyPart(artist.trim().replace(Regex("\\s+"), " "))
             return SCHEMA_PREFIX + "|search|" + normalizedTitle + "|" + normalizedArtist
         }
+
+        /** 转义语义键的分隔符：`%` 必须先于 `|` 替换，否则会二次转义 */
+        private fun escapeKeyPart(value: String): String =
+            value.replace("%", "%25").replace("|", "%7C")
 
         fun resolveKey(songId: String): String =
             SCHEMA_PREFIX + "|resolve|" + songId
