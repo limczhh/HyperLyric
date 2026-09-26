@@ -5,6 +5,7 @@ import android.media.session.MediaController
 import android.media.session.PlaybackState
 import android.os.SystemClock
 import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -27,7 +28,10 @@ internal class StatusBarLyricGestureController(
 
             override fun onDoubleTap(event: MotionEvent): Boolean {
                 if (!ignoreCurrentSequence) {
-                    gestureSnapshot?.let { performTapAction(it.doubleTapAction) }
+                    gestureSnapshot?.let { snapshot ->
+                        performGestureHapticFeedback(snapshot.hapticFeedbackEnabled)
+                        performTapAction(snapshot.doubleTapAction)
+                    }
                 }
                 return true
             }
@@ -37,7 +41,10 @@ internal class StatusBarLyricGestureController(
             override fun onLongPress(event: MotionEvent) {
                 longPressRecognized = true
                 if (!ignoreCurrentSequence) {
-                    gestureSnapshot?.let { performTapAction(it.longPressAction) }
+                    gestureSnapshot?.let { snapshot ->
+                        performGestureHapticFeedback(snapshot.hapticFeedbackEnabled)
+                        performTapAction(snapshot.longPressAction)
+                    }
                 }
             }
         }
@@ -105,8 +112,10 @@ internal class StatusBarLyricGestureController(
         }
 
         if (deltaX < 0f) {
+            performGestureHapticFeedback(snapshot.hapticFeedbackEnabled)
             performSwipeAction(snapshot.swipeLeftAction)
         } else {
+            performGestureHapticFeedback(snapshot.hapticFeedbackEnabled)
             performSwipeAction(snapshot.swipeRightAction)
         }
         return true
@@ -160,8 +169,12 @@ internal class StatusBarLyricGestureController(
             } else {
                 RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE
             },
+            hapticFeedbackEnabled = prefs.getBoolean(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK,
+            ),
         )
-        return snapshot.takeIf(GestureSnapshot::hasAnyAction)
+        return snapshot.takeIf(GestureSnapshot::hasAnyBehavior)
     }
 
     private fun performTapAction(action: Int) {
@@ -174,6 +187,15 @@ internal class StatusBarLyricGestureController(
 
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP ->
                 performOpenMediaApp()
+        }
+    }
+
+    private fun performGestureHapticFeedback(enabled: Boolean) {
+        if (!enabled) return
+        runCatching {
+            touchView.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        }.onFailure { error ->
+            HookLogger.w(TAG, "执行状态栏歌词触感反馈失败", error)
         }
     }
 
@@ -335,9 +357,10 @@ internal class StatusBarLyricGestureController(
         val longPressAction: Int,
         val swipeLeftAction: Int,
         val swipeRightAction: Int,
+        val hapticFeedbackEnabled: Boolean,
     ) {
-        fun hasAnyAction(): Boolean =
-            doubleTapAction != RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_NONE ||
+        fun hasAnyBehavior(): Boolean = hapticFeedbackEnabled ||
+                    doubleTapAction != RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_NONE ||
                     longPressAction != RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_NONE ||
                     swipeLeftAction != RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE ||
                     swipeRightAction != RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE

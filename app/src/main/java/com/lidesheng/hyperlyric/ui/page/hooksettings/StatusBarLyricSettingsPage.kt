@@ -287,6 +287,14 @@ fun StatusBarLyricSettingsPage() {
             RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_SWIPE_RIGHT_ACTION,
         ))
     }
+    var gestureHapticFeedbackEnabled by remember(prefs) {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK,
+            )
+        )
+    }
     val interactionDropdowns = listOf(
         StatusBarLyricGestureDropdown(
             title = stringResource(R.string.title_status_bar_lyric_double_tap),
@@ -466,7 +474,17 @@ fun StatusBarLyricSettingsPage() {
                                     )
                                 },
                             )
-                            statusBarLyricInteractionSection(interactionDropdowns)
+                            statusBarLyricInteractionSection(
+                                dropdowns = interactionDropdowns,
+                                hapticFeedbackEnabled = gestureHapticFeedbackEnabled,
+                                onHapticFeedbackEnabledChange = { enabled ->
+                                    gestureHapticFeedbackEnabled = enabled
+                                    saveConfig(
+                                        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK,
+                                        enabled,
+                                    )
+                                },
+                            )
                         } else {
                             statusBarLyricIconSections(
                                 iconEnabled = iconEnabled,
@@ -667,6 +685,8 @@ private fun StatusBarLyricIconSizeControl(
 
 private fun LazyListScope.statusBarLyricInteractionSection(
     dropdowns: List<StatusBarLyricGestureDropdown>,
+    hapticFeedbackEnabled: Boolean,
+    onHapticFeedbackEnabledChange: (Boolean) -> Unit,
 ) {
     item(key = "status_bar_lyric_interaction_title") {
         SmallTitle(text = stringResource(R.string.title_interaction))
@@ -679,6 +699,11 @@ private fun LazyListScope.statusBarLyricInteractionSection(
                 .fillMaxWidth()
         ) {
             Column {
+                SwitchPreference(
+                    title = stringResource(R.string.title_status_bar_lyric_haptic_feedback),
+                    checked = hapticFeedbackEnabled,
+                    onCheckedChange = onHapticFeedbackEnabledChange,
+                )
                 dropdowns.forEach { dropdown ->
                     OverlayDropdownPreference(
                         title = dropdown.title,

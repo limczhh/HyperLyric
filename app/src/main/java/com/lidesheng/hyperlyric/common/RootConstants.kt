@@ -41,6 +41,8 @@ object RootConstants {
         "key_hook_status_bar_lyric_swipe_left_action"
     const val KEY_HOOK_STATUS_BAR_LYRIC_SWIPE_RIGHT_ACTION =
         "key_hook_status_bar_lyric_swipe_right_action"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK =
+        "key_hook_status_bar_lyric_gesture_haptic_feedback"
     const val KEY_HOOK_LYRIC_MODE = "key_hook_lyric_mode"
     const val KEY_HOOK_LYRIC_SOURCE = "key_hook_lyric_source"
     const val DEFAULT_HOOK_LYRIC_SOURCE = "lyricon"
@@ -355,6 +357,7 @@ object RootConstants {
         STATUS_BAR_LYRIC_GESTURE_SWIPE_NEXT
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_SWIPE_RIGHT_ACTION =
         STATUS_BAR_LYRIC_GESTURE_SWIPE_PREVIOUS
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_GESTURE_HAPTIC_FEEDBACK = true
     const val STATUS_BAR_LYRIC_GESTURE_SWIPE_THRESHOLD_DP = 50
     const val ISLAND_ALBUM_COVER_STYLE_DEFAULT = 0
     const val ISLAND_ALBUM_COVER_STYLE_CIRCLE = 1

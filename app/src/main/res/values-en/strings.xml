@@ -134,6 +134,7 @@
     <string name="title_status_bar_lyric_long_press">Long press</string>
     <string name="title_status_bar_lyric_swipe_left">Swipe left</string>
     <string name="title_status_bar_lyric_swipe_right">Swipe right</string>
+    <string name="title_status_bar_lyric_haptic_feedback">Haptic feedback</string>
     <string name="option_status_bar_lyric_gesture_none">No action</string>
     <string name="option_status_bar_lyric_gesture_toggle_playback">Play/Pause</string>
     <string name="option_status_bar_lyric_gesture_temporary_clock">Show clock temporarily</string>
