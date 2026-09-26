@@ -228,7 +228,7 @@ internal class AmllTtmlFeature(
                 HookLogger.d(LOG_TAG, "平台探测歌词为空: platform=${platform.name}")
                 continue
             }
-            if (requireVerification && !AmllMatch.isPlausibleMatch(item, title, artist)) {
+            if (requireVerification && !AmllMatch.isProbeMatch(item, title, artist)) {
                 // 跨平台 ID 撞号：条目与请求 title/artist 不匹配，拒绝并继续下一平台
                 HookLogger.d(LOG_TAG, "平台探测校验拒绝: platform=${platform.name}")
                 continue

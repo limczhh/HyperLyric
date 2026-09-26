@@ -86,13 +86,30 @@ internal object AmllMatch {
     }
 
     /**
-     * 严格校验：仅 [AmllMatchVerdict.STRICT] 视为通过。
+     * 逐平台探测专用判定（平台 ID 已字面命中时的交叉校验）。
      *
-     * 平台探测的逐平台路径使用（跨平台 ID 撞号时条目与请求多半毫无交集，
-     * 需要更强的证据链，不接受兜底结论）。
+     * 与搜索路径的 [judge] 不同：探测的前提是「平台 ID 精确命中」，条目与请求的相关性
+     * 已由 ID 给出，故此处只要求**请求携带的每个字段各有证据**——歌名对得上、
+     * 至少一位歌手可在条目中确认——而**不要求**歌手命中占比达到搜索路径的阈值：
+     * 库中只登记部分歌手是常态，占比不足不能作为「不是这首歌」的证据，
+     * 据此拒绝会让本可命中的歌曲回落原歌词。
+     *
+     * 跨平台 ID 撞号防护仍然保留：请求携带了哪个字段，该字段就必须有证据；
+     * 两个字段都未提供时无法验证，一律不接受。
      */
-    fun isPlausibleMatch(item: SongItem, title: String?, artist: String?): Boolean =
-        judge(item, title, artist) == AmllMatchVerdict.STRICT
+    fun isProbeMatch(item: SongItem, title: String?, artist: String?): Boolean {
+        if (title == null && artist == null) return false
+        if (title != null) {
+            val names = item.musicNames.orEmpty()
+            if (names.isEmpty() || names.none { fuzzyContains(it, title) }) return false
+        }
+        if (artist != null) {
+            val requestTokens = splitArtistTokens(artist)
+            if (requestTokens.isEmpty()) return false
+            if (artistMatchRatio(requestTokens, item) <= 0.0) return false
+        }
+        return true
+    }
 
     /**
      * 歌名近似相等：归一化后相等，或只差尾部括号装饰 / 版本装饰关键词。
