@@ -8,6 +8,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
@@ -66,7 +67,7 @@ internal object IslandDynamicWidthCoordinator {
             if (refreshDynamicSlotWidths(
                     rootView,
                     config,
-                    forceMaxWidth = hasActiveAutoDuet(rootView, config)
+                    lockMaxWidth = isDuetLockActive(config)
                 )
             ) {
                 scheduleSystemRelayout(rootView, hostToken)
@@ -103,7 +104,7 @@ internal object IslandDynamicWidthCoordinator {
             rootView,
             config,
             overrides,
-            forceMaxWidth = hasActiveAutoDuet(rootView, config)
+            lockMaxWidth = isDuetLockActive(config)
         )
         if (changed) {
             scheduleSystemRelayout(rootView, hostToken)
@@ -145,11 +146,11 @@ internal object IslandDynamicWidthCoordinator {
         rootView: ViewGroup,
         config: IslandSlotRuntimeConfig,
         contentWidthOverrides: Map<String, Float> = emptyMap(),
-        forceMaxWidth: Boolean = false
+        lockMaxWidth: Boolean = false
     ): Boolean {
         if (!config.geometry.isDynamicWidth) return false
 
-        if (forceMaxWidth) {
+        if (lockMaxWidth) {
             var changed = false
             listOf(
                 IslandProbeUtils.LEFT_PARENT_NAME to IslandProbeUtils.LEFT_TEST_VIEW_TAG,
@@ -216,24 +217,14 @@ internal object IslandDynamicWidthCoordinator {
         return changed
     }
 
-    private fun hasActiveAutoDuet(
-        rootView: ViewGroup,
-        config: IslandSlotRuntimeConfig
-    ): Boolean {
-        if (!config.autoDuet) return false
-        return listOf(
-            IslandProbeUtils.LEFT_TEST_VIEW_TAG,
-            IslandProbeUtils.RIGHT_TEST_VIEW_TAG
-        ).any { viewTag ->
-            if (config.modeForTag(viewTag) != RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
-                return@any false
-            }
-            when (val lyricView = rootView.findViewWithTag<View>(viewTag)) {
-                is RichLyricLineView -> lyricView.rawSecondaryLine != null
-                is SpaceGateRichLyricLineView -> lyricView.rawSecondaryLine != null
-                else -> false
-            }
-        }
+    /**
+     * Whether the current song holds every dynamic lyric slot at its configured maximum width.
+     *
+     * The verdict is the song-scoped duet state, so the lock covers the complete song and is
+     * released together with the song instead of expiring on the next lyric line.
+     */
+    private fun isDuetLockActive(config: IslandSlotRuntimeConfig): Boolean {
+        return config.autoDuet && LyriconDataBridge.currentSongHasDuet
     }
 
     private fun dynamicSlotBaseWidthDp(
