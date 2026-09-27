@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root
 import android.os.Bundle
 import android.os.SystemClock
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.lyric.DuetLyricPolicy
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
@@ -68,6 +69,14 @@ object LyriconDataBridge {
 
     @Volatile
     var currentNextLyricLine: IRichLyricLine? = null
+
+    /**
+     * Whether the loaded song carries duet vocals. The verdict belongs to the whole song, so it is
+     * resolved once with the song itself and stays valid until the next song change.
+     */
+    @Volatile
+    var currentSongHasDuet: Boolean = false
+        private set
 
     @Volatile
     var currentPosition: Long = 0L
@@ -299,6 +308,7 @@ object LyriconDataBridge {
         isTextMode = false
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = false
+        currentSongHasDuet = false
         currentLyricMediaMetadata = null
         currentResolvedMediaInfo = null
         currentSong = song
@@ -507,6 +517,7 @@ object LyriconDataBridge {
     fun clearState() {
         currentSong = null
         currentSongName = null
+        currentSongHasDuet = false
         currentLyricMediaMetadata = null
         currentResolvedMediaInfo = null
         currentLyric = null
@@ -582,6 +593,7 @@ object LyriconDataBridge {
         timingNavigator = TimingNavigator(prepared.lines.toTypedArray())
         leadingPlaceholderLine = prepared.leadingPlaceholder
         fullSongLyricsAvailable = prepared.hasRenderableLyrics
+        currentSongHasDuet = DuetLyricPolicy.hasDuet(song.lyrics)
         interludeTracker = InterludeTracker(8_000L)
 
         if (selectCurrentPosition) {
