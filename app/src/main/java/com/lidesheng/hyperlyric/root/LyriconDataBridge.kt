@@ -441,13 +441,18 @@ object LyriconDataBridge {
             position >= it.begin && position < it.end
         }
         val showPreludePlaceholder = activeLines.isEmpty() && preludePlaceholder != null
-        val selectedLines = if (showPreludePlaceholder) {
-            listOf(preludePlaceholder)
-        } else if (activeLines.isNotEmpty()) {
-            activeLines
+        // 长间奏窗口内显示倒计时占位行；延迟窗口与短间奏仍保持最后一行歌词。
+        val interludeCountdown = if (activeLines.isEmpty() && !showPreludePlaceholder) {
+            interludeCountdownNavigator.first(position)
         } else {
+            null
+        }
+        val selectedLines = when {
+            showPreludePlaceholder -> listOf(preludePlaceholder)
+            interludeCountdown != null -> listOf(interludeCountdown)
+            activeLines.isNotEmpty() -> activeLines
             // Outside a prelude gap, retain the previous line through instrumental sections.
-            timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
+            else -> timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
         }
 
         val previousLines = currentLyricLines
