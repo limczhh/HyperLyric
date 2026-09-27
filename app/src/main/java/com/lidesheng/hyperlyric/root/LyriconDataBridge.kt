@@ -288,6 +288,7 @@ object LyriconDataBridge {
         plainTextMarqueeOriginActiveTimeMs
 
     private var timingNavigator: TimingNavigator<TimedLine> = TimingNavigator(emptyArray())
+    private var interludeCountdownNavigator: TimingNavigator<TimedLine> = TimingNavigator(emptyArray())
     private var leadingPlaceholderLine: TimedLine? = null
     private var interludeTracker = InterludeTracker(8_000L)
 
@@ -315,6 +316,7 @@ object LyriconDataBridge {
             rebuildTimeline(song, selectCurrentPosition = false)
         } else {
             timingNavigator = TimingNavigator(emptyArray())
+            interludeCountdownNavigator = TimingNavigator(emptyArray())
             leadingPlaceholderLine = null
         }
     }
@@ -520,6 +522,7 @@ object LyriconDataBridge {
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
         timingNavigator = TimingNavigator(emptyArray())
+        interludeCountdownNavigator = TimingNavigator(emptyArray())
         leadingPlaceholderLine = null
 
         versionCounter.incrementAndGet()
@@ -580,7 +583,15 @@ object LyriconDataBridge {
         val processor = SongPreprocessor(resolveTitleSlot(placeholderFormat))
         val prepared = processor.prepare(song.deepCopy())
         timingNavigator = TimingNavigator(prepared.lines.toTypedArray())
+        interludeCountdownNavigator =
+            TimingNavigator(prepared.interludeCountdowns.toTypedArray())
         leadingPlaceholderLine = prepared.leadingPlaceholder
+        if (prepared.interludeCountdowns.isNotEmpty()) {
+            HookLogger.d(
+                TAG,
+                "间奏倒计时占位行: song=${song.name}, count=${prepared.interludeCountdowns.size}"
+            )
+        }
         fullSongLyricsAvailable = prepared.hasRenderableLyrics
         interludeTracker = InterludeTracker(8_000L)
 
