@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 import android.util.Xml
 import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_ALIGNMENT_RESOLVED
 import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_AGENT_TYPE
+import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_AMLL_TTML_SOURCE
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
@@ -577,7 +578,9 @@ internal class TtmlParser {
         val begin = paragraph.begin.coerceAtLeast(0L)
         val end = if (paragraph.end >= paragraph.begin && paragraph.end >= 0) paragraph.end else begin
         val metadataValues = mutableMapOf<String, String?>(
-            METADATA_KEY_ALIGNMENT_RESOLVED to "true"
+            METADATA_KEY_ALIGNMENT_RESOLVED to "true",
+            // 来源标记：宿主据此判定当前歌词由 AMLL TTML Database 提供
+            METADATA_KEY_AMLL_TTML_SOURCE to "true"
         )
         paragraph.agent?.let { agent ->
             metadataValues[METADATA_KEY_AGENT] = agent

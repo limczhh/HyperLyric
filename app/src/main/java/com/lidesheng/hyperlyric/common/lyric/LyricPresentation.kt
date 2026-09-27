@@ -8,6 +8,12 @@ internal const val METADATA_KEY_ALIGNMENT_RESOLVED = "hyperlyric:alignment-resol
 internal const val METADATA_KEY_AGENT_TYPE = "amll:agent-type"
 
 /**
+ * Marks a line that the AMLL TTML parser produced. It is the only writer of this key, so its
+ * presence identifies lyrics that came from the AMLL TTML Database rather than the source app.
+ */
+internal const val METADATA_KEY_AMLL_TTML_SOURCE = "amll:ttml"
+
+/**
  * The host-side presentation boundary for one lyric frame.
  *
  * A source may provide more than two active lines, but the Super Island renderer intentionally
