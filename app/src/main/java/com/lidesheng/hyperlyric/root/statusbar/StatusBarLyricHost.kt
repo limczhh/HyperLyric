@@ -177,8 +177,7 @@ internal class StatusBarLyricHost(
             coverPaletteBackgroundIsDark = StatusBarTextColorHooker.currentBackgroundIsDark(),
             onLineWillApply = { candidateContentWidth ->
                 latestContentWidthPx = candidateContentWidth
-                val lockAtMaxWidth = autoDuetEnabled && lyrics.rawSecondaryLine != null
-                val desiredWidth = if (lockAtMaxWidth) {
+                val desiredWidth = if (isDuetWidthLocked()) {
                     effectiveWidthLimitPx
                 } else {
                     layoutConfig.desiredWidthPx(
@@ -253,10 +252,8 @@ internal class StatusBarLyricHost(
         var changed = wrapper.maxWidthPx != effectiveWidthLimitPx
         wrapper.maxWidthPx = effectiveWidthLimitPx
 
-        val lyrics = lyricView
-        val lockAtMaxWidth = autoDuetEnabled && lyrics?.rawSecondaryLine != null
         val requestedWidth = when {
-            lockAtMaxWidth -> effectiveWidthLimitPx
+            isDuetWidthLocked() -> effectiveWidthLimitPx
             latestContentWidthPx > 0f -> config.desiredWidthPx(
                 contentWidthPx = latestContentWidthPx,
                 iconWidthPx = iconWidthPx,
@@ -269,6 +266,14 @@ internal class StatusBarLyricHost(
         }
         if (changed) wrapper.requestLayout()
     }
+
+    /**
+     * Whether the current song holds the status-bar lyric viewport at its configured maximum
+     * width. The verdict is the song-scoped duet state, so a duet song stays locked for its whole
+     * playback and the lock is released together with the song.
+     */
+    private fun isDuetWidthLocked(): Boolean =
+        autoDuetEnabled && LyriconDataBridge.currentSongHasDuet
 
     fun clearLyrics() {
         val oldView = lyricView
