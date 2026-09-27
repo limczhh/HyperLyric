@@ -2,10 +2,8 @@ package com.lidesheng.hyperlyric.common.lyric
 
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
-import java.util.Locale
 
 internal const val METADATA_KEY_ALIGNMENT_RESOLVED = "hyperlyric:alignment-resolved"
-internal const val METADATA_KEY_AGENT_TYPE = "amll:agent-type"
 
 /**
  * The host-side presentation boundary for one lyric frame.
@@ -27,18 +25,6 @@ internal data class LyricPresentation(
  * two-agent alignment convention.
  */
 internal object LyricPresentationResolver {
-    private val AGENT_METADATA_KEYS = listOf(
-        "agent",
-        "amll:agent",
-        "vocal",
-        "amll:vocal"
-    )
-    private val AGENT_TYPE_METADATA_KEYS = listOf(
-        METADATA_KEY_AGENT_TYPE,
-        "agent:type",
-        "agentType",
-        "vocal:type"
-    )
 
     fun resolve(
         activeLines: List<IRichLyricLine>,
@@ -147,16 +133,6 @@ internal object LyricPresentationResolver {
             if (line.isAlignedRight) line else line.withAlignment(right)
         }
     }
-
-    private fun IRichLyricLine.agentId(): String? = AGENT_METADATA_KEYS
-        .asSequence()
-        .mapNotNull { key -> metadata?.getString(key)?.trim() }
-        .firstOrNull { it.isNotEmpty() }
-
-    private fun IRichLyricLine.agentType(): String? = AGENT_TYPE_METADATA_KEYS
-        .asSequence()
-        .mapNotNull { key -> metadata?.getString(key)?.trim()?.lowercase(Locale.ROOT) }
-        .firstOrNull { it.isNotEmpty() }
 
     private fun hasDistinctVocalIdentities(
         primary: IRichLyricLine,
