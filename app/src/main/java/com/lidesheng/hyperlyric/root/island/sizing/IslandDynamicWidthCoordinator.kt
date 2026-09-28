@@ -64,12 +64,7 @@ internal object IslandDynamicWidthCoordinator {
             val prefs = HookEntry.instance?.prefs ?: return@post
             val config = IslandSlotRuntimeConfig.from(prefs)
             if (!config.geometry.isDynamicWidth) return@post
-            if (refreshDynamicSlotWidths(
-                    rootView,
-                    config,
-                    lockMaxWidth = isDuetLockActive(config)
-                )
-            ) {
+            if (refreshDynamicSlotWidths(rootView, config)) {
                 scheduleSystemRelayout(rootView, hostToken)
             }
         }
@@ -100,12 +95,7 @@ internal object IslandDynamicWidthCoordinator {
             rootTargets[viewTag] = contentWidthPx
             rootTargets.toMap()
         }
-        val changed = refreshDynamicSlotWidths(
-            rootView,
-            config,
-            overrides,
-            lockMaxWidth = isDuetLockActive(config)
-        )
+        val changed = refreshDynamicSlotWidths(rootView, config, overrides)
         if (changed) {
             scheduleSystemRelayout(rootView, hostToken)
         }
@@ -145,51 +135,36 @@ internal object IslandDynamicWidthCoordinator {
     private fun refreshDynamicSlotWidths(
         rootView: ViewGroup,
         config: IslandSlotRuntimeConfig,
-        contentWidthOverrides: Map<String, Float> = emptyMap(),
-        lockMaxWidth: Boolean = false
+        contentWidthOverrides: Map<String, Float> = emptyMap()
     ): Boolean {
         if (!config.geometry.isDynamicWidth) return false
 
-        if (lockMaxWidth) {
-            var changed = false
+        // 对唱宽度锁定：目标宽度直接取用户设定最大值，不做内容自适应收缩
+        val lockedToMaxWidth = shouldLockToMaxWidth(config)
+        val slotBaseWidthDp = if (lockedToMaxWidth) {
+            config.geometry.rightMaxWidthDp.toFloat()
+        } else {
+            val lyricOnly = config.dynamicWidthBasis ==
+                    RootConstants.ISLAND_DYNAMIC_WIDTH_BASIS_LYRIC_ONLY
             listOf(
-                IslandProbeUtils.LEFT_PARENT_NAME to IslandProbeUtils.LEFT_TEST_VIEW_TAG,
-                IslandProbeUtils.RIGHT_PARENT_NAME to IslandProbeUtils.RIGHT_TEST_VIEW_TAG
-            ).forEach { (parentName, viewTag) ->
-                if (config.modeForTag(viewTag) == RootConstants.ISLAND_CONTENT_MODE_NONE) {
-                    return@forEach
-                }
-                changed = updateDynamicSlotWidth(
+                dynamicSlotBaseWidthDp(
                     rootView,
-                    parentName,
-                    viewTag,
+                    IslandProbeUtils.LEFT_PARENT_NAME,
+                    IslandProbeUtils.LEFT_TEST_VIEW_TAG,
                     config,
-                    config.geometry.maxWidthDp(parentName).toFloat()
-                ) || changed
-            }
-            return changed
+                    contentWidthOverrides[IslandProbeUtils.LEFT_TEST_VIEW_TAG],
+                    lyricOnly
+                ),
+                dynamicSlotBaseWidthDp(
+                    rootView,
+                    IslandProbeUtils.RIGHT_PARENT_NAME,
+                    IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
+                    config,
+                    contentWidthOverrides[IslandProbeUtils.RIGHT_TEST_VIEW_TAG],
+                    lyricOnly
+                )
+            ).filterNotNull().maxOrNull() ?: return false
         }
-
-        val lyricOnly = config.dynamicWidthBasis ==
-                RootConstants.ISLAND_DYNAMIC_WIDTH_BASIS_LYRIC_ONLY
-        val slotBaseWidthDp = listOf(
-            dynamicSlotBaseWidthDp(
-                rootView,
-                IslandProbeUtils.LEFT_PARENT_NAME,
-                IslandProbeUtils.LEFT_TEST_VIEW_TAG,
-                config,
-                contentWidthOverrides[IslandProbeUtils.LEFT_TEST_VIEW_TAG],
-                lyricOnly
-            ),
-            dynamicSlotBaseWidthDp(
-                rootView,
-                IslandProbeUtils.RIGHT_PARENT_NAME,
-                IslandProbeUtils.RIGHT_TEST_VIEW_TAG,
-                config,
-                contentWidthOverrides[IslandProbeUtils.RIGHT_TEST_VIEW_TAG],
-                lyricOnly
-            )
-        ).filterNotNull().maxOrNull() ?: return false
         val baseWidthDp = slotBaseWidthDp.coerceIn(
             config.geometry.rightMinWidthDp.toFloat(),
             config.geometry.rightMaxWidthDp.toFloat()
@@ -218,13 +193,16 @@ internal object IslandDynamicWidthCoordinator {
     }
 
     /**
-     * Whether the current song holds every dynamic lyric slot at its configured maximum width.
-     *
-     * The verdict is the song-scoped duet state, so the lock covers the complete song and is
-     * released together with the song instead of expiring on the next lyric line.
+     * 对唱宽度锁定判定：动态宽度模式 + 至少一个槽位为歌词模式 + 当前歌词存在对唱行
+     * （任意行 isAlignedRight=true，解析器已透传到内部模型）→ 锁定为用户设定最大宽度。
+     * 固定宽度模式忽略；每次刷新按当前歌词重新判定，切歌自动解除。
      */
-    private fun isDuetLockActive(config: IslandSlotRuntimeConfig): Boolean {
-        return config.autoDuet && LyriconDataBridge.currentSongHasDuet
+    private fun shouldLockToMaxWidth(config: IslandSlotRuntimeConfig): Boolean {
+        if (!config.geometry.isDynamicWidth) return false
+        val hasLyricSlot = config.leftMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC ||
+                config.rightMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
+        if (!hasLyricSlot) return false
+        return LyriconDataBridge.currentSong?.lyrics?.any { it.isAlignedRight } == true
     }
 
     private fun dynamicSlotBaseWidthDp(
