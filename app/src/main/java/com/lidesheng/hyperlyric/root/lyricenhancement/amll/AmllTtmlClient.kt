@@ -24,6 +24,58 @@ internal class ProcessingBudget(private val budgetMs: Long) {
 }
 
 /**
+ * 进程级请求节流器：AMLL TTML DB 对请求频率有限制，
+ * 两次请求发起时刻的间隔不足 [MIN_INTERVAL_MS] 时阻塞补足差额。
+ *
+ * 状态刻意保持为进程级单例：服务重启会重建 AmllTtmlClient，
+ * 实例级状态会丢失上次请求时刻，导致新旧客户端交替时出现近乎零间隔的连发。
+ */
+internal object AmllRequestThrottle {
+    /** 两次请求发起时刻的最小间隔（AMLL 服务端限流保护阈值） */
+    private const val MIN_INTERVAL_MS = 300L
+
+    /**
+     * 单次等待上限（兜底）。
+     *
+     * 正常路径下等待量必然不超过 [MIN_INTERVAL_MS]：只有差值不足阈值才进入等待分支。
+     * 设备休眠/进程冻结后 nanoTime 差值只会变大，反而直接跳过等待（前次请求早已满足间隔）。
+     * 该上限仅用于防御时钟读取异常（理论上非单调）把等待放大成分钟级。
+     */
+    private const val MAX_WAIT_MS = 5_000L
+
+    private const val MIN_INTERVAL_NANOS = MIN_INTERVAL_MS * 1_000_000L
+
+    private val lock = Any()
+    private var lastRequestNanos = 0L
+
+    /**
+     * 取得一次请求时隙：距上次请求不足 [MIN_INTERVAL_MS] 时休眠补足。
+     *
+     * 休眠在锁内进行，并发调用者被排成队列逐个放行，而非各自算出差值后一起放行。
+     * 使用 [System.nanoTime] 而非墙钟：单调且不受系统时间校准影响。
+     *
+     * @return 实际等待毫秒数（0 表示无需等待）
+     * @throws InterruptedException 等待期间线程被中断，调用方须恢复中断标记并放弃本次请求
+     */
+    @Throws(InterruptedException::class)
+    fun awaitTurn(): Long = synchronized(lock) {
+        val now = System.nanoTime()
+        val gapNanos = now - lastRequestNanos
+        if (lastRequestNanos != 0L && gapNanos < MIN_INTERVAL_NANOS) {
+            // 向上取整：保证唤醒后两次请求的间隔不小于阈值
+            val waitMs = (MIN_INTERVAL_NANOS - gapNanos + 999_999L) / 1_000_000L
+            val cappedMs = waitMs.coerceAtMost(MAX_WAIT_MS)
+            Thread.sleep(cappedMs)
+            lastRequestNanos = System.nanoTime()
+            return@synchronized cappedMs
+        }
+        // 首个请求不引入额外延迟
+        lastRequestNanos = now
+        0L
+    }
+}
+
+/**
  * 单次搜索请求的参数组合（多策略检索的最小单元）
  *
  * AMLL 服务端对 `artistName` 的判定是「库中**单个**歌手元素包含查询整串」，
@@ -43,7 +95,9 @@ internal data class AmllSearchPlan(
  * - HTTP 429/5xx 指数退避重试：初始 1s、倍率 2、最多 2 次（1s/2s；main 为 3 次，
  *   功能受 34s 处理预算约束收紧）
  * - 网络异常（超时/断网/IOException）与其余 HTTP 错误不重试，直接返回 null
- * - 每次尝试与重试前检查线程中断与剩余预算
+ * - 全局请求节流（[AmllRequestThrottle]）：任意两次请求发起间隔不小于 300ms，
+ *   重试与各调用方共用同一时隙，避免触发 AMLL 服务端限流
+ * - 每次尝试与重试前检查线程中断、取得请求时隙并检查剩余预算
  * - 搜索按 [buildSearchPlans] 逐个策略请求（服务端 `artistName` 只匹配单个歌手名）
  * - 搜索阶段为 [fetchById] 预留预算，不足则停止扩展策略，避免「搜到了却取不回正文」
  * - 日志打印实际请求 URL、items 计数与 HTTP 404 语义：404 是「该查询无歌词」，
@@ -330,7 +384,8 @@ internal class AmllTtmlClient {
 
     /**
      * 带指数退避的请求执行器：
-     * - 每次尝试前检查线程中断与剩余预算
+     * - 每次尝试前检查线程中断、取得全局请求时隙（[AmllRequestThrottle]）并检查剩余预算
+     *   （节流等待计入处理预算，等待期间被中断则直接放弃本次请求）
      * - HTTP 429/5xx → 重试（1s/2s，最多 2 次；重试前检查预算能否覆盖等待+尝试）
      * - IOException（含超时/断网）与其余异常 → 不重试
      * - 其余 HTTP 错误 → 不重试
@@ -347,6 +402,18 @@ internal class AmllTtmlClient {
                 HookLogger.d(LOG_TAG, "请求被中断: request=$requestLabel")
                 return null
             }
+            // 全局节流：重试与各调用方共用同一时隙，服务端看到的是统一节奏
+            val throttledMs = try {
+                AmllRequestThrottle.awaitTurn()
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                HookLogger.d(LOG_TAG, "请求被中断: request=$requestLabel")
+                return null
+            }
+            if (throttledMs > 0L) {
+                HookLogger.d(LOG_TAG, "请求节流: 等待=${throttledMs}ms, request=$requestLabel")
+            }
+            // 节流等待后仍走原有闸门，判定口径不变（等待计入处理预算）
             if (!budget.hasEnoughForAttempt(CONNECT_TIMEOUT_MS.toLong())) {
                 HookLogger.d(LOG_TAG, "预算不足，放弃请求: remaining=${budget.remainingMs()}ms, request=$requestLabel")
                 return null
