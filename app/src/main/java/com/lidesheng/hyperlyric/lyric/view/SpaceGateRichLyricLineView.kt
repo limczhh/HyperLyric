@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import androidx.core.graphics.withScale
 import androidx.core.view.forEach
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
+import com.lidesheng.hyperlyric.lyric.model.LyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.line.SpaceGateLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
@@ -160,6 +161,8 @@ class SpaceGateRichLyricLineView(
 
     fun reset() {
         cancelNextLinePromotion()
+        appliedMainLine = null
+        appliedSecondaryLine = null
         line = null
         renderScale = 1.0f
         lastPosition = Long.MIN_VALUE
@@ -372,6 +375,12 @@ class SpaceGateRichLyricLineView(
     private var lineGeneration = 0
     private var preflightReadyGeneration = -1
 
+    // 已提交到两行的内容:内容未变的那一行不重设(见 [applyMainRow] / [applySecondaryRow])。
+    private var appliedMainLine: LyricLine? = null
+    private var appliedMainTimeline = false
+    private var appliedSecondaryLine: LyricLine? = null
+    private var appliedSecondaryTimeline = false
+
     private fun refreshLines(
         allowNextLinePromotion: Boolean = true,
         bypassIdentityCheck: Boolean = false,
@@ -454,10 +463,14 @@ class SpaceGateRichLyricLineView(
         }
 
         main.isSustainProgressEnabled = mainResult.sustainAwareProgress
-        if (preserveMarquee) {
-            main.setLyricPreservingScroll(mainResult.line, mainResult.isLineTimeline)
-        } else {
-            main.setLyric(mainResult.line, mainResult.isLineTimeline)
+        // 内容没变就不重设:重设会 reset + 重新 seek 渲染器,长行还会重算滚动窗口——另一行换行时
+        // 本行会跟着动一下(owner 2026-10-09 真机反馈「第二行会影响第一行」)。
+        if (rowContentChanged(mainResult.line, mainResult.isLineTimeline, main = true)) {
+            if (preserveMarquee) {
+                main.setLyricPreservingScroll(mainResult.line, mainResult.isLineTimeline)
+            } else {
+                main.setLyric(mainResult.line, mainResult.isLineTimeline)
+            }
         }
         main.isScrollOnly = mainResult.isScrollOnly
         currentMainText = mainResult.line.text
@@ -467,10 +480,12 @@ class SpaceGateRichLyricLineView(
         secondary.visibleIfChanged = secResult.alwaysShow
         secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.isSustainProgressEnabled = secResult.sustainAwareProgress
-        if (preserveMarquee) {
-            secondary.setLyricPreservingScroll(secResult.line, secResult.isLineTimeline)
-        } else {
-            secondary.setLyric(secResult.line, secResult.isLineTimeline)
+        if (rowContentChanged(secResult.line, secResult.isLineTimeline, main = false)) {
+            if (preserveMarquee) {
+                secondary.setLyricPreservingScroll(secResult.line, secResult.isLineTimeline)
+            } else {
+                secondary.setLyric(secResult.line, secResult.isLineTimeline)
+            }
         }
         secondary.isScrollOnly = if (secResult.isNextLinePreview) false else secResult.isScrollOnly
 
@@ -480,6 +495,23 @@ class SpaceGateRichLyricLineView(
         oldSecondaryLine = rawSecondaryLine
         if (requestMarquee) requestStartMarquee()
         dispatchMainLineApplied()
+    }
+
+    /** True when this row's committed content actually differs from the newly built one. */
+    private fun rowContentChanged(line: LyricLine, isLineTimeline: Boolean, main: Boolean): Boolean {
+        val same = if (main) {
+            appliedMainLine == line && appliedMainTimeline == isLineTimeline
+        } else {
+            appliedSecondaryLine == line && appliedSecondaryTimeline == isLineTimeline
+        }
+        if (main) {
+            appliedMainLine = line
+            appliedMainTimeline = isLineTimeline
+        } else {
+            appliedSecondaryLine = line
+            appliedSecondaryTimeline = isLineTimeline
+        }
+        return !same
     }
 
     private fun dispatchMainLineApplied() {
