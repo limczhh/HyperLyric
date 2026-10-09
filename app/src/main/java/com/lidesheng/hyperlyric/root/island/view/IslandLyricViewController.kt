@@ -4,7 +4,6 @@ import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
-import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
 
 /**
  * Applies playback state to one injected island projection.
@@ -110,7 +109,11 @@ internal object IslandLyricViewController {
     /** Stops a projection before its native Xiaomi content is restored. */
     fun stopRecursively(view: View) {
         visitProjectionViews(view) { projection ->
-            YoYoAnimation.cancelAnimation(projection)
+            // 换行预设可能只跑在单行上(对唱),停机时要把整块连同两行一起收干净。
+            when (projection) {
+                is RichLyricLineView -> projection.resetTransitionAnimations()
+                is SpaceGateRichLyricLineView -> projection.resetTransitionAnimations()
+            }
             setPlaybackActive(projection, false)
         }
     }

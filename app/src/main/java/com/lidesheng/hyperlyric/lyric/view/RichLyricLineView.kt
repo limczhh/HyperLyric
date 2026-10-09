@@ -12,6 +12,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
 import androidx.core.graphics.withScale
 import androidx.core.view.forEach
@@ -316,8 +317,32 @@ class RichLyricLineView(
         }
     }
 
+    /**
+     * 停掉这块歌词(或它的某一行)上正在跑的换行动画,并把变换复位。
+     *
+     * 换行预设可能只跑在单行上——对唱的第二行换行时第一行还在唱——只取消整块会漏掉那一行;
+     * 而被取消的动画不得留下半截变换,否则复用的投影会停在淡出或位移的中途。
+     */
+    internal fun resetTransitionAnimations() {
+        resetAnimationState(this)
+        resetAnimationState(main)
+        resetAnimationState(secondary)
+    }
+
+    private fun resetAnimationState(target: View) {
+        YoYoAnimation.cancelAnimation(target)
+        target.alpha = 1f
+        target.translationX = 0f
+        target.translationY = 0f
+        target.scaleX = 1f
+        target.scaleY = 1f
+        target.rotation = 0f
+        target.rotationX = 0f
+        target.rotationY = 0f
+    }
+
     override fun onDetachedFromWindow() {
-        YoYoAnimation.cancelAnimation(this)
+        resetTransitionAnimations()
         super.onDetachedFromWindow()
         reset()
     }

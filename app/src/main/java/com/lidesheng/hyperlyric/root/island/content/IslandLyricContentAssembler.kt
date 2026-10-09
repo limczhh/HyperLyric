@@ -19,7 +19,7 @@ import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.isCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoPresets
-import com.lidesheng.hyperlyric.lyric.view.yoyo.animateUpdate
+import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
@@ -163,8 +163,20 @@ internal object IslandLyricContentAssembler {
                 )
             }
             when (view) {
-                is RichLyricLineView -> view.animateUpdate(scaledPreset) { applyLine(this) }
-                is SpaceGateRichLyricLineView -> view.animateUpdate(scaledPreset) { applyLine(this) }
+                is RichLyricLineView, is SpaceGateRichLyricLineView -> {
+                    // 上一次换行可能还在这块歌词或它的某一行上跑着:先退休它——被取消的动画
+                    // 绝不能提交它捕获的那一份内容,且空闲的歌词块不带任何变换。
+                    resetTransitionAnimations(view)
+                    // 对唱行有自己的时间轴:它换行时另一行还在唱,整块一起播会把仍在唱的那一行
+                    // 也淡出再淡入。只对**变了的那一行**播换行预设,另一行原样留在屏上。
+                    val transitionView = transitionRow(view, targetPresentation) ?: view
+                    YoYoAnimation.switchContent(
+                        transitionView,
+                        scaledPreset.first,
+                        scaledPreset.second
+                    ) { applyLine(view) }
+                }
+
                 else -> applyLine(view)
             }
         } else {
@@ -429,15 +441,55 @@ internal object IslandLyricContentAssembler {
         lineContentSignature(presentation.secondary)
     ).hashCode()
 
-    private fun appliedLineSignature(view: View): Int? {
-        val presentation = when (view) {
-            is RichLyricLineView -> LyricPresentation(view.rawLine, view.rawSecondaryLine)
-            is SpaceGateRichLyricLineView ->
-                LyricPresentation(view.rawLine, view.rawSecondaryLine)
+    private fun appliedLineSignature(view: View): Int? =
+        appliedPresentation(view)?.let(::presentationSignature)
 
-            else -> return null
+    private fun appliedPresentation(view: View): LyricPresentation? = when (view) {
+        is RichLyricLineView -> LyricPresentation(view.rawLine, view.rawSecondaryLine)
+        is SpaceGateRichLyricLineView -> LyricPresentation(view.rawLine, view.rawSecondaryLine)
+        else -> null
+    }
+
+    /**
+     * 换行预设落在哪一行:并发行(独立行)只让它自己播,另一行原样留在屏上。整块一起播只在
+     * 副行是主行的从属内容(翻译/罗马音/和声/下一句预览)或两行同时换了内容时才正确。
+     */
+    private fun transitionRow(view: View, target: LyricPresentation): View? {
+        val applied = appliedPresentation(view) ?: return null
+        return when (
+            resolveLyricTransitionScope(
+                // 副行是独立行 ⟺ 这份呈现自带 second 行:从属内容由主行的字段现场装配,
+                // 呈现里的 secondary 只在 AMLL 对唱行(overlapping line)时非空。
+                secondaryIsIndependent = target.secondary != null,
+                mainRowChanged = lineContentSignature(applied.primary) !=
+                    lineContentSignature(target.primary),
+                secondaryRowChanged = lineContentSignature(applied.secondary) !=
+                    lineContentSignature(target.secondary)
+            )
+        ) {
+            LyricTransitionScope.PROJECTION -> null
+            LyricTransitionScope.MAIN_ROW -> mainRowOf(view)
+            LyricTransitionScope.SECONDARY_ROW -> secondaryRowOf(view)
         }
-        return presentationSignature(presentation)
+    }
+
+    private fun mainRowOf(view: View): View? = when (view) {
+        is RichLyricLineView -> view.main
+        is SpaceGateRichLyricLineView -> view.main
+        else -> null
+    }
+
+    private fun secondaryRowOf(view: View): View? = when (view) {
+        is RichLyricLineView -> view.secondary
+        is SpaceGateRichLyricLineView -> view.secondary
+        else -> null
+    }
+
+    private fun resetTransitionAnimations(view: View) {
+        when (view) {
+            is RichLyricLineView -> view.resetTransitionAnimations()
+            is SpaceGateRichLyricLineView -> view.resetTransitionAnimations()
+        }
     }
 
     private fun IRichLyricLine.withNextLinePreview(nextLine: IRichLyricLine?): IRichLyricLine {
