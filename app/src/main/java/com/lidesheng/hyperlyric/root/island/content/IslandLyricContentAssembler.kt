@@ -5,6 +5,7 @@ import android.text.TextPaint
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
+import com.lidesheng.hyperlyric.common.lyric.agentId
 import com.lidesheng.hyperlyric.common.lyric.METADATA_RESOLVED_SECONDARY_CONTENT
 import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
 import com.lidesheng.hyperlyric.common.lyric.LyricPresentationResolver
@@ -43,7 +44,7 @@ internal object IslandLyricContentAssembler {
         forceUnsplit: Boolean = false,
         forceNoLyricsPlaceholder: Boolean = false
     ): Boolean {
-        val targetPresentation = if (lineOverride != null || secondaryLineOverride != null) {
+        val resolvedPresentation = if (lineOverride != null || secondaryLineOverride != null) {
             LyricPresentation(lineOverride, secondaryLineOverride)
         } else if (forceUnsplit) {
             processedPresentation(
@@ -60,6 +61,9 @@ internal object IslandLyricContentAssembler {
                 isLeft = view.tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG
             )
         }
+        // 主行钉在第一声部上:该声部此刻没有句子时**保持它最后唱的那一行**,不把另一声部正在唱
+        // 的行顶上来——否则每次起句两行都会对调(owner 2026-10-09 真机反馈)。
+        val targetPresentation = holdSilentMainLane(view, resolvedPresentation)
         val targetLine = targetPresentation.primary
         val nextLinePreviewEnabledForView =
             targetLine?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
@@ -440,6 +444,22 @@ internal object IslandLyricContentAssembler {
         lineContentSignature(presentation.primary),
         lineContentSignature(presentation.secondary)
     ).hashCode()
+
+    /**
+     * 主行声部空窗时的保持:呈现换到了另一声部、而**已应用的主行所属声部此刻没有行**时,
+     * 主行继续用已应用的那一行(另一声部在唱的行留在副行)。
+     */
+    private fun holdSilentMainLane(view: View, target: LyricPresentation): LyricPresentation {
+        val applied = appliedPresentation(view) ?: return target
+        val appliedLane = applied.primary?.agentId() ?: return target
+        if (target.primary?.agentId() == appliedLane) return target
+        val laneStillSinging = LyriconDataBridge.currentLyricLines.any { line ->
+            line.agentId() == appliedLane &&
+                (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())
+        }
+        if (laneStillSinging) return target
+        return target.copy(primary = applied.primary)
+    }
 
     private fun appliedLineSignature(view: View): Int? =
         appliedPresentation(view)?.let(::presentationSignature)
