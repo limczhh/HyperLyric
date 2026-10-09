@@ -481,16 +481,23 @@ internal object IslandLyricContentAssembler {
                 // 副行是独立行 ⟺ 这份呈现自带 second 行:从属内容由主行的字段现场装配,
                 // 呈现里的 secondary 只在 AMLL 对唱行(overlapping line)时非空。
                 secondaryIsIndependent = target.secondary != null,
-                mainRowChanged = lineContentSignature(applied.primary) !=
-                    lineContentSignature(target.primary),
-                secondaryRowChanged = lineContentSignature(applied.secondary) !=
-                    lineContentSignature(target.secondary)
+                // 同一行源内容 = 时间窗 + 显示文本;切分片段的词边界/元数据差异不算变化,
+                // 否则同一句会被判成"变了",另一行换行时本行照样重设+淡出(owner 真机 3:33)。
+                mainRowChanged = !isSameRowContent(applied.primary, target.primary),
+                secondaryRowChanged = !isSameRowContent(applied.secondary, target.secondary)
             )
         ) {
             LyricTransitionScope.PROJECTION -> null
             LyricTransitionScope.MAIN_ROW -> mainRowOf(view)
             LyricTransitionScope.SECONDARY_ROW -> secondaryRowOf(view)
         }
+    }
+
+    /** 同一行源内容的判据:时间窗 + 显示文本。 */
+    private fun isSameRowContent(previous: IRichLyricLine?, next: IRichLyricLine?): Boolean {
+        if (previous == null || next == null) return previous === next
+        return previous.begin == next.begin && previous.end == next.end &&
+            previous.text == next.text
     }
 
     private fun mainRowOf(view: View): View? = when (view) {

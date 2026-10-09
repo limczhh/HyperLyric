@@ -479,11 +479,12 @@ class RichLyricLineView(
 
     /** True when this row's committed content actually differs from the newly built one. */
     private fun rowContentChanged(line: LyricLine, isLineTimeline: Boolean, main: Boolean): Boolean {
-        val same = if (main) {
-            appliedMainLine == line && appliedMainTimeline == isLineTimeline
-        } else {
-            appliedSecondaryLine == line && appliedSecondaryTimeline == isLineTimeline
-        }
+        // 只比"同一行源内容"(时间窗 + 显示文本):切分片段里词边界/元数据的差异不算内容变化,
+        // 否则同一句每来一次更新都会被重设一次(owner 真机 3:33 主行被牵连)。
+        val previous = if (main) appliedMainLine else appliedSecondaryLine
+        val previousTimeline = if (main) appliedMainTimeline else appliedSecondaryTimeline
+        val same = previous != null && previousTimeline == isLineTimeline &&
+            previous.begin == line.begin && previous.end == line.end && previous.text == line.text
         if (main) {
             appliedMainLine = line
             appliedMainTimeline = isLineTimeline
