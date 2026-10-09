@@ -10,6 +10,7 @@ import android.annotation.SuppressLint
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.content.Context
+import android.animation.LayoutTransition
 import android.graphics.Canvas
 import android.view.Gravity
 import android.view.View
@@ -535,7 +536,12 @@ class SpaceGateRichLyricLineView(
     }
 
     private fun updateLayoutTransitionX(config: String? = LayoutTransitionX.TRANSITION_CONFIG_SMOOTH) {
-        layoutTransition = LayoutTransitionX(config).apply { setAnimateParentHierarchy(true) }
+        layoutTransition = LayoutTransitionX(config).apply {
+            setAnimateParentHierarchy(true)
+            // 任一行换行都会改变两行块的测量高度,进而重排;CHANGING 动画会把这次重排也演一遍,
+            // 于是换行结束后"再接一个动画"才滑到位(owner 2026-10-09 真机反馈)。出现/消失仍保留。
+            disableTransitionType(LayoutTransition.CHANGING)
+        }
     }
 
     private fun animateNextLinePromotion(nextMainText: String?, nextMainAlignedRight: Boolean) {
