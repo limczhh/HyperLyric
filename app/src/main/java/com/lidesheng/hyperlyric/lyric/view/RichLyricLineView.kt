@@ -10,12 +10,15 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.SuppressLint
 import android.content.Context
+import android.animation.LayoutTransition
 import android.graphics.Canvas
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
 import androidx.core.graphics.withScale
 import androidx.core.view.forEach
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
+import com.lidesheng.hyperlyric.lyric.model.LyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.line.LyricLineView
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
@@ -147,6 +150,8 @@ class RichLyricLineView(
 
     fun reset() {
         cancelNextLinePromotion()
+        appliedMainLine = null
+        appliedSecondaryLine = null
         line = null
         renderScale = 1.0f
         lastPosition = Long.MIN_VALUE
@@ -316,8 +321,32 @@ class RichLyricLineView(
         }
     }
 
+    /**
+     * 停掉这块歌词(或它的某一行)上正在跑的换行动画,并把变换复位。
+     *
+     * 换行预设可能只跑在单行上——对唱的第二行换行时第一行还在唱——只取消整块会漏掉那一行;
+     * 而被取消的动画不得留下半截变换,否则复用的投影会停在淡出或位移的中途。
+     */
+    internal fun resetTransitionAnimations() {
+        resetAnimationState(this)
+        resetAnimationState(main)
+        resetAnimationState(secondary)
+    }
+
+    private fun resetAnimationState(target: View) {
+        YoYoAnimation.cancelAnimation(target)
+        target.alpha = 1f
+        target.translationX = 0f
+        target.translationY = 0f
+        target.scaleX = 1f
+        target.scaleY = 1f
+        target.rotation = 0f
+        target.rotationX = 0f
+        target.rotationY = 0f
+    }
+
     override fun onDetachedFromWindow() {
-        YoYoAnimation.cancelAnimation(this)
+        resetTransitionAnimations()
         super.onDetachedFromWindow()
         reset()
     }
@@ -326,6 +355,12 @@ class RichLyricLineView(
     private var oldSecondaryLine: IRichLyricLine? = null
     private var lineGeneration = 0
     private var preflightReadyGeneration = -1
+
+    // 已提交到两行的内容:内容未变的那一行不重设(见 [applyMainRow] / [applySecondaryRow])。
+    private var appliedMainLine: LyricLine? = null
+    private var appliedMainTimeline = false
+    private var appliedSecondaryLine: LyricLine? = null
+    private var appliedSecondaryTimeline = false
 
     private fun refreshLines(
         allowNextLinePromotion: Boolean = true,
@@ -409,10 +444,14 @@ class RichLyricLineView(
         }
 
         main.isSustainProgressEnabled = mainResult.sustainAwareProgress
-        if (preserveMarquee) {
-            main.setLyricPreservingScroll(mainResult.line, mainResult.isLineTimeline)
-        } else {
-            main.setLyric(mainResult.line, mainResult.isLineTimeline)
+        // 内容没变就不重设:重设会 reset + 重新 seek 渲染器,长行还会重算滚动窗口——另一行换行时
+        // 本行会跟着动一下(owner 2026-10-09 真机反馈「第二行会影响第一行」)。
+        if (rowContentChanged(mainResult.line, mainResult.isLineTimeline, main = true)) {
+            if (preserveMarquee) {
+                main.setLyricPreservingScroll(mainResult.line, mainResult.isLineTimeline)
+            } else {
+                main.setLyric(mainResult.line, mainResult.isLineTimeline)
+            }
         }
         main.isScrollOnly = mainResult.isScrollOnly
         currentMainText = mainResult.line.text
@@ -422,10 +461,12 @@ class RichLyricLineView(
         secondary.visibleIfChanged = secResult.alwaysShow
         secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.isSustainProgressEnabled = secResult.sustainAwareProgress
-        if (preserveMarquee) {
-            secondary.setLyricPreservingScroll(secResult.line, secResult.isLineTimeline)
-        } else {
-            secondary.setLyric(secResult.line, secResult.isLineTimeline)
+        if (rowContentChanged(secResult.line, secResult.isLineTimeline, main = false)) {
+            if (preserveMarquee) {
+                secondary.setLyricPreservingScroll(secResult.line, secResult.isLineTimeline)
+            } else {
+                secondary.setLyric(secResult.line, secResult.isLineTimeline)
+            }
         }
         secondary.isScrollOnly = if (secResult.isNextLinePreview) false else secResult.isScrollOnly
 
@@ -435,6 +476,24 @@ class RichLyricLineView(
         oldSecondaryLine = rawSecondaryLine
         if (requestMarquee) requestStartMarquee()
         dispatchMainLineApplied()
+    }
+
+    /** True when this row's committed content actually differs from the newly built one. */
+    private fun rowContentChanged(line: LyricLine, isLineTimeline: Boolean, main: Boolean): Boolean {
+        // 只比"同一行源内容"(时间窗 + 显示文本):切分片段里词边界/元数据的差异不算内容变化,
+        // 否则同一句每来一次更新都会被重设一次(owner 真机 3:33 主行被牵连)。
+        val previous = if (main) appliedMainLine else appliedSecondaryLine
+        val previousTimeline = if (main) appliedMainTimeline else appliedSecondaryTimeline
+        val same = previous != null && previousTimeline == isLineTimeline &&
+            previous.begin == line.begin && previous.end == line.end && previous.text == line.text
+        if (main) {
+            appliedMainLine = line
+            appliedMainTimeline = isLineTimeline
+        } else {
+            appliedSecondaryLine = line
+            appliedSecondaryTimeline = isLineTimeline
+        }
+        return !same
     }
 
     private fun dispatchMainLineApplied() {
@@ -457,7 +516,12 @@ class RichLyricLineView(
     }
 
     private fun updateLayoutTransitionX(config: String? = LayoutTransitionX.TRANSITION_CONFIG_SMOOTH) {
-        layoutTransition = LayoutTransitionX(config).apply { setAnimateParentHierarchy(true) }
+        layoutTransition = LayoutTransitionX(config).apply {
+            setAnimateParentHierarchy(true)
+            // 任一行换行都会改变两行块的测量高度,进而重排;CHANGING 动画会把这次重排也演一遍,
+            // 于是换行结束后"再接一个动画"才滑到位(owner 2026-10-09 真机反馈)。出现/消失仍保留。
+            disableTransitionType(LayoutTransition.CHANGING)
+        }
     }
 
     private fun animateNextLinePromotion(nextMainText: String?, nextMainAlignedRight: Boolean) {

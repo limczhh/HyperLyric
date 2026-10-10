@@ -45,16 +45,16 @@ internal object LyricPresentationResolver {
             enabled = autoDuet
         )
         val visibleLines = alignedLines.filter { hasLyricContent(it) }
-        val primary = visibleLines.firstOrNull()
+        val primary = mainRowLine(visibleLines, songLines, autoDuet)
             ?: alignedLines.firstOrNull()
             ?: return LyricPresentation(null)
         // A timing collision alone is ambiguous: ordinary sources commonly use
         // end == next.begin for adjacent lines. Only a pair with explicit,
         // distinct vocal identities may occupy the independent duet row.
         val overlappingLine = visibleLines
-            .drop(1)
             .firstOrNull { candidate ->
-                hasLyricContent(candidate) && hasDistinctVocalIdentities(primary, candidate)
+                candidate !== primary &&
+                    hasLyricContent(candidate) && hasDistinctVocalIdentities(primary, candidate)
             }
         val selectedContent = settings.preferredContentFor(
             line = primary,
@@ -78,12 +78,7 @@ internal object LyricPresentationResolver {
     ): List<IRichLyricLine> {
         if (!enabled) return lines
 
-        val agents = buildList {
-            (songLines.orEmpty() + lines).forEach { line ->
-                val agent = line.agentId() ?: return@forEach
-                if (agent !in this) add(agent)
-            }
-        }
+        val agents = laneOrder(songLines.orEmpty() + lines)
         val hasExplicitAgentTypes = (songLines.orEmpty() + lines).any {
             it.agentType() != null
         }
@@ -137,6 +132,32 @@ internal object LyricPresentationResolver {
                 }
             }
             if (line.isAlignedRight) line else line.withAlignment(right)
+        }
+    }
+
+    /**
+     * 主行归哪一个声部:与 [alignAgents] 的对齐口径一致——**整首歌的第一声部**恒占主行。
+     *
+     * 不能按"谁先起句"取(改动前就是 `visibleLines.firstOrNull()`,即最早开始的那一行):
+     * 对唱里任一声部起新句都会让另一声部**仍在唱的那一行**被顶到主行、新句落到副行,两行
+     * 内容整体对调(owner 2026-10-09 真机反馈,实测 3:32 / 3:34 各对调一次)。
+     */
+    private fun mainRowLine(
+        visibleLines: List<IRichLyricLine>,
+        songLines: List<IRichLyricLine>?,
+        autoDuet: Boolean
+    ): IRichLyricLine? {
+        if (!autoDuet) return visibleLines.firstOrNull()
+        val mainLane = laneOrder(songLines.orEmpty() + visibleLines).firstOrNull()
+            ?: return visibleLines.firstOrNull()
+        return visibleLines.firstOrNull { it.agentId() == mainLane } ?: visibleLines.firstOrNull()
+    }
+
+    /** Distinct vocal lanes in song order: the first entry is the singer that owns the main row. */
+    private fun laneOrder(lines: List<IRichLyricLine>): List<String> = buildList {
+        lines.forEach { line ->
+            val agent = line.agentId() ?: return@forEach
+            if (agent !in this) add(agent)
         }
     }
 
