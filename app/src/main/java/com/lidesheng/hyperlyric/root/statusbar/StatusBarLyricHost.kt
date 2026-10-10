@@ -10,6 +10,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
+import android.util.TypedValue
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
@@ -52,6 +54,8 @@ internal class StatusBarLyricHost(
     private var clockGestureReference: WeakReference<View>? = null
     private var managedClockReference: WeakReference<View>? = null
     private var managedClockOriginalVisibility: Int? = null
+    private var managedPadClockReference: WeakReference<TextView>? = null
+    private var managedPadClockStyle: PadClockStyle? = null
     private var shouldKeepClockHidden = false
     private var lyricTemporarilyHidden = false
     private var layoutConfig: StatusBarLyricLayoutConfig? = null
@@ -437,19 +441,29 @@ internal class StatusBarLyricHost(
 
         val oldParent = wrapper.parent as? ViewGroup
         if (oldParent !== parent) oldParent?.removeView(wrapper)
-        val clockIndex = parent.indexOfChild(clock)
-        val wrapperIndex = parent.indexOfChild(wrapper)
+        val anchors = buildList {
+            add(clock)
+            findPadClock(root)?.let { padClock ->
+                directChildWithin(parent, padClock)?.let { add(it) }
+            }
+        }.distinct()
         val shouldBeBeforeClock = insertionOrder ==
                 RootConstants.STATUS_BAR_LYRIC_INSERTION_BEFORE_CLOCK
-        val alreadyInPosition = wrapperIndex >= 0 && clockIndex >= 0 &&
-                if (shouldBeBeforeClock) wrapperIndex < clockIndex else wrapperIndex > clockIndex
-        if (!alreadyInPosition && clockIndex >= 0) {
+        val anchorIndices = anchors.map(parent::indexOfChild).filter { it >= 0 }
+        val wrapperIndex = parent.indexOfChild(wrapper)
+        val firstAnchorIndex = anchorIndices.minOrNull()
+        val lastAnchorIndex = anchorIndices.maxOrNull()
+        val alreadyInPosition = wrapperIndex >= 0 && firstAnchorIndex != null &&
+                lastAnchorIndex != null &&
+                (if (shouldBeBeforeClock) wrapperIndex < firstAnchorIndex
+                else wrapperIndex > lastAnchorIndex)
+        if (!alreadyInPosition && firstAnchorIndex != null && lastAnchorIndex != null) {
             if (wrapperIndex >= 0) parent.removeView(wrapper)
-            val updatedClockIndex = parent.indexOfChild(clock)
+            val updatedAnchorIndices = anchors.map(parent::indexOfChild).filter { it >= 0 }
             val targetIndex = if (shouldBeBeforeClock) {
-                updatedClockIndex
+                updatedAnchorIndices.minOrNull() ?: parent.childCount
             } else {
-                updatedClockIndex + 1
+                (updatedAnchorIndices.maxOrNull() ?: (parent.childCount - 1)) + 1
             }
             parent.addView(
                 wrapper,
@@ -581,6 +595,7 @@ internal class StatusBarLyricHost(
         if (clockReference.get() === clock) return
         releaseClockGestureController()
         restoreClockVisibility()
+        restorePadClockStyle()
         clockReference = WeakReference(clock)
         attachClockGestureController(clock)
     }
@@ -622,20 +637,24 @@ internal class StatusBarLyricHost(
         val root = rootReference.get()
         val clock = clockReference.get() ?: run {
             restoreClockVisibility()
+            restorePadClockStyle()
             return
         }
         if (root?.findViewById<View>(clockId) !== clock) {
             restoreClockVisibility()
+            restorePadClockStyle()
             return
         }
         if (!shouldHide) {
             restoreClockVisibility()
+            restorePadClockStyle()
             return
         }
 
         val managedClock = managedClockReference?.get()
         if (managedClock !== clock) {
             restoreClockVisibility()
+            shouldKeepClockHidden = true
             managedClockReference = WeakReference(clock)
             managedClockOriginalVisibility = clock.visibility
         } else if (clock.visibility != View.GONE) {
@@ -643,6 +662,7 @@ internal class StatusBarLyricHost(
             managedClockOriginalVisibility = clock.visibility
         }
         if (clock.visibility != View.GONE) clock.visibility = View.GONE
+        updatePadClockStyle(root)
     }
 
     private fun restoreClockVisibility() {
@@ -654,6 +674,77 @@ internal class StatusBarLyricHost(
         }
         managedClockReference = null
         managedClockOriginalVisibility = null
+    }
+
+    /** HyperOS Pad status bars use a dedicated `pad_clock` TextView for the date and time. */
+    private fun updatePadClockStyle(root: ViewGroup) {
+        val padClock = findPadClock(root)
+        if (padClock == null) {
+            restorePadClockStyle()
+            return
+        }
+
+        if (managedPadClockReference?.get() !== padClock) {
+            restorePadClockStyle()
+            managedPadClockReference = WeakReference(padClock)
+            managedPadClockStyle = PadClockStyle.capture(padClock)
+        }
+        padClock.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 0f)
+        padClock.setPaddingRelative(1, 0, 0, 0)
+    }
+
+    private fun findPadClock(root: ViewGroup): TextView? {
+        val padClockId = root.resources.getIdentifier("pad_clock", "id", "com.android.systemui")
+        return if (padClockId == 0) null else root.findViewById(padClockId)
+    }
+
+    private fun directChildWithin(parent: ViewGroup, descendant: View): View? {
+        var current = descendant
+        while (current.parent !== parent) {
+            current = current.parent as? View ?: return null
+        }
+        return current
+    }
+
+    private fun restorePadClockStyle() {
+        val view = managedPadClockReference?.get()
+        managedPadClockStyle?.restore(view)
+        managedPadClockReference = null
+        managedPadClockStyle = null
+    }
+
+    private data class PadClockStyle(
+        val textSizePx: Float,
+        val paddingTop: Int,
+        val paddingBottom: Int,
+        val paddingRelative: Boolean,
+        val paddingLeft: Int,
+        val paddingRight: Int,
+        val paddingStart: Int,
+        val paddingEnd: Int,
+    ) {
+        fun restore(view: TextView?) {
+            if (view == null) return
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSizePx)
+            if (paddingRelative) {
+                view.setPaddingRelative(paddingStart, paddingTop, paddingEnd, paddingBottom)
+            } else {
+                view.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom)
+            }
+        }
+
+        companion object {
+            fun capture(view: TextView) = PadClockStyle(
+                textSizePx = view.textSize,
+                paddingTop = view.paddingTop,
+                paddingBottom = view.paddingBottom,
+                paddingRelative = view.isPaddingRelative,
+                paddingLeft = view.paddingLeft,
+                paddingRight = view.paddingRight,
+                paddingStart = view.paddingStart,
+                paddingEnd = view.paddingEnd,
+            )
+        }
     }
 
     private fun restoreNotificationIconContainerVisibility() {
