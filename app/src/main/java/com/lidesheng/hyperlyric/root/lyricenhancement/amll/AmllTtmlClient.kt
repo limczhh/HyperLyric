@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 
+import com.lidesheng.hyperlyric.BuildConfig
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -100,6 +101,8 @@ internal data class AmllSearchPlan(
  * - 每次尝试与重试前检查线程中断、取得请求时隙并检查剩余预算
  * - 搜索按 [buildSearchPlans] 逐个策略请求（服务端 `artistName` 只匹配单个歌手名）
  * - 搜索阶段为 [fetchById] 预留预算，不足则停止扩展策略，避免「搜到了却取不回正文」
+ * - 请求携带显式 UA `HyperLyric/<versionName> (<versionCode>)`，
+ *   替代系统默认的 `Dalvik/...`（见 [USER_AGENT]）
  * - 日志打印实际请求 URL、items 计数与 HTTP 404 语义：404 是「该查询无歌词」，
  *   200 空数组是「搜索成功但无结果」，两者必须可区分
  *
@@ -147,6 +150,17 @@ internal class AmllTtmlClient {
          * 日志需要逐字看到实际查询参数，但超长 title/artist 会挤爆单行日志，故截断尾部。
          */
         private const val MAX_LOGGED_URL_LENGTH = 300
+
+        /**
+         * 请求 UA：`HyperLyric/<versionName> (<versionCode>)`。
+         *
+         * HttpURLConnection 不设置时发出的是系统默认的 `Dalvik/<vm> (Linux; U; Android …)`
+         * （由 RuntimeInit 写入 http.agent，随设备机型/系统版本变化），
+         * 服务端无法据此识别来源、也无法按版本排查问题；
+         * 版本号动态取自 [BuildConfig]，发版无需同步修改。
+         */
+        private val USER_AGENT =
+            "HyperLyric/" + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")"
     }
 
     @Volatile
@@ -425,6 +439,8 @@ internal class AmllTtmlClient {
                     requestMethod = "GET"
                     connectTimeout = CONNECT_TIMEOUT_MS
                     readTimeout = READ_TIMEOUT_MS
+                    // 显式 UA：不设置则发出系统默认的 Dalvik/... 串
+                    setRequestProperty("User-Agent", USER_AGENT)
                 }
                 val code = connection.responseCode
                 if (code == HttpURLConnection.HTTP_OK) {
