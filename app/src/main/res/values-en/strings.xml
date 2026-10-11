@@ -114,6 +114,8 @@
     <string name="title_status_bar_lyric_icon_size">Icon size</string>
     <string name="format_status_bar_lyric_icon_size">%1$d dp</string>
     <string name="label_status_bar_lyric_icon_size_range">Range: %1$d–%2$d dp</string>
+    <string name="title_status_bar_lyric_icon_spacing">Icon-lyrics spacing</string>
+    <string name="label_status_bar_lyric_icon_spacing_range">Range: %1$d–%2$d dp</string>
     <string name="title_status_bar_lyric_portrait_width">Maximum width in portrait</string>
     <string name="title_status_bar_lyric_landscape_width">Maximum width in landscape</string>
     <string name="format_status_bar_lyric_width_value">%1$d dp</string>

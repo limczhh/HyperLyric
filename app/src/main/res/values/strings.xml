@@ -114,6 +114,8 @@
     <string name="title_status_bar_lyric_icon_size">图标大小</string>
     <string name="format_status_bar_lyric_icon_size">%1$d dp</string>
     <string name="label_status_bar_lyric_icon_size_range">范围：%1$d–%2$d dp</string>
+    <string name="title_status_bar_lyric_icon_spacing">图标与歌词间距</string>
+    <string name="label_status_bar_lyric_icon_spacing_range">范围：%1$d–%2$d dp</string>
     <string name="title_status_bar_lyric_portrait_width">竖屏时最大宽度</string>
     <string name="title_status_bar_lyric_landscape_width">横屏时最大宽度</string>
     <string name="format_status_bar_lyric_width_value">%1$d dp</string>

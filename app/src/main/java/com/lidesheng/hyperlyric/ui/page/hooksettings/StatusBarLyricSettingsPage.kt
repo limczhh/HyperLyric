@@ -109,6 +109,17 @@ fun StatusBarLyricSettingsPage() {
             )
         )
     }
+    var iconSpacingDp by remember(prefs) {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP,
+                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP,
+            ).coerceIn(
+                RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SPACING_DP,
+                RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SPACING_DP,
+            )
+        )
+    }
     var portraitMaxWidth by remember(prefs, portraitWidthLimit) {
         mutableIntStateOf(
             readDynamicWidthMaxDp(
@@ -147,6 +158,7 @@ fun StatusBarLyricSettingsPage() {
     var showPortraitMaxWidthDialog by remember { mutableStateOf(false) }
     var showLandscapeMaxWidthDialog by remember { mutableStateOf(false) }
     var showIconSizeDialog by remember { mutableStateOf(false) }
+    var showIconSpacingDialog by remember { mutableStateOf(false) }
     var clockHideBehavior by remember(prefs) {
         mutableIntStateOf(
             prefs.getInt(
@@ -413,6 +425,8 @@ fun StatusBarLyricSettingsPage() {
                     },
                     iconSizeDp = iconSizeDp,
                     onIconSizeClick = { showIconSizeDialog = true },
+                    iconSpacingDp = iconSpacingDp,
+                    onIconSpacingClick = { showIconSpacingDialog = true },
                 )
             }
         },
@@ -469,6 +483,23 @@ fun StatusBarLyricSettingsPage() {
             saveConfig(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP, value)
         },
     )
+    NumberInputDialog(
+        show = showIconSpacingDialog,
+        title = stringResource(R.string.title_status_bar_lyric_icon_spacing),
+        label = stringResource(
+            R.string.label_status_bar_lyric_icon_spacing_range,
+            RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SPACING_DP,
+            RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SPACING_DP,
+        ),
+        initialValue = iconSpacingDp,
+        min = RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SPACING_DP,
+        max = RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SPACING_DP,
+        onDismiss = { showIconSpacingDialog = false },
+        onConfirm = { value ->
+            iconSpacingDp = value
+            saveConfig(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP, value)
+        },
+    )
     StatusBarLyricPaddingDialog(
         show = showPaddingDialog,
         leftDp = paddingLeftDp,
@@ -494,6 +525,8 @@ private fun statusBarLyricIconSections(
     onIconOrderChange: (Int) -> Unit,
     iconSizeDp: Int,
     onIconSizeClick: () -> Unit,
+    iconSpacingDp: Int,
+    onIconSpacingClick: () -> Unit,
 ) {
     SmallTitle(text = stringResource(R.string.title_status_bar_lyric_icon))
     val styles = listOf(
@@ -548,6 +581,10 @@ private fun statusBarLyricIconSections(
                 sizeDp = iconSizeDp,
                 onClick = onIconSizeClick,
             )
+            StatusBarLyricIconSpacingControl(
+                spacingDp = iconSpacingDp,
+                onClick = onIconSpacingClick,
+            )
         }
     }
 }
@@ -562,6 +599,24 @@ private fun StatusBarLyricIconSizeControl(
         endActions = {
             Text(
                 stringResource(R.string.format_status_bar_lyric_icon_size, sizeDp),
+                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            )
+        },
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun StatusBarLyricIconSpacingControl(
+    spacingDp: Int,
+    onClick: () -> Unit,
+) {
+    ArrowPreference(
+        title = stringResource(R.string.title_status_bar_lyric_icon_spacing),
+        endActions = {
+            Text(
+                stringResource(R.string.format_status_bar_lyric_icon_size, spacingDp),
                 fontSize = MiuixTheme.textStyles.body2.fontSize,
                 color = MiuixTheme.colorScheme.onSurfaceVariantActions,
             )
