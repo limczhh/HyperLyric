@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.getFloatCompat
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -124,7 +125,8 @@ internal data class StatusBarLyricLayoutConfig(
             key: String,
             density: Float,
         ): Int {
-            val paddingDp = prefs.getFloat(
+            val paddingDp = getFloatCompat(
+                prefs,
                 key,
                 RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_PADDING_DP,
             ).takeIf { it.isFinite() }?.coerceIn(

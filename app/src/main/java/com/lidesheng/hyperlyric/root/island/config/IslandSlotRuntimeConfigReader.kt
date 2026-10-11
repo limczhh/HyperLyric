@@ -6,6 +6,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.common.SuperIslandWidthPolicy
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
+import com.lidesheng.hyperlyric.common.getFloatCompat
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
 import com.lidesheng.hyperlyric.root.island.sizing.IslandSlotGeometryConfig
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -149,7 +150,8 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_TEXT_SIZE,
                 RootConstants.DEFAULT_HOOK_TEXT_SIZE
             ),
-            textSizeRatio = prefs.getFloat(
+            textSizeRatio = getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
                 RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO
             ),
@@ -266,11 +268,13 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_WORD_MOTION_ENABLED,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_ENABLED
             ),
-            wordMotionCjkLift = prefs.getFloat(
+            wordMotionCjkLift = getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_CJK_LIFT,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_LIFT
             ),
-            wordMotionCjkWave = prefs.getFloat(
+            wordMotionCjkWave = getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_CJK_WAVE,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_WAVE
             ),
@@ -278,11 +282,13 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_WORD_MOTION_LATIN_BY_CHARACTER,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_BY_CHARACTER
             ),
-            wordMotionLatinLift = prefs.getFloat(
+            wordMotionLatinLift = getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_LATIN_LIFT,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT
             ),
-            wordMotionLatinWave = prefs.getFloat(
+            wordMotionLatinWave = getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE
             )

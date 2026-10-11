@@ -7,6 +7,7 @@ import android.util.TypedValue
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
+import com.lidesheng.hyperlyric.common.getFloatCompat
 import com.lidesheng.hyperlyric.lyric.view.Highlight
 import com.lidesheng.hyperlyric.lyric.view.LyricViewStyle
 import com.lidesheng.hyperlyric.lyric.view.Marquee
@@ -39,7 +40,8 @@ object LyricStyleHelper {
             prefs.getInt(RootConstants.KEY_HOOK_TEXT_SIZE, RootConstants.DEFAULT_HOOK_TEXT_SIZE)
         val font = FontHelper.loadFont(prefs)
 
-        val textSizeRatio = prefs.getFloat(
+        val textSizeRatio = getFloatCompat(
+            prefs,
             RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
             RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO
         )
@@ -237,11 +239,13 @@ object LyricStyleHelper {
                     RootConstants.KEY_HOOK_WORD_MOTION_ENABLED,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_ENABLED
                 ),
-                cjkLiftFactor = prefs.getFloat(
+                cjkLiftFactor = getFloatCompat(
+                    prefs,
                     RootConstants.KEY_HOOK_WORD_MOTION_CJK_LIFT,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_LIFT
                 ),
-                cjkWaveFactor = prefs.getFloat(
+                cjkWaveFactor = getFloatCompat(
+                    prefs,
                     RootConstants.KEY_HOOK_WORD_MOTION_CJK_WAVE,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_WAVE
                 ),
@@ -249,11 +253,13 @@ object LyricStyleHelper {
                     RootConstants.KEY_HOOK_WORD_MOTION_LATIN_BY_CHARACTER,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_BY_CHARACTER
                 ),
-                latinLiftFactor = prefs.getFloat(
+                latinLiftFactor = getFloatCompat(
+                    prefs,
                     RootConstants.KEY_HOOK_WORD_MOTION_LATIN_LIFT,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT
                 ),
-                latinWaveFactor = prefs.getFloat(
+                latinWaveFactor = getFloatCompat(
+                    prefs,
                     RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE
                 ),
