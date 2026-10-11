@@ -97,7 +97,16 @@ internal data class StatusBarLyricLayoutConfig(
                     ),
                     density,
                 ),
-                iconSpacingPx = dpToPx(RootConstants.STATUS_BAR_LYRIC_ICON_SPACING_DP, density),
+                iconSpacingPx = dpToPx(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP,
+                        RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP,
+                    ).coerceIn(
+                        RootConstants.STATUS_BAR_LYRIC_ICON_MIN_SPACING_DP,
+                        RootConstants.STATUS_BAR_LYRIC_ICON_MAX_SPACING_DP,
+                    ),
+                    density,
+                ),
                 dynamicMaxWidthPx = dpToPx(dynamicMaxDp, density),
                 paddingLeftPx = paddingPx(
                     prefs,

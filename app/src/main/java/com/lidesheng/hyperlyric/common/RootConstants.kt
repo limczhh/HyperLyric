@@ -15,6 +15,8 @@ object RootConstants {
         "key_hook_status_bar_lyric_icon_order"
     const val KEY_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP =
         "key_hook_status_bar_lyric_icon_size_dp"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP =
+        "key_hook_status_bar_lyric_icon_spacing_dp"
     const val KEY_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH =
         "key_hook_status_bar_lyric_portrait_dynamic_max_width"
     const val KEY_HOOK_STATUS_BAR_LYRIC_LANDSCAPE_DYNAMIC_MAX_WIDTH =
@@ -326,7 +328,9 @@ object RootConstants {
     const val STATUS_BAR_LYRIC_ICON_MIN_SIZE_DP = 10
     const val STATUS_BAR_LYRIC_ICON_MAX_SIZE_DP = 24
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SIZE_DP = 16
-    const val STATUS_BAR_LYRIC_ICON_SPACING_DP = 3
+    const val STATUS_BAR_LYRIC_ICON_MIN_SPACING_DP = 0
+    const val STATUS_BAR_LYRIC_ICON_MAX_SPACING_DP = 16
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ICON_SPACING_DP = 3
     const val STATUS_BAR_LYRIC_PORTRAIT_MAX_WIDTH_DP = 200
     const val STATUS_BAR_LYRIC_LANDSCAPE_MAX_WIDTH_DP = 400
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_PORTRAIT_DYNAMIC_MAX_WIDTH = 150
