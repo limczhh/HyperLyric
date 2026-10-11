@@ -23,6 +23,7 @@ import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.AiTranslationLanguageSettings
 import com.lidesheng.hyperlyric.common.LyricEnhancementConstants
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.getFloatCompat
 import com.lidesheng.hyperlyric.ui.component.FloatInputDialog
 import com.lidesheng.hyperlyric.ui.component.MultiSelectDialog
 import com.lidesheng.hyperlyric.ui.component.MultiSelectDialogOption
@@ -160,10 +161,10 @@ private fun OpenAiTranslationSettingsPage() {
         mutableStateOf(prefs.getString(AI_KEY_PROMPT, defaultPrompt) ?: defaultPrompt)
     }
     var temperature by remember(prefs) {
-        mutableFloatStateOf(prefs.getFloat(AI_KEY_TEMPERATURE, 1f))
+        mutableFloatStateOf(getFloatCompat(prefs, AI_KEY_TEMPERATURE, 1f))
     }
     var topP by remember(prefs) {
-        mutableFloatStateOf(prefs.getFloat(AI_KEY_TOP_P, 1f))
+        mutableFloatStateOf(getFloatCompat(prefs, AI_KEY_TOP_P, 1f))
     }
     var maxTokens by remember(prefs) {
         mutableIntStateOf(

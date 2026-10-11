@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.getFloatCompat
 import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.component.TextInputDialog
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
@@ -46,7 +47,8 @@ internal fun LyricDisplaySettings(
     }
     var textSizeRatio by remember {
         mutableFloatStateOf(
-            prefs.getFloat(
+            getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
                 RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO
             )

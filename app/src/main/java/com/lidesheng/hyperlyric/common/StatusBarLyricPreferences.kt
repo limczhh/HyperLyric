@@ -119,7 +119,7 @@ object StatusBarLyricPreferences {
             delegate.getLong(readKey(requireNotNull(key)), defValue)
 
         override fun getFloat(key: String?, defValue: Float): Float =
-            delegate.getFloat(readKey(requireNotNull(key)), defValue)
+            getFloatCompat(delegate, readKey(requireNotNull(key)), defValue)
 
         override fun getBoolean(key: String?, defValue: Boolean): Boolean =
             delegate.getBoolean(readKey(requireNotNull(key)), defValue)

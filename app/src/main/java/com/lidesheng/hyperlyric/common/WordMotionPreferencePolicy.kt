@@ -39,14 +39,16 @@ object WordMotionPreferencePolicy {
             RootConstants.DEFAULT_HOOK_WORD_MOTION_ENABLED
         ),
         cjkLiftFactor = normalizeLiftFactor(
-            prefs.getFloat(
+            getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_CJK_LIFT,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_LIFT
             ),
             RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_LIFT
         ),
         cjkWaveFactor = normalizeWaveFactor(
-            prefs.getFloat(
+            getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_CJK_WAVE,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_CJK_WAVE
             ),
@@ -57,14 +59,16 @@ object WordMotionPreferencePolicy {
             RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_BY_CHARACTER
         ),
         latinLiftFactor = normalizeLiftFactor(
-            prefs.getFloat(
+            getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_LATIN_LIFT,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT
             ),
             RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT
         ),
         latinWaveFactor = normalizeWaveFactor(
-            prefs.getFloat(
+            getFloatCompat(
+                prefs,
                 RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE,
                 RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE
             ),

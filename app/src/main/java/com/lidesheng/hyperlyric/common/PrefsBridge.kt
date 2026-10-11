@@ -19,7 +19,7 @@ object PrefsBridge {
     fun getInt(key: String, default: Int): Int = getPrefs().getInt(key, default)
     fun getString(key: String, default: String? = null): String? = getPrefs().getString(key, default)
     fun getLong(key: String, default: Long): Long = getPrefs().getLong(key, default)
-    fun getFloat(key: String, default: Float): Float = getPrefs().getFloat(key, default)
+    fun getFloat(key: String, default: Float): Float = getFloatCompat(getPrefs(), key, default)
     fun getStringSet(key: String, default: Set<String>? = null): Set<String>? = getPrefs().getStringSet(key, default)
 
     fun putBoolean(key: String, value: Boolean) {

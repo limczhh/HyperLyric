@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.translation
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.common.AiTranslationLanguageSettings
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.getFloatCompat
 
 internal data class AiTranslationConfig(
     val provider: String,
@@ -78,12 +79,14 @@ internal data class AiTranslationConfig(
                     RootConstants.KEY_HOOK_AI_TRANS_FORCE_OVERRIDE,
                     RootConstants.DEFAULT_HOOK_AI_TRANS_FORCE_OVERRIDE
                 ),
-                temperature = preferences.getFloat(
+                temperature = getFloatCompat(
+                    preferences,
                     RootConstants.KEY_HOOK_AI_TRANS_TEMPERATURE,
                     RootConstants.DEFAULT_HOOK_AI_TRANS_TEMPERATURE
                 )
                     .coerceIn(0f, 2f),
-                topP = preferences.getFloat(
+                topP = getFloatCompat(
+                    preferences,
                     RootConstants.KEY_HOOK_AI_TRANS_TOP_P,
                     RootConstants.DEFAULT_HOOK_AI_TRANS_TOP_P
                 )
