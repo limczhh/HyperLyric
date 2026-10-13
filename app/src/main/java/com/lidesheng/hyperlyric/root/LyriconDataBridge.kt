@@ -639,7 +639,6 @@ object LyriconDataBridge {
      * A whole-song source wins over the current line so an interlude cannot remove the view.
      */
     fun hasLyricsForPresentation(): Boolean {
-        if (isPureMusicLyricSuppressed()) return false
         fullSongLyricsAvailable?.let { return it }
         return !currentLyric.isNullOrBlank() || hasRenderableLine(currentLyricLine)
     }
@@ -662,7 +661,6 @@ object LyriconDataBridge {
      * pass the lyric gate when the user selected native restoration.
      */
     fun noLyricsPlaceholderLine(): IRichLyricLine? {
-        if (isPureMusicLyricSuppressed()) return null
         val metadata = currentLyricMediaMetadata ?: return null
         return SongPreprocessor(
             resolveTitleSlot(placeholderFormat),
@@ -677,7 +675,6 @@ object LyriconDataBridge {
     }
 
     fun hasNoLyricsPlaceholderForPresentation(): Boolean {
-        if (isPureMusicLyricSuppressed()) return false
         val metadata = currentLyricMediaMetadata ?: return false
         return when (placeholderFormat) {
             RootConstants.PLACEHOLDER_FORMAT_NONE -> false
@@ -688,8 +685,13 @@ object LyriconDataBridge {
         }
     }
 
-    /** 纯音乐"替换为空"时抑制一切歌词与占位内容展示。 */
-    private fun isPureMusicLyricSuppressed(): Boolean =
+    /** 纯音乐行为是否正在替换歌词内容（替换为空或替换为音乐信息）。 */
+    fun isPureMusicLyricReplaced(): Boolean =
+        currentSongIsPureMusic &&
+                pureMusicLyricBehavior != RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_KEEP
+
+    /** 纯音乐"替换为空"是否生效。 */
+    fun isPureMusicLyricEmptied(): Boolean =
         currentSongIsPureMusic &&
                 pureMusicLyricBehavior == RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY
 
