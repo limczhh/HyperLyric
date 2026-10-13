@@ -2,10 +2,6 @@
 
 ## General
 
-### What is the difference between Online and Offline?
-
-Their core features are essentially the same. Online additionally provides AI translation and an online lyric source that ordinary apps can call by sending notifications. Offline only removes network features.
-
 ### What do HyperLyric, lyric providers, and lyric sources do?
 
 HyperLyric is the lyric consumer and display layer. It renders lyrics in Xiaomi HyperIsland but does not obtain lyrics from the music app. Lyric sources such as Lyricon, SuperLyric, and LyricInfo provide the lyrics. If nothing appears, the source may not have sent lyrics, or it may not be compatible with the music app version.
