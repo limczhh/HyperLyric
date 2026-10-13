@@ -222,6 +222,7 @@ object RootConstants {
     const val KEY_HOOK_LYRIC_PREVIEW = "key_hook_lyric_preview"
     const val KEY_HOOK_LYRIC_LONG_INTERLUDE_COUNTDOWN =
         "key_hook_lyric_long_interlude_countdown"
+    const val KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR = "key_hook_pure_music_lyric_behavior"
     const val KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE = "key_hook_island_music_wave_style"
 
     // ================= ANIMATION & MARQUEE KEYS =================
@@ -597,6 +598,18 @@ object RootConstants {
     const val DEFAULT_HOOK_PLACEHOLDER_FORMAT = PLACEHOLDER_FORMAT_COUNTDOWN
     const val DEFAULT_HOOK_LYRIC_PREVIEW = false
     const val DEFAULT_HOOK_LYRIC_LONG_INTERLUDE_COUNTDOWN = true
+
+    const val PURE_MUSIC_LYRIC_BEHAVIOR_KEEP = 0
+    const val PURE_MUSIC_LYRIC_BEHAVIOR_MUSIC_INFO = 1
+    const val PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY = 2
+    const val DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR = PURE_MUSIC_LYRIC_BEHAVIOR_KEEP
+
+    fun normalizePureMusicLyricBehavior(value: Int): Int {
+        return value.takeIf {
+            it in PURE_MUSIC_LYRIC_BEHAVIOR_KEEP..PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY
+        } ?: DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+    }
+
     const val ISLAND_MUSIC_WAVE_STYLE_DEFAULT = 0
     const val ISLAND_MUSIC_WAVE_STYLE_COVER_COLOR = 1
     const val ISLAND_MUSIC_WAVE_STYLE_COVER_GRADIENT = 2
