@@ -31,6 +31,8 @@ object RootConstants {
         "key_hook_status_bar_lyric_notification_icon_hide_behavior"
     const val KEY_HOOK_STATUS_BAR_LYRIC_ISLAND_HIDE_BEHAVIOR =
         "key_hook_status_bar_lyric_island_hide_behavior"
+    const val KEY_HOOK_STATUS_BAR_LYRIC_CONTENT_MODE =
+        "key_hook_status_bar_lyric_content_mode"
     const val KEY_HOOK_STATUS_BAR_LYRIC_ADJUST_WIDTH_FOR_SUPER_ISLAND =
         "key_hook_status_bar_lyric_adjust_width_for_super_island"
     const val KEY_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN =
@@ -354,6 +356,7 @@ object RootConstants {
     const val STATUS_BAR_LYRIC_ISLAND_HIDE_ALWAYS = 2
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ISLAND_HIDE_BEHAVIOR =
         STATUS_BAR_LYRIC_ISLAND_HIDE_NONE
+    const val DEFAULT_HOOK_STATUS_BAR_LYRIC_CONTENT_MODE = ISLAND_CONTENT_MODE_LYRIC
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_ADJUST_WIDTH_FOR_SUPER_ISLAND = true
     const val DEFAULT_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN = true
     const val STATUS_BAR_LYRIC_GESTURE_ACTION_NONE = 0
