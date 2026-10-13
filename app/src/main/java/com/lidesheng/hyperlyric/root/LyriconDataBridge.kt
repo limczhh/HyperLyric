@@ -4,6 +4,9 @@ import android.os.Bundle
 import android.os.SystemClock
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.DuetLyricPolicy
+import com.lidesheng.hyperlyric.common.lyric.isPureMusicLyricText
+import com.lidesheng.hyperlyric.common.lyric.isPureMusicMarkerLine
+import com.lidesheng.hyperlyric.common.lyric.isPureMusicSongLyrics
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
@@ -14,6 +17,7 @@ import com.lidesheng.hyperlyric.lyric.view.InterludeTracker
 import com.lidesheng.hyperlyric.lyric.view.SongPreprocessor
 import com.lidesheng.hyperlyric.lyric.view.TimedLine
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
+import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -156,6 +160,18 @@ object LyriconDataBridge {
 
     @Volatile
     private var showLyricPreview = RootConstants.DEFAULT_HOOK_LYRIC_PREVIEW
+
+    @Volatile
+    private var pureMusicLyricBehavior = RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+
+    /** 当前歌词内容是否命中纯音乐标记，随歌曲/歌词/单行更新重算。 */
+    @Volatile
+    var currentSongIsPureMusic: Boolean = false
+        private set
+
+    /** 最近一次源推送的原始歌词行，用于纯音乐行为切换后重建显示内容。 */
+    @Volatile
+    private var rawActiveLyricLine: IRichLyricLine? = null
 
     fun updateLyricPackage(packageName: String?) {
         currentLyricPackageName = packageName
@@ -332,6 +348,8 @@ object LyriconDataBridge {
         if (song != null) {
             rebuildTimeline(song, selectCurrentPosition = false)
         } else {
+            currentSongIsPureMusic = false
+            rawActiveLyricLine = null
             timingNavigator = TimingNavigator(emptyArray())
             interludeCountdownNavigator = TimingNavigator(emptyArray())
             leadingPlaceholderLine = null
@@ -396,6 +414,8 @@ object LyriconDataBridge {
         plainTextMarqueeOriginActiveTimeMs = 0L
         leadingPlaceholderLine = null
         fullSongLyricsAvailable = null
+        currentSongIsPureMusic = false
+        rawActiveLyricLine = null
         currentLyric = null
         currentLyricLine = null
         currentLyricLines = emptyList()
@@ -465,6 +485,22 @@ object LyriconDataBridge {
         return true
     }
 
+    fun updatePureMusicLyricBehavior(behavior: Int): Boolean {
+        if (pureMusicLyricBehavior == behavior) return false
+        pureMusicLyricBehavior = behavior
+
+        val song = currentSong?.takeIf {
+            !isTextMode && fullSongLyricsAvailable != null
+        }
+        if (song != null) {
+            rebuildTimeline(song, selectCurrentPosition = true)
+        } else if (currentSongIsPureMusic) {
+            currentLyricLine = resolveActiveLyricLine()
+            currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
+        }
+        return true
+    }
+
     fun updatePosition(position: Long): Boolean {
         currentPosition = position
         if (isTextMode) return false
@@ -509,13 +545,14 @@ object LyriconDataBridge {
             // Without a preview candidate, retain the previous line through instrumental sections.
             else -> timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
         }
+        val effectiveLines = applyPureMusicTimelineBehavior(selectedLines, position)
 
         val previousLines = currentLyricLines
         val previousNextLine = currentNextLyricLine
-        val foundLine = selectedLines.firstOrNull()
-        currentLyricLines = selectedLines
+        val foundLine = effectiveLines.firstOrNull()
+        currentLyricLines = effectiveLines
         currentLyricLine = foundLine
-        currentNextLyricLine = if (!showPreludePlaceholder) {
+        currentNextLyricLine = if (!showPreludePlaceholder && effectiveLines === selectedLines) {
             // An active long row's adjacent entry may already have finished. A future gap
             // preview is itself the selected main row, so look beyond it rather than repeat it.
             timingNavigator.findNextEntry(maxOf(position, selectedLines.lastOrNull()?.begin ?: position))
@@ -526,7 +563,7 @@ object LyriconDataBridge {
         val newText = foundLine?.text ?: currentLyric ?: ""
         // 占位符圆点没有文本，不能只靠文本变化判断是否需要刷新。
         // 切歌或切换到同文本歌词时，新的歌词行仍然需要传给渲染器。
-        val lineChanged = selectedLines != previousLines ||
+        val lineChanged = effectiveLines != previousLines ||
                 currentNextLyricLine !== previousNextLine
 
         if (lineChanged || newText != currentLyric) {
@@ -543,8 +580,9 @@ object LyriconDataBridge {
         isTextMode = true
         leadingPlaceholderLine = null
         fullSongLyricsAvailable = null
+        currentSongIsPureMusic = isPureMusicLyricText(text)
         currentLyric = text
-        currentLyricLine = if (!text.isNullOrBlank()) {
+        rawActiveLyricLine = if (!text.isNullOrBlank()) {
             val lines = text.lines()
             RichLyricLine(
                 text = lines.first(),
@@ -553,6 +591,7 @@ object LyriconDataBridge {
         } else {
             null
         }
+        currentLyricLine = resolveActiveLyricLine()
         currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
         currentNextLyricLine = null
     }
@@ -562,10 +601,12 @@ object LyriconDataBridge {
         leadingPlaceholderLine = null
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
-        currentLyricLine = line
-        currentLyricLines = listOf(line)
-        currentNextLyricLine = null
+        currentSongIsPureMusic = isPureMusicMarkerLine(line.text)
+        rawActiveLyricLine = line
         currentLyric = line.text
+        currentLyricLine = resolveActiveLyricLine()
+        currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
+        currentNextLyricLine = null
     }
 
     fun clearState() {
@@ -584,6 +625,8 @@ object LyriconDataBridge {
         isTextMode = false
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
+        currentSongIsPureMusic = false
+        rawActiveLyricLine = null
         timingNavigator = TimingNavigator(emptyArray())
         interludeCountdownNavigator = TimingNavigator(emptyArray())
         leadingPlaceholderLine = null
@@ -596,6 +639,11 @@ object LyriconDataBridge {
      * A whole-song source wins over the current line so an interlude cannot remove the view.
      */
     fun hasLyricsForPresentation(): Boolean {
+        if (currentSongIsPureMusic &&
+            pureMusicLyricBehavior == RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY
+        ) {
+            return false
+        }
         fullSongLyricsAvailable?.let { return it }
         return !currentLyric.isNullOrBlank() || hasRenderableLine(currentLyricLine)
     }
@@ -646,7 +694,68 @@ object LyriconDataBridge {
         return line != null && (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())
     }
 
+    /** 按纯音乐行为对源推送的单行内容做替换，未命中或保持不变时返回原始行。 */
+    private fun resolveActiveLyricLine(): IRichLyricLine? {
+        val rawLine = rawActiveLyricLine ?: return null
+        if (!currentSongIsPureMusic) return rawLine
+        return when (pureMusicLyricBehavior) {
+            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_MUSIC_INFO ->
+                pureMusicMusicInfoLine(currentPlaybackClock().positionMs) ?: rawLine
+
+            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY -> null
+
+            else -> rawLine
+        }
+    }
+
+    /** 时间线选行结果的纯音乐行为覆盖，返回原列表实例表示未覆盖。 */
+    private fun applyPureMusicTimelineBehavior(
+        selectedLines: List<IRichLyricLine>,
+        position: Long
+    ): List<IRichLyricLine> {
+        if (!currentSongIsPureMusic) return selectedLines
+        return when (pureMusicLyricBehavior) {
+            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_MUSIC_INFO ->
+                pureMusicMusicInfoLine(position)?.let(::listOf) ?: selectedLines
+
+            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY -> emptyList()
+
+            else -> selectedLines
+        }
+    }
+
+    /** 用用户配置的音乐信息布局合成歌词行，媒体信息不可用时返回 null 以回退原歌词。 */
+    private fun pureMusicMusicInfoLine(position: Long): IRichLyricLine? {
+        val prefs = HookEntry.instance?.prefs ?: return null
+        val mediaInfo = resolvePureMusicMediaInfo() ?: return null
+        val lines = IslandMetadataContentAssembler.buildConfiguredMusicInfoLines(
+            prefs = prefs,
+            mediaInfo = mediaInfo,
+            playbackPosition = position,
+            playbackDuration = currentSong?.duration?.takeIf { it > 0L } ?: mediaInfo.duration
+        )
+        return RichLyricLine(
+            text = lines.firstLine.takeIf { it.isNotBlank() },
+            translation = lines.secondLine.takeIf { it.isNotBlank() }
+        )
+    }
+
+    private fun resolvePureMusicMediaInfo(): MediaMetadataHelper.MediaInfo? {
+        currentResolvedMediaInfo?.let { resolved ->
+            return resolved.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+        }
+        val metadata = currentLyricMediaMetadata ?: return null
+        val fallback = MediaMetadataHelper.MediaInfo(
+            title = metadata.title.orEmpty(),
+            artist = metadata.artist.orEmpty(),
+            album = metadata.album.orEmpty(),
+            duration = metadata.duration ?: -1L
+        )
+        return fallback.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+    }
+
     private fun rebuildTimeline(song: Song, selectCurrentPosition: Boolean) {
+        currentSongIsPureMusic = isPureMusicSongLyrics(song.lyrics.orEmpty().map { it.text })
         val processor = SongPreprocessor(
             resolveTitleSlot(placeholderFormat),
             showLongInterludeCountdown,

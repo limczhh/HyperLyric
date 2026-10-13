@@ -551,6 +551,14 @@ class HookEntry : XposedModule() {
                     RootConstants.DEFAULT_HOOK_LYRIC_PREVIEW
                 )
             )
+            LyriconDataBridge.updatePureMusicLyricBehavior(
+                RootConstants.normalizePureMusicLyricBehavior(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR,
+                        RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+                    )
+                )
+            )
 
             val renderer = SystemUiLyricRenderer
             lyricEnhancementCoordinator = runCatching {
@@ -700,6 +708,29 @@ class HookEntry : XposedModule() {
                                     )
                                 } else {
                                     HookLogger.d(TAG, "歌词预览设置未变化")
+                                }
+                            }
+                        }
+
+                        RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR -> {
+                            val behavior = RootConstants.normalizePureMusicLyricBehavior(
+                                prefs.getInt(
+                                    key,
+                                    RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+                                )
+                            )
+                            Handler(Looper.getMainLooper()).post {
+                                val changed =
+                                    LyriconDataBridge.updatePureMusicLyricBehavior(behavior)
+                                if (changed) {
+                                    SystemUiLyricRenderer.updateLyricLine()
+                                    val playbackClock = LyriconDataBridge.currentPlaybackClock()
+                                    SystemUiLyricRenderer.updatePosition(
+                                        playbackClock.positionMs,
+                                        playbackClock.playbackSpeed
+                                    )
+                                } else {
+                                    HookLogger.d(TAG, "纯音乐歌词行为设置未变化")
                                 }
                             }
                         }
