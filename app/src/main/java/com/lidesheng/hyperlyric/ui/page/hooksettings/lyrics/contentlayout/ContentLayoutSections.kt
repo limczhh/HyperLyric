@@ -150,6 +150,8 @@ internal fun LazyListScope.contentLayoutSections(
     onLyricAlignmentChange: (ContentLayoutAlignment) -> Unit,
     placeholderFormat: Int,
     onPlaceholderFormatChange: (Int) -> Unit,
+    pureMusicBehavior: Int,
+    onPureMusicBehaviorChange: (Int) -> Unit,
     lyricPreviewEnabled: Boolean,
     onLyricPreviewEnabledChange: (Boolean) -> Unit,
     showLongInterludeCountdown: Boolean,
@@ -231,6 +233,11 @@ internal fun LazyListScope.contentLayoutSections(
             stringResource(id = R.string.option_placeholder_title),
             stringResource(id = R.string.option_placeholder_countdown)
         )
+        val pureMusicBehaviorOptions = listOf(
+            stringResource(id = R.string.option_pure_music_keep),
+            stringResource(id = R.string.option_pure_music_music_info),
+            stringResource(id = R.string.option_pure_music_empty)
+        )
         Card(
             modifier = Modifier
                 .padding(horizontal = 12.dp)
@@ -258,6 +265,15 @@ internal fun LazyListScope.contentLayoutSections(
                         RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN
                     ),
                     onSelectedIndexChange = onPlaceholderFormatChange
+                )
+                OverlayDropdownPreference(
+                    title = stringResource(id = R.string.title_pure_music_lyric_behavior),
+                    items = pureMusicBehaviorOptions,
+                    selectedIndex = pureMusicBehavior.coerceIn(
+                        RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_KEEP,
+                        RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY
+                    ),
+                    onSelectedIndexChange = onPureMusicBehaviorChange
                 )
                 SwitchPreference(
                     title = stringResource(id = R.string.title_lyric_preview),

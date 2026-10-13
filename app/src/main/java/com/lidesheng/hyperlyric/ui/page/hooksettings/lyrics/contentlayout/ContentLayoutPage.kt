@@ -79,6 +79,16 @@ fun ContentLayoutPage() {
             )
         )
     }
+    var pureMusicBehavior by remember(prefs) {
+        mutableStateOf(
+            RootConstants.normalizePureMusicLyricBehavior(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR,
+                    RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+                )
+            )
+        )
+    }
     var showLongInterludeCountdown by remember(prefs) {
         mutableStateOf(
             prefs.getBoolean(
@@ -234,6 +244,11 @@ fun ContentLayoutPage() {
             onPlaceholderFormatChange = {
                 placeholderFormat = it
                 PrefsBridge.putInt(RootConstants.KEY_HOOK_PLACEHOLDER_FORMAT, it)
+            },
+            pureMusicBehavior = pureMusicBehavior,
+            onPureMusicBehaviorChange = {
+                pureMusicBehavior = it
+                PrefsBridge.putInt(RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR, it)
             },
             lyricPreviewEnabled = lyricPreviewEnabled,
             onLyricPreviewEnabledChange = {

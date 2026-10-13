@@ -345,6 +345,10 @@
     <string name="title_lyric_preview">Lyric preview</string>
     <string name="summary_lyric_preview">Preview the next lyric after a line with an end time finishes</string>
     <string name="title_lyric_long_interlude_countdown">Show countdown dots during long lyric interludes</string>
+    <string name="title_pure_music_lyric_behavior">Pure Music Lyric Behavior</string>
+    <string name="option_pure_music_keep">Keep As Is</string>
+    <string name="option_pure_music_music_info">Replace With Music Info</string>
+    <string name="option_pure_music_empty">Replace With Empty</string>
     <string name="title_size">Size</string>
     <string name="label_size_range">Range: 8 ~ 16</string>
     <string name="title_font_weight">Font Weight</string>
