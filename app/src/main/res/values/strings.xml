@@ -138,6 +138,7 @@
     <string name="option_status_bar_lyric_island_hide_none">不隐藏</string>
     <string name="option_status_bar_lyric_island_hide_playing">播放时隐藏</string>
     <string name="option_status_bar_lyric_island_hide_always">始终隐藏</string>
+    <string name="title_status_bar_lyric_content">内容</string>
     <string name="title_status_bar_lyric_adjust_width_for_super_island">自动避让超级岛</string>
     <string name="title_status_bar_lyric_hide_lock_screen">锁屏时隐藏歌词</string>
     <string name="title_status_bar_lyric_double_tap">双击</string>

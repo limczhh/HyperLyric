@@ -138,6 +138,7 @@
     <string name="option_status_bar_lyric_island_hide_none">Do not hide</string>
     <string name="option_status_bar_lyric_island_hide_playing">Hide while playing</string>
     <string name="option_status_bar_lyric_island_hide_always">Always hide</string>
+    <string name="title_status_bar_lyric_content">Content</string>
     <string name="title_status_bar_lyric_adjust_width_for_super_island">Automatically avoid Super Island</string>
     <string name="title_status_bar_lyric_hide_lock_screen">Hide lyrics on lock screen</string>
     <string name="title_status_bar_lyric_double_tap">Double tap</string>
