@@ -789,6 +789,25 @@ private fun statusBarLyricVisibilitySections(
             .padding(bottom = 12.dp)
             .fillMaxWidth()
     ) {
+        OverlayDropdownPreference(
+            title = stringResource(R.string.title_status_bar_lyric_content),
+            items = listOf(
+                stringResource(R.string.option_content_none),
+                stringResource(R.string.option_content_music_info),
+                stringResource(R.string.option_content_lyric),
+            ),
+            selectedIndex = contentModeIndex,
+            onSelectedIndexChange = { index ->
+                contentModeValues.getOrNull(index)?.let(onContentModeChange)
+            },
+        )
+    }
+    Card(
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp)
+            .fillMaxWidth()
+    ) {
         Column {
             OverlayDropdownPreference(
                 title = stringResource(R.string.title_status_bar_lyric_clock_hide_behavior),
@@ -819,18 +838,6 @@ private fun statusBarLyricVisibilitySections(
                 ),
                 selectedIndex = islandHideBehavior,
                 onSelectedIndexChange = onIslandHideBehaviorChange,
-            )
-            OverlayDropdownPreference(
-                title = stringResource(R.string.title_status_bar_lyric_content),
-                items = listOf(
-                    stringResource(R.string.option_content_none),
-                    stringResource(R.string.option_content_music_info),
-                    stringResource(R.string.option_content_lyric),
-                ),
-                selectedIndex = contentModeIndex,
-                onSelectedIndexChange = { index ->
-                    contentModeValues.getOrNull(index)?.let(onContentModeChange)
-                },
             )
             SwitchPreference(
                 title = stringResource(R.string.title_status_bar_lyric_hide_lock_screen),
