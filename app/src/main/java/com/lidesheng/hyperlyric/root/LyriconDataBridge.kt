@@ -17,6 +17,7 @@ import com.lidesheng.hyperlyric.lyric.view.InterludeTracker
 import com.lidesheng.hyperlyric.lyric.view.SongPreprocessor
 import com.lidesheng.hyperlyric.lyric.view.TimedLine
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
+import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -569,6 +570,12 @@ object LyriconDataBridge {
             currentLyric = newText
             return true
         }
+        // 纯音乐替换为音乐信息时，占位内容不走时间线选行，
+        // 每次位置更新都触发一次渲染检查，保证时间字段逐秒刷新（渲染层按签名去重）。
+        if (isPureMusicLyricHandled() && noLyricsBehaviorShowsMusicInfo()) {
+            currentLyric = ""
+            return true
+        }
         return false
     }
 
@@ -662,6 +669,7 @@ object LyriconDataBridge {
      */
     fun noLyricsPlaceholderLine(): IRichLyricLine? {
         if (isNoLyricsContentSuppressed()) return null
+        if (noLyricsBehaviorShowsMusicInfo()) return pureMusicMusicInfoLine()
         val metadata = currentLyricMediaMetadata ?: return null
         return SongPreprocessor(
             resolveTitleSlot(placeholderFormat),
@@ -677,6 +685,9 @@ object LyriconDataBridge {
 
     fun hasNoLyricsPlaceholderForPresentation(): Boolean {
         if (isNoLyricsContentSuppressed()) return false
+        if (noLyricsBehaviorShowsMusicInfo()) {
+            return resolvePureMusicMediaInfo() != null
+        }
         val metadata = currentLyricMediaMetadata ?: return false
         return when (placeholderFormat) {
             RootConstants.PLACEHOLDER_FORMAT_NONE -> false
@@ -707,6 +718,41 @@ object LyriconDataBridge {
     /** 无歌词/纯音乐时是否展示音乐信息占位。 */
     fun noLyricsBehaviorShowsMusicInfo(): Boolean =
         noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO
+
+    /** 模块是否正在接管文本展示（歌词或替换内容），状态栏时钟/通知图标隐藏依赖此判定。 */
+    fun isPresentingManagedContent(): Boolean =
+        hasLyricsForPresentation() || noLyricsBehaviorShowsMusicInfo()
+
+    /** 用用户配置的音乐信息布局合成展示行，媒体信息不可用时返回 null。 */
+    private fun pureMusicMusicInfoLine(): IRichLyricLine? {
+        val prefs = HookEntry.instance?.prefs ?: return null
+        val mediaInfo = resolvePureMusicMediaInfo() ?: return null
+        val playbackClock = currentPlaybackClock()
+        val lines = IslandMetadataContentAssembler.buildConfiguredMusicInfoLines(
+            prefs = prefs,
+            mediaInfo = mediaInfo,
+            playbackPosition = playbackClock.positionMs,
+            playbackDuration = currentSong?.duration?.takeIf { it > 0L } ?: mediaInfo.duration
+        )
+        return RichLyricLine(
+            text = lines.firstLine.takeIf { it.isNotBlank() },
+            translation = lines.secondLine.takeIf { it.isNotBlank() }
+        )
+    }
+
+    private fun resolvePureMusicMediaInfo(): MediaMetadataHelper.MediaInfo? {
+        currentResolvedMediaInfo?.let { resolved ->
+            return resolved.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+        }
+        val metadata = currentLyricMediaMetadata ?: return null
+        val fallback = MediaMetadataHelper.MediaInfo(
+            title = metadata.title.orEmpty(),
+            artist = metadata.artist.orEmpty(),
+            album = metadata.album.orEmpty(),
+            duration = metadata.duration ?: -1L
+        )
+        return fallback.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+    }
 
     private fun hasRenderableLine(line: IRichLyricLine?): Boolean {
         return line != null && (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())

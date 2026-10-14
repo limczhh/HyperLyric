@@ -375,7 +375,7 @@ internal object StatusBarLyricRenderer {
             val shouldHide = !clockTemporarilyRevealed && enabled &&
                     LyriconDataBridge.isPlaybackActive() && when (behavior) {
                 RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING ->
-                    LyriconDataBridge.hasLyricsForPresentation() && !lyricTemporarilyHidden
+                    LyriconDataBridge.isPresentingManagedContent() && !lyricTemporarilyHidden
 
                 RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT ->
                     StatusBarLyricIslandRegionDispatcher.hasIsland()
@@ -403,7 +403,7 @@ internal object StatusBarLyricRenderer {
             ) ?: RootConstants.STATUS_BAR_LYRIC_NOTIFICATION_ICON_HIDE_NONE
             val active = enabled &&
                     LyriconDataBridge.isPlaybackActive() &&
-                    LyriconDataBridge.hasLyricsForPresentation() &&
+                    LyriconDataBridge.isPresentingManagedContent() &&
                     !lyricTemporarilyHidden
             StatusBarLyricHostRegistry.liveHosts().forEach { host ->
                 host.setNotificationIconContainerHidden(active &&
@@ -430,7 +430,7 @@ internal object StatusBarLyricRenderer {
         } else {
             RootConstants.STATUS_BAR_LYRIC_ISLAND_HIDE_NONE
         }
-        val hasLyrics = enabled && LyriconDataBridge.hasLyricsForPresentation()
+        val hasLyrics = enabled && LyriconDataBridge.isPresentingManagedContent()
         val shouldOwnIsland = hasLyrics && when (behavior) {
             RootConstants.STATUS_BAR_LYRIC_ISLAND_HIDE_WHILE_PLAYING ->
                 LyriconDataBridge.isPlaybackActive()
