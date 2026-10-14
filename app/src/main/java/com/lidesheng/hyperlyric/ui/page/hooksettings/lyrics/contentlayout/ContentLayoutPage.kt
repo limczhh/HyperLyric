@@ -81,10 +81,10 @@ fun ContentLayoutPage() {
     }
     var pureMusicBehavior by remember(prefs) {
         mutableStateOf(
-            RootConstants.normalizePureMusicLyricBehavior(
+            RootConstants.normalizeNoLyricsLyricBehavior(
                 prefs.getInt(
-                    RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR,
-                    RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+                    RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR,
+                    RootConstants.DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
                 )
             )
         )
@@ -248,7 +248,7 @@ fun ContentLayoutPage() {
             pureMusicBehavior = pureMusicBehavior,
             onPureMusicBehaviorChange = {
                 pureMusicBehavior = it
-                PrefsBridge.putInt(RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR, it)
+                PrefsBridge.putInt(RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR, it)
             },
             lyricPreviewEnabled = lyricPreviewEnabled,
             onLyricPreviewEnabledChange = {

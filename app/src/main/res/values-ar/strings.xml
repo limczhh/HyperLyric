@@ -266,10 +266,11 @@
   <string name="option_placeholder_title_artist">العنوان - الفنان</string>
   <string name="option_placeholder_title">العنوان</string>
   <string name="option_placeholder_countdown">نقاط العد التنازلي</string>
-  <string name="title_pure_music_lyric_behavior">سلوك كلمات الموسيقى الصرفة</string>
-  <string name="option_pure_music_keep">إبقاء كما هو</string>
-  <string name="option_pure_music_music_info">استبدال بمعلومات الموسيقى</string>
-  <string name="option_pure_music_empty">استبدال بفراغ</string>
+  <string name="title_no_lyrics_lyric_behavior">سلوك كلمات الأغاني بدون كلمات أو الموسيقى الصرفة</string>
+  <string name="option_no_lyrics_keep">إبقاء كما هو</string>
+  <string name="option_no_lyrics_music_info">استبدال بمعلومات الموسيقى</string>
+  <string name="option_no_lyrics_empty">استبدال بفراغ</string>
+  <string name="option_no_lyrics_restore_default">العودة إلى الافتراضي</string>
   <string name="title_size">الحجم</string>
   <string name="label_size_range">النطاق: 8 ~ 16</string>
   <string name="title_font_weight">وزن الخط</string>

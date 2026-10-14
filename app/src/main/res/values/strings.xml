@@ -345,10 +345,11 @@
     <string name="title_lyric_preview">歌词预览</string>
     <string name="summary_lyric_preview">拥有结束时间的歌词结束后提前显示下一句歌词</string>
     <string name="title_lyric_long_interlude_countdown">歌词长间奏显示倒计时圆点</string>
-    <string name="title_pure_music_lyric_behavior">纯音乐歌词行为</string>
-    <string name="option_pure_music_keep">保持不变</string>
-    <string name="option_pure_music_music_info">替换为音乐信息</string>
-    <string name="option_pure_music_empty">替换为空</string>
+    <string name="title_no_lyrics_lyric_behavior">无歌词/纯音乐歌词行为</string>
+    <string name="option_no_lyrics_keep">保持不变</string>
+    <string name="option_no_lyrics_music_info">替换为音乐信息</string>
+    <string name="option_no_lyrics_empty">替换为空</string>
+    <string name="option_no_lyrics_restore_default">回退到默认</string>
     <string name="title_size">大小</string>
     <string name="label_size_range">范围：8 ~ 16</string>
     <string name="title_font_weight">字重</string>
@@ -545,8 +546,6 @@
     <string name="title_behavior_after_pause">暂停音乐后行为</string>
     <string name="option_after_pause_default">恢复默认</string>
     <string name="option_after_pause_keep">保持不变</string>
-    <string name="title_behavior_after_no_lyrics">无歌词时行为</string>
-    <string name="option_after_no_lyrics_music_info">显示音乐信息</string>
     <string name="title_island_long_press_behavior">超级岛长按行为</string>
     <string name="option_island_long_press_default">默认</string>
     <string name="option_island_long_press_lyric_share">拖拽分享</string>
