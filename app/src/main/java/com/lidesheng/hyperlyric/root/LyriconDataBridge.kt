@@ -17,7 +17,6 @@ import com.lidesheng.hyperlyric.lyric.view.InterludeTracker
 import com.lidesheng.hyperlyric.lyric.view.SongPreprocessor
 import com.lidesheng.hyperlyric.lyric.view.TimedLine
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
-import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -162,7 +161,7 @@ object LyriconDataBridge {
     private var showLyricPreview = RootConstants.DEFAULT_HOOK_LYRIC_PREVIEW
 
     @Volatile
-    private var pureMusicLyricBehavior = RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+    private var noLyricsLyricBehavior = RootConstants.DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
 
     /** 当前歌词内容是否命中纯音乐标记，随歌曲/歌词/单行更新重算。 */
     @Volatile
@@ -485,9 +484,9 @@ object LyriconDataBridge {
         return true
     }
 
-    fun updatePureMusicLyricBehavior(behavior: Int): Boolean {
-        if (pureMusicLyricBehavior == behavior) return false
-        pureMusicLyricBehavior = behavior
+    fun updateNoLyricsLyricBehavior(behavior: Int): Boolean {
+        if (noLyricsLyricBehavior == behavior) return false
+        noLyricsLyricBehavior = behavior
 
         val song = currentSong?.takeIf {
             !isTextMode && fullSongLyricsAvailable != null
@@ -545,7 +544,7 @@ object LyriconDataBridge {
             // Without a preview candidate, retain the previous line through instrumental sections.
             else -> timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
         }
-        val effectiveLines = applyPureMusicTimelineBehavior(selectedLines, position)
+        val effectiveLines = applyNoLyricsTimelineBehavior(selectedLines)
 
         val previousLines = currentLyricLines
         val previousNextLine = currentNextLyricLine
@@ -639,6 +638,7 @@ object LyriconDataBridge {
      * A whole-song source wins over the current line so an interlude cannot remove the view.
      */
     fun hasLyricsForPresentation(): Boolean {
+        if (isPureMusicLyricHandled()) return false
         fullSongLyricsAvailable?.let { return it }
         return !currentLyric.isNullOrBlank() || hasRenderableLine(currentLyricLine)
     }
@@ -661,6 +661,7 @@ object LyriconDataBridge {
      * pass the lyric gate when the user selected native restoration.
      */
     fun noLyricsPlaceholderLine(): IRichLyricLine? {
+        if (isNoLyricsContentSuppressed()) return null
         val metadata = currentLyricMediaMetadata ?: return null
         return SongPreprocessor(
             resolveTitleSlot(placeholderFormat),
@@ -675,6 +676,7 @@ object LyriconDataBridge {
     }
 
     fun hasNoLyricsPlaceholderForPresentation(): Boolean {
+        if (isNoLyricsContentSuppressed()) return false
         val metadata = currentLyricMediaMetadata ?: return false
         return when (placeholderFormat) {
             RootConstants.PLACEHOLDER_FORMAT_NONE -> false
@@ -685,78 +687,42 @@ object LyriconDataBridge {
         }
     }
 
-    /** 纯音乐行为是否正在替换歌词内容（替换为空或替换为音乐信息）。 */
-    fun isPureMusicLyricReplaced(): Boolean =
+    /** 纯音乐且行为非"保持不变"时，标记文本不再作为歌词内容展示。 */
+    private fun isPureMusicLyricHandled(): Boolean =
         currentSongIsPureMusic &&
-                pureMusicLyricBehavior != RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_KEEP
+                noLyricsLyricBehavior != RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_KEEP
 
-    /** 纯音乐"替换为空"是否生效。 */
-    fun isPureMusicLyricEmptied(): Boolean =
-        currentSongIsPureMusic &&
-                pureMusicLyricBehavior == RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY
+    /** 纯音乐被行为接管（非"保持不变"），对唱宽度锁定不适用。 */
+    fun isPureMusicLyricReplaced(): Boolean = isPureMusicLyricHandled()
+
+    /** "替换为空"是否生效，状态栏仅保留图标。 */
+    fun isNoLyricsBehaviorEmpty(): Boolean =
+        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY
+
+    /** "替换为空/回退到默认"时不展示任何占位内容。 */
+    private fun isNoLyricsContentSuppressed(): Boolean =
+        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY ||
+                noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
+
+    /** 无歌词/纯音乐时是否展示音乐信息占位。 */
+    fun noLyricsBehaviorShowsMusicInfo(): Boolean =
+        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO
 
     private fun hasRenderableLine(line: IRichLyricLine?): Boolean {
         return line != null && (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())
     }
 
-    /** 按纯音乐行为对源推送的单行内容做替换，未命中或保持不变时返回原始行。 */
+    /** 按无歌词/纯音乐行为处理源推送的单行内容，接管时置空以走无歌词占位链路。 */
     private fun resolveActiveLyricLine(): IRichLyricLine? {
         val rawLine = rawActiveLyricLine ?: return null
-        if (!currentSongIsPureMusic) return rawLine
-        return when (pureMusicLyricBehavior) {
-            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_MUSIC_INFO ->
-                pureMusicMusicInfoLine(currentPlaybackClock().positionMs) ?: rawLine
-
-            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY -> null
-
-            else -> rawLine
-        }
+        return if (isPureMusicLyricHandled()) null else rawLine
     }
 
-    /** 时间线选行结果的纯音乐行为覆盖，返回原列表实例表示未覆盖。 */
-    private fun applyPureMusicTimelineBehavior(
-        selectedLines: List<IRichLyricLine>,
-        position: Long
+    /** 时间线选行结果的行为覆盖，纯音乐被接管时清空选行，返回原列表实例表示未覆盖。 */
+    private fun applyNoLyricsTimelineBehavior(
+        selectedLines: List<IRichLyricLine>
     ): List<IRichLyricLine> {
-        if (!currentSongIsPureMusic) return selectedLines
-        return when (pureMusicLyricBehavior) {
-            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_MUSIC_INFO ->
-                pureMusicMusicInfoLine(position)?.let(::listOf) ?: selectedLines
-
-            RootConstants.PURE_MUSIC_LYRIC_BEHAVIOR_EMPTY -> emptyList()
-
-            else -> selectedLines
-        }
-    }
-
-    /** 用用户配置的音乐信息布局合成歌词行，媒体信息不可用时返回 null 以回退原歌词。 */
-    private fun pureMusicMusicInfoLine(position: Long): IRichLyricLine? {
-        val prefs = HookEntry.instance?.prefs ?: return null
-        val mediaInfo = resolvePureMusicMediaInfo() ?: return null
-        val lines = IslandMetadataContentAssembler.buildConfiguredMusicInfoLines(
-            prefs = prefs,
-            mediaInfo = mediaInfo,
-            playbackPosition = position,
-            playbackDuration = currentSong?.duration?.takeIf { it > 0L } ?: mediaInfo.duration
-        )
-        return RichLyricLine(
-            text = lines.firstLine.takeIf { it.isNotBlank() },
-            translation = lines.secondLine.takeIf { it.isNotBlank() }
-        )
-    }
-
-    private fun resolvePureMusicMediaInfo(): MediaMetadataHelper.MediaInfo? {
-        currentResolvedMediaInfo?.let { resolved ->
-            return resolved.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
-        }
-        val metadata = currentLyricMediaMetadata ?: return null
-        val fallback = MediaMetadataHelper.MediaInfo(
-            title = metadata.title.orEmpty(),
-            artist = metadata.artist.orEmpty(),
-            album = metadata.album.orEmpty(),
-            duration = metadata.duration ?: -1L
-        )
-        return fallback.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+        return if (isPureMusicLyricHandled()) emptyList() else selectedLines
     }
 
     private fun rebuildTimeline(song: Song, selectCurrentPosition: Boolean) {

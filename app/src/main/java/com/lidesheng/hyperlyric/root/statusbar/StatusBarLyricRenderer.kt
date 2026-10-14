@@ -317,8 +317,10 @@ internal object StatusBarLyricRenderer {
         val hasLyrics = LyriconDataBridge.hasLyricsForPresentation()
         val hasPlaceholder = !hasLyrics &&
                 LyriconDataBridge.hasNoLyricsPlaceholderForPresentation()
+        // "替换为空"时即使没有占位内容，也要保留图标宿主的展示机会。
+        val showIconOnly = !hasLyrics && LyriconDataBridge.isNoLyricsBehaviorEmpty()
         if (!LyricTypePreference.isEnabled(prefs, RootConstants.LYRIC_TYPE_STATUS_BAR) ||
-            (!hasLyrics && !hasPlaceholder)
+            (!hasLyrics && !hasPlaceholder && !showIconOnly)
         ) return false
         if (prefs.getBoolean(
                 RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN,

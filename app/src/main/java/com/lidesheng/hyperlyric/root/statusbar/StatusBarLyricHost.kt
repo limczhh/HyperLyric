@@ -361,7 +361,7 @@ internal class StatusBarLyricHost(
 
         val requestedWidth = when {
             isDuetWidthLocked() -> effectiveWidthLimitPx
-            LyriconDataBridge.isPureMusicLyricEmptied() -> config.desiredWidthPx(
+            LyriconDataBridge.isNoLyricsBehaviorEmpty() -> config.desiredWidthPx(
                 contentWidthPx = 0f,
                 iconWidthPx = iconWidthPx,
             ).coerceAtMost(effectiveWidthLimitPx)
@@ -688,9 +688,9 @@ internal class StatusBarLyricHost(
 
     private fun updateVisibility(wrapper: MaxWidthFrameLayout, lyrics: RichLyricLineView) {
         val hasLine = isRenderable(lyrics.rawLine) || isRenderable(lyrics.rawSecondaryLine)
-        // 纯音乐"替换为空"时保留图标占位，仅隐藏歌词文本。
+        // "替换为空"时保留图标占位，仅隐藏歌词文本。
         val iconOnly = !hasLine && iconWidthPx > 0 &&
-                LyriconDataBridge.isPureMusicLyricEmptied()
+                LyriconDataBridge.isNoLyricsBehaviorEmpty()
         if (iconOnly) {
             layoutConfig?.let { config ->
                 val iconOnlyWidth = config.desiredWidthPx(

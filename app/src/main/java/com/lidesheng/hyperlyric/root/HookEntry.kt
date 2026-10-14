@@ -87,7 +87,7 @@ class HookEntry : XposedModule() {
             RootConstants.KEY_HOOK_ISLAND_DYNAMIC_MAX_WIDTH,
             RootConstants.KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT,
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
-            RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
+            RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR,
             RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW,
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GRADIENT,
@@ -551,11 +551,11 @@ class HookEntry : XposedModule() {
                     RootConstants.DEFAULT_HOOK_LYRIC_PREVIEW
                 )
             )
-            LyriconDataBridge.updatePureMusicLyricBehavior(
-                RootConstants.normalizePureMusicLyricBehavior(
+            LyriconDataBridge.updateNoLyricsLyricBehavior(
+                RootConstants.normalizeNoLyricsLyricBehavior(
                     prefs.getInt(
-                        RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR,
-                        RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+                        RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR,
+                        RootConstants.DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
                     )
                 )
             )
@@ -712,16 +712,16 @@ class HookEntry : XposedModule() {
                             }
                         }
 
-                        RootConstants.KEY_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR -> {
-                            val behavior = RootConstants.normalizePureMusicLyricBehavior(
+                        RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR -> {
+                            val behavior = RootConstants.normalizeNoLyricsLyricBehavior(
                                 prefs.getInt(
                                     key,
-                                    RootConstants.DEFAULT_HOOK_PURE_MUSIC_LYRIC_BEHAVIOR
+                                    RootConstants.DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
                                 )
                             )
                             Handler(Looper.getMainLooper()).post {
                                 val changed =
-                                    LyriconDataBridge.updatePureMusicLyricBehavior(behavior)
+                                    LyriconDataBridge.updateNoLyricsLyricBehavior(behavior)
                                 if (changed) {
                                     SystemUiLyricRenderer.updateLyricLine()
                                     val playbackClock = LyriconDataBridge.currentPlaybackClock()
@@ -730,7 +730,7 @@ class HookEntry : XposedModule() {
                                         playbackClock.playbackSpeed
                                     )
                                 } else {
-                                    HookLogger.d(TAG, "纯音乐歌词行为设置未变化")
+                                    HookLogger.d(TAG, "无歌词/纯音乐歌词行为设置未变化")
                                 }
                             }
                         }

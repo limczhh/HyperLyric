@@ -67,8 +67,7 @@ internal class IslandPresentationDecisionEvaluator(
             lyricPackageName = LyriconDataBridge.currentLyricPackageName,
             hasLyricsForPresentation = LyriconDataBridge.hasLyricsForPresentation(),
             hasMusicInfoForPresentation = LyriconDataBridge.hasMusicInfoForPresentation(),
-            showMusicInfoWhenNoLyrics = currentNoLyricsBehavior() ==
-                    RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_MUSIC_INFO,
+            showMusicInfoWhenNoLyrics = LyriconDataBridge.noLyricsBehaviorShowsMusicInfo(),
             enabled = IslandProbeUtils.isSuperIslandEnabled(),
             playbackActive = presentationState.isPlaybackActive(),
             pauseBehavior = currentPauseBehavior()
@@ -81,12 +80,5 @@ internal class IslandPresentationDecisionEvaluator(
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
             RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE
         ) ?: RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE
-    }
-
-    private fun currentNoLyricsBehavior(): Int {
-        return HookEntry.instance?.prefs?.getInt(
-            RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
-            RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
-        ) ?: RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
     }
 }

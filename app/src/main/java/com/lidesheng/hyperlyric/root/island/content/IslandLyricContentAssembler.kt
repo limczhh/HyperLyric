@@ -353,7 +353,7 @@ internal object IslandLyricContentAssembler {
     ): LyricPresentation {
         if (!LyriconDataBridge.hasLyricsForPresentation()) {
             return if (allowNoLyricsPlaceholder &&
-                (ignoreNoLyricsBehavior || shouldUseNoLyricsPlaceholder(prefs))
+                (ignoreNoLyricsBehavior || shouldUseNoLyricsPlaceholder())
             ) {
                 LyriconDataBridge.noLyricsPlaceholderLine()?.let { line ->
                     LyricPresentation(primary = line)
@@ -419,13 +419,10 @@ internal object IslandLyricContentAssembler {
         )
     }
 
-    fun shouldUseNoLyricsPlaceholder(prefs: SharedPreferences): Boolean {
+    fun shouldUseNoLyricsPlaceholder(): Boolean {
         return !LyriconDataBridge.hasLyricsForPresentation() &&
-                LyriconDataBridge.hasMusicInfoForPresentation() &&
-                prefs.getInt(
-                    RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS,
-                    RootConstants.DEFAULT_HOOK_ISLAND_BEHAVIOR_AFTER_NO_LYRICS
-                ) == RootConstants.ISLAND_NO_LYRICS_BEHAVIOR_MUSIC_INFO
+                LyriconDataBridge.noLyricsBehaviorShowsMusicInfo() &&
+                LyriconDataBridge.hasMusicInfoForPresentation()
     }
 
     private fun applyPlaybackSnapshot(
