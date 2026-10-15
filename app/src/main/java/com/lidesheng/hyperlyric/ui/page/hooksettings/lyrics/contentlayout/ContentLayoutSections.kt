@@ -150,8 +150,8 @@ internal fun LazyListScope.contentLayoutSections(
     onLyricAlignmentChange: (ContentLayoutAlignment) -> Unit,
     placeholderFormat: Int,
     onPlaceholderFormatChange: (Int) -> Unit,
-    pureMusicBehavior: Int,
-    onPureMusicBehaviorChange: (Int) -> Unit,
+    noLyricsBehavior: Int,
+    onNoLyricsBehaviorChange: (Int) -> Unit,
     lyricPreviewEnabled: Boolean,
     onLyricPreviewEnabledChange: (Boolean) -> Unit,
     showLongInterludeCountdown: Boolean,
@@ -270,11 +270,11 @@ internal fun LazyListScope.contentLayoutSections(
                 OverlayDropdownPreference(
                     title = stringResource(id = R.string.title_no_lyrics_lyric_behavior),
                     items = noLyricsBehaviorOptions,
-                    selectedIndex = pureMusicBehavior.coerceIn(
+                    selectedIndex = noLyricsBehavior.coerceIn(
                         RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_KEEP,
                         RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
                     ),
-                    onSelectedIndexChange = onPureMusicBehaviorChange
+                    onSelectedIndexChange = onNoLyricsBehaviorChange
                 )
                 SwitchPreference(
                     title = stringResource(id = R.string.title_lyric_preview),
