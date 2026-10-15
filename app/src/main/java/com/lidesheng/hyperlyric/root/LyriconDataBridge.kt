@@ -548,7 +548,7 @@ object LyriconDataBridge {
             // Without a preview candidate, retain the previous line through instrumental sections.
             else -> timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
         }
-        val effectiveLines = applyNoLyricsTimelineBehavior(selectedLines)
+        val effectiveLines = applyNoLyricsTimelineBehavior(selectedLines, position)
 
         val previousLines = currentLyricLines
         val previousNextLine = currentNextLyricLine
@@ -571,12 +571,6 @@ object LyriconDataBridge {
 
         if (lineChanged || newText != currentLyric) {
             currentLyric = newText
-            return true
-        }
-        // 纯音乐替换为音乐信息时，占位内容不走时间线选行，
-        // 每次位置更新都触发一次渲染检查，保证时间字段逐秒刷新（渲染层按签名去重）。
-        if (isPureMusicLyricHandled() && noLyricsBehaviorShowsMusicInfo()) {
-            currentLyric = ""
             return true
         }
         return false
@@ -648,7 +642,7 @@ object LyriconDataBridge {
      * A whole-song source wins over the current line so an interlude cannot remove the view.
      */
     fun hasLyricsForPresentation(): Boolean {
-        if (isPureMusicLyricHandled()) return false
+        if (isPureMusicContentSuppressed()) return false
         fullSongLyricsAvailable?.let { return it }
         return !currentLyric.isNullOrBlank() || hasRenderableLine(currentLyricLine)
     }
@@ -708,6 +702,14 @@ object LyriconDataBridge {
         currentSongIsPureMusic &&
                 noLyricsLyricBehavior != RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_KEEP
 
+    /**
+     * 纯音乐内容被行为主动清空（替换为空/回退到默认）。此时选行结果已被丢弃，
+     * 不能再让整首歌的"有歌词"结论去占用文本槽位，否则会隐藏系统元素却不展示任何内容。
+     * "替换为音乐信息"不在此列：它把展示行替换成音乐信息，内容始终存在。
+     */
+    private fun isPureMusicContentSuppressed(): Boolean =
+        currentSongIsPureMusic && isNoLyricsContentSuppressed()
+
     /** 纯音乐被行为接管（非"保持不变"），对唱宽度锁定不适用。 */
     fun isPureMusicLyricReplaced(): Boolean = isPureMusicLyricHandled()
 
@@ -734,15 +736,16 @@ object LyriconDataBridge {
                 hasNoLyricsPlaceholderForPresentation() ||
                 isNoLyricsBehaviorEmpty()
 
-    /** 用用户配置的音乐信息布局合成展示行，没有可显示内容时返回 null。 */
-    private fun pureMusicMusicInfoLine(): IRichLyricLine? {
+    /** 用用户配置的音乐信息布局合成展示行，没有可显示内容时返回 null 以便调用方回退。 */
+    private fun pureMusicMusicInfoLine(
+        position: Long = currentPlaybackClock().positionMs
+    ): IRichLyricLine? {
         val prefs = HookEntry.instance?.prefs ?: return null
         val mediaInfo = resolvePureMusicMediaInfo() ?: return null
-        val playbackClock = currentPlaybackClock()
         val lines = IslandMetadataContentAssembler.buildConfiguredMusicInfoLines(
             prefs = prefs,
             mediaInfo = mediaInfo,
-            playbackPosition = playbackClock.positionMs,
+            playbackPosition = position,
             playbackDuration = currentSong?.duration?.takeIf { it > 0L } ?: mediaInfo.duration
         )
         val firstLine = lines.firstLine.takeIf { it.isNotBlank() }
@@ -773,17 +776,40 @@ object LyriconDataBridge {
         return line != null && (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())
     }
 
-    /** 按无歌词/纯音乐行为处理源推送的单行内容，接管时置空以走无歌词占位链路。 */
+    /**
+     * 按无歌词/纯音乐行为替换源推送的单行内容。"替换为音乐信息"在媒体信息尚未就绪时必须回退到
+     * 原始行：直接置空会让 hasLyricsForPresentation 与 currentLyricLine 互相矛盾，渲染层拿到空
+     * 展示、系统元素却已按"有内容"被隐藏，切歌后状态栏就整条空白。
+     */
     private fun resolveActiveLyricLine(): IRichLyricLine? {
         val rawLine = rawActiveLyricLine ?: return null
-        return if (isPureMusicLyricHandled()) null else rawLine
+        if (!currentSongIsPureMusic) return rawLine
+        return when (noLyricsLyricBehavior) {
+            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO ->
+                pureMusicMusicInfoLine() ?: rawLine
+
+            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY,
+            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT -> null
+
+            else -> rawLine
+        }
     }
 
-    /** 时间线选行结果的行为覆盖，纯音乐被接管时清空选行，返回原列表实例表示未覆盖。 */
+    /** 时间线选行结果的行为覆盖，返回原列表实例表示未覆盖。 */
     private fun applyNoLyricsTimelineBehavior(
-        selectedLines: List<IRichLyricLine>
+        selectedLines: List<IRichLyricLine>,
+        position: Long
     ): List<IRichLyricLine> {
-        return if (isPureMusicLyricHandled()) emptyList() else selectedLines
+        if (!currentSongIsPureMusic) return selectedLines
+        return when (noLyricsLyricBehavior) {
+            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO ->
+                pureMusicMusicInfoLine(position)?.let(::listOf) ?: selectedLines
+
+            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY,
+            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT -> emptyList()
+
+            else -> selectedLines
+        }
     }
 
     private fun rebuildTimeline(song: Song, selectCurrentPosition: Boolean) {
