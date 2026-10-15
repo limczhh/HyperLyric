@@ -55,9 +55,6 @@ internal object StatusBarLyricRenderer {
                 clearOnMain()
                 return@dispatchLatest
             }
-            refreshClockVisibility(prefs)
-            refreshNotificationIconVisibility(prefs)
-            refreshIslandSuppressionPolicy(prefs)
             StatusBarLyricIslandRegionDispatcher.updateAdjustmentEnabled(
                 prefs.getBoolean(
                     RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ADJUST_WIDTH_FOR_SUPER_ISLAND,
@@ -66,10 +63,18 @@ internal object StatusBarLyricRenderer {
             )
             if (!shouldRender(prefs)) {
                 renderingEnabled = false
+                // 本轮没有任何自有内容可展示，必须交还时钟/通知图标/灵动岛，
+                // 否则"播放时隐藏"会把系统元素一起藏掉，留下整条空白的状态栏。
+                refreshClockVisibility(null)
+                refreshNotificationIconVisibility(null)
+                refreshIslandSuppressionPolicy(null)
                 clearOnMain()
                 return@dispatchLatest
             }
             renderingEnabled = true
+            refreshClockVisibility(prefs)
+            refreshNotificationIconVisibility(prefs)
+            refreshIslandSuppressionPolicy(prefs)
             StatusBarLyricHostRegistry.liveHosts().forEach { host ->
                 host.setLyricTemporarilyHidden(lyricTemporarilyHidden)
                 host.render(prefs, force = force)
@@ -78,6 +83,14 @@ internal object StatusBarLyricRenderer {
             publishRenderedLyricState()
         }
     }
+
+    /**
+     * 只有模块确实在渲染自有内容时，才有资格隐藏时钟、通知图标与灵动岛。
+     * 单看设置项或数据桥的内容判定都不够：本方法还要跟 [shouldRender] 的结论保持一致，
+     * 否则锁屏隐藏、暂停策略等分支会让系统元素被藏掉而自有视图是空的。
+     */
+    private fun isOwningStatusBarContent(): Boolean =
+        renderingEnabled && LyriconDataBridge.isPresentingManagedContent()
 
     fun ensureKeyguardStateListener(context: Context) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -375,7 +388,7 @@ internal object StatusBarLyricRenderer {
             val shouldHide = !clockTemporarilyRevealed && enabled &&
                     LyriconDataBridge.isPlaybackActive() && when (behavior) {
                 RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING ->
-                    LyriconDataBridge.isPresentingManagedContent() && !lyricTemporarilyHidden
+                    isOwningStatusBarContent() && !lyricTemporarilyHidden
 
                 RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT ->
                     StatusBarLyricIslandRegionDispatcher.hasIsland()
@@ -403,7 +416,7 @@ internal object StatusBarLyricRenderer {
             ) ?: RootConstants.STATUS_BAR_LYRIC_NOTIFICATION_ICON_HIDE_NONE
             val active = enabled &&
                     LyriconDataBridge.isPlaybackActive() &&
-                    LyriconDataBridge.isPresentingManagedContent() &&
+                    isOwningStatusBarContent() &&
                     !lyricTemporarilyHidden
             StatusBarLyricHostRegistry.liveHosts().forEach { host ->
                 host.setNotificationIconContainerHidden(active &&
@@ -430,7 +443,7 @@ internal object StatusBarLyricRenderer {
         } else {
             RootConstants.STATUS_BAR_LYRIC_ISLAND_HIDE_NONE
         }
-        val hasLyrics = enabled && LyriconDataBridge.isPresentingManagedContent()
+        val hasLyrics = enabled && isOwningStatusBarContent()
         val shouldOwnIsland = hasLyrics && when (behavior) {
             RootConstants.STATUS_BAR_LYRIC_ISLAND_HIDE_WHILE_PLAYING ->
                 LyriconDataBridge.isPlaybackActive()

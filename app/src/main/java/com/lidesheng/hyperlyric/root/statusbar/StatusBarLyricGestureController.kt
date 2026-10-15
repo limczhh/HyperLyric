@@ -298,8 +298,9 @@ internal class StatusBarLyricGestureController(
     }
 
     private fun resolveCurrentMediaAppLaunchTarget(): MediaAppLaunchTarget? {
+        // 替换内容（音乐信息/占位行）也是模块自己展示的，点按同样应该能回到媒体应用。
         if (!LyriconDataBridge.isPlaybackActive() ||
-            !LyriconDataBridge.hasLyricsForPresentation() ||
+            !LyriconDataBridge.isPresentingManagedContent() ||
             StatusBarLyricHostRegistry.liveHosts().none(StatusBarLyricHost::isShowingLyric)
         ) {
             return null

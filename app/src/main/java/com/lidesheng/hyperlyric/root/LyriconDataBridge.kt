@@ -506,7 +506,10 @@ object LyriconDataBridge {
         if (isTextMode) return false
         val song = currentSong ?: return false
         val lyrics = song.lyrics
-        if (lyrics.isNullOrEmpty()) return false
+        if (lyrics.isNullOrEmpty()) {
+            // 无歌词歌曲没有可选行的时间线，但"替换为音乐信息"里的时间字段仍需逐秒刷新。
+            return noLyricsBehaviorShowsMusicInfo()
+        }
 
         // 先展示此刻有效的源歌词行；开唱前只有当前没有源内容时才补前奏占位行。
         val activeLines = buildList {
@@ -685,8 +688,10 @@ object LyriconDataBridge {
 
     fun hasNoLyricsPlaceholderForPresentation(): Boolean {
         if (isNoLyricsContentSuppressed()) return false
+        // 必须与实际合成的展示行保持一致：仅判断媒体信息是否存在，会在布局字段全为空时
+        // 声称有占位内容，渲染层却拿不到可显示的行。
         if (noLyricsBehaviorShowsMusicInfo()) {
-            return resolvePureMusicMediaInfo() != null
+            return pureMusicMusicInfoLine() != null
         }
         val metadata = currentLyricMediaMetadata ?: return false
         return when (placeholderFormat) {
@@ -719,11 +724,17 @@ object LyriconDataBridge {
     fun noLyricsBehaviorShowsMusicInfo(): Boolean =
         noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO
 
-    /** 模块是否正在接管文本展示（歌词或替换内容），状态栏时钟/通知图标隐藏依赖此判定。 */
+    /**
+     * 模块是否真的在接管文本展示。时钟、通知图标与灵动岛的隐藏都依赖此判定，因此必须基于
+     * 实际可展示的内容而非设置项本身：否则选了"替换为音乐信息"却没有内容可渲染时，
+     * 系统元素会被一并隐藏，得到一条完全空白的状态栏。
+     */
     fun isPresentingManagedContent(): Boolean =
-        hasLyricsForPresentation() || noLyricsBehaviorShowsMusicInfo()
+        hasLyricsForPresentation() ||
+                hasNoLyricsPlaceholderForPresentation() ||
+                isNoLyricsBehaviorEmpty()
 
-    /** 用用户配置的音乐信息布局合成展示行，媒体信息不可用时返回 null。 */
+    /** 用用户配置的音乐信息布局合成展示行，没有可显示内容时返回 null。 */
     private fun pureMusicMusicInfoLine(): IRichLyricLine? {
         val prefs = HookEntry.instance?.prefs ?: return null
         val mediaInfo = resolvePureMusicMediaInfo() ?: return null
@@ -734,16 +745,20 @@ object LyriconDataBridge {
             playbackPosition = playbackClock.positionMs,
             playbackDuration = currentSong?.duration?.takeIf { it > 0L } ?: mediaInfo.duration
         )
+        val firstLine = lines.firstLine.takeIf { it.isNotBlank() }
+        val secondLine = lines.secondLine.takeIf { it.isNotBlank() }
+        // 主行是状态栏判定可见性的唯一依据，配置的首行为空时降级用次行顶上。
+        val primary = firstLine ?: secondLine ?: return null
         return RichLyricLine(
-            text = lines.firstLine.takeIf { it.isNotBlank() },
-            translation = lines.secondLine.takeIf { it.isNotBlank() }
+            text = primary,
+            translation = if (firstLine == null) null else secondLine
         )
     }
 
     private fun resolvePureMusicMediaInfo(): MediaMetadataHelper.MediaInfo? {
-        currentResolvedMediaInfo?.let { resolved ->
-            return resolved.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
-        }
+        currentResolvedMediaInfo
+            ?.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+            ?.let { return it }
         val metadata = currentLyricMediaMetadata ?: return null
         val fallback = MediaMetadataHelper.MediaInfo(
             title = metadata.title.orEmpty(),
