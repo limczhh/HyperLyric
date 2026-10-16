@@ -347,6 +347,9 @@
     <string name="title_lyric_long_interlude_countdown">歌词长间奏显示倒计时圆点</string>
     <string name="title_no_lyrics_lyric_behavior">无歌词/纯音乐歌词行为</string>
     <string name="title_tail_timeout_behavior">尾奏超时行为</string>
+    <string name="title_tail_timeout_delay">尾奏超时时长</string>
+    <string name="label_tail_timeout_delay_range">范围：0 ~ 30</string>
+    <string name="summary_tail_timeout_delay">输入 n 秒：有结束时间的歌词在最后一句结束后 n 秒触发，只有开始时间的歌词在最后一句开始后 n+5 秒触发。</string>
     <string name="option_lyric_behavior_keep">保持不变</string>
     <string name="option_lyric_behavior_music_info">替换为音乐信息</string>
     <string name="option_lyric_behavior_restore_default">回退到默认</string>

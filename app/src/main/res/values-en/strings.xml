@@ -347,6 +347,9 @@
     <string name="title_lyric_long_interlude_countdown">Show countdown dots during long lyric interludes</string>
     <string name="title_no_lyrics_lyric_behavior">No Lyrics / Pure Music Behavior</string>
     <string name="title_tail_timeout_behavior">Tail Timeout Behavior</string>
+    <string name="title_tail_timeout_delay">Tail Timeout Delay</string>
+    <string name="label_tail_timeout_delay_range">Range: 0 ~ 30</string>
+    <string name="summary_tail_timeout_delay">Enter n seconds: lyrics with an end time trigger n seconds after the last line ends, and lyrics with only a start time trigger n+5 seconds after the last line begins.</string>
     <string name="option_lyric_behavior_keep">Keep As Is</string>
     <string name="option_lyric_behavior_music_info">Replace With Music Info</string>
     <string name="option_lyric_behavior_restore_default">Fall Back to Default</string>

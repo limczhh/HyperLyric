@@ -167,6 +167,10 @@ object LyriconDataBridge {
     @Volatile
     private var tailTimeoutBehavior = RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
 
+    /** 尾奏超时时长（秒），记为 n；只有开始时间的歌词额外多等 5 秒。 */
+    @Volatile
+    private var tailTimeoutDelaySeconds = RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_DELAY_SECONDS
+
     /** 当前歌词内容是否命中纯音乐标记，随歌曲/歌词/单行更新重算。 */
     @Volatile
     var currentSongIsPureMusic: Boolean = false
@@ -523,6 +527,19 @@ object LyriconDataBridge {
     fun updateTailTimeoutBehavior(behavior: Int): Boolean {
         if (tailTimeoutBehavior == behavior) return false
         tailTimeoutBehavior = behavior
+
+        val song = currentSong?.takeIf {
+            !isTextMode && fullSongLyricsAvailable != null
+        } ?: return true
+        rebuildTimeline(song, selectCurrentPosition = true)
+        return true
+    }
+
+    /** 切换尾奏超时时长：超时点由时长推导，需要重算时间线。 */
+    fun updateTailTimeoutDelaySeconds(seconds: Int): Boolean {
+        val normalized = RootConstants.normalizeTailTimeoutDelaySeconds(seconds)
+        if (tailTimeoutDelaySeconds == normalized) return false
+        tailTimeoutDelaySeconds = normalized
 
         val song = currentSong?.takeIf {
             !isTextMode && fullSongLyricsAvailable != null
@@ -906,23 +923,23 @@ object LyriconDataBridge {
 
     /**
      * 由时间线推导尾奏超时时刻：每一行按自身的时间语义算出一个超时点，取其中最晚的一个。
-     * 拥有合法结束时间（end > begin）的行取结束后 3 秒，只有开始时间的行取开始后 8 秒。
+     * 设用户配置的时长为 n 秒，拥有合法结束时间（end > begin）的行取结束后 n 秒，只有开始时间
+     * 的行取开始后 n + 5 秒。
      *
      * 只看"按开始时间排序的最后一行"在对唱歌词里会提前截断——前一行的结束时间可能晚于最后
      * 一行的结束时间，逐行取最大才能覆盖到真正最晚结束的那一句。没有可用歌词行时返回
      * [Long.MAX_VALUE]，即永不超时；接近上限的时刻做饱和处理，避免溢出成负数导致立刻判为尾奏。
      */
     private fun resolveTailTimeoutDeadline(lines: List<TimedLine>): Long {
+        val endDelayMs = tailTimeoutDelaySeconds * 1_000L
+        val beginOnlyDelayMs =
+            (tailTimeoutDelaySeconds + RootConstants.TAIL_TIMEOUT_BEGIN_ONLY_EXTRA_SECONDS) * 1_000L
         var deadline = Long.MIN_VALUE
         for (line in lines) {
             val hasEndTime = line.end > line.begin
             val anchor = if (hasEndTime) line.end else line.begin
             if (anchor < 0L) continue
-            val delay = if (hasEndTime) {
-                RootConstants.TAIL_TIMEOUT_AFTER_LINE_END_MS
-            } else {
-                RootConstants.TAIL_TIMEOUT_AFTER_LINE_BEGIN_MS
-            }
+            val delay = if (hasEndTime) endDelayMs else beginOnlyDelayMs
             val candidate = if (anchor > Long.MAX_VALUE - delay) {
                 Long.MAX_VALUE
             } else {

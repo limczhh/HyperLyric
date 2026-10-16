@@ -222,6 +222,7 @@ object RootConstants {
         "key_hook_lyric_long_interlude_countdown"
     const val KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR = "key_hook_no_lyrics_lyric_behavior"
     const val KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR = "key_hook_tail_timeout_behavior"
+    const val KEY_HOOK_TAIL_TIMEOUT_DELAY_SECONDS = "key_hook_tail_timeout_delay_seconds"
     const val KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE = "key_hook_island_music_wave_style"
 
     // ================= ANIMATION & MARQUEE KEYS =================
@@ -614,17 +615,28 @@ object RootConstants {
     const val TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT = 2
     const val DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR = TAIL_TIMEOUT_BEHAVIOR_KEEP
 
-    /** 最后一句拥有结束时间时，从其结束起计算的超时时长。 */
-    const val TAIL_TIMEOUT_AFTER_LINE_END_MS = 3_000L
-
-    /** 最后一句只有开始时间时，从其开始起计算的超时时长。 */
-    const val TAIL_TIMEOUT_AFTER_LINE_BEGIN_MS = 8_000L
-
     fun normalizeTailTimeoutBehavior(value: Int): Int {
         return value.takeIf {
             it in TAIL_TIMEOUT_BEHAVIOR_KEEP..TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT
         } ?: DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
     }
+
+    /**
+     * 尾奏超时时长（秒），记为 n：拥有结束时间的歌词在最后一句结束后 n 秒触发，
+     * 只有开始时间的歌词在最后一句开始后 n + [TAIL_TIMEOUT_BEGIN_ONLY_EXTRA_SECONDS] 秒触发。
+     */
+    const val DEFAULT_HOOK_TAIL_TIMEOUT_DELAY_SECONDS = 3
+    const val MIN_HOOK_TAIL_TIMEOUT_DELAY_SECONDS = 0
+    const val MAX_HOOK_TAIL_TIMEOUT_DELAY_SECONDS = 30
+
+    /** 只有开始时间的歌词，超时点相对"有结束时间"额外多等的秒数。 */
+    const val TAIL_TIMEOUT_BEGIN_ONLY_EXTRA_SECONDS = 5
+
+    fun normalizeTailTimeoutDelaySeconds(value: Int): Int =
+        value.coerceIn(
+            MIN_HOOK_TAIL_TIMEOUT_DELAY_SECONDS,
+            MAX_HOOK_TAIL_TIMEOUT_DELAY_SECONDS
+        )
 
     const val ISLAND_MUSIC_WAVE_STYLE_DEFAULT = 0
     const val ISLAND_MUSIC_WAVE_STYLE_COVER_COLOR = 1

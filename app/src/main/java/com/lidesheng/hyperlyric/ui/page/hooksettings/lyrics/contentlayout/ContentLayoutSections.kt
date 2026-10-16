@@ -34,6 +34,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
@@ -154,6 +155,8 @@ internal fun LazyListScope.contentLayoutSections(
     onNoLyricsBehaviorChange: (Int) -> Unit,
     tailTimeoutBehavior: Int,
     onTailTimeoutBehaviorChange: (Int) -> Unit,
+    tailTimeoutDelaySeconds: Int,
+    onTailTimeoutDelayClick: () -> Unit,
     lyricPreviewEnabled: Boolean,
     onLyricPreviewEnabledChange: (Boolean) -> Unit,
     showLongInterludeCountdown: Boolean,
@@ -285,6 +288,18 @@ internal fun LazyListScope.contentLayoutSections(
                         RootConstants.TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT
                     ),
                     onSelectedIndexChange = onTailTimeoutBehaviorChange
+                )
+                ArrowPreference(
+                    title = stringResource(id = R.string.title_tail_timeout_delay),
+                    summary = stringResource(id = R.string.summary_tail_timeout_delay),
+                    endActions = {
+                        Text(
+                            "$tailTimeoutDelaySeconds",
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                        )
+                    },
+                    onClick = onTailTimeoutDelayClick
                 )
                 SwitchPreference(
                     title = stringResource(id = R.string.title_lyric_preview),

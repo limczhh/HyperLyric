@@ -11,6 +11,7 @@ import com.lidesheng.hyperlyric.common.MusicInfoLayoutPolicy
 import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
+import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookConfigSaver
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookPrefs
@@ -99,6 +100,16 @@ fun ContentLayoutPage() {
             )
         )
     }
+    var tailTimeoutDelaySeconds by remember(prefs) {
+        mutableStateOf(
+            RootConstants.normalizeTailTimeoutDelaySeconds(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_TAIL_TIMEOUT_DELAY_SECONDS,
+                    RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_DELAY_SECONDS
+                )
+            )
+        )
+    }
     var showLongInterludeCountdown by remember(prefs) {
         mutableStateOf(
             prefs.getBoolean(
@@ -152,6 +163,7 @@ fun ContentLayoutPage() {
         )
     }
     var editingRow by remember { mutableStateOf<Int?>(null) }
+    var showTailTimeoutDelayDialog by remember { mutableStateOf(false) }
 
     val currentEditingRow = editingRow
     val currentFields = when (currentEditingRow) {
@@ -227,6 +239,21 @@ fun ContentLayoutPage() {
         }
     )
 
+    NumberInputDialog(
+        show = showTailTimeoutDelayDialog,
+        title = stringResource(id = R.string.title_tail_timeout_delay),
+        label = stringResource(id = R.string.label_tail_timeout_delay_range),
+        summary = stringResource(id = R.string.summary_tail_timeout_delay),
+        initialValue = tailTimeoutDelaySeconds,
+        min = RootConstants.MIN_HOOK_TAIL_TIMEOUT_DELAY_SECONDS,
+        max = RootConstants.MAX_HOOK_TAIL_TIMEOUT_DELAY_SECONDS,
+        onDismiss = { showTailTimeoutDelayDialog = false },
+        onConfirm = { value ->
+            tailTimeoutDelaySeconds = value
+            PrefsBridge.putInt(RootConstants.KEY_HOOK_TAIL_TIMEOUT_DELAY_SECONDS, value)
+        }
+    )
+
     XposedLyricSettingPage(title = stringResource(id = R.string.title_content_layout)) {
         contentLayoutSections(
             firstLine = firstLine,
@@ -265,6 +292,8 @@ fun ContentLayoutPage() {
                 tailTimeoutBehavior = it
                 PrefsBridge.putInt(RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR, it)
             },
+            tailTimeoutDelaySeconds = tailTimeoutDelaySeconds,
+            onTailTimeoutDelayClick = { showTailTimeoutDelayDialog = true },
             lyricPreviewEnabled = lyricPreviewEnabled,
             onLyricPreviewEnabledChange = {
                 lyricPreviewEnabled = it

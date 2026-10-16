@@ -268,6 +268,9 @@
   <string name="option_placeholder_countdown">نقاط العد التنازلي</string>
   <string name="title_no_lyrics_lyric_behavior">سلوك كلمات الأغاني بدون كلمات أو الموسيقى الصرفة</string>
   <string name="title_tail_timeout_behavior">سلوك مهلة نهاية الأغنية</string>
+  <string name="title_tail_timeout_delay">مدة مهلة نهاية الأغنية</string>
+  <string name="label_tail_timeout_delay_range">النطاق: 0 ~ 30</string>
+  <string name="summary_tail_timeout_delay">أدخل n ثانية: الكلمات التي لها وقت انتهاء تُفعَّل بعد n ثانية من انتهاء السطر الأخير، والكلمات التي لها وقت بداية فقط تُفعَّل بعد n+5 ثانية من بداية السطر الأخير.</string>
   <string name="option_lyric_behavior_keep">إبقاء كما هو</string>
   <string name="option_lyric_behavior_music_info">استبدال بمعلومات الموسيقى</string>
   <string name="option_lyric_behavior_restore_default">العودة إلى الافتراضي</string>
