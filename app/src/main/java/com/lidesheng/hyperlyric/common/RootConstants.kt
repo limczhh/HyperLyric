@@ -221,6 +221,7 @@ object RootConstants {
     const val KEY_HOOK_LYRIC_LONG_INTERLUDE_COUNTDOWN =
         "key_hook_lyric_long_interlude_countdown"
     const val KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR = "key_hook_no_lyrics_lyric_behavior"
+    const val KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR = "key_hook_tail_timeout_behavior"
     const val KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE = "key_hook_island_music_wave_style"
 
     // ================= ANIMATION & MARQUEE KEYS =================
@@ -602,6 +603,27 @@ object RootConstants {
         return value.takeIf {
             it in NO_LYRICS_LYRIC_BEHAVIOR_KEEP..NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
         } ?: DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
+    }
+
+    /**
+     * 尾奏超时行为：最后一句歌词越过后仍没有新内容时接管展示。
+     * 与"无歌词/纯音乐歌词行为"共用取值语义，但没有"替换为空"。
+     */
+    const val TAIL_TIMEOUT_BEHAVIOR_KEEP = 0
+    const val TAIL_TIMEOUT_BEHAVIOR_MUSIC_INFO = 1
+    const val TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT = 2
+    const val DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR = TAIL_TIMEOUT_BEHAVIOR_KEEP
+
+    /** 最后一句拥有结束时间时，从其结束起计算的超时时长。 */
+    const val TAIL_TIMEOUT_AFTER_LINE_END_MS = 3_000L
+
+    /** 最后一句只有开始时间时，从其开始起计算的超时时长。 */
+    const val TAIL_TIMEOUT_AFTER_LINE_BEGIN_MS = 8_000L
+
+    fun normalizeTailTimeoutBehavior(value: Int): Int {
+        return value.takeIf {
+            it in TAIL_TIMEOUT_BEHAVIOR_KEEP..TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT
+        } ?: DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
     }
 
     const val ISLAND_MUSIC_WAVE_STYLE_DEFAULT = 0
