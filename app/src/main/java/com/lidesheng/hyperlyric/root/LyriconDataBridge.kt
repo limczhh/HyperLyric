@@ -665,7 +665,7 @@ object LyriconDataBridge {
      * pass the lyric gate when the user selected native restoration.
      */
     fun noLyricsPlaceholderLine(): IRichLyricLine? {
-        if (isNoLyricsContentSuppressed()) return null
+        if (isNoLyricsBehaviorRestoreDefault()) return null
         if (noLyricsBehaviorShowsMusicInfo()) return pureMusicMusicInfoLine()
         val metadata = currentLyricMediaMetadata ?: return null
         return SongPreprocessor(
@@ -681,7 +681,7 @@ object LyriconDataBridge {
     }
 
     fun hasNoLyricsPlaceholderForPresentation(): Boolean {
-        if (isNoLyricsContentSuppressed()) return false
+        if (isNoLyricsBehaviorRestoreDefault()) return false
         // 必须与实际合成的展示行保持一致：仅判断媒体信息是否存在，会在布局字段全为空时
         // 声称有占位内容，渲染层却拿不到可显示的行。
         if (noLyricsBehaviorShowsMusicInfo()) {
@@ -703,24 +703,19 @@ object LyriconDataBridge {
                 noLyricsLyricBehavior != RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_KEEP
 
     /**
-     * 纯音乐内容被行为主动清空（替换为空/回退到默认）。此时选行结果已被丢弃，
-     * 不能再让整首歌的"有歌词"结论去占用文本槽位，否则会隐藏系统元素却不展示任何内容。
-     * "替换为音乐信息"不在此列：它把展示行替换成音乐信息，内容始终存在。
+     * 纯音乐内容被"回退到默认"主动清空。此时选行结果已被丢弃，不能再让整首歌的"有歌词"结论
+     * 去占用文本槽位，否则会隐藏系统元素却不展示任何内容。"替换为音乐信息"不在此列：它把展示行
+     * 替换成音乐信息，内容始终存在。
      */
     private fun isPureMusicContentSuppressed(): Boolean =
-        currentSongIsPureMusic && isNoLyricsContentSuppressed()
+        currentSongIsPureMusic && isNoLyricsBehaviorRestoreDefault()
 
     /** 纯音乐被行为接管（非"保持不变"），对唱宽度锁定不适用。 */
     fun isPureMusicLyricReplaced(): Boolean = isPureMusicLyricHandled()
 
-    /** "替换为空"是否生效，状态栏仅保留图标。 */
-    fun isNoLyricsBehaviorEmpty(): Boolean =
-        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY
-
-    /** "替换为空/回退到默认"时不展示任何占位内容。 */
-    private fun isNoLyricsContentSuppressed(): Boolean =
-        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY ||
-                noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
+    /** "回退到默认"时不展示任何占位内容。 */
+    private fun isNoLyricsBehaviorRestoreDefault(): Boolean =
+        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
 
     /** 无歌词/纯音乐时是否展示音乐信息占位。 */
     fun noLyricsBehaviorShowsMusicInfo(): Boolean =
@@ -732,9 +727,7 @@ object LyriconDataBridge {
      * 系统元素会被一并隐藏，得到一条完全空白的状态栏。
      */
     fun isPresentingManagedContent(): Boolean =
-        hasLyricsForPresentation() ||
-                hasNoLyricsPlaceholderForPresentation() ||
-                isNoLyricsBehaviorEmpty()
+        hasLyricsForPresentation() || hasNoLyricsPlaceholderForPresentation()
 
     /** 用用户配置的音乐信息布局合成展示行，没有可显示内容时返回 null 以便调用方回退。 */
     private fun pureMusicMusicInfoLine(
@@ -788,7 +781,6 @@ object LyriconDataBridge {
             RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO ->
                 pureMusicMusicInfoLine() ?: rawLine
 
-            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY,
             RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT -> null
 
             else -> rawLine
@@ -805,7 +797,6 @@ object LyriconDataBridge {
             RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO ->
                 pureMusicMusicInfoLine(position)?.let(::listOf) ?: selectedLines
 
-            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_EMPTY,
             RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT -> emptyList()
 
             else -> selectedLines

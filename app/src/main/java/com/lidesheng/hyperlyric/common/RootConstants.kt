@@ -595,8 +595,7 @@ object RootConstants {
 
     const val NO_LYRICS_LYRIC_BEHAVIOR_KEEP = 0
     const val NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO = 1
-    const val NO_LYRICS_LYRIC_BEHAVIOR_EMPTY = 2
-    const val NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT = 3
+    const val NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT = 2
     const val DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR = NO_LYRICS_LYRIC_BEHAVIOR_KEEP
 
     fun normalizeNoLyricsLyricBehavior(value: Int): Int {

@@ -361,10 +361,6 @@ internal class StatusBarLyricHost(
 
         val requestedWidth = when {
             isDuetWidthLocked() -> effectiveWidthLimitPx
-            LyriconDataBridge.isNoLyricsBehaviorEmpty() -> config.desiredWidthPx(
-                contentWidthPx = 0f,
-                iconWidthPx = iconWidthPx,
-            ).coerceAtMost(effectiveWidthLimitPx)
             latestContentWidthPx > 0f -> config.desiredWidthPx(
                 contentWidthPx = latestContentWidthPx,
                 iconWidthPx = iconWidthPx,
@@ -688,24 +684,9 @@ internal class StatusBarLyricHost(
 
     private fun updateVisibility(wrapper: MaxWidthFrameLayout, lyrics: RichLyricLineView) {
         val hasLine = isRenderable(lyrics.rawLine) || isRenderable(lyrics.rawSecondaryLine)
-        // "替换为空"时保留图标占位，仅隐藏歌词文本。
-        val iconOnly = !hasLine && iconWidthPx > 0 &&
-                LyriconDataBridge.isNoLyricsBehaviorEmpty()
-        if (iconOnly) {
-            layoutConfig?.let { config ->
-                val iconOnlyWidth = config.desiredWidthPx(
-                    contentWidthPx = 0f,
-                    iconWidthPx = iconWidthPx,
-                )
-                if (wrapper.desiredWidthPx != iconOnlyWidth) {
-                    wrapper.desiredWidthPx = iconOnlyWidth
-                    wrapper.requestLayout()
-                }
-            }
-        }
         val shouldShow = when (contentMode) {
             RootConstants.ISLAND_CONTENT_MODE_NONE -> !lyricTemporarilyHidden
-            else -> (hasLine || iconOnly) && !lyricTemporarilyHidden
+            else -> hasLine && !lyricTemporarilyHidden
         }
         wrapper.visibility = if (shouldShow) View.VISIBLE else View.GONE
         iconController?.setHostVisible(shouldShow)

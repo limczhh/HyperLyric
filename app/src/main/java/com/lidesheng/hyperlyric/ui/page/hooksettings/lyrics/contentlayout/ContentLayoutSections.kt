@@ -236,7 +236,6 @@ internal fun LazyListScope.contentLayoutSections(
         val noLyricsBehaviorOptions = listOf(
             stringResource(id = R.string.option_no_lyrics_keep),
             stringResource(id = R.string.option_no_lyrics_music_info),
-            stringResource(id = R.string.option_no_lyrics_empty),
             stringResource(id = R.string.option_no_lyrics_restore_default)
         )
         Card(
