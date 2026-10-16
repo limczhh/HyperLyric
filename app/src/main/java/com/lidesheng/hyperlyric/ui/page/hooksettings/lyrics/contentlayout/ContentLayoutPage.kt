@@ -89,6 +89,16 @@ fun ContentLayoutPage() {
             )
         )
     }
+    var tailTimeoutBehavior by remember(prefs) {
+        mutableStateOf(
+            RootConstants.normalizeTailTimeoutBehavior(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR,
+                    RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
+                )
+            )
+        )
+    }
     var showLongInterludeCountdown by remember(prefs) {
         mutableStateOf(
             prefs.getBoolean(
@@ -249,6 +259,11 @@ fun ContentLayoutPage() {
             onNoLyricsBehaviorChange = {
                 noLyricsBehavior = it
                 PrefsBridge.putInt(RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR, it)
+            },
+            tailTimeoutBehavior = tailTimeoutBehavior,
+            onTailTimeoutBehaviorChange = {
+                tailTimeoutBehavior = it
+                PrefsBridge.putInt(RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR, it)
             },
             lyricPreviewEnabled = lyricPreviewEnabled,
             onLyricPreviewEnabledChange = {

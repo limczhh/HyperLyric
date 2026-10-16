@@ -88,6 +88,7 @@ class HookEntry : XposedModule() {
             RootConstants.KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT,
             RootConstants.KEY_HOOK_ISLAND_BEHAVIOR_AFTER_PAUSE,
             RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR,
+            RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR,
             RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GLOW,
             RootConstants.KEY_HOOK_ISLAND_PROGRESS_GRADIENT,
@@ -559,6 +560,14 @@ class HookEntry : XposedModule() {
                     )
                 )
             )
+            LyriconDataBridge.updateTailTimeoutBehavior(
+                RootConstants.normalizeTailTimeoutBehavior(
+                    prefs.getInt(
+                        RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR,
+                        RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
+                    )
+                )
+            )
 
             val renderer = SystemUiLyricRenderer
             lyricEnhancementCoordinator = runCatching {
@@ -712,17 +721,27 @@ class HookEntry : XposedModule() {
                             }
                         }
 
-                        RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR -> {
-                            val behavior = RootConstants.normalizeNoLyricsLyricBehavior(
+                        RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR,
+                        RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR -> {
+                            val noLyricsBehavior = RootConstants.normalizeNoLyricsLyricBehavior(
                                 prefs.getInt(
-                                    key,
+                                    RootConstants.KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR,
                                     RootConstants.DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
                                 )
                             )
+                            val tailBehavior = RootConstants.normalizeTailTimeoutBehavior(
+                                prefs.getInt(
+                                    RootConstants.KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR,
+                                    RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
+                                )
+                            )
                             Handler(Looper.getMainLooper()).post {
-                                val changed =
-                                    LyriconDataBridge.updateNoLyricsLyricBehavior(behavior)
-                                if (changed) {
+                                // 两个 setter 都必须无条件调用：短路求值会漏掉另一个行为。
+                                val noLyricsChanged =
+                                    LyriconDataBridge.updateNoLyricsLyricBehavior(noLyricsBehavior)
+                                val tailChanged =
+                                    LyriconDataBridge.updateTailTimeoutBehavior(tailBehavior)
+                                if (noLyricsChanged || tailChanged) {
                                     SystemUiLyricRenderer.updateLyricLine()
                                     val playbackClock = LyriconDataBridge.currentPlaybackClock()
                                     SystemUiLyricRenderer.updatePosition(
@@ -730,7 +749,7 @@ class HookEntry : XposedModule() {
                                         playbackClock.playbackSpeed
                                     )
                                 } else {
-                                    HookLogger.d(TAG, "无歌词/纯音乐歌词行为设置未变化")
+                                    HookLogger.d(TAG, "无歌词/纯音乐与尾奏超时行为设置未变化")
                                 }
                             }
                         }

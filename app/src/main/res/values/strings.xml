@@ -346,9 +346,10 @@
     <string name="summary_lyric_preview">拥有结束时间的歌词结束后提前显示下一句歌词</string>
     <string name="title_lyric_long_interlude_countdown">歌词长间奏显示倒计时圆点</string>
     <string name="title_no_lyrics_lyric_behavior">无歌词/纯音乐歌词行为</string>
-    <string name="option_no_lyrics_keep">保持不变</string>
-    <string name="option_no_lyrics_music_info">替换为音乐信息</string>
-    <string name="option_no_lyrics_restore_default">回退到默认</string>
+    <string name="title_tail_timeout_behavior">尾奏超时行为</string>
+    <string name="option_lyric_behavior_keep">保持不变</string>
+    <string name="option_lyric_behavior_music_info">替换为音乐信息</string>
+    <string name="option_lyric_behavior_restore_default">回退到默认</string>
     <string name="title_size">大小</string>
     <string name="label_size_range">范围：8 ~ 16</string>
     <string name="title_font_weight">字重</string>

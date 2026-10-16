@@ -152,6 +152,8 @@ internal fun LazyListScope.contentLayoutSections(
     onPlaceholderFormatChange: (Int) -> Unit,
     noLyricsBehavior: Int,
     onNoLyricsBehaviorChange: (Int) -> Unit,
+    tailTimeoutBehavior: Int,
+    onTailTimeoutBehaviorChange: (Int) -> Unit,
     lyricPreviewEnabled: Boolean,
     onLyricPreviewEnabledChange: (Boolean) -> Unit,
     showLongInterludeCountdown: Boolean,
@@ -233,10 +235,10 @@ internal fun LazyListScope.contentLayoutSections(
             stringResource(id = R.string.option_placeholder_title),
             stringResource(id = R.string.option_placeholder_countdown)
         )
-        val noLyricsBehaviorOptions = listOf(
-            stringResource(id = R.string.option_no_lyrics_keep),
-            stringResource(id = R.string.option_no_lyrics_music_info),
-            stringResource(id = R.string.option_no_lyrics_restore_default)
+        val lyricBehaviorOptions = listOf(
+            stringResource(id = R.string.option_lyric_behavior_keep),
+            stringResource(id = R.string.option_lyric_behavior_music_info),
+            stringResource(id = R.string.option_lyric_behavior_restore_default)
         )
         Card(
             modifier = Modifier
@@ -268,12 +270,21 @@ internal fun LazyListScope.contentLayoutSections(
                 )
                 OverlayDropdownPreference(
                     title = stringResource(id = R.string.title_no_lyrics_lyric_behavior),
-                    items = noLyricsBehaviorOptions,
+                    items = lyricBehaviorOptions,
                     selectedIndex = noLyricsBehavior.coerceIn(
                         RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_KEEP,
                         RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
                     ),
                     onSelectedIndexChange = onNoLyricsBehaviorChange
+                )
+                OverlayDropdownPreference(
+                    title = stringResource(id = R.string.title_tail_timeout_behavior),
+                    items = lyricBehaviorOptions,
+                    selectedIndex = tailTimeoutBehavior.coerceIn(
+                        RootConstants.TAIL_TIMEOUT_BEHAVIOR_KEEP,
+                        RootConstants.TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT
+                    ),
+                    onSelectedIndexChange = onTailTimeoutBehaviorChange
                 )
                 SwitchPreference(
                     title = stringResource(id = R.string.title_lyric_preview),

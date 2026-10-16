@@ -346,9 +346,10 @@
     <string name="summary_lyric_preview">Preview the next lyric after a line with an end time finishes</string>
     <string name="title_lyric_long_interlude_countdown">Show countdown dots during long lyric interludes</string>
     <string name="title_no_lyrics_lyric_behavior">No Lyrics / Pure Music Behavior</string>
-    <string name="option_no_lyrics_keep">Keep As Is</string>
-    <string name="option_no_lyrics_music_info">Replace With Music Info</string>
-    <string name="option_no_lyrics_restore_default">Fall Back to Default</string>
+    <string name="title_tail_timeout_behavior">Tail Timeout Behavior</string>
+    <string name="option_lyric_behavior_keep">Keep As Is</string>
+    <string name="option_lyric_behavior_music_info">Replace With Music Info</string>
+    <string name="option_lyric_behavior_restore_default">Fall Back to Default</string>
     <string name="title_size">Size</string>
     <string name="label_size_range">Range: 8 ~ 16</string>
     <string name="title_font_weight">Font Weight</string>
