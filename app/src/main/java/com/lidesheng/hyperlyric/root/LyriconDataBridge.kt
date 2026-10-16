@@ -541,12 +541,12 @@ object LyriconDataBridge {
             return noLyricsBehaviorShowsMusicInfo()
         }
 
-        currentSongInTailTimeout = position >= tailTimeoutDeadlineMs
-
         // 先展示此刻有效的源歌词行；开唱前只有当前没有源内容时才补前奏占位行。
         val activeLines = buildList {
             timingNavigator.forEachAt(position) { add(it) }
         }
+        // 仍有正在唱的行时不算尾奏：对唱里前一行可能晚于最后一行结束，只看超时点会截断它。
+        currentSongInTailTimeout = activeLines.isEmpty() && position >= tailTimeoutDeadlineMs
         val preludePlaceholder = leadingPlaceholderLine?.takeIf {
             position >= it.begin && position < it.end
         }
@@ -905,21 +905,32 @@ object LyriconDataBridge {
     }
 
     /**
-     * 由时间线最后一句推导尾奏超时时刻：拥有合法结束时间（end > begin）时取结束后 3 秒，
-     * 只有开始时间时取开始后 8 秒。没有歌词行时返回 [Long.MAX_VALUE]，即永不超时；
-     * 接近上限的时刻做饱和处理，避免溢出成负数导致立刻判为尾奏。
+     * 由时间线推导尾奏超时时刻：每一行按自身的时间语义算出一个超时点，取其中最晚的一个。
+     * 拥有合法结束时间（end > begin）的行取结束后 3 秒，只有开始时间的行取开始后 8 秒。
+     *
+     * 只看"按开始时间排序的最后一行"在对唱歌词里会提前截断——前一行的结束时间可能晚于最后
+     * 一行的结束时间，逐行取最大才能覆盖到真正最晚结束的那一句。没有可用歌词行时返回
+     * [Long.MAX_VALUE]，即永不超时；接近上限的时刻做饱和处理，避免溢出成负数导致立刻判为尾奏。
      */
     private fun resolveTailTimeoutDeadline(lines: List<TimedLine>): Long {
-        val lastLine = lines.lastOrNull() ?: return Long.MAX_VALUE
-        val hasEndTime = lastLine.end > lastLine.begin
-        val anchor = if (hasEndTime) lastLine.end else lastLine.begin
-        if (anchor < 0L) return Long.MAX_VALUE
-        val delay = if (hasEndTime) {
-            RootConstants.TAIL_TIMEOUT_AFTER_LINE_END_MS
-        } else {
-            RootConstants.TAIL_TIMEOUT_AFTER_LINE_BEGIN_MS
+        var deadline = Long.MIN_VALUE
+        for (line in lines) {
+            val hasEndTime = line.end > line.begin
+            val anchor = if (hasEndTime) line.end else line.begin
+            if (anchor < 0L) continue
+            val delay = if (hasEndTime) {
+                RootConstants.TAIL_TIMEOUT_AFTER_LINE_END_MS
+            } else {
+                RootConstants.TAIL_TIMEOUT_AFTER_LINE_BEGIN_MS
+            }
+            val candidate = if (anchor > Long.MAX_VALUE - delay) {
+                Long.MAX_VALUE
+            } else {
+                anchor + delay
+            }
+            if (candidate > deadline) deadline = candidate
         }
-        return if (anchor > Long.MAX_VALUE - delay) Long.MAX_VALUE else anchor + delay
+        return if (deadline == Long.MIN_VALUE) Long.MAX_VALUE else deadline
     }
 
     private fun rebuildTimeline(song: Song, selectCurrentPosition: Boolean) {
@@ -942,7 +953,9 @@ object LyriconDataBridge {
         }
         fullSongLyricsAvailable = prepared.hasRenderableLyrics
         tailTimeoutDeadlineMs = resolveTailTimeoutDeadline(prepared.lines)
-        currentSongInTailTimeout = currentPosition >= tailTimeoutDeadlineMs
+        // 是否"此刻没有正在唱的行"只能由选行判定，这里先保守置否；selectCurrentPosition 为真时
+        // 随后的 updatePosition 会立刻按真实选行重算，为假时等下一次位置采样重算。
+        currentSongInTailTimeout = false
         currentSongHasDuet = DuetLyricPolicy.hasDuet(song.lyrics)
         interludeTracker = InterludeTracker(8_000L)
 
