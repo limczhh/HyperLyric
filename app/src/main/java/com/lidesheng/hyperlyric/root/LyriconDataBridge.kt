@@ -701,7 +701,7 @@ object LyriconDataBridge {
      * 不会让无歌词源冒充成有歌词而通过歌词判定。
      */
     fun noLyricsPlaceholderLine(): IRichLyricLine? {
-        if (isContentSuppressedForPresentation()) return null
+        if (isPlaceholderSuppressed()) return null
         if (noLyricsBehaviorShowsMusicInfo()) return musicInfoDisplayLine()
         val metadata = currentLyricMediaMetadata ?: return null
         return SongPreprocessor(
@@ -717,7 +717,7 @@ object LyriconDataBridge {
     }
 
     fun hasNoLyricsPlaceholderForPresentation(): Boolean {
-        if (isContentSuppressedForPresentation()) return false
+        if (isPlaceholderSuppressed()) return false
         // 必须与实际合成的展示行保持一致：仅判断媒体信息是否存在，会在布局字段全为空时
         // 声称有占位内容，渲染层却拿不到可显示的行。
         if (noLyricsBehaviorShowsMusicInfo()) {
@@ -767,6 +767,17 @@ object LyriconDataBridge {
     /** 任一行为要求交还系统默认展示，此时既不显示歌词也不显示任何占位内容。 */
     private fun isContentSuppressedForPresentation(): Boolean =
         isPureMusicContentSuppressed() || isTailContentSuppressed()
+
+    /**
+     * 占位符路径专用的抑制判定。能走到占位符就说明此刻没有可展示的歌词，因此"回退到默认"对
+     * 无歌词、纯音乐、尾奏超时三种情形一律生效，不需要再判断歌曲上下文。
+     *
+     * 不能与 [isContentSuppressedForPresentation] 混用：后者给 hasLyricsForPresentation 用，必须
+     * 保留纯音乐门控，否则正常播放中的歌词也会被"回退到默认"一并清掉；而本方法若沿用那个门控，
+     * 普通无歌词歌曲（不含纯音乐标记）选"回退到默认"时仍会注入标题/倒计时占位符。
+     */
+    private fun isPlaceholderSuppressed(): Boolean =
+        isNoLyricsBehaviorRestoreDefault() || isTailContentSuppressed()
 
     /** 纯音乐被行为接管（非"保持不变"），对唱宽度锁定不适用。 */
     fun isPureMusicLyricReplaced(): Boolean = isPureMusicLyricHandled()
