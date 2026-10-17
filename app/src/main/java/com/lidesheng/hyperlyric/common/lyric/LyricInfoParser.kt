@@ -20,6 +20,11 @@ object LyricInfoParser {
         "translationLrc",
         "transLrc"
     )
+    private val SONG_MID_KEYS = listOf(
+        "songMid",
+        "songmid",
+        "media_mid"
+    )
 
     fun parse(json: String): Song? = parsePayload(json)?.song
 
@@ -35,6 +40,7 @@ object LyricInfoParser {
             val artist = obj.optionalText("artist")
             val album = obj.optionalText("album")
             val songId = obj.optionalText("songId")
+            val songMid = obj.songMidText()
 
             val parsedPrimary = when {
                 rawLyric != null -> parseLyricLines(rawLyric, enhanced = true) ?: return null
@@ -57,7 +63,8 @@ object LyricInfoParser {
                     name = title,
                     artist = artist,
                     album = album,
-                    lyrics = resultLines
+                    lyrics = resultLines,
+                    songMid = songMid
                 ),
                 songId = songId,
                 title = title,
@@ -264,6 +271,11 @@ object LyricInfoParser {
         .asSequence()
         .mapNotNull { key -> optionalText(key) }
         .firstOrNull { LRC_TIME_RE.matcher(it).find() }
+
+    private fun JSONObject.songMidText(): String? = SONG_MID_KEYS
+        .asSequence()
+        .mapNotNull { key -> optionalText(key) }
+        .firstOrNull()
 }
 
 private data class ParsedLine(val timeMs: Long, val line: RichLyricLine)

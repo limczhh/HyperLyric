@@ -298,7 +298,8 @@ internal class LyricEnhancementCoordinator(
                 candidate.artist == baseSong.artist &&
                 candidate.album == baseSong.album &&
                 candidate.duration == baseSong.duration &&
-                candidate.metadata == baseSong.metadata
+                candidate.metadata == baseSong.metadata &&
+                candidate.songMid == baseSong.songMid
         if (!onlyLyricsChanged) {
             HookLogger.w(LOG_TAG, "歌词增强功能修改了歌曲信息，拒绝写回: feature=${featureName}")
             return null

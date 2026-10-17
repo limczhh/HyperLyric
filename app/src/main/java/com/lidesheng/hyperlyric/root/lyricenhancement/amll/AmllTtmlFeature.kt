@@ -116,6 +116,7 @@ internal class AmllTtmlFeature(
             ?: song.artist?.takeIf { it.isNotBlank() }
         val album = mediaInfo?.album?.takeIf { it.isNotBlank() }
         val songId = song.id?.takeIf { it.isNotBlank() }
+        val songMid = song.songMid?.takeIf { it.isNotBlank() }
         // 歌词源包名：宿主仅透传本次歌词源提供的 packageName（无 MediaSession 推断），
         // 可信度高，映射到平台后单次精确直查（spec §7.1 宿主建议已落地）
         val sourcePackageName = mediaInfo?.sourcePackageName?.takeIf { it.isNotBlank() }
@@ -123,6 +124,7 @@ internal class AmllTtmlFeature(
         HookLogger.d(
             LOG_TAG,
             "开始处理: song=\"${song.name.orEmpty()}\", songId=${songId ?: "null"}, " +
+                    "songMid=${songMid ?: "null"}, " +
                     "package=${sourcePackageName ?: "null"}, " +
                     "title=${title ?: "null"}, artist=${artist ?: "null"}, album=${album ?: "null"}"
         )
@@ -132,7 +134,7 @@ internal class AmllTtmlFeature(
         if (songId != null && config.platformProbe &&
             (sourcePackageName != null || title != null || artist != null)
         ) {
-            val probeTtml = probePlatforms(songId, title, artist, sourcePackageName, budget)
+            val probeTtml = probePlatforms(songId, songMid, title, artist, sourcePackageName, budget)
             if (probeTtml != null) {
                 return buildResult(
                     song = song,
@@ -164,10 +166,14 @@ internal class AmllTtmlFeature(
      * 2. resolve 缓存快路径：上次探测已解析出平台（写入前已通过校验），仅查该平台；
      * 3. ID 格式预判逐平台探测：每平台命中须通过 title/artist 交叉校验
      *    （防跨平台 ID 撞号误匹配）；title/artist 皆空则不探测（无法验证即不冒险）。
-     * 探测命中后缓存 exact 与 resolve 两个条目，二次播放零网络命中。
+     *    QQ 平台先按 songId 原样查询，未命中才换取另一形态的标识符再查一次。
+     * 探测命中后缓存 exact 与 resolve 两个条目。单标识符平台二次播放零网络命中；
+     * QQ 若靠第二候选命中，二次播放仍会为首个候选发一次未命中请求——exact 只缓存
+     * 命中结果，不写负缓存。
      */
     private fun probePlatforms(
         songId: String,
+        songMid: String?,
         title: String?,
         artist: String?,
         sourcePackageName: String?,
@@ -194,6 +200,12 @@ internal class AmllTtmlFeature(
         }
         // 仅逐平台探测路径需要交叉校验（包名/resolve 已确定平台）
         val requireVerification = mappedPlatform == null && resolvedPlatform == null
+        // 换取第二候选只在确信 songId 属于 QQ 时进行：包名映射为 QQ、resolve 缓存已判定
+        // 为 QQ（与包名同等强度的证据）、或 songId 本身即 mid 格式。盲探纯数字 ID 属
+        // 跨平台猜测，QQ 的 songId 空间稠密自增，换来的很可能是另一首歌。
+        val canResolveQq = mappedPlatform == AmllPlatformIdField.QQ ||
+                resolvedPlatform == AmllPlatformIdField.QQ ||
+                AmllPlatformId.isQqMid(songId)
 
         val generation = cache.currentGeneration()
         for (platform in probeOrder) {
@@ -206,50 +218,96 @@ internal class AmllTtmlFeature(
                 return null
             }
 
-            // 平台内精确缓存命中：零网络返回
-            val exactKey = TtmlCache.exactKey(platform, songId)
-            cache.get(exactKey, title = title, artist = artist)?.let { lookup ->
-                HookLogger.d(
-                    LOG_TAG,
-                    "缓存命中: key=${TtmlCache.shortKey(exactKey)}, " +
-                            "size=${lookup.ttml.toByteArray().size}B"
-                )
-                return TtmlFetch(lookup.ttml, fromCache = true)
-            }
-            HookLogger.d(LOG_TAG, "缓存未命中: key=${TtmlCache.shortKey(exactKey)}")
+            var candidate: String? = songId
+            var secondResolved = false
+            while (candidate != null) {
+                val currentCandidate = candidate
 
-            val item = client.fetchByPlatformId(platform, songId, budget)
-            if (item == null) {
-                HookLogger.d(LOG_TAG, "平台探测未命中: platform=${platform.name}")
-                continue
+                // 平台内精确缓存命中：零网络返回
+                val exactKey = TtmlCache.exactKey(platform, currentCandidate)
+                val cached = cache.get(exactKey, title = title, artist = artist)
+                if (cached != null) {
+                    HookLogger.d(
+                        LOG_TAG,
+                        "缓存命中: key=${TtmlCache.shortKey(exactKey)}, " +
+                                "size=${cached.ttml.toByteArray().size}B"
+                    )
+                    return TtmlFetch(cached.ttml, fromCache = true)
+                }
+                HookLogger.d(LOG_TAG, "缓存未命中: key=${TtmlCache.shortKey(exactKey)}")
+
+                val item = client.fetchByPlatformId(platform, currentCandidate, budget)
+                if (item == null) {
+                    HookLogger.d(
+                        LOG_TAG,
+                        "平台探测未命中: platform=${platform.name}, id=$currentCandidate"
+                    )
+                } else {
+                    val ttml = item.lyrics
+                    when {
+                        ttml.isNullOrBlank() -> HookLogger.d(
+                            LOG_TAG,
+                            "平台探测歌词为空: platform=${platform.name}, id=$currentCandidate"
+                        )
+
+                        requireVerification && !AmllMatch.isProbeMatch(item, title, artist) -> {
+                            // 跨平台 ID 撞号：条目与请求 title/artist 不匹配，拒绝并继续下一候选
+                            HookLogger.d(
+                                LOG_TAG,
+                                "平台探测校验拒绝: platform=${platform.name}, id=$currentCandidate"
+                            )
+                        }
+
+                        else -> {
+                            HookLogger.d(
+                                LOG_TAG,
+                                "平台探测命中: platform=${platform.name}, " +
+                                        "id=${item.id}, size=${ttml.toByteArray().size}B"
+                            )
+                            cache.put(
+                                semanticKey = exactKey,
+                                ttml = ttml,
+                                expectedGeneration = generation,
+                                title = title,
+                                artist = artist,
+                                details = TtmlMetadataExtractor.extract(ttml)
+                            )
+                            cache.putResolve(songId, platform.name, generation)
+                            return TtmlFetch(ttml, fromCache = false)
+                        }
+                    }
+                }
+
+                // 第二个候选只在当前候选未命中后才求解，命中的歌曲不产生额外请求
+                candidate = if (secondResolved) {
+                    null
+                } else {
+                    secondResolved = true
+                    secondCandidate(platform, songId, songMid, canResolveQq, cache, budget)
+                }
             }
-            val ttml = item.lyrics
-            if (ttml.isNullOrBlank()) {
-                HookLogger.d(LOG_TAG, "平台探测歌词为空: platform=${platform.name}")
-                continue
-            }
-            if (requireVerification && !AmllMatch.isProbeMatch(item, title, artist)) {
-                // 跨平台 ID 撞号：条目与请求 title/artist 不匹配，拒绝并继续下一平台
-                HookLogger.d(LOG_TAG, "平台探测校验拒绝: platform=${platform.name}")
-                continue
-            }
-            HookLogger.d(
-                LOG_TAG,
-                "平台探测命中: platform=${platform.name}, " +
-                        "id=${item.id}, size=${ttml.toByteArray().size}B"
-            )
-            cache.put(
-                semanticKey = exactKey,
-                ttml = ttml,
-                expectedGeneration = generation,
-                title = title,
-                artist = artist,
-                details = TtmlMetadataExtractor.extract(ttml)
-            )
-            cache.putResolve(songId, platform.name, generation)
-            return TtmlFetch(ttml, fromCache = false)
         }
         return null
+    }
+
+    /**
+     * 平台内第二候选标识符：QQ 音乐的查询键可能是数字 songId，也可能是 songmid。
+     *
+     * 歌词源已透传 songMid 时直接采用，省去一次转换请求；否则仅在 [canResolveQq]
+     * 确信 songId 属于 QQ 时才换取。其余平台只有 songId 一种查询键。
+     */
+    private fun secondCandidate(
+        platform: AmllPlatformIdField,
+        songId: String,
+        songMid: String?,
+        canResolveQq: Boolean,
+        cache: TtmlCache,
+        budget: ProcessingBudget,
+    ): String? {
+        if (platform != AmllPlatformIdField.QQ) return null
+        songMid?.takeIf { it != songId }?.let { return it }
+        if (!canResolveQq) return null
+        return QqSongIdResolver.counterpart(songId, cache, budget)?.takeIf { it != songId }
     }
 
     /** 搜索回退：search 缓存 → 模糊搜索 + 交叉校验 → 按 id 取完整 TTML → 缓存 */

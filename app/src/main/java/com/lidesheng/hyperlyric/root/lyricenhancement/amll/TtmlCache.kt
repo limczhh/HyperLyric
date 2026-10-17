@@ -58,6 +58,10 @@ internal class TtmlCache(
         fun resolveKey(songId: String): String =
             SCHEMA_PREFIX + "|resolve|" + songId
 
+        /** QQ ID 转换缓存语义键，键为转换的输入值，两个方向各自成键 */
+        fun qqIdPairKey(known: String): String =
+            SCHEMA_PREFIX + "|qqid|" + known
+
         fun shortKey(semanticKey: String): String =
             semanticKey.removePrefix(SCHEMA_PREFIX + "|")
     }
@@ -166,6 +170,31 @@ internal class TtmlCache(
             storage.putString(entryKey(physicalKeyOf(resolveKey(songId))), platformName)
         }.onFailure {
             HookLogger.w(LOG_TAG, "写入平台探测缓存失败: songId=" + songId, it)
+        }
+    }
+
+    fun getQqCounterpart(known: String): String? = synchronized(lock) {
+        runCatching {
+            storage.getString(entryKey(physicalKeyOf(qqIdPairKey(known))))
+        }.getOrElse {
+            HookLogger.w(LOG_TAG, "读取 QQ ID 转换缓存失败: known=" + known, it)
+            null
+        }?.takeIf { it.isNotBlank() }
+    }
+
+    fun putQqCounterpart(
+        known: String,
+        value: String,
+        expectedGeneration: Long = currentGeneration(),
+    ) = synchronized(lock) {
+        if (generation != expectedGeneration) {
+            HookLogger.d(LOG_TAG, "缓存已清理，丢弃过期 QQ ID 转换写入: known=$known")
+            return@synchronized
+        }
+        runCatching {
+            storage.putString(entryKey(physicalKeyOf(qqIdPairKey(known))), value)
+        }.onFailure {
+            HookLogger.w(LOG_TAG, "写入 QQ ID 转换缓存失败: known=" + known, it)
         }
     }
 

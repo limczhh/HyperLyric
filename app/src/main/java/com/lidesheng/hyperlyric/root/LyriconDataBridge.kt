@@ -463,7 +463,8 @@ object LyriconDataBridge {
                 enhancedSong.artist == expectedBaseSong.artist &&
                 enhancedSong.album == expectedBaseSong.album &&
                 enhancedSong.duration == expectedBaseSong.duration &&
-                enhancedSong.metadata == expectedBaseSong.metadata
+                enhancedSong.metadata == expectedBaseSong.metadata &&
+                enhancedSong.songMid == expectedBaseSong.songMid
         if (!onlyLyricsChanged) {
             HookLogger.w(TAG, "歌词增强结果修改了歌曲信息，拒绝写回")
             return false

@@ -35,6 +35,9 @@ internal object AmllPlatformId {
         "com.spotify.music" to AmllPlatformIdField.SPOTIFY
     )
 
+    /** QQ 音乐 songmid 格式：14 位、00 前缀、base62 */
+    private val QQ_MID_PATTERN = Regex("00[0-9A-Za-z]{12}")
+
     /**
      * 将歌词源包名映射到 AMLL 平台 ID 字段。
      *
@@ -44,10 +47,14 @@ internal object AmllPlatformId {
     fun mapPackageName(packageName: String?): AmllPlatformIdField? =
         packageName?.let { PACKAGE_TO_FIELD[it] }
 
+    /** 判断歌曲 ID 是否为 QQ 音乐 songmid 格式 */
+    fun isQqMid(id: String): Boolean = QQ_MID_PATTERN.matches(id)
+
     /**
      * 按歌曲 ID 格式预判平台探测顺序：
      * - 纯数字 ID → NCM → QQ → APPLE（三家歌曲 ID 均为纯数字，国内用户 NCM 命中率最高）
-     * - 含非数字字符（base62 等）→ 仅 SPOTIFY
+     * - QQ mid → QQ → SPOTIFY
+     * - 其余（base62 等）→ 仅 SPOTIFY
      *
      * 每个平台的命中结果仍须经条目交叉校验（防跨平台 ID 撞号误匹配）。
      */
@@ -57,6 +64,11 @@ internal object AmllPlatformId {
                 AmllPlatformIdField.NCM,
                 AmllPlatformIdField.QQ,
                 AmllPlatformIdField.APPLE
+            )
+        } else if (isQqMid(songId)) {
+            listOf(
+                AmllPlatformIdField.QQ,
+                AmllPlatformIdField.SPOTIFY
             )
         } else {
             listOf(AmllPlatformIdField.SPOTIFY)
