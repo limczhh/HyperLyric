@@ -5,8 +5,13 @@ set -euo pipefail
 : "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}"
 : "${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID is required}"
 : "${RELEASE_TAG:?RELEASE_TAG is required}"
-: "${RELEASE_URL:?RELEASE_URL is required}"
 : "${RELEASE_NOTES_ZH_FILE:?RELEASE_NOTES_ZH_FILE is required}"
+
+ANNOUNCEMENT_BRANCH="${ANNOUNCEMENT_BRANCH:-}"
+ANNOUNCEMENT_PLAIN_BODY="${ANNOUNCEMENT_PLAIN_BODY:-false}"
+if [[ -z "$ANNOUNCEMENT_BRANCH" && "$ANNOUNCEMENT_PLAIN_BODY" != 'true' ]]; then
+  : "${RELEASE_URL:?RELEASE_URL is required}"
+fi
 
 APK="${APK:-}"
 
@@ -50,9 +55,21 @@ RELEASE_NOTES_ZH="$(<"$RELEASE_NOTES_ZH_FILE")"
 ANNOUNCEMENT_HEADER="${ANNOUNCEMENT_HEADER:-}"
 ANNOUNCEMENT_LINK_LABEL="${ANNOUNCEMENT_LINK_LABEL:-下载地址}"
 ANNOUNCEMENT_NOTES_LABEL="${ANNOUNCEMENT_NOTES_LABEL:-更新日志}"
-ANNOUNCEMENT_PLAIN_BODY="${ANNOUNCEMENT_PLAIN_BODY:-false}"
+PARSE_MODE=""
 
-if [[ "$ANNOUNCEMENT_PLAIN_BODY" == "true" && -n "$ANNOUNCEMENT_HEADER" ]]; then
+if [[ -n "$ANNOUNCEMENT_BRANCH" ]]; then
+  html_escape() {
+    jq -rn --arg text "$1" '$text | @html'
+  }
+
+  CAPTION_TEXT="$(printf '%s\n\nbranch:\n%s\n\n%s：\n%s' \
+    "$ANNOUNCEMENT_HEADER" "$ANNOUNCEMENT_BRANCH" \
+    "$ANNOUNCEMENT_NOTES_LABEL" "$RELEASE_NOTES_ZH")"
+  CAPTION="$(printf '%s\n\nbranch:\n<blockquote>%s</blockquote>\n\n%s：\n<blockquote>%s</blockquote>' \
+    "$(html_escape "$ANNOUNCEMENT_HEADER")" "$(html_escape "$ANNOUNCEMENT_BRANCH")" \
+    "$(html_escape "$ANNOUNCEMENT_NOTES_LABEL")" "$(html_escape "$RELEASE_NOTES_ZH")")"
+  PARSE_MODE="HTML"
+elif [[ "$ANNOUNCEMENT_PLAIN_BODY" == "true" && -n "$ANNOUNCEMENT_HEADER" ]]; then
   CAPTION="$(printf '%s\n\n%s' "$ANNOUNCEMENT_HEADER" "$RELEASE_NOTES_ZH")"
 elif [[ "$ANNOUNCEMENT_PLAIN_BODY" == "true" ]]; then
   CAPTION="$RELEASE_NOTES_ZH"
@@ -66,15 +83,21 @@ else
     "$ANNOUNCEMENT_NOTES_LABEL" "$RELEASE_NOTES_ZH")"
 fi
 
-if (( ${#CAPTION} > 1024 )); then
+CAPTION_TEXT="${CAPTION_TEXT:-$CAPTION}"
+if (( ${#CAPTION_TEXT} > 1024 )); then
   echo "::error::中文更新日志过长，Telegram 媒体 Caption 超过 1024 个字符；请精简更新日志"
   exit 1
+fi
+
+declare -a CAPTION_ARGS=(--form-string "caption=$CAPTION")
+if [[ -n "$PARSE_MODE" ]]; then
+  CAPTION_ARGS+=(--form-string "parse_mode=$PARSE_MODE")
 fi
 
 if (( ${#FILES[@]} == 1 )); then
   telegram_request sendDocument \
     --form-string "chat_id=$TELEGRAM_CHAT_ID" \
-    --form-string "caption=$CAPTION" \
+    "${CAPTION_ARGS[@]}" \
     -F "document=@${FILES[0]}"
 else
   MEDIA_JSON='[]'
@@ -86,7 +109,9 @@ else
       MEDIA_JSON="$(jq -c \
         --arg media "attach://$ATTACH_NAME" \
         --arg caption "$CAPTION" \
-        '. + [{"type":"document","media":$media,"caption":$caption}]' \
+        --arg parse_mode "$PARSE_MODE" \
+        '. + [{"type":"document","media":$media,"caption":$caption} +
+          (if $parse_mode == "" then {} else {"parse_mode":$parse_mode} end)]' \
         <<< "$MEDIA_JSON")"
     else
       MEDIA_JSON="$(jq -c \
