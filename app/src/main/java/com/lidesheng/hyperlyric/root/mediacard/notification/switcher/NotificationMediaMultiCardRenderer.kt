@@ -14,14 +14,14 @@ import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaMaterialBridge
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostApi
-import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaHostClasses
 import com.lidesheng.hyperlyric.root.mediacard.progress.view.SpringInterpolator
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.progress.MediaProgressStyleHooker
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColors
 import com.lidesheng.hyperlyric.root.utils.HookLogger
-import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import java.util.LinkedHashMap
 import kotlin.math.abs
@@ -88,21 +88,6 @@ internal class NotificationMediaMultiCardRenderer(
         const val EDGE_MENU_SPRING_RESPONSE = 0.44f
         const val SYSTEMUI_PACKAGE = "com.android.systemui"
         const val SYSTEMUI_LAYOUT_CLASS = "com.android.systemui.R\$layout"
-        val CONTROLLER_DEPENDENCIES = listOf(
-            "context",
-            "activityStarter",
-            "seekBarViewModel",
-            "mediaTransferManager",
-            "fullAodController",
-            "miPlayPluginManager",
-            "mediaOutputDialogManager",
-            "notificationStat",
-            "miuiMediaAlbumAnimationUtils",
-            "dynamicIslandController",
-            "mainHandler",
-            "miuiMediaActionButtonUtils",
-            "miuiMediaWakeLockManager"
-        )
     }
 
     private class Card(
@@ -111,7 +96,8 @@ internal class NotificationMediaMultiCardRenderer(
         val player: View,
         val holder: Any,
         val controller: Any,
-        val original: Boolean
+        val original: Boolean,
+        val nativeController: NotificationMediaNativeFactory.Controller? = null
     ) {
         var playbackObserver: NotificationMediaPlaybackObserver? = null
         var fullAodRestoreCaptured = false
@@ -412,9 +398,14 @@ internal class NotificationMediaMultiCardRenderer(
         it.parameterCount == 0
     }
 
-    private var holderConstructor: Constructor<*>? = null
-    private var controllerConstructor: Constructor<*>? = null
-    private var seekBarConstructor: Constructor<*>? = null
+    private val nativeFactory by lazy {
+        val holderAllocator by lazy {
+            requireNotNull(HookEntry.instance).getInvoker(Any::class.java.getDeclaredConstructor())
+        }
+        NotificationMediaNativeFactory(layoutController, templateController) { clazz ->
+            holderAllocator.newInstanceSpecial(clazz)
+        }
+    }
     private var layoutId: Int? = null
 
     private var header: ViewGroup? = null
@@ -964,19 +955,21 @@ internal class NotificationMediaMultiCardRenderer(
         val player = inflatePlayer(context) ?: return null
         val holder = createHolder(player) ?: return null
         applyLoadedLayouts(player, holder)
-        val controller = createController() ?: return null
-        val card = Card(key, data, player, holder, controller, original = false)
-        val pageParams = pageLayoutParams(player)
+        val nativeController = createController() ?: return null
+        val controller = nativeController.instance
+        val card = Card(
+            key, data, player, holder, controller, original = false,
+            nativeController = nativeController
+        )
         return runCatching {
-            pages.addView(player, pageParams)
+            pages.addView(player, pageLayoutParams(player))
             attachMethod?.invoke(controller, holder)
+            NotificationMediaMaterialBridge.attach(controller, header)
             onPlayerAttached(player, holder)
             bind(card, data, refreshArtworkIfMissing = true)
             card
         }.onFailure { error ->
-            onPlayerDetached(player)
-            runCatching { detachMethod?.invoke(controller) }
-            (player.parent as? ViewGroup)?.removeView(player)
+            destroyExtraCard(card)
             warn("绑定副媒体卡片失败: key=$key", error)
         }.getOrNull()
     }
@@ -986,6 +979,7 @@ internal class NotificationMediaMultiCardRenderer(
         data: Any,
         refreshArtworkIfMissing: Boolean = false
     ) {
+        card.nativeController?.prepareBind(data)
         bindMethod?.invoke(card.controller, data)
         if (refreshArtworkIfMissing) {
             refreshArtworkIfMissing(card, data)
@@ -1048,11 +1042,15 @@ internal class NotificationMediaMultiCardRenderer(
 
     private fun destroyExtraCard(card: Card) {
         if (card.original) return
+        NotificationMediaMaterialBridge.detach(card.controller)
         card.playbackObserver?.clear()
         card.playbackObserver = null
-        onPlayerDetached(card.player)
+        runCatching { onPlayerDetached(card.player) }
+            .onFailure { warn("移除副媒体视图失败: key=${card.key}", it) }
         runCatching { detachMethod?.invoke(card.controller) }
             .onFailure { warn("销毁副媒体控制器失败: key=${card.key}", it) }
+        runCatching { card.nativeController?.close() }
+            .onFailure { warn("清理副媒体进度状态失败: key=${card.key}", it) }
         (card.player.parent as? ViewGroup)?.removeView(card.player)
     }
 
@@ -1747,90 +1745,15 @@ internal class NotificationMediaMultiCardRenderer(
 
     private fun createHolder(player: View): Any? {
         return runCatching {
-            val constructor = holderConstructor ?: run {
-                val clazz = holderClassLoader?.loadClass(NotificationMediaHostClasses.HOLDER)
-                    ?: error("MediaViewHolder class unavailable")
-                clazz.getDeclaredConstructor(View::class.java).apply {
-                    isAccessible = true
-                }.also { holderConstructor = it }
-            }
-            constructor.newInstance(player)
+            val original = originalCard ?: error("原生媒体 Holder 尚未就绪")
+            nativeFactory.createHolder(player, original.holder, original.player)
         }.onFailure { warn("创建原生媒体 Holder 失败", it) }.getOrNull()
     }
 
-    private fun createController(): Any? {
-        return runCatching {
-            val values = CONTROLLER_DEPENDENCIES.map { name ->
-                readField(templateController, name)
-            }.toMutableList()
-            values[2] = createSeekBarViewModel()
-                ?: error("SeekBarViewModel clone unavailable")
-            if (values.any { it == null }) {
-                error("MiuiMediaViewControllerImpl 依赖字段不完整")
-            }
-            createActionButtonUtils()?.let { actionButtonUtils ->
-                values[11] = actionButtonUtils
-            }
-
-            val constructor = controllerConstructor ?: controllerClass.declaredConstructors
-                .firstOrNull { candidate ->
-                    candidate.parameterCount == values.size && candidate.parameterTypes
-                        .zip(values)
-                        .all { (type, value) ->
-                            value != null && type.isAssignableFrom(value.javaClass)
-                        }
-                }?.apply { isAccessible = true }
-                ?.also { controllerConstructor = it }
-                ?: error("MiuiMediaViewControllerImpl 构造函数不匹配")
-
-            constructor.newInstance(*values.toTypedArray()).also { controller ->
-                readField(templateController, "statusBarState")?.let { state ->
-                    writeField(controller, "statusBarState", state)
-                }
-            }
-        }.onFailure { warn("创建原生媒体控制器失败", it) }.getOrNull()
-    }
-
-    /**
-     * MiuiMediaActionButtonUtils keeps play/next timing and pending updateJob
-     * as instance state. The native graph has one controller, while this
-     * renderer creates several. Give every visible page an independent
-     * utility instance so one page cannot consume another page's play update.
-     */
-    private fun createActionButtonUtils(): Any? {
-        val template = readField(templateController, "miuiMediaActionButtonUtils") ?: return null
-        val dependencies = arrayOf(
-            readField(template, "uiScope"),
-            readField(template, "context"),
-            readField(template, "notificationStat")
-        )
-        if (dependencies.any { it == null }) return null
-
-        val constructor = template.javaClass.declaredConstructors.firstOrNull { candidate ->
-            candidate.parameterCount == dependencies.size && candidate.parameterTypes
-                .zip(dependencies)
-                .all { (type, value) -> value != null && type.isAssignableFrom(value.javaClass) }
-        }?.apply { isAccessible = true } ?: return null
-        return runCatching { constructor.newInstance(*dependencies) }
-            .onFailure { warn("创建独立媒体按钮工具失败", it) }
+    private fun createController(): NotificationMediaNativeFactory.Controller? {
+        return runCatching { nativeFactory.createController() }
+            .onFailure { warn("创建原生媒体控制器失败", it) }
             .getOrNull()
-    }
-
-    private fun createSeekBarViewModel(): Any? {
-        val template = readField(templateController, "seekBarViewModel") ?: return null
-        val executor = readField(template, "bgExecutor") ?: return null
-        val falsingManager = readField(template, "falsingManager") ?: return null
-        return runCatching {
-            val constructor = seekBarConstructor ?: template.javaClass.declaredConstructors
-                .firstOrNull { candidate ->
-                    candidate.parameterCount == 2 &&
-                        candidate.parameterTypes[0].isAssignableFrom(executor.javaClass) &&
-                        candidate.parameterTypes[1].isAssignableFrom(falsingManager.javaClass)
-                }?.apply { isAccessible = true }
-                ?.also { seekBarConstructor = it }
-                ?: error("SeekBarViewModel 构造函数不匹配")
-            constructor.newInstance(executor, falsingManager)
-        }.onFailure { warn("创建独立 SeekBarViewModel 失败", it) }.getOrNull()
     }
 
     private fun applyLoadedLayouts(player: View, holder: Any) {

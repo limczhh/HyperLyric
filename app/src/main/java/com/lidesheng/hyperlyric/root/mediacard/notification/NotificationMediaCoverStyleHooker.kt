@@ -132,7 +132,7 @@ object NotificationMediaCoverStyleHooker {
                         method.parameterTypes[0] == Int::class.javaPrimitiveType
 
             NotificationMediaHostClasses.LAYOUT_CONTROLLER ->
-                method.name == "loadLayout\$1" && method.parameterCount == 0
+                method.name in listOf("loadLayout\$1", "loadLayout") && method.parameterCount == 0
 
             else -> false
         }

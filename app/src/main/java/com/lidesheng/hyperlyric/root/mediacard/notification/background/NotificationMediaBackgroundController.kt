@@ -12,6 +12,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaCardTonePolicy
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaDataIdentity
+import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaMaterialBridge
 import com.lidesheng.hyperlyric.root.mediacard.notification.style.NotificationMediaForegroundStyler
 import com.lidesheng.hyperlyric.root.mediacard.style.MediaCardForegroundColorSource
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -53,7 +54,10 @@ internal object NotificationMediaBackgroundController {
         val state = states.getOrPut(controller) { ControllerState() }
         if (!isActive(controller)) {
             state.request.incrementAndGet()
-            if (state.customApplied) restoreMediaBackground(state)
+            if (state.customApplied) {
+                restoreMediaBackground(state)
+                NotificationMediaMaterialBridge.restore(controller)
+            }
             NotificationMediaForegroundStyler.clear(controller)
             state.token = null
             state.appliedRenderKey = null
@@ -104,8 +108,8 @@ internal object NotificationMediaBackgroundController {
         state.renderPending = true
         val request = state.request.incrementAndGet()
         val renderer = resolveRenderer(controller.javaClass.classLoader) ?: run {
-            clearCustomBackground(controller, state)
             state.renderPending = false
+            clearCustomBackground(controller, state)
             return
         }
 
@@ -121,8 +125,8 @@ internal object NotificationMediaBackgroundController {
             if (rendered == null) {
                 mediaBg.post {
                     if (states[controller] === state && state.request.get() == request) {
-                        clearCustomBackground(controller, state)
                         state.renderPending = false
+                        clearCustomBackground(controller, state)
                     }
                 }
                 return@execute
@@ -177,6 +181,7 @@ internal object NotificationMediaBackgroundController {
                     state.renderPending = false
                     return@post
                 }
+                NotificationMediaMaterialBridge.clear(controller)
                 applyBackground(
                     mediaBg = mediaBg,
                     bitmap = rendered.bitmap,
@@ -312,6 +317,7 @@ internal object NotificationMediaBackgroundController {
         state.backgroundIsDark = null
         state.foregroundSource = null
         state.appliedRenderKey = null
+        NotificationMediaMaterialBridge.restore(controller)
     }
 
     private fun resolveRenderer(classLoader: ClassLoader?): NotificationMediaBackgroundRenderer? {

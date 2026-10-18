@@ -361,9 +361,11 @@ internal class NotificationMediaHostApi private constructor(
                 "setSeamless",
                 mediaDataClass
             ).apply { isAccessible = true }
-            val loadLayout = layoutControllerClass.getDeclaredMethod("loadLayout\$1").apply {
-                isAccessible = true
-            }
+            val loadLayout = listOf("loadLayout\$1", "loadLayout").firstNotNullOfOrNull { name ->
+                layoutControllerClass.declaredMethods.firstOrNull {
+                    it.name == name && it.parameterCount == 0
+                }
+            }?.apply { isAccessible = true } ?: error("Native media loadLayout unavailable")
             val seekBarField = runCatching {
                 holderClass.getDeclaredField("seekBar").apply { isAccessible = true }
             }.getOrNull()

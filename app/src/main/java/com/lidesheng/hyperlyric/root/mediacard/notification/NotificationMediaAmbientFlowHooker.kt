@@ -67,6 +67,7 @@ object NotificationMediaAmbientFlowHooker {
             HookLogger.w(TAG, "通知中心媒体控制器不可用")
             return
         }
+        val materialHooksAvailable = NotificationMediaMaterialBridge.hook(xposedModule, classLoader)
         var installed = 0
         val installedNativeUpdates = mutableSetOf<String>()
         TARGET_METHOD_NAMES
@@ -88,11 +89,10 @@ object NotificationMediaAmbientFlowHooker {
                     HookLogger.e(TAG, "安装通知中心媒体 Hook 失败: method=${method.name}", error)
                 }
             }
-        NotificationMediaBackgroundController.setNativeHooksAvailable(
-            classLoader,
-            installedNativeUpdates.containsAll(NATIVE_BACKGROUND_UPDATE_METHODS)
-        )
-        if (!installedNativeUpdates.containsAll(NATIVE_BACKGROUND_UPDATE_METHODS)) {
+        val nativeBackgroundAvailable = "updateForegroundColors" in installedNativeUpdates &&
+            ("updateMediaBackground" in installedNativeUpdates || materialHooksAvailable)
+        NotificationMediaBackgroundController.setNativeHooksAvailable(classLoader, nativeBackgroundAvailable)
+        if (!nativeBackgroundAvailable) {
             HookLogger.w(TAG, "通知中心原生背景接口不完整，跳过自定义背景 Hook")
         }
 
@@ -149,6 +149,7 @@ object NotificationMediaAmbientFlowHooker {
     class ControllerHook(private val action: Action) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val controller = chain.thisObject ?: return chain.proceed()
+            if (action == Action.DETACH) NotificationMediaMaterialBridge.detach(controller)
             if (!MediaCardRuntimeConfig.current.enabled) {
                 if (action == Action.DETACH) {
                     removeView(controller, forgetState = true)
@@ -185,6 +186,7 @@ object NotificationMediaAmbientFlowHooker {
             runCatching {
                 when (action) {
                     Action.ATTACH -> {
+                        NotificationMediaMaterialBridge.attach(controller)
                         syncView(controller)
                         applyUnifiedForeground(controller)
                     }
