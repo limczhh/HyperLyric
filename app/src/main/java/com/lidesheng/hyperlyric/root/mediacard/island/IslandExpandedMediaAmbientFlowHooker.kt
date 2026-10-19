@@ -156,6 +156,7 @@ object IslandExpandedMediaAmbientFlowHooker {
                 "bindMediaData" -> method.parameterCount == 1
                 "detach" -> method.parameterCount == 0
                 "setAlbumImage" -> method.parameterCount == 1
+                "setMusicBgShader" -> method.parameterCount == 2
                 "setSeamless" -> method.parameterCount == 2
                 "updateForegroundColors" -> method.parameterCount == 1
                 else -> false
@@ -187,6 +188,10 @@ object IslandExpandedMediaAmbientFlowHooker {
                     api.getHolders(binder).forEach { holder ->
                         api.applyNativeForeground(binder, holder)
                     }
+                    if (!IslandExpandedMediaBackgroundController.isActive()) {
+                        applyMode(binder, allowCoverColor = false)
+                        applyCardTheme(binder)
+                    }
                 } finally {
                     if (previousRefreshBinder == null) {
                         uiModeRefreshBinder.remove()
@@ -209,7 +214,7 @@ object IslandExpandedMediaAmbientFlowHooker {
                 "attach" -> BinderHook(Action.ATTACH)
                 "bindMediaData" -> BinderHook(Action.BIND)
                 "detach" -> BinderHook(Action.DETACH)
-                "setAlbumImage" -> BinderHook(Action.ALBUM)
+                "setAlbumImage", "setMusicBgShader" -> BinderHook(Action.ALBUM)
                 "setSeamless" -> BinderHook(Action.SEAMLESS)
                 "updateForegroundColors" -> ForegroundColorsHook()
                 else -> null
@@ -1878,8 +1883,17 @@ object IslandExpandedMediaAmbientFlowHooker {
         ) {
             val view = target.expandedView
             val methods = expandedBackgroundMethods(target)
-            val blurOpened = methods.getBackgroundBlurOpened.invoke(null, view.context) as Boolean
-            if (!blurOpened || view.parent == null) {
+            val materialOpened = methods.getBackgroundMaterialOpened.invoke(null, view.context) as Boolean
+            val glass = methods.glassApi
+            if (materialOpened && view.parent != null && glass?.isGlassMode() == true) {
+                // Let the plugin establish its outline and blur geometry, then switch only its token.
+                methods.updateBackgroundBg.invoke(target.owner, view, false)
+                glass.applyLight(view)
+                return
+            }
+            // A prior glass token must not affect classic blending or a plain fallback drawable.
+            glass?.clear(view)
+            if (!materialOpened || view.parent == null) {
                 methods.setMiViewBlurMode.invoke(null, view, 0)
                 methods.clearMiBackgroundBlendColor.invoke(null, view)
                 view.background = requireNotNull(
@@ -1918,6 +1932,7 @@ object IslandExpandedMediaAmbientFlowHooker {
             }
             val methods = expandedBackgroundMethods(target)
             target.nativeBackgroundViews.forEach { view ->
+                methods.glassApi?.clear(view)
                 methods.setMiViewBlurMode.invoke(null, view, 0)
                 methods.clearMiBackgroundBlendColor.invoke(null, view)
                 if (view !== target.customBackgroundView) view.background = null
@@ -2031,9 +2046,10 @@ object IslandExpandedMediaAmbientFlowHooker {
                 val detach = binderClass.declaredMethods.single {
                     it.name == "detach" && it.parameterCount == 0
                 }.apply { isAccessible = true }
-                val setAlbumImage = binderClass.declaredMethods.single {
+                val artworkUpdate = (binderClass.declaredMethods.singleOrNull {
                     it.name == "setAlbumImage" && it.parameterCount == 1
-                }.apply { isAccessible = true }
+                } ?: binderClass.getDeclaredMethod("setMusicBgShader", mediaDataClass, Drawable::class.java))
+                    .apply { isAccessible = true }
                 val setSeamless = binderClass.declaredMethods.single {
                     it.name == "setSeamless" && it.parameterCount == 2
                 }.apply { isAccessible = true }
@@ -2055,7 +2071,7 @@ object IslandExpandedMediaAmbientFlowHooker {
                         attach,
                         bind,
                         detach,
-                        setAlbumImage,
+                        artworkUpdate,
                         setSeamless,
                         binderClass.declaredMethods.single {
                             it.name == "updateForegroundColors" && it.parameterCount == 1
@@ -2223,7 +2239,8 @@ object IslandExpandedMediaAmbientFlowHooker {
     private data class ExpandedBackgroundMethods(
         val updateBackgroundBg: Method,
         val getMiniBar: Method,
-        val getBackgroundBlurOpened: Method,
+        val getBackgroundMaterialOpened: Method,
+        val glassApi: IslandExpandedMediaGlassApi?,
         val setMiViewBlurMode: Method,
         val clearMiBackgroundBlendColor: Method,
         val setMiBackgroundBlendColors: Method,
@@ -2254,10 +2271,12 @@ object IslandExpandedMediaAmbientFlowHooker {
                     getMiniBar = baseContentViewClass.getDeclaredMethod("getMiniBar").apply {
                         isAccessible = true
                     },
-                    getBackgroundBlurOpened = miBlurCompatClass.getDeclaredMethod(
-                        "getBackgroundBlurOpened",
-                        Context::class.java
-                    ).apply { isAccessible = true },
+                    getBackgroundMaterialOpened = (runCatching {
+                        miBlurCompatClass.getDeclaredMethod("getBackgroundMaterialOpened", Context::class.java)
+                    }.getOrNull() ?: miBlurCompatClass.getDeclaredMethod(
+                        "getBackgroundBlurOpened", Context::class.java
+                    )).apply { isAccessible = true },
+                    glassApi = IslandExpandedMediaGlassApi.create(classLoader),
                     setMiViewBlurMode = miBlurCompatClass.getDeclaredMethod(
                         "setMiViewBlurModeCompat",
                         View::class.java,

@@ -75,6 +75,8 @@ internal object NotificationMediaMaterialBridge {
         }.getOrDefault(false)
     }
 
+    fun isAvailable(controller: Any): Boolean = loaders.containsKey(controller.javaClass.classLoader)
+
     /** A detached native header is only an argument adapter; it owns no collectors. */
     fun attach(controller: Any, host: ViewGroup? = null) {
         val loader = controller.javaClass.classLoader ?: return
@@ -116,9 +118,19 @@ internal object NotificationMediaMaterialBridge {
         if (NotificationMediaBackgroundController.shouldSuppressNativeBackground(controller)) return
         runCatching {
             guarded {
-                material.effect.apply.invoke(material.effect.instance, target.proxy, material.context)
+                val context = NotificationMediaAmbientFlowHooker.materialContext(material.context)
+                material.effect.apply.invoke(material.effect.instance, target.proxy, context)
+                applyGlassOverride(target.proxy, material.effect, context)
             }
         }.onFailure { HookLogger.w(TAG, "恢复媒体卡片原生材质失败", it) }
+    }
+
+    private fun applyGlassOverride(header: ViewGroup, effect: Effect, context: Context) {
+        if (!NotificationMediaAmbientFlowHooker.usesDarkGlassMaterial()) return
+        val holder = field(header, "mediaViewHolder") ?: return
+        if (!NotificationMediaGlassMaterial.apply(holder, effect.instance.javaClass.simpleName, context)) {
+            guarded { effect.apply.invoke(effect.instance, header, context) }
+        }
     }
 
     private class MaterialHook(private val effect: Effect, private val applying: Boolean) : Hooker {
@@ -136,9 +148,22 @@ internal object NotificationMediaMaterialBridge {
             } else {
                 materials.remove(header)
             }
-            val result = if (applying && original != null &&
+            val suppressNative = applying && original != null &&
                 NotificationMediaBackgroundController.shouldSuppressNativeBackground(original)
-            ) null else chain.proceed()
+            val context = if (applying) {
+                NotificationMediaAmbientFlowHooker.materialContext(chain.args[1] as Context)
+            } else null
+            val result = if (suppressNative) {
+                null
+            } else if (applying) {
+                chain.proceed(arrayOf(header, requireNotNull(context)))
+            } else {
+                chain.proceed()
+            }
+            if (applying && !suppressNative) {
+                runCatching { applyGlassOverride(header, effect, requireNotNull(context)) }
+                    .onFailure { HookLogger.w(TAG, "同步原生媒体卡片玻璃材质失败", it) }
+            }
             affected.forEach { (controller, target) ->
                 runCatching {
                     if (applying) {

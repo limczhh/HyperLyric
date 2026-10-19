@@ -221,15 +221,14 @@ object NotificationMediaAmbientFlowHooker {
         override fun intercept(chain: Chain): Any? {
             if (!MediaCardRuntimeConfig.current.enabled) return chain.proceed()
             val controller = chain.thisObject ?: return chain.proceed()
-            val result = if (NotificationMediaBackgroundController.shouldSuppressNativeBackground(
-                    controller
-                )
-            ) {
-                null
-            } else {
-                chain.proceed()
+            val suppressNative = NotificationMediaBackgroundController.shouldSuppressNativeBackground(controller)
+            if (methodName == "updateForegroundColors" && !suppressNative) {
+                // Restore before the native refresh, so returning to the system theme keeps its new colors.
+                NotificationMediaForegroundStyler.clear(controller)
             }
+            val result = if (suppressNative) null else chain.proceed()
             if (methodName == "updateForegroundColors") {
+                NotificationMediaMaterialBridge.restore(controller)
                 NotificationMediaBackgroundController.onUiModeChanged(controller)
                 refreshCustomFlowTone(controller)
             }
@@ -573,7 +572,19 @@ object NotificationMediaAmbientFlowHooker {
         }
         val mode = currentMode()
         if (mode != RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL) {
-            NotificationMediaForegroundStyler.clear(controller)
+            val theme = currentCardTheme()
+            if (NotificationMediaMaterialBridge.isAvailable(controller) &&
+                (theme == RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT ||
+                    theme == RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK)
+            ) {
+                // Glass materials force a dark palette context, regardless of the controller theme.
+                NotificationMediaForegroundStyler.apply(
+                    controller = controller,
+                    backgroundIsDark = theme == RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK
+                )
+            } else {
+                NotificationMediaForegroundStyler.clear(controller)
+            }
             return
         }
         val state = states[controller]
@@ -693,6 +704,22 @@ object NotificationMediaAmbientFlowHooker {
         data class Custom(val artwork: MediaFlowArtwork) : MediaFlowColorPayload
     }
 
+    internal fun usesDarkGlassMaterial(): Boolean =
+        currentCardTheme() == RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK
+
+    internal fun materialContext(context: Context): Context = when (currentCardTheme()) {
+        RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT -> context.withNightMode(Configuration.UI_MODE_NIGHT_NO)
+        RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK -> context.withNightMode(Configuration.UI_MODE_NIGHT_YES)
+        else -> context
+    }
+
+    private fun Context.withNightMode(nightMode: Int): Context {
+        val configuration = Configuration(resources.configuration).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightMode
+        }
+        return createConfigurationContext(configuration)
+    }
+
     private data class ControllerThemeState(val originalContext: Context)
 
     private fun newColorExecutor() = Executors.newSingleThreadExecutor { task ->
@@ -733,13 +760,6 @@ object NotificationMediaAmbientFlowHooker {
             contextField.set(controller, state.originalContext)
         }
 
-        private fun Context.withNightMode(nightMode: Int): Context {
-            val configuration = Configuration(resources.configuration).apply {
-                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightMode
-            }
-            return createConfigurationContext(configuration)
-        }
-
         companion object {
             fun create(classLoader: ClassLoader): CardThemeApi {
                 val controllerClass = controllerClassNames.firstNotNullOfOrNull { className ->
@@ -772,8 +792,7 @@ object NotificationMediaAmbientFlowHooker {
         private val resumeMethod: Method,
         private val pauseMethod: Method,
         private val getMainColorMethod: Method,
-        private val getPaletteColorMethod: Method,
-        private val drawableToBitmapMethod: Method
+        private val getPaletteColorMethod: Method
     ) {
         fun createView(context: Context): View = constructor.newInstance(context) as View
 
@@ -795,10 +814,14 @@ object NotificationMediaAmbientFlowHooker {
             pauseMethod.invoke(view)
         }
 
-        fun extractSystemPalette(drawable: Drawable): MediaAmbientFlowPalette {
-            val bitmap = drawableToBitmapMethod.invoke(null, drawable) as Bitmap
-            val mainColor = getMainColorMethod.invoke(null, bitmap) as Int
-            return createPalette(mainColor)
+        fun extractSystemPalette(drawable: Drawable): MediaAmbientFlowPalette? {
+            val bitmap = MediaArtworkSampler.sample(drawable) ?: return null
+            return try {
+                val mainColor = getMainColorMethod.invoke(null, bitmap) as Int
+                createPalette(mainColor)
+            } finally {
+                bitmap.recycle()
+            }
         }
 
         fun createPalette(mainColor: Int): MediaAmbientFlowPalette {
@@ -829,13 +852,6 @@ object NotificationMediaAmbientFlowHooker {
                 val resume = viewClass.getDeclaredMethod("resume").apply { isAccessible = true }
                 val pause = viewClass.getDeclaredMethod("pause").apply { isAccessible = true }
 
-                val drawableUtils = classLoader.loadClass("com.miui.utils.DrawableUtils")
-                val drawableToBitmap = drawableUtils.declaredMethods.single { method ->
-                    method.name == "drawable2Bitmap" &&
-                            method.parameterTypes.contentEquals(arrayOf(Drawable::class.java)) &&
-                            method.returnType == Bitmap::class.java
-                }.apply { isAccessible = true }
-
                 val miPalette = classLoader.loadClass("miuix.mipalette.MiPalette")
                 miPalette.declaredMethods.firstOrNull { method ->
                     method.name == "init" && method.parameterCount == 0
@@ -859,8 +875,7 @@ object NotificationMediaAmbientFlowHooker {
                     resumeMethod = resume,
                     pauseMethod = pause,
                     getMainColorMethod = getMainColor,
-                    getPaletteColorMethod = getPaletteColor,
-                    drawableToBitmapMethod = drawableToBitmap
+                    getPaletteColorMethod = getPaletteColor
                 )
             }
         }

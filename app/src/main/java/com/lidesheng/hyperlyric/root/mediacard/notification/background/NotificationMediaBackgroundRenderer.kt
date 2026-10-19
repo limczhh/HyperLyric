@@ -704,17 +704,29 @@ internal class NotificationMediaBackgroundRenderer(
             fun create(classLoader: ClassLoader): MonetApi {
                 val schemeClass = classLoader.loadClass("com.android.systemui.monet.ColorScheme")
                 val paletteClass = classLoader.loadClass("com.android.systemui.monet.TonalPalette")
-                val styleClass = classLoader.loadClass("com.android.systemui.monet.Style")
-                val constructor =
-                    schemeClass.declaredConstructors.singleOrNull { it.parameterCount == 3 }
-                        ?: schemeClass.declaredConstructors.single { it.parameterCount == 2 }
+                val booleanType = Boolean::class.javaPrimitiveType
+                val intType = Int::class.javaPrimitiveType
+                val constructors = schemeClass.declaredConstructors.filter { constructor ->
+                    val types = constructor.parameterTypes
+                    types.firstOrNull() == WallpaperColors::class.java &&
+                        (types.last().isEnum || types.last() == intType) &&
+                        (types.size == 2 || (types.size == 3 && types[1] == booleanType))
+                }
+                val constructor = constructors.singleOrNull { it.parameterCount == 3 }
+                    ?: constructors.single { it.parameterCount == 2 }
                 constructor.isAccessible = true
-                val valueOf = styleClass.getDeclaredMethod("valueOf", String::class.java).apply {
-                    isAccessible = true
+                val styleClass = constructor.parameterTypes.last()
+                val contentStyle = if (styleClass == intType) {
+                    // New AOSP Monet uses Style.CONTENT = 6 (the SchemeContent branch).
+                    6
+                } else {
+                    styleClass.getDeclaredMethod("valueOf", String::class.java)
+                        .apply { isAccessible = true }.invoke(null, "CONTENT")
+                        ?: error("Monet CONTENT style is unavailable")
                 }
                 return MonetApi(
                     constructor,
-                    valueOf.invoke(null, "CONTENT") ?: error("Monet CONTENT style is unavailable"),
+                    contentStyle,
                     paletteClass.requiredField("allShades"),
                     schemeClass.optionalField("mNeutral1", "neutral1"),
                     schemeClass.optionalField("mNeutral2", "neutral2"),
