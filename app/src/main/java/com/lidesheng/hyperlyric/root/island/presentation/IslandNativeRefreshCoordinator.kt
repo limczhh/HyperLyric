@@ -153,13 +153,6 @@ internal object IslandNativeRefreshCoordinator {
             eventCoordinator,
             "getWindowView"
         ) ?: return null
-        val controller = IslandTextHookerSupport.callNoArgMethodResult(
-            windowView,
-            "getWindowViewController"
-        ) ?: return null
-        val maxWidth = (controller.let {
-            IslandTextHookerSupport.callNoArgMethodResult(it, "getIslandMaxWidth")
-        } as? Number)?.toFloat() ?: return null
         val methods = nativeUpdateMethods.getOrPut(windowView.javaClass) {
             val allMethods = windowView.javaClass.methods
             val matches = allMethods.filter(::isNativeUpdateMethod)
@@ -180,6 +173,17 @@ internal object IslandNativeRefreshCoordinator {
         }
         val updateMethod = methods.firstOrNull { it.parameterTypes[0].isInstance(data) }
             ?: return null
+        // Newer plugins calculate width internally and no longer take a width argument.
+        val maxWidth = if (updateMethod.parameterTypes[2] == Float::class.javaPrimitiveType) {
+            val controller = IslandTextHookerSupport.callNoArgMethodResult(
+                windowView,
+                "getWindowViewController"
+            ) ?: return null
+            (IslandTextHookerSupport.callNoArgMethodResult(controller, "getIslandMaxWidth")
+                as? Number)?.toFloat() ?: return null
+        } else {
+            null
+        }
 
         return NativeTarget(
             root = token.root,
@@ -193,11 +197,15 @@ internal object IslandNativeRefreshCoordinator {
 
     private fun invokeNativeUpdate(target: NativeTarget, active: ActiveRefresh): Boolean {
         return runCatching {
-            val arguments = when (target.updateMethod.parameterTypes.size) {
-                // Plugin 16.5.3.43.0 / 17.0.2.11.1.
-                3 -> arrayOf(target.data, false, target.maxWidth)
+            val types = target.updateMethod.parameterTypes
+            val arguments = when {
+                // Plugin 18.3.2.22.0: expanded, reInflated; width is owned by the plugin.
+                types.size == 3 && types[2] == Boolean::class.javaPrimitiveType ->
+                    arrayOf(target.data, false, false)
+                // Plugin 16.5.3.43.0 / 17.0.2.11.1: expanded, maxWidth.
+                types.size == 3 -> arrayOf(target.data, false, target.maxWidth)
                 // Plugin 17.1.4.26.0 adds the reInflated flag.
-                4 -> arrayOf(target.data, false, target.maxWidth, false)
+                types.size == 4 -> arrayOf(target.data, false, target.maxWidth, false)
                 else -> error("unexpected updateDynamicIslandView signature")
             }
             target.updateMethod.invoke(target.windowView, *arguments)
@@ -214,7 +222,7 @@ internal object IslandNativeRefreshCoordinator {
             HookLogger.d(
                 TAG,
                 "已请求小米原生超级岛刷新: root=${System.identityHashCode(target.root)}, " +
-                        "keyHash=${target.key.hashCode()}, maxWidth=${target.maxWidth}, " +
+                        "keyHash=${target.key.hashCode()}, maxWidth=${target.maxWidth ?: "native"}, " +
                         "parameterCount=${target.updateMethod.parameterTypes.size}"
             )
             true
@@ -257,12 +265,17 @@ internal object IslandNativeRefreshCoordinator {
             method.returnType != Void.TYPE ||
             (types.size != 3 && types.size != 4) ||
             types[0].name != "com.android.systemui.plugins.miui.dynamicisland.DynamicIslandData" ||
-            types[1] != Boolean::class.javaPrimitiveType ||
-            types[2] != Float::class.javaPrimitiveType
+            types[1] != Boolean::class.javaPrimitiveType
         ) {
             return false
         }
-        return types.size == 3 || types[3] == Boolean::class.javaPrimitiveType
+        return when (types.size) {
+            3 -> types[2] == Float::class.javaPrimitiveType ||
+                types[2] == Boolean::class.javaPrimitiveType
+            4 -> types[2] == Float::class.javaPrimitiveType &&
+                types[3] == Boolean::class.javaPrimitiveType
+            else -> false
+        }
     }
 
     private fun runOnMain(block: () -> Unit) {
@@ -290,6 +303,6 @@ internal object IslandNativeRefreshCoordinator {
         val key: String,
         val windowView: Any,
         val updateMethod: Method,
-        val maxWidth: Float
+        val maxWidth: Float?
     )
 }
