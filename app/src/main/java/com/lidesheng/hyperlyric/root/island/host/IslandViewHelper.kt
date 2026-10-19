@@ -178,7 +178,7 @@ object IslandViewHelper {
     }
 
     /**
-     * Makes one native host layer consume its parent width while an injected Fake dynamic slot is
+     * Makes one native host layer consume its parent width while an injected island slot is
      * active. The original width is retained per View so native layout can be restored exactly.
      */
     fun setFillParentWidthForInjection(view: View, fillParent: Boolean): Boolean {

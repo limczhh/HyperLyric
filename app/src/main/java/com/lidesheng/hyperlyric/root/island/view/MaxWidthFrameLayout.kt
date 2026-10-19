@@ -1,6 +1,8 @@
 package com.lidesheng.hyperlyric.root.island.view
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Rect
 import android.widget.FrameLayout
 
 /**
@@ -33,6 +35,25 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
      * pre-measure passes still use the regular content-based maximum-width behavior.
      */
     var fillExactParentWidth: Boolean = false
+
+    /** Island slots clip horizontal animation overflow without cutting off vertical transitions. */
+    var clipToWidth: Boolean = false
+    private val drawingBounds = Rect()
+
+    override fun dispatchDraw(canvas: Canvas) {
+        if (!clipToWidth) {
+            super.dispatchDraw(canvas)
+            return
+        }
+        val saveCount = canvas.save()
+        try {
+            canvas.getClipBounds(drawingBounds)
+            canvas.clipRect(0, drawingBounds.top, width, drawingBounds.bottom)
+            super.dispatchDraw(canvas)
+        } finally {
+            canvas.restoreToCount(saveCount)
+        }
+    }
 
     /**
      * Used only by injected Super Island test blocks.
@@ -69,7 +90,11 @@ class MaxWidthFrameLayout(context: Context) : FrameLayout(context) {
                 return
             }
             val givenWidth = MeasureSpec.getSize(widthMeasureSpec)
-            val width = if (givenWidth == 0 || givenWidth > maxWidthPx) maxWidthPx else givenWidth
+            val width = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+                maxWidthPx
+            } else {
+                givenWidth.coerceAtMost(maxWidthPx)
+            }
             super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), heightMeasureSpec)
             if (measuredWidth > maxWidthPx) setMeasuredDimension(maxWidthPx, measuredHeight)
             return

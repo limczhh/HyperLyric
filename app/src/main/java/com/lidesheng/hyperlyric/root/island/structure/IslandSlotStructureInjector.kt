@@ -225,7 +225,7 @@ internal object IslandSlotStructureInjector {
         if (existingWrapper != null) {
             existingWrapper.keepVisible = true
             existingWrapper.clipChildren = false
-            var changed = updateFakeDynamicWidthChain(
+            var changed = updateSlotWidthChain(
                 rootView,
                 parent,
                 container,
@@ -278,7 +278,7 @@ internal object IslandSlotStructureInjector {
             maxWidthPx = widthPx
             keepVisible = true
         }
-        updateFakeDynamicWidthChain(rootView, parent, container, wrapperView, config)
+        updateSlotWidthChain(rootView, parent, container, wrapperView, config)
         updateWrapper(wrapperView, widthPx, config, parentName)
         wrapperView.addView(
             createLyricView(rootView, viewTag, config, mode, playbackActive),
@@ -288,7 +288,7 @@ internal object IslandSlotStructureInjector {
         container.addView(
             wrapperView,
             FrameLayout.LayoutParams(
-                wrapperLayoutWidth(config, wrapperView),
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -326,7 +326,7 @@ internal object IslandSlotStructureInjector {
             ?: return false
         val targetView = wrapper.findViewWithTag<View>(viewTag) ?: return false
 
-        var changed = updateFakeDynamicWidthChain(rootView, parent, container, wrapper, config)
+        var changed = updateSlotWidthChain(rootView, parent, container, wrapper, config)
         wrapper.keepVisible = true
         if (container.visibility != View.VISIBLE) {
             IslandViewHelper.showForInjection(container)
@@ -357,7 +357,7 @@ internal object IslandSlotStructureInjector {
         val parent = IslandViewHelper.findViewByName(rootView, parentName) as? ViewGroup
             ?: return false
 
-        var changed = updateFakeDynamicWidthChain(rootView, parent, container, wrapper, config)
+        var changed = updateSlotWidthChain(rootView, parent, container, wrapper, config)
         wrapper.keepVisible = true
         if (container.visibility != View.VISIBLE) {
             IslandViewHelper.showForInjection(container)
@@ -382,6 +382,10 @@ internal object IslandSlotStructureInjector {
         parentName: String
     ): Boolean {
         var changed = false
+        if (!wrapper.clipToWidth) {
+            wrapper.clipToWidth = true
+            changed = true
+        }
         if (wrapper.clipChildren) {
             wrapper.clipChildren = false
             changed = true
@@ -414,7 +418,7 @@ internal object IslandSlotStructureInjector {
             changed = true
         }
         val layoutParams = wrapper.layoutParams
-        val expectedWidth = wrapperLayoutWidth(config, wrapper)
+        val expectedWidth = FrameLayout.LayoutParams.MATCH_PARENT
         if (layoutParams != null && (layoutParams.width != expectedWidth || layoutParams.height != FrameLayout.LayoutParams.MATCH_PARENT)) {
             layoutParams.width = expectedWidth
             layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT
@@ -477,25 +481,27 @@ internal object IslandSlotStructureInjector {
         return wasZeroWidth
     }
 
-    private fun updateFakeDynamicWidthChain(
+    private fun updateSlotWidthChain(
         rootView: ViewGroup,
         parent: ViewGroup,
         container: ViewGroup,
         wrapper: MaxWidthFrameLayout,
         config: IslandSlotRuntimeConfig
     ): Boolean {
-        val fillParentWidth = config.geometry.isDynamicWidth &&
+        val fillExactWidth = config.geometry.isDynamicWidth &&
                 IslandProbeUtils.isFakeBigIslandModuleArea(rootView)
-        var changed = IslandViewHelper.setFillParentWidthForInjection(parent, fillParentWidth)
-        changed = IslandViewHelper.setFillParentWidthForInjection(container, fillParentWidth) || changed
+        // Preserve content-based AT_MOST pre-measurement, but consume the native allocation
+        // during the final exact pass. Fixed child widths otherwise escape a narrowed island.
+        var changed = IslandViewHelper.setFillParentWidthForInjection(parent, true)
+        changed = IslandViewHelper.setFillParentWidthForInjection(container, true) || changed
 
-        if (wrapper.fillExactParentWidth != fillParentWidth) {
-            wrapper.fillExactParentWidth = fillParentWidth
+        if (wrapper.fillExactParentWidth != fillExactWidth) {
+            wrapper.fillExactParentWidth = fillExactWidth
             changed = true
         }
 
         val layoutParams = wrapper.layoutParams
-        val expectedWidth = wrapperLayoutWidth(config, wrapper)
+        val expectedWidth = FrameLayout.LayoutParams.MATCH_PARENT
         if (layoutParams != null && layoutParams.width != expectedWidth) {
             layoutParams.width = expectedWidth
             wrapper.layoutParams = layoutParams
@@ -504,21 +510,6 @@ internal object IslandSlotStructureInjector {
 
         if (changed) wrapper.requestLayout()
         return changed
-    }
-
-    private fun wrapperLayoutWidth(
-        config: IslandSlotRuntimeConfig,
-        wrapper: MaxWidthFrameLayout
-    ): Int {
-        return if (wrapper.fillExactParentWidth) {
-            FrameLayout.LayoutParams.MATCH_PARENT
-        } else if (config.geometry.isDynamicWidth && wrapper.desiredWidthPx > 0) {
-            wrapper.desiredWidthPx
-        } else if (!config.isSplitMode) {
-            FrameLayout.LayoutParams.MATCH_PARENT
-        } else {
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        }
     }
 
     private fun createLyricTextLayoutParams(): FrameLayout.LayoutParams {

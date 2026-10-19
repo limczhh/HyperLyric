@@ -284,23 +284,14 @@ internal object IslandDynamicWidthCoordinator {
         val wrapper = rootView.findViewWithTag<View>("${viewTag}_WRAPPER")
             as? MaxWidthFrameLayout ?: return false
         val configuredMaxWidthPx = config.geometry.widthPx(rootView, parentName) ?: return false
-        val layoutParams = wrapper.layoutParams
-        val layoutWidthChanged = !wrapper.fillExactParentWidth &&
-                (layoutParams != null && layoutParams.width != targetWidthPx)
         val widthChanged = wrapper.desiredWidthPx != targetWidthPx ||
-                wrapper.maxWidthPx != configuredMaxWidthPx ||
-                layoutWidthChanged
+                wrapper.maxWidthPx != configuredMaxWidthPx
         if (!widthChanged) return false
 
         wrapper.maxWidthPx = configuredMaxWidthPx
         wrapper.desiredWidthPx = targetWidthPx
-        if (!wrapper.fillExactParentWidth &&
-            layoutParams != null &&
-            layoutParams.width != targetWidthPx
-        ) {
-            layoutParams.width = targetWidthPx
-            wrapper.layoutParams = layoutParams
-        }
+        // Keep MATCH_PARENT: desiredWidthPx participates in native pre-measurement,
+        // while the final parent spec bounds the visible lyric viewport.
         wrapper.requestLayout()
         wrapper.parent?.requestLayout()
         rootView.requestLayout()
