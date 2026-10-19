@@ -155,7 +155,8 @@ object MediaProgressStyleHooker {
 
         if (
             style == RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE &&
-            (api.observerOnChanged == null || api.attachMethod == null)
+            (api.observerOnChanged == null || api.attachMethod == null ||
+                api.controllerSeekBarViewModelField == null)
         ) {
             HookLogger.w(TAG, "通知中心进度或拖动接口不可用，跳过波浪进度条替换")
             return 0
@@ -363,14 +364,29 @@ object MediaProgressStyleHooker {
         private val action: Action
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
+            val enabled = MediaCardRuntimeConfig.current.enabled
+            // New holders are populated by a factory rather than a constructor. Replace before
+            // attach() installs the native change/touch listeners on holder.seekBar.
+            if (enabled && action == Action.NATIVE_GLOW_ATTACH) {
+                runCatching { chain.args.firstOrNull()?.let(api::replaceWithNativeGlow) }
+                    .onFailure { HookLogger.e(TAG, "初始化通知中心光辉进度条失败", it) }
+            }
+            // Native detach() clears controller.holder before returning.
+            val detachedHolder = if (enabled && action == Action.DETACH) {
+                runCatching { chain.thisObject?.let(api::getHolder) }
+                    .onFailure { HookLogger.e(TAG, "读取通知中心进度条 Holder 失败", it) }
+                    .getOrNull()
+            } else {
+                null
+            }
             val result = chain.proceed()
             if (!MediaCardRuntimeConfig.current.enabled) return result
             val controller = chain.thisObject ?: return result
             runCatching {
                 when (action) {
                     Action.ATTACH -> api.attachWaveListener(controller)
-                    Action.DETACH -> api.detachProgress(controller)
-                    Action.NATIVE_GLOW_ATTACH -> api.attachNativeGlow(controller)
+                    Action.DETACH -> detachedHolder?.let(api::detachProgress)
+                    Action.NATIVE_GLOW_ATTACH -> api.updateProgressColor(controller)
 
                     Action.FULL_AOD -> {
                         val toFullAod = chain.args.getOrNull(0) as? Boolean ?: false
@@ -535,7 +551,7 @@ object MediaProgressStyleHooker {
         private val runtimeShaderField: Field?,
         private val observerOuterField: Field?,
         private val controllerHolderField: Field,
-        private val controllerSeekBarViewModelField: Field,
+        val controllerSeekBarViewModelField: Field?,
         val observerOnChanged: Method?,
         val attachMethod: Method?,
         val detachMethod: Method?,
@@ -623,23 +639,14 @@ object MediaProgressStyleHooker {
         fun attachWaveListener(controller: Any) {
             val holder = getHolder(controller) ?: return
             val seekBar = replaceWithWave(holder) ?: return
-            val viewModel = controllerSeekBarViewModelField.get(controller) ?: return
+            val viewModel = controllerSeekBarViewModelField?.get(controller) ?: return
             val listener = common?.createChangeListener(viewModel) ?: return
             seekBar.setOnSeekBarChangeListener(listener)
         }
 
-        fun attachNativeGlow(controller: Any) {
-            getHolder(controller)?.let { holder ->
-                replaceWithNativeGlow(holder)
-                updateProgressColor(controller)
-            }
-        }
-
-        fun detachProgress(controller: Any) {
-            getHolder(controller)?.let { holder ->
-                restoreWaveSeekBar(holder)
-                restoreNativeGlow(holder, holderFields.seekBarField)
-            }
+        fun detachProgress(holder: Any) {
+            restoreWaveSeekBar(holder)
+            restoreNativeGlow(holder, holderFields.seekBarField)
         }
 
         fun updateProgressColor(controller: Any) {
@@ -693,8 +700,7 @@ object MediaProgressStyleHooker {
                     controllerHolderField = controllerClass.getDeclaredField("holder")
                         .apply { isAccessible = true },
                     controllerSeekBarViewModelField =
-                        controllerClass.getDeclaredField("seekBarViewModel")
-                            .apply { isAccessible = true },
+                        findField(controllerClass, "seekBarViewModel"),
                     observerOnChanged = observerClass?.declaredMethods?.firstOrNull {
                         it.name == "onChanged" && it.parameterCount == 1
                     },
