@@ -42,6 +42,27 @@ object UnlockFocusWhitelist {
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
+        // Install before Plugin.onCreate()/listener callbacks can cache a whitelist result.
+        runCatching {
+            val factoryClass = defaultClassLoader.loadClass("$PLUGIN_INSTANCE_CLASS\$PluginFactory")
+            factoryClass.declaredMethods.firstOrNull { method ->
+                method.name == "createPluginContext" &&
+                    Context::class.java.isAssignableFrom(method.returnType)
+            }?.let { method ->
+                method.isAccessible = true
+                module.managedHook(
+                    executable = method,
+                    capability = "unlock.focus.plugin_context",
+                    hooker = PluginContextHooker(),
+                )
+                HookLogger.i(TAG, "插件 Context 创建 Hook 已安装")
+            }
+        }.onFailure { error ->
+            if (error !is ClassNotFoundException) {
+                HookLogger.w(TAG, "安装插件 Context 创建 Hook 失败，使用插件加载回调", error)
+            }
+        }
+
         // PluginInstance 拦截器始终安装（检测动态加载的插件）
         runCatching {
             val pluginInstanceClass = defaultClassLoader.loadClass(PLUGIN_INSTANCE_CLASS)
@@ -170,21 +191,33 @@ object UnlockFocusWhitelist {
         HookLogger.d(TAG, "焦点通知白名单 Hook 已移除")
     }
 
+    private fun installPluginContextHooks(context: Context) {
+        runCatching { UnlockIslandWhitelist.doHookInClassLoader(context.classLoader) }
+            .onFailure { HookLogger.w(TAG, "安装插件下拉小窗白名单 Hook 失败", it) }
+        runCatching { doHookInClassLoader(context.classLoader) }
+            .onFailure { HookLogger.w(TAG, "安装插件焦点白名单 Hook 失败", it) }
+    }
+
+    class PluginContextHooker : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val result = chain.proceed()
+            (result as? Context)?.let(::installPluginContextHooks)
+            return result
+        }
+    }
+
     class PluginLoadHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
             runCatching {
-                val thisObj = chain.thisObject ?: return result
-                thisObj.javaClass.declaredFields.forEach { f ->
-                    if (f.name == "mPluginContext" || f.name == "mContext") {
-                        f.isAccessible = true
-                        (f.get(thisObj) as? Context)?.let { context ->
-                            doHookInClassLoader(context.classLoader)
-                            UnlockIslandWhitelist.doHookInClassLoader(context.classLoader)
-                        }
-                    }
+                val instance = chain.thisObject ?: return result
+                val context = PluginContextResolver.resolve(instance)
+                if (context != null) {
+                    installPluginContextHooks(context)
+                } else {
+                    HookLogger.w(TAG, "插件加载回调未找到插件 Context: class=${instance.javaClass.name}")
                 }
-            }
+            }.onFailure { HookLogger.w(TAG, "处理插件加载回调失败", it) }
             return result
         }
     }

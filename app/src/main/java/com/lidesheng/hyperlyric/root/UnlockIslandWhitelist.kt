@@ -20,6 +20,7 @@ object UnlockIslandWhitelist {
     private val hookHandles = mutableMapOf<Method, HookHandle>()
     private val knownClassLoaders = mutableSetOf<ClassLoader>()
     private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+    private val lock = Any()
 
     fun hook(xposedModule: XposedModule, defaultClassLoader: ClassLoader) {
         module = xposedModule
@@ -42,23 +43,24 @@ object UnlockIslandWhitelist {
         if (prefs.getBoolean(prefKey, RootConstants.DEFAULT_HOOK_REMOVE_ISLAND_WHITELIST)) {
             doHookInClassLoader(defaultClassLoader)
         } else {
-            hookedClassLoaders.add(defaultClassLoader)
-            knownClassLoaders.add(defaultClassLoader)
+            synchronized(lock) { knownClassLoaders.add(defaultClassLoader) }
+            HookLogger.i(TAG, "超级岛下拉小窗白名单解除未启用")
         }
     }
 
     fun doHookInClassLoader(cl: ClassLoader?) {
-        if (cl == null || !hookedClassLoaders.add(cl)) return
-        knownClassLoaders.add(cl)
-
-        val prefs = (module as? HookEntry)?.prefs ?: return
-        val enabled = prefs.getBoolean(
-            RootConstants.KEY_HOOK_REMOVE_ISLAND_WHITELIST,
-            RootConstants.DEFAULT_HOOK_REMOVE_ISLAND_WHITELIST
-        )
-        if (!enabled) return
-
-        installHook(cl)
+        if (cl == null) return
+        synchronized(lock) {
+            knownClassLoaders.add(cl)
+            val prefs = (module as? HookEntry)?.prefs ?: return
+            if (!prefs.getBoolean(
+                    RootConstants.KEY_HOOK_REMOVE_ISLAND_WHITELIST,
+                    RootConstants.DEFAULT_HOOK_REMOVE_ISLAND_WHITELIST
+                ) || cl in hookedClassLoaders
+            ) return
+            // A failed/early lookup must remain retryable when plugin loading finishes.
+            if (installHook(cl)) hookedClassLoaders.add(cl)
+        }
     }
 
     /** Release only the preference callback; API 102 will hand the hook handles to the next gen. */
@@ -82,48 +84,52 @@ object UnlockIslandWhitelist {
         return true
     }
 
-    private fun installHook(cl: ClassLoader) {
-        runCatching {
-            val targetClass = cl.loadClass(TARGET_CLASS)
-            val method = targetClass.declaredMethods.find { it.name == TARGET_METHOD }
-
-            if (method != null && !hookHandles.containsKey(method)) {
-                val handle = module.managedHook(
-                    executable = method,
-                    capability = "unlock.island.$TARGET_METHOD",
-                    hooker = ReturnTrueHooker(),
-                )
-                hookHandles[method] = handle
-                HookLogger.d(
-                    TAG,
-                    "超级岛下拉小窗白名单 Hook 已安装: method=$TARGET_METHOD"
-                )
-            }
-        }.onFailure { e ->
-            if (e !is ClassNotFoundException) {
-                HookLogger.e(TAG, "媒体超级岛下拉小窗白名单注入失败", e)
-            }
+    private fun installHook(cl: ClassLoader): Boolean = runCatching {
+        val targetClass = cl.loadClass(TARGET_CLASS)
+        val method = targetClass.getDeclaredMethod(TARGET_METHOD, String::class.java)
+        require(method.returnType == Boolean::class.javaPrimitiveType) {
+            "Unexpected return type: $method"
         }
-    }
+        if (!hookHandles.containsKey(method)) {
+            val handle = module.managedHook(
+                executable = method,
+                capability = "unlock.island.$TARGET_METHOD",
+                hooker = ReturnTrueHooker(),
+            )
+            hookHandles[method] = handle
+            HookLogger.i(TAG, "超级岛下拉小窗白名单 Hook 已安装: method=$method")
+        }
+        true
+    }.onFailure { error ->
+        if (error !is ClassNotFoundException) {
+            HookLogger.e(TAG, "媒体超级岛下拉小窗白名单注入失败: classLoader=$cl", error)
+        }
+    }.getOrDefault(false)
 
     private fun hookAllKnownClassLoaders() {
-        knownClassLoaders.toList().forEach { cl ->
-            installHook(cl)
-        }
+        synchronized(lock) { knownClassLoaders.toList() }.forEach(::doHookInClassLoader)
     }
 
     private fun unhookAll() {
-        hookHandles.forEach { (method, handle) ->
-            handle.unhook()
-            HookRuntimeRegistry.forget(module, handle)
+        synchronized(lock) {
+            hookHandles.forEach { (_, handle) ->
+                handle.unhook()
+                HookRuntimeRegistry.forget(module, handle)
+            }
+            hookHandles.clear()
+            hookedClassLoaders.clear()
         }
-        hookHandles.clear()
-        HookLogger.d(TAG, "超级岛下拉小窗白名单 Hook 已移除")
+        HookLogger.i(TAG, "超级岛下拉小窗白名单 Hook 已移除")
     }
 
     class ReturnTrueHooker : Hooker {
+        private val loggedPackages = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
         override fun intercept(chain: Chain): Any {
-            // hook 存在即代表功能开启，无需读取偏好
+            val packageName = chain.args.firstOrNull() as? String ?: "<empty>"
+            if (loggedPackages.add(packageName)) {
+                HookLogger.i(TAG, "媒体小窗白名单已放行: package=$packageName")
+            }
             return true
         }
     }
