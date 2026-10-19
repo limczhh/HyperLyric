@@ -420,6 +420,7 @@ internal class NotificationMediaMultiCardRenderer(
     private var nativeEdgeMenuShowing = false
     /** True only after the current edge gesture was accepted by native SystemUI. */
     private var nativeEdgeGestureAccepted = false
+    private var singleCardOrder: Pair<List<String>, String?>? = null
     private var hostTranslation = 0f
     private var originalLayoutParams: FrameLayout.LayoutParams? = null
     private var originalCard: Card? = null
@@ -586,11 +587,42 @@ internal class NotificationMediaMultiCardRenderer(
         // never competes with it for its own scroll position.
         scrollView?.translationX = hostTranslation
         pageContainer?.translationX = edgeActionTranslation()
+        if (!isActive && edgeActionSide != null) {
+            originalCard?.player?.translationX = cardTranslation
+        }
         onEdgeActionTranslationChanged(cardTranslation)
     }
 
-    fun headerTranslation(): Float? = scrollView?.let {
-        it.translationX
+    fun headerTranslation(): Float? = scrollView?.translationX
+        ?: originalCard?.player?.translationX?.takeIf { edgeActionSide != null }
+
+    /** Single-view mode shares the existing header/menu without creating carousel pages. */
+    fun syncSingleCard(keys: List<String>, selectedKey: String?) {
+        val order = keys to selectedKey
+        if (singleCardOrder != order || !canShowEdgeAction()) {
+            closeNativeEdgeMenu()
+            resetEdgeOverscroll()
+        }
+        singleCardOrder = order
+    }
+
+    fun singleCardEdgeSide(deltaX: Float, selectedIndex: Int, pageCount: Int): EdgeActionSide? {
+        if (isActive || pageCount < 2 || selectedIndex !in 0 until pageCount ||
+            !canShowEdgeAction()
+        ) return null
+        return edgeSideForPosition(deltaX, selectedIndex.toFloat(), pageCount)
+    }
+
+    fun dragSingleCardEdge(side: EdgeActionSide, distance: Float) {
+        if (!isActive) onEdgeDragged(side, distance)
+    }
+
+    fun releaseSingleCardEdge(side: EdgeActionSide) {
+        if (!isActive) onEdgeReleased(side, 0f)
+    }
+
+    fun cancelSingleCardEdge() {
+        if (!isActive) onEdgeCancelled()
     }
 
     /**
@@ -601,7 +633,7 @@ internal class NotificationMediaMultiCardRenderer(
      */
     fun prepareNativeEdgeGesture(side: EdgeActionSide): Boolean {
         nativeEdgeGestureAccepted = false
-        if (!isActive || cards.size < 2 || !canShowEdgeAction() ||
+        if (originalCard == null || !canShowEdgeAction() ||
             !canUseNativeEdgeMenu()
         ) return false
         val host = header ?: return false
@@ -681,7 +713,7 @@ internal class NotificationMediaMultiCardRenderer(
 
     /** Returns null when the row does not belong to this renderer. */
     fun nativeSlideMenuShouldShow(row: Any): Boolean? {
-        if (!isActive || cards.size < 2) return null
+        if (originalCard == null || !canShowEdgeAction()) return null
         val host = header ?: return false
         if (readField(host, "slideMenu") !== row) return false
         if (!nativeEdgeMenuShowing || !canShowEdgeAction() ||
@@ -803,6 +835,7 @@ internal class NotificationMediaMultiCardRenderer(
         pageGapPx = 0
         hostTranslation = 0f
         compactAodActive = false
+        singleCardOrder = null
         originalVisibility = View.VISIBLE
         originalAlpha = 1f
         header = null
@@ -1387,7 +1420,15 @@ internal class NotificationMediaMultiCardRenderer(
 
         val scroller = scrollView ?: return null
         val location = pageLocation(scroller.scrollX)
-        val lastPage = (cards.size - 1).coerceAtLeast(0)
+        return edgeSideForPosition(deltaX, location, cards.size)
+    }
+
+    private fun edgeSideForPosition(
+        deltaX: Float,
+        location: Float,
+        pageCount: Int
+    ): EdgeActionSide? {
+        val lastPage = (pageCount - 1).coerceAtLeast(0)
         val side = when {
             location <= 0.01f -> if (isLayoutRtl()) {
                 EdgeActionSide.RIGHT
@@ -1438,7 +1479,9 @@ internal class NotificationMediaMultiCardRenderer(
             return
         }
 
-        if (directEdgeDismiss && edgeActionDistance >= edgeDismissThreshold()) {
+        if (directEdgeDismiss && canDirectDismissEdge() &&
+            edgeActionDistance >= edgeDismissThreshold()
+        ) {
             startDirectEdgeDismiss()
         } else {
             closeEdgeOverscroll(animated = true)
@@ -1522,6 +1565,7 @@ internal class NotificationMediaMultiCardRenderer(
         val cardTranslation = hostTranslation + edgeActionTranslation()
         scrollView?.translationX = hostTranslation
         pageContainer?.translationX = edgeActionTranslation()
+        if (!isActive) originalCard?.player?.translationX = cardTranslation
         onEdgeActionTranslationChanged(cardTranslation)
     }
 
@@ -1554,6 +1598,9 @@ internal class NotificationMediaMultiCardRenderer(
     private fun resetEdgeOverscroll() {
         edgeOverscrollAnimator?.cancel()
         edgeOverscrollAnimator = null
+        if (!isActive && edgeActionSide != null) {
+            originalCard?.player?.translationX = hostTranslation
+        }
         edgeActionSide = null
         edgeActionDistance = 0f
         directEdgeDismiss = false

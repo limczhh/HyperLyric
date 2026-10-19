@@ -747,6 +747,10 @@ internal object NotificationMediaSingleCardSwitcherHooker {
         private var touchDirectionDecided = false
         private var touchHorizontal = false
         private var touchConsumed = false
+        private var touchEdgeSide: NotificationMediaMultiCardRenderer.EdgeActionSide? = null
+        private var touchNativeHandoff = false
+        private var touchNativePassthrough = false
+        private var touchSingleCardOrder: Pair<List<String>, String?>? = null
         private var switcherUnavailable = false
         private var fullAodActive = false
         private var pageIndicatorOrderLockGeneration: Int? = null
@@ -1008,11 +1012,19 @@ internal object NotificationMediaSingleCardSwitcherHooker {
 
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    if (touchEdgeSide != null) multiCardRenderer.cancelSingleCardEdge()
                     resetTouch(view)
-                    touchDownX = event.x
-                    touchDownY = event.y
+                    // The single-view fallback translates this very player. Screen coordinates
+                    // keep that translation from feeding back into the next MOVE distance.
+                    touchDownX = event.rawX
+                    touchDownY = event.rawY
                     touchThreshold = calculateSwitchThreshold(view)
                     touchIgnored = isSeekBarTouch(view, event)
+                    if (!multiCardRenderer.isActive) {
+                        val snapshot = pageSnapshot()
+                        touchSingleCardOrder = snapshot.entries.map { it.first } to snapshot.selectedKey
+                        touchNativePassthrough = isNativeEdgeMenuShowing()
+                    }
                     // A seek bar belongs to the card and must keep the
                     // HorizontalScrollView from stealing its drag. When the
                     // switcher owns at least two sessions, block the outer
@@ -1024,12 +1036,25 @@ internal object NotificationMediaSingleCardSwitcherHooker {
 
                 MotionEvent.ACTION_MOVE -> {
                     if (touchIgnored) return chain.proceed()
-                    if (touchConsumed) return true
-
-                    val dx = event.x - touchDownX
-                    val dy = event.y - touchDownY
+                    val dx = event.rawX - touchDownX
+                    val dy = event.rawY - touchDownY
                     val absDx = abs(dx)
                     val absDy = abs(dy)
+                    if (touchNativeHandoff) return true
+                    if (touchNativePassthrough) {
+                        if (!touchConsumed && absDx > touchSlop &&
+                            absDx > absDy * DIRECTION_LOCK_RATIO
+                        ) {
+                            cancelPlayerTouch(chain, event)
+                            touchConsumed = true
+                        }
+                        return if (touchConsumed) true else chain.proceed()
+                    }
+                    touchEdgeSide?.let { side ->
+                        multiCardRenderer.dragSingleCardEdge(side, edgeDistance(side, dx))
+                        return true
+                    }
+                    if (touchConsumed) return true
                     if (!touchDirectionDecided) {
                         if (maxOf(absDx, absDy) <= touchSlop) {
                             return chain.proceed()
@@ -1052,7 +1077,7 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                         }
                     }
 
-                    if (!touchHorizontal || absDx < touchThreshold) {
+                    if (!touchHorizontal) {
                         return chain.proceed()
                     }
 
@@ -1062,15 +1087,30 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                     // single-card mode.
                     if (multiCardRenderer.isActive) return chain.proceed()
 
-                    val cancel = MotionEvent.obtain(event)
-                    cancel.action = MotionEvent.ACTION_CANCEL
-                    runCatching {
-                        chain.proceed(arrayOf<Any?>(cancel))
-                    }.onFailure { error ->
-                        HookLogger.w(TAG, "取消原生媒体卡片触摸目标失败", error)
+                    val snapshot = pageSnapshot()
+                    val order = snapshot.entries.map { it.first } to snapshot.selectedKey
+                    // A data/order update must not turn an in-flight page gesture into a clear.
+                    if (touchSingleCardOrder != order) {
+                        cancelPlayerTouch(chain, event)
+                        touchConsumed = true
+                        return true
                     }
-                    cancel.recycle()
+                    val side = multiCardRenderer.singleCardEdgeSide(
+                        dx, snapshot.selectedIndex, snapshot.entries.size
+                    )
+                    if (side != null) {
+                        touchNativeHandoff = onNativeEdgeGestureRequested(side)
+                        if (!touchNativeHandoff) {
+                            touchEdgeSide = side
+                            multiCardRenderer.dragSingleCardEdge(side, edgeDistance(side, dx))
+                        }
+                        cancelPlayerTouch(chain, event)
+                        touchConsumed = true
+                        return true
+                    }
+                    if (absDx < touchThreshold) return chain.proceed()
 
+                    cancelPlayerTouch(chain, event)
                     touchConsumed = true
                     val visualStep = if (dx < 0f) 1 else -1
                     val step = if (view.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
@@ -1088,6 +1128,24 @@ internal object NotificationMediaSingleCardSwitcherHooker {
 
                 MotionEvent.ACTION_UP,
                 MotionEvent.ACTION_CANCEL -> {
+                    if (touchNativeHandoff || (touchNativePassthrough && touchConsumed)) {
+                        // CANCEL means native SwipeHelper took over. UP without takeover must
+                        // roll back the speculative handoff instead of leaving the row exposed.
+                        if (event.actionMasked == MotionEvent.ACTION_UP) {
+                            onNativeEdgeGestureCancelled()
+                        }
+                        resetTouch(view)
+                        return true
+                    }
+                    touchEdgeSide?.let { side ->
+                        if (event.actionMasked == MotionEvent.ACTION_UP) {
+                            multiCardRenderer.releaseSingleCardEdge(side)
+                        } else {
+                            multiCardRenderer.cancelSingleCardEdge()
+                        }
+                        resetTouch(view)
+                        return true
+                    }
                     if (touchConsumed) {
                         resetTouch(view)
                         return true
@@ -1103,6 +1161,26 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                 }
             }
             return chain.proceed()
+        }
+
+        private fun cancelPlayerTouch(chain: Chain, event: MotionEvent) {
+            val cancel = MotionEvent.obtain(event)
+            cancel.action = MotionEvent.ACTION_CANCEL
+            try {
+                chain.proceed(arrayOf<Any?>(cancel))
+            } catch (error: Throwable) {
+                HookLogger.w(TAG, "取消原生媒体卡片触摸目标失败", error)
+            } finally {
+                cancel.recycle()
+            }
+        }
+
+        private fun edgeDistance(
+            side: NotificationMediaMultiCardRenderer.EdgeActionSide,
+            deltaX: Float
+        ): Float = when (side) {
+            NotificationMediaMultiCardRenderer.EdgeActionSide.LEFT -> deltaX
+            NotificationMediaMultiCardRenderer.EdgeActionSide.RIGHT -> -deltaX
         }
 
         private fun bindSelected(data: Any) {
@@ -1374,6 +1452,13 @@ internal object NotificationMediaSingleCardSwitcherHooker {
                         }
                     }
                 }
+            } else {
+                val snapshot = pageSnapshot()
+                val order = snapshot.entries.map { it.first } to snapshot.selectedKey
+                if (touchEdgeSide != null && touchSingleCardOrder != order) {
+                    touchEdgeSide = null
+                }
+                multiCardRenderer.syncSingleCard(order.first, order.second)
             }
         }
 
@@ -1557,6 +1642,10 @@ internal object NotificationMediaSingleCardSwitcherHooker {
             touchDirectionDecided = false
             touchHorizontal = false
             touchConsumed = false
+            touchEdgeSide = null
+            touchNativeHandoff = false
+            touchNativePassthrough = false
+            touchSingleCardOrder = null
         }
 
         private fun runOnMain(block: () -> Unit) {
