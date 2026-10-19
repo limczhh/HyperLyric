@@ -25,6 +25,8 @@ internal object IslandTextHooker {
         "miui.systemui.dynamicisland.view.DynamicIslandExpandedView"
     private const val ANIMATION_DELEGATE_CLASS =
         "miui.systemui.dynamicisland.anim.DynamicIslandAnimationDelegate"
+    private const val FAKE_VIEW_ANIMATOR_CLASS =
+        "miui.systemui.dynamicisland.anim.ui.animator.FakeViewAnimator"
     private const val EVENT_COORDINATOR_CLASS =
         "miui.systemui.dynamicisland.event.DynamicIslandEventCoordinator"
     private const val ADAPTER_CLASS =
@@ -74,22 +76,32 @@ internal object IslandTextHooker {
         }
 
         installFeature("应用返回 fake view") {
-            val animationDelegateClass = cl.loadClass(ANIMATION_DELEGATE_CLASS)
-            animationDelegateClass.declaredMethods
-                .filter {
-                    it.name == "fakeViewToExpanded" &&
-                            it.parameterTypes.size == 2 &&
-                            it.parameterTypes[0].name == CONTENT_VIEW_CLASS &&
-                            it.parameterTypes[1] == Boolean::class.javaPrimitiveType
+            // 新版将过渡实现移入 FakeViewAnimator；只安装一个入口，避免重复回调。
+            val expandedTransition = listOf(FAKE_VIEW_ANIMATOR_CLASS, ANIMATION_DELEGATE_CLASS)
+                .firstNotNullOfOrNull { className ->
+                    val targetClass = try {
+                        cl.loadClass(className)
+                    } catch (_: ClassNotFoundException) {
+                        null
+                    }
+                    targetClass?.declaredMethods?.firstOrNull {
+                        it.name == "fakeViewToExpanded" &&
+                                it.returnType == Void.TYPE &&
+                                it.parameterTypes.size == 2 &&
+                                it.parameterTypes[0].name == CONTENT_VIEW_CLASS &&
+                                it.parameterTypes[1] == Boolean::class.javaPrimitiveType
+                    }
                 }
-                .forEach { method ->
-                    method.isAccessible = true
-                    module.managedHook(
-                        executable = method,
-                        capability = "island.fake.expanded_transition",
-                        hooker = FakeIslandTransitionHooker.ExpandedViewTransitionHook(),
-                    )
-                }
+            if (expandedTransition != null) {
+                expandedTransition.isAccessible = true
+                module.managedHook(
+                    executable = expandedTransition,
+                    capability = "island.fake.expanded_transition",
+                    hooker = FakeIslandTransitionHooker.ExpandedViewTransitionHook(),
+                )
+            } else {
+                HookLogger.w(TAG, "未找到兼容的 FakeView 展开过渡接口")
+            }
 
             cl.loadClass(EVENT_COORDINATOR_CLASS).declaredMethods
                 .filter {
