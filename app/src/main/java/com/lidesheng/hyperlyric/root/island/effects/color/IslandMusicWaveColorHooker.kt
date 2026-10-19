@@ -18,6 +18,7 @@ import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
 import java.lang.ref.WeakReference
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -31,6 +32,12 @@ internal object IslandMusicWaveColorHooker {
         Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     )
     private val trackedHolders = WeakHashMap<Any, TrackedHolder>()
+    private val registeringHolder = ThreadLocal<Any>()
+    private val callbackHolders = WeakHashMap<Any, WeakReference<Any>>()
+    private val hookedGradientMethods = mutableSetOf<Method>()
+
+    @Volatile
+    private var generation = 0
 
     @Volatile
     private var module: XposedModule? = null
@@ -56,35 +63,10 @@ internal object IslandMusicWaveColorHooker {
 
         try {
             val holderClass = classLoader.loadClass(ICON_HOLDER_CLASS)
-            val callbackClass = classLoader.loadClass(
-                "$ICON_HOLDER_CLASS\$Companion\$GradientLottieValueCallback"
-            )
-            val getValueMethods = callbackClass.declaredMethods.filter {
-                it.name == "getValue" &&
-                        it.parameterCount == 1 &&
-                        it.parameterTypes[0].name.startsWith("com.airbnb.lottie.value.") &&
-                        (it.returnType == arrayOf<Int>().javaClass ||
-                                it.returnType == Any::class.java)
-            }
-            if (getValueMethods.none { it.returnType == arrayOf<Int>().javaClass }) {
-                hookedClassLoaders.remove(classLoader)
-                HookLogger.w(TAG, "音频律动颜色回调不可用: target=GradientLottieValueCallback.getValue")
-                return
-            }
-            // Lottie calls the erased Object-returning bridge through getValueInternal.
-            // Deoptimize that caller and hook both descriptors so an inlined typed call
-            // inside the bridge cannot bypass the override.
-            requireNotNull(callbackClass.superclass).declaredMethods.filter {
-                it.name == "getValueInternal" && it.parameterCount == 7 &&
-                        it.returnType == Any::class.java &&
-                        it.parameterTypes.contentEquals(arrayOf(
-                            Float::class.javaPrimitiveType, Float::class.javaPrimitiveType,
-                            Any::class.java, Any::class.java,
-                            Float::class.javaPrimitiveType, Float::class.javaPrimitiveType,
-                            Float::class.javaPrimitiveType
-                        ))
-            }.forEach(xposedModule::deoptimize)
-            getValueMethods.forEach { method ->
+            val api = IslandMusicWaveNativeApi.create(holderClass)
+            // Keep Lottie's frame caller interpreted so an inlined callback cannot bypass the Hook.
+            api.gradientCallers.forEach(xposedModule::deoptimize)
+            api.gradientMethods.forEach { method ->
                 method.isAccessible = true
                 xposedModule.managedHook(
                     executable = method,
@@ -103,19 +85,32 @@ internal object IslandMusicWaveColorHooker {
                 isAccessible = true
             }
 
-            val setLottieColorMethod = holderClass.declaredMethods.firstOrNull {
-                it.name == "setLottieColor" &&
-                        it.parameterTypes.contentEquals(arrayOf(Bitmap::class.java))
-            }
-            if (setLottieColorMethod != null) {
-                setLottieColorMethod.isAccessible = true
+            api.callbackRegistration?.let { method ->
+                method.isAccessible = true
                 xposedModule.managedHook(
-                    executable = setLottieColorMethod,
-                    capability = "island.music_wave.set_lottie_color",
-                    hooker = SetLottieColorHook(dataField, lottieViewField),
+                    executable = method,
+                    capability = "island.music_wave.capture_callback",
+                    hooker = CaptureGradientCallbackHook(api, dataField, lottieViewField),
+                )
+            }
+
+            val paletteMethod = api.paletteMethod
+            if (paletteMethod != null) {
+                paletteMethod.isAccessible = true
+                xposedModule.managedHook(
+                    executable = paletteMethod,
+                    capability = if (paletteMethod.name == "setLottieColor")
+                        "island.music_wave.set_lottie_color"
+                    else "island.music_wave.get_lottie_color",
+                    hooker = ArtworkPaletteHook(
+                        dataField, lottieViewField,
+                        holderClass.declaredFields.firstOrNull {
+                            paletteMethod.name == "getLottieColor" && it.name == "cachedBitmap"
+                        }?.apply { isAccessible = true }
+                    ),
                 )
             } else {
-                HookLogger.w(TAG, "音频律动原生取色接口不可用: target=setLottieColor")
+                HookLogger.w(TAG, "音频律动原生取色接口不可用: target=setLottieColor/getLottieColor")
             }
 
             val picInfoField = holderClass.getDeclaredField("picInfo").apply {
@@ -212,7 +207,11 @@ internal object IslandMusicWaveColorHooker {
 
     fun cleanup() {
         runOnMain {
+            generation++
             restoreNativeColors()
+            synchronized(callbackHolders) { callbackHolders.clear() }
+            synchronized(hookedGradientMethods) { hookedGradientMethods.clear() }
+            registeringHolder.remove()
             synchronized(trackedHolders) {
                 trackedHolders.clear()
             }
@@ -395,38 +394,98 @@ internal object IslandMusicWaveColorHooker {
         }
     }
 
-    private class SetLottieColorHook(
+    private class ArtworkPaletteHook(
+        private val dataField: Field?,
+        private val lottieViewField: Field,
+        private val cachedBitmapField: Field?
+    ) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val requestGeneration = generation
+            val holder = chain.thisObject
+            val data = runCatching { holder?.let { dataField?.get(it) } }.getOrNull()
+            val result = chain.proceed()
+            if (holder == null || data == null) return result
+            runCatching {
+                // New getLottieColor() runs on Dispatchers.IO. Extract there, then touch Views on main.
+                val bitmap = chain.args.getOrNull(0) as? Bitmap
+                val artworkPalette = runCatching {
+                    if (IslandProbeUtils.extractMediaIslandInfo(data) != null) {
+                        bitmap?.let(CoverColorHelper::extractPalette)
+                    } else null
+                }.onFailure { error ->
+                    HookLogger.w(TAG, "当前媒体封面取色失败，将恢复原生颜色: ${error.message}")
+                }.getOrNull()
+                runOnMain {
+                    runCatching {
+                        if (generation != requestGeneration || dataField?.get(holder) !== data ||
+                            (cachedBitmapField != null && cachedBitmapField.get(holder) !== bitmap)
+                        ) {
+                            return@runCatching
+                        }
+                        val target = IslandModificationTargetPolicy.resolve(
+                            data = data,
+                            hostRoot = IslandProbeUtils.getHolderRootView(holder)
+                        )
+                        if (!target.isMediaTarget) {
+                            untrackHolder(holder)
+                            refresh()
+                            return@runCatching
+                        }
+                        val lottieView = lottieViewField.get(holder) as? View
+                        trackHolder(holder, data, lottieView)
+                        rememberArtworkPalette(holder, artworkPalette)
+                        refresh()
+                    }.onFailure { HookLogger.e(TAG, "应用音频律动封面色失败", it) }
+                }
+            }.onFailure { HookLogger.e(TAG, "读取原生音频律动颜色失败", it) }
+            return result
+        }
+    }
+
+    private class CaptureGradientCallbackHook(
+        private val api: IslandMusicWaveNativeApi,
         private val dataField: Field?,
         private val lottieViewField: Field
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
             runCatching {
-                val holder = chain.thisObject ?: return@runCatching
-                val data = dataField?.get(holder) ?: return@runCatching
-                val target = IslandModificationTargetPolicy.resolve(
-                    data = data,
-                    hostRoot = IslandProbeUtils.getHolderRootView(holder)
-                )
-                if (!target.isMediaTarget) {
-                    untrackHolder(holder)
-                    refresh()
-                    return@runCatching
+                val holder = registeringHolder.get() ?: return@runCatching
+                val view = lottieViewField.get(holder) ?: return@runCatching
+                if (api.drawableField?.get(view) !== chain.thisObject) return@runCatching
+                val callback = chain.args.getOrNull(2) ?: return@runCatching
+                val methods = api.callbackMethods(callback.javaClass)
+                check(methods.isNotEmpty()) { "Native music-wave value callback unavailable" }
+                methods.forEach { method ->
+                    synchronized(hookedGradientMethods) {
+                        if (method !in hookedGradientMethods) {
+                            method.isAccessible = true
+                            requireNotNull(module).managedHook(
+                                executable = method,
+                                capability = "island.music_wave.native_gradient",
+                                hooker = NativeGradientValueHook(dataField),
+                            )
+                            hookedGradientMethods.add(method)
+                        }
+                    }
                 }
-                val lottieView = lottieViewField.get(holder) as? View
-                trackHolder(holder, data, lottieView)
-                val bitmap = chain.args.getOrNull(0) as? Bitmap
-                val artworkPalette = runCatching {
-                    bitmap?.let(CoverColorHelper::extractPalette)
-                }.onFailure { error ->
-                    HookLogger.w(TAG, "当前媒体封面取色失败，将恢复原生颜色: ${error.message}")
-                }.getOrNull()
-                rememberArtworkPalette(holder, artworkPalette)
-                refresh()
-            }.onFailure { e ->
-                HookLogger.e(TAG, "读取原生音频律动颜色失败", e)
-            }
-            return result
+                synchronized(callbackHolders) { callbackHolders[callback] = WeakReference(holder) }
+            }.onFailure { HookLogger.e(TAG, "跟踪原生音频律动颜色回调失败", it) }
+            return chain.proceed()
+        }
+    }
+
+    private class NativeGradientValueHook(private val dataField: Field?) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val colors = callbackColors ?: return chain.proceed()
+            val holder = synchronized(callbackHolders) {
+                callbackHolders[chain.thisObject]?.get()
+            } ?: return chain.proceed()
+            val tracked = synchronized(trackedHolders) { trackedHolders[holder] }
+                ?: return chain.proceed()
+            val allowed = runCatching {
+                tracked.dataRef.get() === dataField?.get(holder) && isAllowedTarget(holder, tracked)
+            }.getOrDefault(false)
+            return if (allowed) colors else chain.proceed()
         }
     }
 
@@ -436,7 +495,13 @@ internal object IslandMusicWaveColorHooker {
         private val picInfoField: Field
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val result = chain.proceed()
+            val previous = registeringHolder.get()
+            chain.thisObject?.let(registeringHolder::set)
+            val result = try {
+                chain.proceed()
+            } finally {
+                if (previous == null) registeringHolder.remove() else registeringHolder.set(previous)
+            }
             runCatching {
                 val holder = chain.thisObject ?: return@runCatching
                 if (!isMusicWave(picInfoField.get(holder))) {
