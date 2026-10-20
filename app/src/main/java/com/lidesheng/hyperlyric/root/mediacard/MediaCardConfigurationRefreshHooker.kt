@@ -12,11 +12,15 @@ import io.github.libxposed.api.XposedModule
 import java.util.Collections
 import java.util.WeakHashMap
 
-/** Hooks SystemUIApplication directly because HyperOS bypasses Application callbacks. */
+/**
+ * Hooks the SystemUI application implementation because HyperOS bypasses Application callbacks.
+ */
 internal object MediaCardConfigurationRefreshHooker {
     private const val TAG = "MediaCardConfigurationRefresh"
-    private const val SYSTEM_UI_APPLICATION_CLASS =
-        "com.android.systemui.SystemUIApplication"
+    private val SYSTEM_UI_APPLICATION_CLASSES = listOf(
+        "com.android.systemui.application.impl.SystemUIApplicationImpl",
+        "com.android.systemui.SystemUIApplication",
+    )
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val hookedClassLoaders = Collections.synchronizedSet(
@@ -31,17 +35,19 @@ internal object MediaCardConfigurationRefreshHooker {
             return
         }
 
-        val method = runCatching {
-            classLoader.loadClass(SYSTEM_UI_APPLICATION_CLASS)
-                .declaredMethods
-                .firstOrNull { candidate ->
-                    candidate.name == "onConfigurationChanged" &&
+        val method = SYSTEM_UI_APPLICATION_CLASSES.firstNotNullOfOrNull { className ->
+            runCatching {
+                classLoader.loadClass(className)
+                    .declaredMethods
+                    .firstOrNull { candidate ->
+                        candidate.name == "onConfigurationChanged" &&
                             candidate.parameterTypes.contentEquals(
                                 arrayOf(Configuration::class.java)
                             ) &&
                             candidate.returnType == Void.TYPE
-                }
-        }.getOrNull()
+                    }
+            }.getOrNull()
+        }
 
         if (method == null) {
             hookedClassLoaders.remove(classLoader)
@@ -57,7 +63,10 @@ internal object MediaCardConfigurationRefreshHooker {
                 hooker = ConfigurationChangedHook(),
             )
         }.onSuccess {
-            HookLogger.d(TAG, "媒体卡片主题刷新 Hook 已初始化")
+            HookLogger.d(
+                TAG,
+                "媒体卡片主题刷新 Hook 已初始化: target=${method.declaringClass.name}"
+            )
         }.onFailure { error ->
             hookedClassLoaders.remove(classLoader)
             HookLogger.w(
