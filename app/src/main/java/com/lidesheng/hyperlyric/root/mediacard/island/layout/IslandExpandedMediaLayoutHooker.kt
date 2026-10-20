@@ -81,8 +81,10 @@ object IslandExpandedMediaLayoutHooker {
 
     private class ConstraintSetLoadHook : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val resourceId = chain.args.getOrNull(0) as? Int ?: return chain.proceed()
-            val context = chain.args.getOrNull(1) as? Context ?: return chain.proceed()
+            val resourceId = chain.args.firstOrNull { it is Int } as? Int
+                ?: return chain.proceed()
+            val context = chain.args.firstOrNull { it is Context } as? Context
+                ?: return chain.proceed()
             if (!context.isTargetIslandLayout(resourceId)) return chain.proceed()
 
             val result = chain.proceed()
@@ -474,13 +476,17 @@ object IslandExpandedMediaLayoutHooker {
         companion object {
             fun create(classLoader: ClassLoader): NativeApi {
                 val constraintSetClass = classLoader.loadClass(CONSTRAINT_SET_CLASS)
-                val load = constraintSetClass.getDeclaredMethod(
-                    "load",
-                    Int::class.javaPrimitiveType,
-                    Context::class.java
-                ).apply { isAccessible = true }
                 val integer = requireNotNull(Int::class.javaPrimitiveType)
                 val float = requireNotNull(Float::class.javaPrimitiveType)
+                // Prefer the AndroidX/SystemUI order and retain the legacy fork's reversed order.
+                val loadMethod = runCatching {
+                    constraintSetClass.getDeclaredMethod("load", Context::class.java, integer)
+                }.getOrNull() ?: runCatching {
+                    constraintSetClass.getDeclaredMethod("load", integer, Context::class.java)
+                }.getOrNull() ?: error(
+                    "ConstraintSet.load(Context,int)/load(int,Context) unavailable"
+                )
+                loadMethod.isAccessible = true
                 val islandControllerClass = classLoader.loadClassOrNull(
                     "com.android.systemui.statusbar.notification.mediaisland.MiuiIslandMediaControllerImpl"
                 )
@@ -488,7 +494,7 @@ object IslandExpandedMediaLayoutHooker {
                     "com.android.systemui.statusbar.notification.mediaisland.PlayerIslandConstraintLayout"
                 )
                 return NativeApi(
-                    constraintSetLoadMethods = listOf(load),
+                    constraintSetLoadMethods = listOf(loadMethod),
                     reInflateMethods = islandControllerClass?.declaredMethods
                         ?.filter { it.name.startsWith("reInflateView") }
                         ?.onEach { it.isAccessible = true }
