@@ -44,7 +44,7 @@ object UnlockIslandWhitelist {
             doHookInClassLoader(defaultClassLoader)
         } else {
             synchronized(lock) { knownClassLoaders.add(defaultClassLoader) }
-            HookLogger.i(TAG, "超级岛下拉小窗白名单解除未启用")
+            HookLogger.d(TAG, "超级岛下拉小窗白名单解除未启用")
         }
     }
 
@@ -97,7 +97,7 @@ object UnlockIslandWhitelist {
                 hooker = ReturnTrueHooker(),
             )
             hookHandles[method] = handle
-            HookLogger.i(TAG, "超级岛下拉小窗白名单 Hook 已安装: method=$method")
+            HookLogger.d(TAG, "超级岛下拉小窗白名单 Hook 已安装: method=$method")
         }
         true
     }.onFailure { error ->
@@ -119,7 +119,7 @@ object UnlockIslandWhitelist {
             hookHandles.clear()
             hookedClassLoaders.clear()
         }
-        HookLogger.i(TAG, "超级岛下拉小窗白名单 Hook 已移除")
+        HookLogger.d(TAG, "超级岛下拉小窗白名单 Hook 已移除")
     }
 
     class ReturnTrueHooker : Hooker {
@@ -128,7 +128,7 @@ object UnlockIslandWhitelist {
         override fun intercept(chain: Chain): Any {
             val packageName = chain.args.firstOrNull() as? String ?: "<empty>"
             if (loggedPackages.add(packageName)) {
-                HookLogger.i(TAG, "媒体小窗白名单已放行: package=$packageName")
+                HookLogger.d(TAG, "媒体小窗白名单已放行: package=$packageName")
             }
             return true
         }

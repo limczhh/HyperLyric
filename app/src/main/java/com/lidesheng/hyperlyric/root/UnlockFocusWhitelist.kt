@@ -55,7 +55,7 @@ object UnlockFocusWhitelist {
                     capability = "unlock.focus.plugin_context",
                     hooker = PluginContextHooker(),
                 )
-                HookLogger.i(TAG, "插件 Context 创建 Hook 已安装")
+                HookLogger.d(TAG, "插件 Context 创建 Hook 已安装")
             }
         }.onFailure { error ->
             if (error !is ClassNotFoundException) {
