@@ -12,7 +12,7 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.WeakHashMap
 
-/** Capabilities verified against main SystemUI 16.03.251211.r, not the island plugin. */
+/** Uses the notification container's own island monitor from the main SystemUI. */
 internal object StatusBarNotificationIconPositionHooker {
     private const val TAG = "StatusBarNotificationIcons"
     private var bridge: Bridge? = null
@@ -105,7 +105,6 @@ internal object StatusBarNotificationIconPositionHooker {
         private val areaClass = loader.loadClass("com.android.systemui.statusbar.views.MiuiNotificationStatusContainer")
         val iconClass = loader.loadClass("com.android.systemui.statusbar.phone.NotificationIconContainer")
         private val injectClass = loader.loadClass("com.android.systemui.statusbar.phone.NotificationIconContainerInject")
-        private val monitorClass = loader.loadClass("com.android.systemui.statusbar.IslandMonitor\$RealContainerIslandMonitor")
         private val islandControllerClass = loader.loadClass("com.android.systemui.statusbar.StatusBarIslandControllerImpl")
         val inner = field(rootClass, "mNotificationIconAreaInner", View::class.java)
         val updateParent = method(rootClass, "updateNotificationIconAreaInnnerParent")
@@ -121,7 +120,14 @@ internal object StatusBarNotificationIconPositionHooker {
         }
         val calculate = method(iconClass, "calculateIconXTranslations")
         val inject = field(iconClass, "mInject", injectClass)
-        val monitor = field(injectClass, "_islandMonitor", monitorClass)
+        val monitor = injectClass.getDeclaredField("_islandMonitor").apply {
+            check(type.name in setOf(
+                "com.android.systemui.statusbar.IslandMonitor\$NotificationContainerIslandMonitor",
+                "com.android.systemui.statusbar.IslandMonitor\$RealContainerIslandMonitor",
+            )) { "$name: unexpected field type $type" }
+            isAccessible = true
+        }
+        private val monitorClass = monitor.type
         val islandWidth = field(monitorClass, "islandWidth", Int::class.javaPrimitiveType!!)
         private val islandController = field(monitorClass, "islandController", islandControllerClass)
         private val translation = islandControllerClass.getDeclaredMethod("getTranslationX").apply {

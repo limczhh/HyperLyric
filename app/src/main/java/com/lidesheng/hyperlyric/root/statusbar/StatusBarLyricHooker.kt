@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.statusbar
 
+import android.animation.TimeInterpolator
 import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.managedHook
@@ -7,6 +8,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
+import java.lang.reflect.Field
 
 /** Installs the Xiaomi HyperOS status-bar lyric host hook. */
 internal object StatusBarLyricHooker {
@@ -16,6 +18,8 @@ internal object StatusBarLyricHooker {
     private const val MIUI_CLOCK_CLASS = "com.android.systemui.statusbar.views.MiuiClock"
     private const val MIUI_COLLAPSED_STATUS_BAR_FRAGMENT_CLASS =
         "com.android.systemui.statusbar.phone.MiuiCollapsedStatusBarFragment"
+    private const val HOME_STATUS_BAR_BINDER_CLASS =
+        "com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinderInjector"
 
     fun hook(module: XposedModule, classLoader: ClassLoader) {
         val islandRegionAvailable = runCatching {
@@ -92,26 +96,33 @@ internal object StatusBarLyricHooker {
     }
 
     private fun hookNotificationIconVisibility(module: XposedModule, classLoader: ClassLoader) {
-        val methods = runCatching {
-            classLoader.loadClass(MIUI_COLLAPSED_STATUS_BAR_FRAGMENT_CLASS)
-                .declaredMethods.filter { method ->
-                    val parameters = method.parameterTypes
-                    method.returnType == Void.TYPE && when (method.name) {
-                        "animateShow" -> parameters.size == 3 &&
-                                parameters[0] == View::class.java &&
-                                parameters[1] == Boolean::class.javaPrimitiveType &&
-                                parameters[2] == Boolean::class.javaPrimitiveType
+        val methods = listOf(HOME_STATUS_BAR_BINDER_CLASS, MIUI_COLLAPSED_STATUS_BAR_FRAGMENT_CLASS)
+            .firstNotNullOfOrNull { className ->
+                runCatching {
+                    classLoader.loadClass(className).declaredMethods.filter { method ->
+                        val parameters = method.parameterTypes
+                        method.returnType == Void.TYPE && if (className == HOME_STATUS_BAR_BINDER_CLASS) {
+                            method.name in setOf("animateShow", "animateHide") &&
+                                    parameters.contentEquals(
+                                        arrayOf(View::class.java, Boolean::class.javaPrimitiveType)
+                                    )
+                        } else when (method.name) {
+                            "animateShow" -> parameters.size == 3 &&
+                                    parameters[0] == View::class.java &&
+                                    parameters[1] == Boolean::class.javaPrimitiveType &&
+                                    parameters[2] == Boolean::class.javaPrimitiveType
 
-                        "animateHiddenState" -> parameters.size == 4 &&
-                                parameters[0] == Int::class.javaPrimitiveType &&
-                                parameters[1] == View::class.java &&
-                                parameters[2] == Boolean::class.javaPrimitiveType &&
-                                parameters[3] == Boolean::class.javaPrimitiveType
+                            "animateHiddenState" -> parameters.size == 4 &&
+                                    parameters[0] == Int::class.javaPrimitiveType &&
+                                    parameters[1] == View::class.java &&
+                                    parameters[2] == Boolean::class.javaPrimitiveType &&
+                                    parameters[3] == Boolean::class.javaPrimitiveType
 
-                        else -> false
+                            else -> false
+                        }
                     }
-                }
-        }.getOrNull().orEmpty()
+                }.getOrNull()?.takeIf { it.isNotEmpty() }
+            }.orEmpty()
 
         if (methods.isEmpty()) {
             HookLogger.w(
@@ -123,13 +134,14 @@ internal object StatusBarLyricHooker {
         methods.forEach { method ->
             runCatching {
                 method.isAccessible = true
-                val isShowMethod = method.name == "animateShow"
+                val hasVisibilityArgument = method.name == "animateHiddenState"
                 module.managedHook(
                     executable = method,
                     capability = "status_bar.lyric.notification_icon_visibility",
                     hooker = NotificationIconVisibilityHook(
-                        viewArgumentIndex = if (isShowMethod) 0 else 1,
-                        visibilityArgumentIndex = if (isShowMethod) null else 0,
+                        viewArgumentIndex = if (hasVisibilityArgument) 1 else 0,
+                        visibilityArgumentIndex = if (hasVisibilityArgument) 0 else null,
+                        defaultVisibility = if (method.name == "animateHide") View.INVISIBLE else View.VISIBLE,
                     ),
                 )
             }.onFailure { error ->
@@ -137,6 +149,29 @@ internal object StatusBarLyricHooker {
                     TAG,
                     "状态栏歌词通知图标显隐保护未安装: method=${method.name}, reason=${error.message}"
                 )
+            }
+        }
+        val binderClass = methods.first().declaringClass
+        if (binderClass.name == HOME_STATUS_BAR_BINDER_CLASS) {
+            runCatching {
+                val iconsField = binderClass.getDeclaredField("mNotificationIconAreaInner").apply {
+                    check(type == View::class.java)
+                    isAccessible = true
+                }
+                val animation = binderClass.getDeclaredMethod(
+                    "startAnimation", View::class.java, Float::class.javaPrimitiveType,
+                    TimeInterpolator::class.java, Runnable::class.java,
+                ).apply {
+                    check(returnType == Void.TYPE)
+                    isAccessible = true
+                }
+                module.managedHook(
+                    executable = animation,
+                    capability = "status_bar.lyric.notification_icon_visibility.animation",
+                    hooker = NotificationIconAnimationHook(iconsField),
+                )
+            }.onFailure { error ->
+                HookLogger.w(TAG, "状态栏歌词通知图标动画保护未安装: reason=${error.message}")
             }
         }
     }
@@ -190,18 +225,40 @@ internal object StatusBarLyricHooker {
     private class NotificationIconVisibilityHook(
         private val viewArgumentIndex: Int,
         private val visibilityArgumentIndex: Int?,
+        private val defaultVisibility: Int = View.VISIBLE,
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val result = chain.proceed()
             val view = chain.args.getOrNull(viewArgumentIndex) as? View ?: return result
             val visibility = visibilityArgumentIndex?.let { index ->
                 (chain.args.getOrNull(index) as? Number)?.toInt()
-            } ?: View.VISIBLE
+            } ?: defaultVisibility
             StatusBarLyricHostRegistry.onNotificationIconNativeVisibilityRequested(
                 view = view,
                 visibility = visibility,
             )
             return result
+        }
+    }
+
+    /** Native animation completion can set VISIBLE again after animateShow returns. */
+    private class NotificationIconAnimationHook(private val iconsField: Field) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val view = chain.args.firstOrNull() as? View ?: return chain.proceed()
+            if (iconsField.get(chain.thisObject) !== view) return chain.proceed()
+            val alpha = (chain.args.getOrNull(1) as? Number)?.toFloat()
+            val visibility = when (alpha) {
+                1f -> View.VISIBLE
+                0f -> View.INVISIBLE
+                else -> return chain.proceed()
+            }
+            val action = chain.args.getOrNull(3) as? Runnable ?: return chain.proceed()
+            val args = chain.args.toTypedArray()
+            args[3] = Runnable {
+                action.run()
+                StatusBarLyricHostRegistry.onNotificationIconNativeVisibilityRequested(view, visibility)
+            }
+            return chain.proceed(args)
         }
     }
 
