@@ -291,6 +291,14 @@ class HookEntry : XposedModule() {
             }
             superIslandHotReloadCoordinator.installPluginHooks(this, pluginClassLoaders)
 
+            IslandMusicWaveColorHooker.restoreDynamicHooks(
+                this,
+                HookRuntimeRegistry.pendingExecutables(
+                    this, IslandMusicWaveColorHooker.NATIVE_GRADIENT_CAPABILITY
+                ).filterIsInstance<java.lang.reflect.Method>(),
+                pluginClassLoaders,
+            )
+
             val unmatchedBeforeFinish = HookRuntimeRegistry.unmatched(this)
             if (unmatchedBeforeFinish.isNotEmpty()) {
                 error(
@@ -317,6 +325,9 @@ class HookEntry : XposedModule() {
                 val currentApp = app
                 if (!initializeSystemEnvironment(currentApp)) {
                     error("runtime reinitialization returned failure")
+                }
+                runOnMainAndWait {
+                    IslandMusicWaveColorHooker.adoptHotReloadCallbacks(state?.musicWaveCallbacks.orEmpty())
                 }
 
                 val restoredSnapshot = if (state?.runtimeReady == true) {
@@ -955,12 +966,13 @@ class HookEntry : XposedModule() {
             hosts += transfer.kind.name
             hosts += transfer.moduleType
         }
-        return ArrayList<Any?>(5).apply {
+        return ArrayList<Any?>(6).apply {
             add(HOT_RELOAD_TRANSFER_VERSION)
             add(meta)
             add(dispatcher)
             add(hosts)
             add(ArrayList(transfers.statusBarRoots))
+            add(transfers.musicWaveCallbacks)
         }
     }
 
@@ -998,6 +1010,8 @@ class HookEntry : XposedModule() {
             statusBarRoots = (transfer.getOrNull(4) as? ArrayList<*>)
                 ?.filterIsInstance<ViewGroup>()
                 .orEmpty(),
+            // Older builds have no callback payload; their dynamic handles are still reclaimed above.
+            musicWaveCallbacks = (transfer.getOrNull(5) as? ArrayList<*>).orEmpty(),
         )
     }
 
@@ -1067,6 +1081,7 @@ class HookEntry : XposedModule() {
         val dispatcher: Any?,
         val islandTransfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
         val statusBarRoots: List<ViewGroup>,
+        val musicWaveCallbacks: List<*>,
     )
 
     private fun findCurrentApplication(): Application? {

@@ -26,6 +26,7 @@ internal object IslandMusicWaveColorHooker {
     private const val TAG = "IslandMusicWaveColorHooker"
     private const val ICON_HOLDER_CLASS =
         "miui.systemui.dynamicisland.module.IslandIconViewHolder"
+    const val NATIVE_GRADIENT_CAPABILITY = "island.music_wave.native_gradient"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val hookedClassLoaders = Collections.synchronizedSet(
@@ -50,6 +51,9 @@ internal object IslandMusicWaveColorHooker {
 
     @Volatile
     private var latestArtworkPalette: IntArray? = null
+
+    @Volatile
+    private var latestArtworkBitmap: WeakReference<Bitmap>? = null
 
     @Volatile
     private var overrideApplied = false
@@ -205,6 +209,100 @@ internal object IslandMusicWaveColorHooker {
         }
     }
 
+    /** Only framework containers, native objects and primitive arrays cross module generations. */
+    fun prepareForHotReload(): ArrayList<Any?> {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        val callbacks = ArrayList<Any?>()
+        synchronized(callbackHolders) {
+            callbackHolders.forEach { (callback, holderRef) ->
+                val holder = holderRef.get() ?: return@forEach
+                val tracked = synchronized(trackedHolders) { trackedHolders[holder] }
+                    ?: return@forEach
+                val data = tracked.dataRef.get() ?: return@forEach
+                val isLatest = latestArtworkHolder?.get() === holder
+                val bitmap = if (isLatest) latestArtworkBitmap?.get() else null
+                val palette = if (isLatest) latestArtworkPalette else null
+                callbacks.add(arrayListOf(callback, holder, data, bitmap, palette?.copyOf()))
+            }
+        }
+        cleanup()
+        return callbacks
+    }
+
+    fun restoreDynamicHooks(
+        xposedModule: XposedModule,
+        methods: List<Method>,
+        classLoaders: Iterable<ClassLoader>,
+    ) {
+        if (methods.isEmpty()) return
+        classLoaders.forEach { loader ->
+            val holderClass = try {
+                loader.loadClass(ICON_HOLDER_CLASS)
+            } catch (_: ClassNotFoundException) {
+                return@forEach
+            }
+            val api = IslandMusicWaveNativeApi.create(holderClass)
+            val dataField = holderClass.getDeclaredField("data").apply { isAccessible = true }
+            methods.filter { it in api.callbackMethods(it.declaringClass) }.forEach { method ->
+                installNativeGradientHook(xposedModule, method, dataField)
+            }
+        }
+    }
+
+    fun adoptHotReloadCallbacks(callbacks: List<*>) {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        callbacks.forEach { raw ->
+            val entry = raw as? ArrayList<*> ?: return@forEach
+            val callback = entry.getOrNull(0) ?: return@forEach
+            val holder = entry.getOrNull(1) ?: return@forEach
+            val data = entry.getOrNull(2) ?: return@forEach
+            runCatching {
+                val holderClass = holder.javaClass
+                val api = IslandMusicWaveNativeApi.create(holderClass)
+                val dataField = holderClass.getDeclaredField("data").apply { isAccessible = true }
+                if (dataField.get(holder) !== data) return@runCatching
+                val picInfo = holderClass.getDeclaredField("picInfo").apply { isAccessible = true }.get(holder)
+                if (!isMusicWave(picInfo)) return@runCatching
+                val methods = api.callbackMethods(callback.javaClass)
+                check(methods.isNotEmpty()) { "Transferred music-wave callback is incompatible" }
+                methods.forEach { installNativeGradientHook(requireNotNull(module), it, dataField) }
+                val view = holderClass.getDeclaredField("lottieView").apply { isAccessible = true }
+                    .get(holder) as? View ?: return@runCatching
+                val target = IslandModificationTargetPolicy.resolve(
+                    data, IslandProbeUtils.getHolderRootView(holder)
+                )
+                if (!target.isMediaTarget) {
+                    return@runCatching
+                }
+                trackHolder(holder, data, view)
+                synchronized(callbackHolders) { callbackHolders[callback] = WeakReference(holder) }
+                val bitmap = runCatching {
+                    holderClass.getDeclaredField("cachedBitmap").apply { isAccessible = true }.get(holder)
+                }.getOrNull() as? Bitmap
+                val palette = entry.getOrNull(4) as? IntArray
+                if (palette != null && bitmap != null && bitmap === entry.getOrNull(3)) {
+                    latestArtworkHolder = WeakReference(holder)
+                    latestArtworkPalette = palette.copyOf()
+                    latestArtworkBitmap = WeakReference(bitmap)
+                }
+            }.onFailure { HookLogger.e(TAG, "接管音频律动颜色回调失败", it) }
+        }
+        refresh()
+    }
+
+    private fun installNativeGradientHook(xposedModule: XposedModule, method: Method, dataField: Field?) {
+        synchronized(hookedGradientMethods) {
+            if (method in hookedGradientMethods) return
+            method.isAccessible = true
+            xposedModule.managedHook(
+                executable = method,
+                capability = NATIVE_GRADIENT_CAPABILITY,
+                hooker = NativeGradientValueHook(dataField),
+            )
+            hookedGradientMethods.add(method)
+        }
+    }
+
     fun cleanup() {
         runOnMain {
             generation++
@@ -217,6 +315,7 @@ internal object IslandMusicWaveColorHooker {
             }
             latestArtworkHolder = null
             latestArtworkPalette = null
+            latestArtworkBitmap = null
             hookedClassLoaders.clear()
             callbackColors = null
             module = null
@@ -337,15 +436,18 @@ internal object IslandMusicWaveColorHooker {
 
     private fun rememberArtworkPalette(
         holder: Any,
-        palette: Pair<IntArray, IntArray>?
+        palette: Pair<IntArray, IntArray>?,
+        bitmap: Bitmap?,
     ) {
         if (palette == null || palette.first.isEmpty() && palette.second.isEmpty()) {
             latestArtworkHolder = null
             latestArtworkPalette = null
+            latestArtworkBitmap = null
             return
         }
         latestArtworkHolder = WeakReference(holder)
         latestArtworkPalette = palette.second.copyOf()
+        latestArtworkBitmap = bitmap?.let(::WeakReference)
     }
 
     private fun untrackHolder(holder: Any) {
@@ -433,7 +535,7 @@ internal object IslandMusicWaveColorHooker {
                         }
                         val lottieView = lottieViewField.get(holder) as? View
                         trackHolder(holder, data, lottieView)
-                        rememberArtworkPalette(holder, artworkPalette)
+                        rememberArtworkPalette(holder, artworkPalette, bitmap)
                         refresh()
                     }.onFailure { HookLogger.e(TAG, "应用音频律动封面色失败", it) }
                 }
@@ -456,17 +558,7 @@ internal object IslandMusicWaveColorHooker {
                 val methods = api.callbackMethods(callback.javaClass)
                 check(methods.isNotEmpty()) { "Native music-wave value callback unavailable" }
                 methods.forEach { method ->
-                    synchronized(hookedGradientMethods) {
-                        if (method !in hookedGradientMethods) {
-                            method.isAccessible = true
-                            requireNotNull(module).managedHook(
-                                executable = method,
-                                capability = "island.music_wave.native_gradient",
-                                hooker = NativeGradientValueHook(dataField),
-                            )
-                            hookedGradientMethods.add(method)
-                        }
-                    }
+                    installNativeGradientHook(requireNotNull(module), method, dataField)
                 }
                 synchronized(callbackHolders) { callbackHolders[callback] = WeakReference(holder) }
             }.onFailure { HookLogger.e(TAG, "跟踪原生音频律动颜色回调失败", it) }
@@ -534,13 +626,13 @@ internal object IslandMusicWaveColorHooker {
             }
             return result
         }
+    }
 
-        private fun isMusicWave(picInfo: Any?): Boolean {
-            val pic = picInfo?.javaClass?.methods
-                ?.firstOrNull { it.name == "getPic" && it.parameterTypes.isEmpty() }
-                ?.invoke(picInfo) as? String
-            return pic == "musicWave" || pic == "musicPause"
-        }
+    private fun isMusicWave(picInfo: Any?): Boolean {
+        val pic = picInfo?.javaClass?.methods
+            ?.firstOrNull { it.name == "getPic" && it.parameterTypes.isEmpty() }
+            ?.invoke(picInfo) as? String
+        return pic == "musicWave" || pic == "musicPause"
     }
 
     private data class TrackedHolder(

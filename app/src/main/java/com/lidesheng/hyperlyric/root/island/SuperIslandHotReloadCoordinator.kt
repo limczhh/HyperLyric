@@ -42,7 +42,7 @@ internal class SuperIslandHotReloadCoordinator(
             IslandProgressGlowController.clearAll()
             IslandProgressGlowHooker.cleanupForHotReload()
             IslandAlbumCoverStyleHooker.cleanup()
-            IslandMusicWaveColorHooker.cleanup()
+            val musicWaveCallbacks = IslandMusicWaveColorHooker.prepareForHotReload()
             IslandMediaSwipeHooker.prepareForHotReload()
             IslandNativeRefreshCoordinator.clear()
             // Strip status-bar module views only after the other fallible cleanup checks pass.
@@ -50,6 +50,7 @@ internal class SuperIslandHotReloadCoordinator(
             HotReloadTransfers(
                 islandHosts = islandHosts,
                 statusBarRoots = statusBarRoots,
+                musicWaveCallbacks = musicWaveCallbacks,
             )
         }
 
@@ -132,6 +133,7 @@ internal class SuperIslandHotReloadCoordinator(
     internal data class HotReloadTransfers(
         val islandHosts: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
         val statusBarRoots: List<ViewGroup>,
+        val musicWaveCallbacks: ArrayList<Any?>,
     )
 
     private companion object {

@@ -57,6 +57,10 @@ internal object HookRuntimeRegistry {
         return synchronized(lock) { owners[module] }?.unmatched().orEmpty()
     }
 
+    /** Dynamic hooks must be reclaimed before their next native registration event. */
+    fun pendingExecutables(module: XposedModule, capability: String): List<Executable> =
+        synchronized(lock) { owners[module] }?.pendingExecutables(capability).orEmpty()
+
     /** Stop and wait for hooks installed by a failed new generation before releasing it. */
     fun abortAndAwait(module: XposedModule, timeout: Long, unit: TimeUnit): Boolean {
         return synchronized(lock) { owners[module] }?.abortAndAwait(timeout, unit) ?: true
@@ -333,6 +337,11 @@ internal object HookRuntimeRegistry {
             oldHandles.flatMap { (key, handles) ->
                 List(handles.size) { key.signature }
             }
+        }
+
+        internal fun pendingExecutables(capability: String): List<Executable> = synchronized(records) {
+            oldHandles.filterKeys { capabilityFromId(it.id) == capability }
+                .values.flatten().map { it.executable }.distinct()
         }
 
         internal fun forget(handle: HookHandle) {
