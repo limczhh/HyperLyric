@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">HyperLyric</string>
-  <string name="app_description">إحضار كلمات HyperIsland إلى Xiaomi HyperOS 3</string>
+  <string name="app_description">يوفّر كلمات الأغاني على مستوى النظام لأجهزة Xiaomi</string>
   <string name="label_lyric_listener_service">مستمع معلومات الوسائط</string>
   <string name="label_lyric_enable_service">مراقب الوسائط HyperLyric</string>
   <string name="unknown">غير معروف</string>
@@ -205,11 +205,11 @@
   <string name="summary_show_progress">متعطّلوش على أنظمة تانية! اتعمله اختبار بس على HyperOS 3</string>
   <string name="title_progress_color">لون شريط التقدّم</string>
   <string name="title_lyric_highlight_color">لون تمييز الكلمات</string>
-  <string name="title_song_info_highlight_color">لون تمييز معلومات الأغنية</string>
+  <string name="title_song_info_highlight_color">لون تمييز معلومات الموسيقى</string>
   <string name="summary_progress_color">يسري المفعول بعد تغيير المقطع</string>
   <string name="title_show_album_art">عرض غلاف الألبوم</string>
   <string name="title_focus_style">نمط بؤرة الإشعارات</string>
-  <string name="title_song_info">معلومات الأغنية</string>
+  <string name="title_song_info">معلومات الموسيقى</string>
   <string name="option_info_none">بدون</string>
   <string name="option_info_title">العنوان</string>
   <string name="option_info_artist">الفنان</string>
@@ -284,8 +284,8 @@
   <string name="title_marquee_speed">سرعة الشريط المتحرك</string>
   <string name="label_marquee_speed_range">النطاق: 5 ~ 100</string>
   <string name="title_marquee_metadata_speed">سرعة الشريط المتحرك</string>
-  <string name="title_marquee_metadata_mode">شريط بيانات الأغنية المتحرك</string>
-  <string name="summary_marquee_metadata_mode">تمرير شريط متحرك لمعلومات الأغنية</string>
+  <string name="title_marquee_metadata_mode">شريط بيانات الموسيقى المتحرك</string>
+  <string name="summary_marquee_metadata_mode">تمرير شريط متحرك لمعلومات الموسيقى</string>
   <string name="title_marquee_metadata_delay">تأخير بداية الشريط المتحرك</string>
   <string name="title_marquee_metadata_loop">فاصل التكرار</string>
   <string name="title_marquee_metadata_infinite">تكرار لا نهائي</string>
@@ -535,7 +535,7 @@
   <string name="setup_root_permission_summary">تتيح إعادة تشغيل واجهة النظام من التطبيق بسهولة. يظل التطبيق قابلاً للاستخدام بدون Root، لكن يجب إعادة تشغيل واجهة النظام يدوياً.</string>
   <string name="title_select_work_mode">اختيار وضع العمل</string>
   <string name="title_grant_permissions">منح الأذونات</string>
-  <string name="summary_permission_listener">قراءة حالة التشغيل ومعلومات الأغنية</string>
+  <string name="summary_permission_listener">قراءة حالة التشغيل ومعلومات الموسيقى</string>
   <string name="summary_permission_post_notification">السماح للتطبيق بإرسال إشعارات لعرض الكلمات</string>
   <string name="summary_add_whitelist">اختيار تطبيقات الموسيقى لعرض الكلمات</string>
   <string name="title_setup_complete">اكتمل الإعداد</string>

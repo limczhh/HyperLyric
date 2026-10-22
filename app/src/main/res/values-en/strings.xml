@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HyperLyric</string>
-    <string name="app_description">Brings HyperIsland lyrics to xiaomi HyperOS 3</string>
+    <string name="app_description">Brings system-level lyrics to Xiaomi devices</string>
     <string name="label_lyric_listener_service">Media Information Listener</string>
     <string name="label_lyric_enable_service">HyperLyric Media Monitor</string>
 
@@ -278,11 +278,11 @@
     <string name="summary_show_progress">Do not disable on other systems! Only tested on HyperOS 3</string>
     <string name="title_progress_color">Progress Bar Accent Color</string>
     <string name="title_lyric_highlight_color">Lyric Highlight Color</string>
-    <string name="title_song_info_highlight_color">Song Info Highlight Color</string>
+    <string name="title_song_info_highlight_color">Music Info Highlight Color</string>
     <string name="summary_progress_color">Takes effect after track change</string>
     <string name="title_show_album_art">Show Album Art</string>
     <string name="title_focus_style">Notification Spotlight Style</string>
-    <string name="title_song_info">Song Info</string>
+    <string name="title_song_info">Music Info</string>
     <string name="option_info_none">None</string>
     <string name="option_info_title">Title</string>
     <string name="option_info_artist">Artist</string>
@@ -365,8 +365,8 @@
     <string name="title_marquee_speed">Marquee Speed</string>
     <string name="label_marquee_speed_range">Range: 5 ~ 100</string>
     <string name="title_marquee_metadata_speed">Marquee Speed</string>
-    <string name="title_marquee_metadata_mode">Metadata Marquee</string>
-    <string name="summary_marquee_metadata_mode">Marquee scrolling for song info</string>
+    <string name="title_marquee_metadata_mode">Music Info Marquee</string>
+    <string name="summary_marquee_metadata_mode">Marquee scrolling for music info</string>
     <string name="title_marquee_metadata_delay">Initial Marquee Delay</string>
     <string name="title_marquee_metadata_loop">Loop Interval</string>
     <string name="title_marquee_metadata_infinite">Infinite Loop</string>
@@ -645,7 +645,7 @@
     <string name="setup_root_permission_summary">Lets you restart SystemUI from the app for convenience. The app remains usable without root, but SystemUI must be restarted manually.</string>
     <string name="title_select_work_mode">Select Work Mode</string>
     <string name="title_grant_permissions">Grant Permissions</string>
-    <string name="summary_permission_listener">Read playback state and song info</string>
+    <string name="summary_permission_listener">Read playback state and music info</string>
     <string name="summary_permission_post_notification">Allow the app to send notifications to display lyrics</string>
     <string name="summary_add_whitelist">Select music apps to display lyrics</string>
     <string name="title_setup_complete">Configuration complete</string>

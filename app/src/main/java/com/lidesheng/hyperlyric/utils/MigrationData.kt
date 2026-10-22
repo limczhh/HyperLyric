@@ -14,6 +14,15 @@ data class MigrationNote(
 object MigrationData {
     val notes = listOf(
         MigrationNote(
+            versionCode = 1942,
+            items = listOf(
+                MigrationItem(
+                    text = "温馨提示",
+                    summary = "本次更新针对澎湃 4 上大多数失效的功能做了修复，欢迎携带前往 GitHub 反馈问题",
+                )
+            )
+        ),
+        MigrationNote(
             versionCode = 1939,
             items = listOf(
                 MigrationItem(

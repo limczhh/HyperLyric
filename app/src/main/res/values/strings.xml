@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HyperLyric</string>
-    <string name="app_description">为小米 HyperOS 3 带来超级岛歌词</string>
+    <string name="app_description">为小米设备带来系统级歌词</string>
     <string name="label_lyric_listener_service">获取媒体信息权限</string>
     <string name="label_lyric_enable_service">HyperLyric媒体信息监听</string>
 
@@ -278,11 +278,11 @@
     <string name="summary_show_progress">其他系统切勿关闭！仅通过澎湃3设备测试</string>
     <string name="title_progress_color">进度条强调色</string>
     <string name="title_lyric_highlight_color">歌词强调色</string>
-    <string name="title_song_info_highlight_color">歌曲信息强调色</string>
+    <string name="title_song_info_highlight_color">音乐信息强调色</string>
     <string name="summary_progress_color">切歌后生效</string>
     <string name="title_show_album_art">显示专辑封面</string>
     <string name="title_focus_style">焦点通知样式</string>
-    <string name="title_song_info">歌曲信息</string>
+    <string name="title_song_info">音乐信息</string>
     <string name="option_info_none">无</string>
     <string name="option_info_title">标题</string>
     <string name="option_info_artist">艺术家</string>
@@ -364,8 +364,8 @@
     <string name="title_marquee_speed">滚动速度</string>
     <string name="label_marquee_speed_range">范围：5 ~ 100</string>
     <string name="title_marquee_metadata_speed">滚动速度</string>
-    <string name="title_marquee_metadata_mode">歌曲信息滚动</string>
-    <string name="summary_marquee_metadata_mode">针对歌曲信息</string>
+    <string name="title_marquee_metadata_mode">音乐信息滚动</string>
+    <string name="summary_marquee_metadata_mode">针对音乐信息</string>
     <string name="title_marquee_metadata_delay">初始滚动延迟</string>
     <string name="title_marquee_metadata_loop">循环间隔</string>
     <string name="title_marquee_metadata_infinite">无限循环</string>
@@ -654,7 +654,7 @@
     <string name="setup_root_permission_summary">用于在应用内重启系统界面，方便配置生效。没有 Root 权限也可以正常使用应用，但需要手动重启系统界面。</string>
     <string name="title_select_work_mode">选择应用工作模式</string>
     <string name="title_grant_permissions">授予必要权限</string>
-    <string name="summary_permission_listener">读取播放状态和歌曲信息</string>
+    <string name="summary_permission_listener">读取播放状态和音乐信息</string>
     <string name="summary_permission_post_notification">允许app发送通知以显示歌词</string>
     <string name="summary_add_whitelist">勾选需要显示歌词的音乐App</string>
     <string name="title_setup_complete">配置完成</string>
