@@ -48,6 +48,10 @@ object MediaProgressStyleHooker {
         "com.android.systemui.statusbar.notification.mediaisland.MiuiIslandMediaViewBinderImpl"
     private const val PROGRESS_CLASS =
         "com.android.systemui.media.controls.ui.viewmodel.SeekBarViewModel\$Progress"
+    private const val RENDER_STATE_CLASS =
+        "com.android.systemui.statusbar.notification.mediacontrol.MiuiSeekBarRenderState"
+    private const val MEDIA_DATA_CLASS =
+        "com.android.systemui.media.controls.shared.model.MediaData"
     private const val SEEK_BAR_VIEW_MODEL_CLASS =
         "com.android.systemui.media.controls.ui.viewmodel.SeekBarViewModel"
     private const val SEEK_BAR_CHANGE_LISTENER_CLASS =
@@ -155,8 +159,7 @@ object MediaProgressStyleHooker {
 
         if (
             style == RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE &&
-            (api.observerOnChanged == null || api.attachMethod == null ||
-                api.controllerSeekBarViewModelField == null)
+            (!api.hasProgressCallback || api.attachMethod == null || !api.hasViewModelSource)
         ) {
             HookLogger.w(TAG, "通知中心进度或拖动接口不可用，跳过波浪进度条替换")
             return 0
@@ -178,9 +181,16 @@ object MediaProgressStyleHooker {
         }
 
         if (style == RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE) {
-            api.observerOnChanged?.let { method ->
-                installMethod(xposedModule, method, NotificationProgressHook(api)) {
+            val renderStateMethod = api.renderStateMethod.takeIf { api.usesRenderState }
+            if (renderStateMethod != null) {
+                installMethod(xposedModule, renderStateMethod, NotificationRenderStateHook(api)) {
                     installed++
+                }
+            } else {
+                api.observerOnChanged?.let { method ->
+                    installMethod(xposedModule, method, NotificationProgressHook(api)) {
+                        installed++
+                    }
                 }
             }
             api.attachMethod?.let { method ->
@@ -247,6 +257,11 @@ object MediaProgressStyleHooker {
             HookLogger.w(TAG, "超级岛进度条接口不可用: reason=${it.message}")
         }.getOrNull() ?: return 0
 
+        if (!api.hasProgressCallback || !api.hasViewModelSource) {
+            HookLogger.w(TAG, "超级岛进度或拖动接口不可用，跳过波浪进度条替换")
+            return 0
+        }
+
         var installed = 0
         api.holderConstructors.forEach { constructor ->
             runCatching {
@@ -261,8 +276,17 @@ object MediaProgressStyleHooker {
                 HookLogger.e(TAG, "安装超级岛进度条构造 Hook 失败", it)
             }
         }
-        installMethod(xposedModule, api.seekBarChangedMethod, IslandProgressHook(api)) {
-            installed++
+        val renderStateMethod = api.renderStateMethod.takeIf { api.usesRenderState }
+        if (renderStateMethod != null) {
+            installMethod(xposedModule, renderStateMethod, IslandRenderStateHook(api)) {
+                installed++
+            }
+        } else {
+            api.seekBarChangedMethod?.let { method ->
+                installMethod(xposedModule, method, IslandProgressHook(api)) {
+                    installed++
+                }
+            }
         }
         api.attachMethod?.let { method ->
             installMethod(xposedModule, method, IslandBinderHook(api, Action.ATTACH)) {
@@ -346,6 +370,27 @@ object MediaProgressStyleHooker {
         }
     }
 
+    private class NotificationRenderStateHook(private val api: NotificationApi) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val result = chain.proceed()
+            if (!MediaCardRuntimeConfig.current.enabled) return result
+            val controller = chain.thisObject ?: return result
+            val state = chain.args.getOrNull(0) ?: return result
+            runCatching {
+                val holder = api.getHolder(controller) ?: return@runCatching
+                api.common?.updateRenderState(
+                    holder = holder,
+                    state = state,
+                    isIsland = false,
+                    mediaData = api.getMediaData(controller)
+                )
+            }.onFailure {
+                HookLogger.e(TAG, "更新通知中心波浪进度条失败", it)
+            }
+            return result
+        }
+    }
+
     private class IslandProgressHook(private val api: IslandApi) : Hooker {
         override fun intercept(chain: Chain): Any? {
             if (!MediaCardRuntimeConfig.current.enabled) return chain.proceed()
@@ -356,6 +401,18 @@ object MediaProgressStyleHooker {
             } else {
                 chain.proceed()
             }
+        }
+    }
+
+    private class IslandRenderStateHook(private val api: IslandApi) : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val result = chain.proceed()
+            if (!MediaCardRuntimeConfig.current.enabled) return result
+            val binder = chain.thisObject ?: return result
+            val state = chain.args.getOrNull(0) ?: return result
+            runCatching { api.updateRenderState(binder, state) }
+                .onFailure { HookLogger.e(TAG, "更新超级岛波浪进度条失败", it) }
+            return result
         }
     }
 
@@ -370,6 +427,10 @@ object MediaProgressStyleHooker {
             if (enabled && action == Action.NATIVE_GLOW_ATTACH) {
                 runCatching { chain.args.firstOrNull()?.let(api::replaceWithNativeGlow) }
                     .onFailure { HookLogger.e(TAG, "初始化通知中心光辉进度条失败", it) }
+            }
+            if (enabled && action == Action.ATTACH) {
+                runCatching { chain.args.firstOrNull()?.let(api::replaceWithWave) }
+                    .onFailure { HookLogger.e(TAG, "初始化通知中心波浪进度条失败", it) }
             }
             // Native detach() clears controller.holder before returning.
             val detachedHolder = if (enabled && action == Action.DETACH) {
@@ -412,6 +473,14 @@ object MediaProgressStyleHooker {
         private val action: Action
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
+            if (
+                MediaCardRuntimeConfig.current.enabled &&
+                action == Action.ATTACH
+            ) {
+                runCatching {
+                    chain.args.take(2).filterNotNull().forEach(api::replaceWithWave)
+                }.onFailure { HookLogger.e(TAG, "初始化超级岛波浪进度条失败", it) }
+            }
             val result = chain.proceed()
             if (!MediaCardRuntimeConfig.current.enabled) return result
             val binder = chain.thisObject ?: return result
@@ -448,8 +517,13 @@ object MediaProgressStyleHooker {
         private val durationField: Field,
         private val elapsedTimeField: Field,
         private val falsingManagerField: Field,
-        private val seekBarChangeListenerConstructor: Constructor<*>
+        private val seekBarChangeListenerConstructor: Constructor<*>,
+        private val renderStateApi: RenderStateApi?,
+        private val mediaDataIsPlayingField: Field?
     ) {
+        val supportsRenderState: Boolean
+            get() = renderStateApi != null
+
         @SuppressLint("SetTextI18n")
         fun updateProgress(holder: Any, progress: Any, isIsland: Boolean): Boolean {
             val seekBar = waveSeekBars[holder] ?: return false
@@ -488,6 +562,59 @@ object MediaProgressStyleHooker {
             return true
         }
 
+        @SuppressLint("SetTextI18n")
+        fun updateRenderState(
+            holder: Any,
+            state: Any,
+            isIsland: Boolean,
+            mediaData: Any?
+        ): Boolean {
+            val seekBar = waveSeekBars[holder] ?: return false
+            val holderApi = if (isIsland) {
+                IslandApi.currentHolderFields
+            } else {
+                NotificationApi.currentHolderFields
+            } ?: return false
+            val stateApi = renderStateApi ?: return false
+            val elapsedTimeView = holderApi.elapsedTimeField.get(holder) as? TextView
+            val totalTimeView = holderApi.totalTimeField.get(holder) as? TextView
+            val enabled = stateApi.enabledField.getBoolean(state)
+            val seekAvailable = stateApi.seekAvailableField.getBoolean(state)
+            val scrubbing = stateApi.scrubbingField.getBoolean(state)
+            if (enabled) {
+                seekBar.isEnabled = seekAvailable
+                seekBar.max = stateApi.durationField.getInt(state)
+                (stateApi.elapsedTimeField.get(state) as? Int)?.let { elapsedTime ->
+                    if (!scrubbing) seekBar.progress = elapsedTime
+                }
+                (stateApi.elapsedTimeTextField.get(state) as? CharSequence)?.let {
+                    elapsedTimeView?.text = it
+                }
+                (stateApi.totalTimeTextField.get(state) as? CharSequence)?.let {
+                    totalTimeView?.text = it
+                }
+                seekBar.contentDescription =
+                    stateApi.contentDescriptionField.get(state) as? CharSequence
+                seekBar.animate = readIsPlaying(mediaData) && !scrubbing
+                seekBar.transitionEnabled = !seekAvailable
+            } else {
+                seekBar.isEnabled = false
+                seekBar.progress = 0
+                seekBar.contentDescription = ""
+                seekBar.animate = false
+                elapsedTimeView?.text = "00:00"
+                totalTimeView?.text = "00:00"
+            }
+            return true
+        }
+
+        private fun readIsPlaying(mediaData: Any?): Boolean {
+            if (mediaData == null) return false
+            return runCatching {
+                mediaDataIsPlayingField?.get(mediaData) as? Boolean ?: false
+            }.getOrDefault(false)
+        }
+
         fun createChangeListener(viewModel: Any): SeekBar.OnSeekBarChangeListener? {
             val falsingManager = falsingManagerField.get(viewModel) ?: return null
             return seekBarChangeListenerConstructor.newInstance(
@@ -517,7 +644,42 @@ object MediaProgressStyleHooker {
                     durationField = field(progressClass, "duration"),
                     elapsedTimeField = field(progressClass, "elapsedTime"),
                     falsingManagerField = field(viewModelClass, "falsingManager"),
-                    seekBarChangeListenerConstructor = listenerConstructor
+                    seekBarChangeListenerConstructor = listenerConstructor,
+                    renderStateApi = runCatching {
+                        RenderStateApi.create(classLoader.loadClass(RENDER_STATE_CLASS))
+                    }.getOrNull(),
+                    mediaDataIsPlayingField = runCatching {
+                        field(classLoader.loadClass(MEDIA_DATA_CLASS), "isPlaying")
+                    }.getOrNull()
+                )
+            }
+        }
+    }
+
+    private class RenderStateApi private constructor(
+        val enabledField: Field,
+        val seekAvailableField: Field,
+        val scrubbingField: Field,
+        val elapsedTimeField: Field,
+        val durationField: Field,
+        val elapsedTimeTextField: Field,
+        val totalTimeTextField: Field,
+        val contentDescriptionField: Field
+    ) {
+        companion object {
+            fun create(stateClass: Class<*>): RenderStateApi {
+                fun field(name: String) = stateClass.getDeclaredField(name).apply {
+                    isAccessible = true
+                }
+                return RenderStateApi(
+                    enabledField = field("enabled"),
+                    seekAvailableField = field("seekAvailable"),
+                    scrubbingField = field("scrubbing"),
+                    elapsedTimeField = field("elapsedMs"),
+                    durationField = field("durationMs"),
+                    elapsedTimeTextField = field("elapsedTimeText"),
+                    totalTimeTextField = field("totalTimeText"),
+                    contentDescriptionField = field("contentDescription")
                 )
             }
         }
@@ -552,12 +714,26 @@ object MediaProgressStyleHooker {
         private val observerOuterField: Field?,
         private val controllerHolderField: Field,
         val controllerSeekBarViewModelField: Field?,
+        private val controllerProgressOwnerField: Field?,
+        private val progressOwnerViewModelField: Field?,
+        private val controllerMediaDataField: Field?,
         val observerOnChanged: Method?,
+        val renderStateMethod: Method?,
         val attachMethod: Method?,
         val detachMethod: Method?,
         val fullAodMethod: Method?,
         val updateForegroundColorsMethod: Method?
     ) {
+        val hasProgressCallback: Boolean
+            get() = usesRenderState || observerOnChanged != null
+
+        val usesRenderState: Boolean
+            get() = renderStateMethod != null && common?.supportsRenderState == true
+
+        val hasViewModelSource: Boolean
+            get() = controllerSeekBarViewModelField != null ||
+                (controllerProgressOwnerField != null && progressOwnerViewModelField != null)
+
         fun replaceWithWave(holder: Any): SeekBar? {
             currentHolderFields = holderFields
             return replaceWithWaveSeekBar(
@@ -636,10 +812,18 @@ object MediaProgressStyleHooker {
 
         fun getHolder(controller: Any): Any? = controllerHolderField.get(controller)
 
+        fun getMediaData(controller: Any): Any? = controllerMediaDataField?.get(controller)
+
+        private fun getSeekBarViewModel(controller: Any): Any? {
+            controllerSeekBarViewModelField?.get(controller)?.let { return it }
+            val owner = controllerProgressOwnerField?.get(controller) ?: return null
+            return progressOwnerViewModelField?.get(owner)
+        }
+
         fun attachWaveListener(controller: Any) {
             val holder = getHolder(controller) ?: return
             val seekBar = replaceWithWave(holder) ?: return
-            val viewModel = controllerSeekBarViewModelField?.get(controller) ?: return
+            val viewModel = getSeekBarViewModel(controller) ?: return
             val listener = common?.createChangeListener(viewModel) ?: return
             seekBar.setOnSeekBarChangeListener(listener)
         }
@@ -681,6 +865,7 @@ object MediaProgressStyleHooker {
                 }.getOrNull()
                 val seekBarClass = classLoader.loadClass(HYPER_PROGRESS_SEEK_BAR_CLASS)
                 val holderFields = holderFields(holderClass)
+                val progressOwner = findField(controllerClass, "seekBarProgressOwner")
                 val observerOuter = observerClass?.let {
                     findField(it, "this\$0")
                 }
@@ -701,9 +886,15 @@ object MediaProgressStyleHooker {
                         .apply { isAccessible = true },
                     controllerSeekBarViewModelField =
                         findField(controllerClass, "seekBarViewModel"),
+                    controllerProgressOwnerField = progressOwner,
+                    progressOwnerViewModelField = progressOwner?.let {
+                        findField(it.type, "seekBarViewModel")
+                    },
+                    controllerMediaDataField = findField(controllerClass, "mediaData"),
                     observerOnChanged = observerClass?.declaredMethods?.firstOrNull {
                         it.name == "onChanged" && it.parameterCount == 1
                     },
+                    renderStateMethod = findMethod(controllerClass, "onRenderState", 1),
                     attachMethod = findMethod(controllerClass, "attach"),
                     detachMethod = findMethod(controllerClass, "detach"),
                     fullAodMethod = findMethod(controllerClass, "onFullAodStateChanged", 1),
@@ -720,11 +911,25 @@ object MediaProgressStyleHooker {
         private val holderFields: HolderFields,
         private val binderHolderField: Field,
         private val binderDummyHolderField: Field,
-        private val binderSeekBarViewModelField: Field,
-        val seekBarChangedMethod: Method,
+        private val binderSeekBarViewModelField: Field?,
+        private val binderProgressOwnerField: Field?,
+        private val progressOwnerViewModelField: Field?,
+        private val binderMediaDataField: Field?,
+        val seekBarChangedMethod: Method?,
+        val renderStateMethod: Method?,
         val attachMethod: Method?,
         val detachMethod: Method?
     ) {
+        val hasProgressCallback: Boolean
+            get() = usesRenderState || seekBarChangedMethod != null
+
+        val usesRenderState: Boolean
+            get() = renderStateMethod != null && common.supportsRenderState
+
+        val hasViewModelSource: Boolean
+            get() = binderSeekBarViewModelField != null ||
+                (binderProgressOwnerField != null && progressOwnerViewModelField != null)
+
         fun replaceWithWave(holder: Any): SeekBar? {
             currentHolderFields = holderFields
             return replaceWithWaveSeekBar(
@@ -740,12 +945,28 @@ object MediaProgressStyleHooker {
         )
 
         fun attachWaveListeners(binder: Any) {
-            val viewModel = binderSeekBarViewModelField.get(binder) ?: return
+            val viewModel = binderSeekBarViewModelField?.get(binder)
+                ?: run {
+                    val owner = binderProgressOwnerField?.get(binder) ?: return
+                    progressOwnerViewModelField?.get(owner)
+                } ?: return
             getHolders(binder).forEach { holder ->
                 val seekBar = replaceWithWave(holder) ?: return@forEach
                 common.createChangeListener(viewModel)?.let { listener ->
                     seekBar.setOnSeekBarChangeListener(listener)
                 }
+            }
+        }
+
+        fun updateRenderState(binder: Any, state: Any) {
+            val mediaData = binderMediaDataField?.get(binder)
+            getHolders(binder).forEach { holder ->
+                common.updateRenderState(
+                    holder = holder,
+                    state = state,
+                    isIsland = true,
+                    mediaData = mediaData
+                )
             }
         }
 
@@ -764,19 +985,28 @@ object MediaProgressStyleHooker {
                     Modifier.isStatic(method.modifiers) &&
                         method.parameterCount == 3 &&
                         method.name.contains("seekBarChanged")
-                } ?: error("Island seekBarChanged callback unavailable")
+                }
+                val renderStateMethod = findMethod(binderClass, "onRenderState", 1)
+                if (seekBarChanged == null && renderStateMethod == null) {
+                    error("Island progress callback unavailable")
+                }
+                val progressOwner = findField(binderClass, "seekBarProgressOwner")
                 return IslandApi(
                     common = common,
                     holderConstructors = holderClass.declaredConstructors.toList(),
                     holderFields = holderFields(holderClass),
-                    binderHolderField = binderClass.getDeclaredField("holder")
-                        .apply { isAccessible = true },
-                    binderDummyHolderField = binderClass.getDeclaredField("dummyHolder")
-                        .apply { isAccessible = true },
-                    binderSeekBarViewModelField =
-                        binderClass.getDeclaredField("seekBarViewModel")
-                            .apply { isAccessible = true },
+                    binderHolderField = findField(binderClass, "holder")
+                        ?: error("Island holder field unavailable"),
+                    binderDummyHolderField = findField(binderClass, "dummyHolder")
+                        ?: error("Island dummy holder field unavailable"),
+                    binderSeekBarViewModelField = findField(binderClass, "seekBarViewModel"),
+                    binderProgressOwnerField = progressOwner,
+                    progressOwnerViewModelField = progressOwner?.let {
+                        findField(it.type, "seekBarViewModel")
+                    },
+                    binderMediaDataField = findField(binderClass, "mediaData"),
                     seekBarChangedMethod = seekBarChanged,
+                    renderStateMethod = renderStateMethod,
                     attachMethod = findMethod(binderClass, "attach"),
                     detachMethod = findMethod(binderClass, "detach")
                 )
