@@ -21,6 +21,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun LazyListScope.homePageSections(
     quote: String,
     isDateSpecificQuote: Boolean,
+    hidePoetryCard: Boolean,
     onQuoteClick: () -> Unit,
     onQuoteLongPress: () -> Unit,
     onSuperIslandConfigClick: () -> Unit,
@@ -31,33 +32,35 @@ fun LazyListScope.homePageSections(
     onRemoveFocusWhitelistToggle: (Boolean) -> Unit,
     onAppSettingsClick: () -> Unit,
 ) {
-    item(key = "quote") {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .fillMaxWidth(),
-            colors = if (isDateSpecificQuote) {
-                CardDefaults.defaultColors(
-                    color = colorResource(R.color.quote_special_card_red),
-                    contentColor = colorResource(R.color.quote_special_text_red),
-                )
-            } else {
-                CardDefaults.defaultColors()
-            },
-            onClick = onQuoteClick,
-            onLongPress = onQuoteLongPress,
-        ) {
-            Text(
-                text = quote,
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-                color = if (isDateSpecificQuote) {
-                    colorResource(R.color.quote_special_text_red)
+    if (!hidePoetryCard) {
+        item(key = "quote") {
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .fillMaxWidth(),
+                colors = if (isDateSpecificQuote) {
+                    CardDefaults.defaultColors(
+                        color = colorResource(R.color.quote_special_card_red),
+                        contentColor = colorResource(R.color.quote_special_text_red),
+                    )
                 } else {
-                    MiuixTheme.colorScheme.onSurface
+                    CardDefaults.defaultColors()
                 },
-                modifier = Modifier.padding(16.dp)
-            )
+                onClick = onQuoteClick,
+                onLongPress = onQuoteLongPress,
+            ) {
+                Text(
+                    text = quote,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    color = if (isDateSpecificQuote) {
+                        colorResource(R.color.quote_special_text_red)
+                    } else {
+                        MiuixTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
         }
     }
 

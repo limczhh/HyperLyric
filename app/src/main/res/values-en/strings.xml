@@ -83,6 +83,7 @@
     <string name="summary_enable_blur">Enable blur effects for top and bottom bars</string>
     <string name="title_exclude_from_recents">Hide from Recents</string>
     <string name="title_hide_launcher_icon">Hide Launcher Icon</string>
+    <string name="title_hide_home_poetry_card">Hide Homepage Poetry Card</string>
     <string name="title_config_management">Configuration Management</string>
     <string name="toast_restore_empty">File content is empty</string>
     <string name="title_backup">Backup</string>

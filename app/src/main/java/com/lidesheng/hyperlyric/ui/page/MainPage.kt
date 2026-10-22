@@ -124,6 +124,14 @@ fun MainPage() {
             )
         )
     }
+    var hideHomePoetryCard by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                UIConstants.KEY_HIDE_HOME_POETRY_CARD,
+                UIConstants.DEFAULT_HIDE_HOME_POETRY_CARD
+            )
+        )
+    }
     var removeFocusWhitelist by remember {
         mutableStateOf(
             prefs.getBoolean(
@@ -143,6 +151,11 @@ fun MainPage() {
                     floatingNavBarEnabled = p.getBoolean(
                         UIConstants.KEY_FLOATING_NAV_BAR,
                         UIConstants.DEFAULT_FLOATING_NAV_BAR
+                    )
+                UIConstants.KEY_HIDE_HOME_POETRY_CARD ->
+                    hideHomePoetryCard = p.getBoolean(
+                        UIConstants.KEY_HIDE_HOME_POETRY_CARD,
+                        UIConstants.DEFAULT_HIDE_HOME_POETRY_CARD
                     )
 
             }
@@ -427,6 +440,7 @@ fun MainPage() {
                         outerPadding = innerPadding,
                         quote = dateSpecificQuote ?: randomQuote,
                         isDateSpecificQuote = dateSpecificQuote != null,
+                        hidePoetryCard = hideHomePoetryCard,
                         onQuoteClick = { randomQuote = QuotesData.list.random() },
                         onQuoteLongPress = { navigator.navigate(Route.Poetry) },
                         onSuperIslandConfigClick = { navigator.navigate(Route.HookSettings) },

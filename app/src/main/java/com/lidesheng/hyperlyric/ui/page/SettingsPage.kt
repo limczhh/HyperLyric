@@ -316,6 +316,24 @@ private fun LazyListScope.settingsSections(
                         )
                     }
                 )
+                var hideHomePoetryCard by remember {
+                    mutableStateOf(
+                        prefs.getBoolean(
+                            UIConstants.KEY_HIDE_HOME_POETRY_CARD,
+                            UIConstants.DEFAULT_HIDE_HOME_POETRY_CARD
+                        )
+                    )
+                }
+                SwitchPreference(
+                    title = stringResource(R.string.title_hide_home_poetry_card),
+                    checked = hideHomePoetryCard,
+                    onCheckedChange = {
+                        hideHomePoetryCard = it
+                        prefs.edit {
+                            putBoolean(UIConstants.KEY_HIDE_HOME_POETRY_CARD, it)
+                        }
+                    }
+                )
             }
         }
     }

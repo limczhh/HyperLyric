@@ -23,6 +23,7 @@ fun HomePage(
     outerPadding: PaddingValues,
     quote: String,
     isDateSpecificQuote: Boolean,
+    hidePoetryCard: Boolean,
     onQuoteClick: () -> Unit,
     onQuoteLongPress: () -> Unit,
     onSuperIslandConfigClick: () -> Unit,
@@ -71,6 +72,7 @@ fun HomePage(
                 homePageSections(
                     quote = quote,
                     isDateSpecificQuote = isDateSpecificQuote,
+                    hidePoetryCard = hidePoetryCard,
                     onQuoteClick = onQuoteClick,
                     onQuoteLongPress = onQuoteLongPress,
                     onSuperIslandConfigClick = onSuperIslandConfigClick,
