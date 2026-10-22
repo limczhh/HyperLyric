@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">HyperLyric</string>
     <string name="app_description">为小米 HyperOS 3 带来超级岛歌词</string>
     <string name="label_lyric_listener_service">获取媒体信息权限</string>
     <string name="label_lyric_enable_service">HyperLyric媒体信息监听</string>
@@ -645,17 +646,22 @@
     <string name="toast_shizuku_permission_required">请前往 Shizuku 授予权限</string>
 
     <!-- ———————————————————————— SetupPage ———————————————————————— -->
-    <string name="title_setup">引导页面</string>
     <string name="next">下一步</string>
+    <string name="setup_go_home">前往主页</string>
+    <string name="setup_app_list_permission_title">应用列表权限</string>
+    <string name="setup_app_list_permission_summary">用于统一管理和配置歌词提供器。没有此权限也可以正常使用应用。</string>
+    <string name="setup_root_permission_title">Root 权限</string>
+    <string name="setup_root_permission_summary">用于在应用内重启系统界面，方便配置生效。没有 Root 权限也可以正常使用应用，但需要手动重启系统界面。</string>
     <string name="title_select_work_mode">选择应用工作模式</string>
     <string name="title_grant_permissions">授予必要权限</string>
     <string name="summary_permission_listener">读取播放状态和歌曲信息</string>
     <string name="summary_permission_post_notification">允许app发送通知以显示歌词</string>
     <string name="summary_add_whitelist">勾选需要显示歌词的音乐App</string>
-    <string name="title_setup_complete">基础设置已完成</string>
+    <string name="title_setup_complete">配置完成</string>
+    <string name="setup_lyric_settings_title">歌词设置</string>
     <string name="title_disclaimer">免责声明</string>
     <string name="title_disclaimer_notice">温馨提示</string>
-    <string name="summary_disclaimer">Hook模式依赖系统级注入框架运行。\n\n启用后将修改系统界面的核心布局参数，极端情况下可能引发未知异常。\n\n请您务必知晓：因使用本模块导致的任何数据遗失或系统故障后果自负，开发者不承担任何直接或间接责任。</string>
+    <string name="summary_disclaimer">Hook 模式依赖系统级注入框架运行。\n\n启用后会修改系统界面，可能导致系统界面崩溃、显示异常或其他问题。\n\n请您务必知晓：因使用本模块导致的任何数据遗失或系统故障后果自负，开发者不承担任何直接或间接责任。</string>
     <string name="setup_completion_dynamic_island">请授予通知监听和发送通知权限后即可使用</string>
 
     <string name="setup_select_lyric_source">选择歌词源</string>

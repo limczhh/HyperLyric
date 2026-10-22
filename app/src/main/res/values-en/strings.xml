@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">HyperLyric</string>
     <string name="app_description">Brings HyperIsland lyrics to xiaomi HyperOS 3</string>
     <string name="label_lyric_listener_service">Media Information Listener</string>
     <string name="label_lyric_enable_service">HyperLyric Media Monitor</string>
@@ -636,17 +637,22 @@
     <string name="toast_shizuku_permission_required">Please go to Shizuku to grant permission</string>
 
     <!-- ———————————————————————— SetupPage ———————————————————————— -->
-    <string name="title_setup">Setup</string>
     <string name="next">Next</string>
+    <string name="setup_go_home">Go to Home</string>
+    <string name="setup_app_list_permission_title">App list access</string>
+    <string name="setup_app_list_permission_summary">Used to manage and configure lyric providers in one place. The app remains usable without this access.</string>
+    <string name="setup_root_permission_title">Root access</string>
+    <string name="setup_root_permission_summary">Lets you restart SystemUI from the app for convenience. The app remains usable without root, but SystemUI must be restarted manually.</string>
     <string name="title_select_work_mode">Select Work Mode</string>
     <string name="title_grant_permissions">Grant Permissions</string>
     <string name="summary_permission_listener">Read playback state and song info</string>
     <string name="summary_permission_post_notification">Allow the app to send notifications to display lyrics</string>
     <string name="summary_add_whitelist">Select music apps to display lyrics</string>
-    <string name="title_setup_complete">Setup Complete</string>
+    <string name="title_setup_complete">Configuration complete</string>
+    <string name="setup_lyric_settings_title">Lyric Settings</string>
     <string name="title_disclaimer">Disclaimer</string>
     <string name="title_disclaimer_notice">Notice</string>
-    <string name="summary_disclaimer">Hook mode relies on system-level injection framework.\n\nEnabling it will modify core layout parameters of SystemUI, which may cause unexpected issues in extreme cases.\n\nPlease be aware: the developer is not responsible for any data loss or system failures caused by using this module.</string>
+    <string name="summary_disclaimer">Hook mode relies on a system-level injection framework.\n\nEnabling it modifies SystemUI and may cause SystemUI to crash, display incorrectly, or encounter other issues.\n\nPlease be aware: the developer is not responsible for data loss or system failures caused by using this module.</string>
     <string name="setup_completion_dynamic_island">Grant notification listener and send notification permissions to start using</string>
 
     <string name="setup_select_lyric_source">Select Lyric Source</string>

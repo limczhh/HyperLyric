@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="app_name">HyperLyric</string>
   <string name="app_description">إحضار كلمات HyperIsland إلى Xiaomi HyperOS 3</string>
   <string name="label_lyric_listener_service">مستمع معلومات الوسائط</string>
   <string name="label_lyric_enable_service">مراقب الوسائط HyperLyric</string>
@@ -523,8 +524,15 @@
   <string name="summary_bypass_focus_limit">ميزة تجريبية، فعّلها وانت واخد بالك</string>
   <string name="toast_shizuku_not_running">Shizuku مش شغّال</string>
   <string name="toast_shizuku_permission_required">من فضلك روح على Shizuku وامنح الإذن</string>
-  <string name="title_setup">الإعداد</string>
+  <string name="title_lyric_type">نوع الكلمات</string>
+  <string name="option_lyric_type_super_island">كلمات الجزيرة الفائقة</string>
+  <string name="option_lyric_type_status_bar">كلمات شريط الحالة</string>
   <string name="next">التالي</string>
+  <string name="setup_go_home">الانتقال إلى الصفحة الرئيسية</string>
+  <string name="setup_app_list_permission_title">الوصول إلى قائمة التطبيقات</string>
+  <string name="setup_app_list_permission_summary">يُستخدم لإدارة موفّرات الكلمات وإعدادها في مكان واحد. يظل التطبيق قابلاً للاستخدام بدون هذا الوصول.</string>
+  <string name="setup_root_permission_title">صلاحيات Root</string>
+  <string name="setup_root_permission_summary">تتيح إعادة تشغيل واجهة النظام من التطبيق بسهولة. يظل التطبيق قابلاً للاستخدام بدون Root، لكن يجب إعادة تشغيل واجهة النظام يدوياً.</string>
   <string name="title_select_work_mode">اختيار وضع العمل</string>
   <string name="title_grant_permissions">منح الأذونات</string>
   <string name="summary_permission_listener">قراءة حالة التشغيل ومعلومات الأغنية</string>
@@ -533,7 +541,7 @@
   <string name="title_setup_complete">اكتمل الإعداد</string>
   <string name="title_disclaimer">إخلاء المسؤولية</string>
   <string name="title_disclaimer_notice">تنبيه</string>
-  <string name="summary_disclaimer">وضع Hook بيعتمد على إطار حقن على مستوى النظام.\n\nتفعيله هيعدّل معاملات التخطيط الأساسية لواجهة النظام، وده ممكن يسبب مشاكل غير متوقعة في حالات نادرة.\n\nخد بالك: المطوّر مش مسؤول عن أي فقدان بيانات أو أعطال بالنظام ناتجة عن استخدام الوحدة دي.</string>
+  <string name="summary_disclaimer">وضع Hook يعتمد على إطار حقن على مستوى النظام.\n\nتفعيله يعدّل واجهة النظام وقد يؤدي إلى تعطلها أو ظهورها بشكل غير صحيح أو حدوث مشكلات أخرى.\n\nيرجى العلم أن المطوّر غير مسؤول عن فقدان البيانات أو أعطال النظام الناتجة عن استخدام هذه الوحدة.</string>
   <string name="setup_completion_dynamic_island">امنح إذن الوصول للإشعارات وإذن إرسال الإشعارات عشان تبدأ الاستخدام</string>
   <string name="setup_select_lyric_source">اختيار مصدر الكلمات</string>
   <string name="setup_download_lyric_core">تحميل Lyricon Central</string>

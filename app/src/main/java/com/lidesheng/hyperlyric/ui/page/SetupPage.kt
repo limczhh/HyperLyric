@@ -1,26 +1,24 @@
 package com.lidesheng.hyperlyric.ui.page
 
 import android.content.Context
-import android.content.Intent
-import android.provider.Settings
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,126 +27,142 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.state.ToggleableState
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.edit
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.common.LyricTypePreference
+import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
-import com.lidesheng.hyperlyric.lyric.ConfigRepository
-import com.lidesheng.hyperlyric.lyric.commonMusicApps
 import com.lidesheng.hyperlyric.root.RootApplication
 import com.lidesheng.hyperlyric.ui.utils.rememberExternalLinkOpener
-import com.lidesheng.hyperlyric.ui.utils.tryStartExternalActivity
-import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Info
+import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import kotlinx.coroutines.launch
+
+private const val SETUP_PAGE_COUNT = 4
 
 @Composable
 fun SetupPage(onNavigateToMain: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    val pagerState = rememberPagerState(pageCount = { SETUP_PAGE_COUNT })
     val prefs =
         remember { context.getSharedPreferences(UIConstants.PREF_NAME, Context.MODE_PRIVATE) }
     val snackbarHostState = remember { SnackbarHostState() }
     val onOpenLink = rememberExternalLinkOpener(snackbarHostState)
-    val msgXposedNotActive = stringResource(R.string.toast_xposed_module_not_active)
 
-    var workMode by remember {
-        val initialMode = prefs.getInt(UIConstants.KEY_WORK_MODE, UIConstants.DEFAULT_WORK_MODE)
-        mutableIntStateOf(initialMode)
+    var outputTarget by remember {
+        mutableIntStateOf(LyricTypePreference.read(prefs))
     }
-
     var selectedSource by remember {
         mutableStateOf(
             prefs.getString(
                 RootConstants.KEY_HOOK_LYRIC_SOURCE,
                 RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
-            ) ?: "lyricon"
+            ) ?: RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
         )
     }
 
-    val onFinish = {
+    val completeSetup = {
         prefs.edit { putBoolean(UIConstants.KEY_SETUP_COMPLETED, true) }
         onNavigateToMain()
+    }
+    val finishSetup = {
+        if (RootApplication.xposedService != null) {
+            PrefsBridge.putBoolean(RootConstants.KEY_HOOK_ENABLE, true)
+        }
+        completeSetup()
+    }
+    val pageTitle = when (pagerState.currentPage) {
+        0 -> R.string.app_name
+        1 -> R.string.title_disclaimer_notice
+        2 -> R.string.setup_lyric_settings_title
+        3 -> R.string.title_setup_complete
+        else -> R.string.app_name
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
-            TopAppBar(title = stringResource(R.string.title_setup))
+            TopAppBar(title = stringResource(pageTitle))
         },
         bottomBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 20.dp)
-                    .navigationBarsPadding(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (pagerState.currentPage > 0) {
+            Column {
+                SetupPageIndicator(
+                    currentPage = pagerState.currentPage,
+                    pageCount = SETUP_PAGE_COUNT
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 16.dp)
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val isFirstPage = pagerState.currentPage == 0
+                    val isLastPage = pagerState.currentPage == SETUP_PAGE_COUNT - 1
+
+                    if (!isFirstPage) {
+                        TextButton(
+                            text = stringResource(R.string.back),
+                            onClick = {
+                                scope.launch {
+                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
                     TextButton(
-                        text = stringResource(R.string.back),
+                        text = stringResource(
+                            if (isLastPage) R.string.setup_go_home else R.string.next
+                        ),
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
                         onClick = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            if (isLastPage) {
+                                finishSetup()
+                            } else {
+                                scope.launch {
+                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                }
                             }
                         },
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
-
-                val isLastPage = pagerState.currentPage == 3
-
-                TextButton(
-                    text = if (isLastPage) stringResource(R.string.confirm) else stringResource(R.string.next),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    onClick = {
-                        if (isLastPage) {
-                            onFinish()
-                        } else if (pagerState.currentPage == 0 && workMode == 0 && RootApplication.xposedService == null) {
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    message = msgXposedNotActive,
-                                    duration = SnackbarDuration.Custom(2000L)
-                                )
-                            }
+                        modifier = if (isFirstPage) {
+                            Modifier.fillMaxWidth()
                         } else {
-                            scope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                            }
+                            Modifier.weight(1f)
                         }
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+                    )
+                }
             }
         }
     ) { padding ->
@@ -160,159 +174,132 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
             userScrollEnabled = false
         ) { page ->
             when (page) {
-                0 -> ModeSelectionPage(
-                    selectedMode = workMode,
-                    onModeSelected = {
-                        workMode = it
-                        prefs.edit { putInt(UIConstants.KEY_WORK_MODE, it) }
-                    }
-                )
-
-                1 -> if (workMode == 0) DisclaimerPage() else PermissionPage(snackbarHostState)
-                2 -> if (workMode == 0) LyricSourceSelectionPage(
-                    onOpenLink = onOpenLink,
+                0 -> SetupIntroPage()
+                1 -> DisclaimerPage()
+                2 -> LyricConfigurationPage(
+                    outputTarget = outputTarget,
                     selectedSource = selectedSource,
+                    onOutputTargetSelected = { target ->
+                        outputTarget = target
+                        PrefsBridge.putInt(RootConstants.KEY_HOOK_LYRIC_TYPE, target)
+                    },
                     onSourceSelected = { source ->
                         selectedSource = source
-                        prefs.edit { putString(RootConstants.KEY_HOOK_LYRIC_SOURCE, source) }
-                    }
-                ) else WhitelistPage()
-
-                3 -> CompletionPage(workMode = workMode, selectedSource = selectedSource)
+                        PrefsBridge.putString(RootConstants.KEY_HOOK_LYRIC_SOURCE, source)
+                    },
+                    onOpenLink = onOpenLink
+                )
+                3 -> CompletionPage()
             }
         }
     }
 }
 
 @Composable
-fun ModeSelectionPage(selectedMode: Int, onModeSelected: (Int) -> Unit) {
-    RootApplication.xposedService != null
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+private fun SetupPageIndicator(currentPage: Int, pageCount: Int) {
+    val selectedColor = if (MiuixTheme.colorScheme.background.luminance() < 0.5f) {
+        Color.White
+    } else {
+        Color.Black
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        item {
-            Text(
-                text = stringResource(R.string.title_select_work_mode),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 20.dp)
+        repeat(pageCount) { index ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (index == currentPage) {
+                            selectedColor
+                        } else {
+                            MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f)
+                        }
+                    )
             )
         }
+    }
+}
+
+@Composable
+private fun SetupIntroPage() {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
         item {
-            Card(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { onModeSelected(0) },
-                pressFeedbackType = PressFeedbackType.Tilt,
-                colors = CardDefaults.defaultColors(
-                    color = if (selectedMode == 0) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer
-                )
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = stringResource(R.string.title_super_island_lyrics),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (selectedMode == 0) Color.White else MiuixTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.summary_super_island_lyrics),
-                        fontSize = 14.sp,
-                        color = if (selectedMode == 0) Color.White.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceSecondary,
-                        modifier = Modifier.padding(top = 4.dp)
+                Box(
+                    modifier = Modifier
+                        .size(88.dp)
+                        .graphicsLayer {
+                            clip = true
+                            shape = RoundedCornerShape(24.dp)
+                        }
+                        .squircleClip(24.dp)
+                        .background(colorResource(R.color.app_icon_red)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        contentDescription = stringResource(R.string.app_name),
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(Color.White),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .scale(1.5f)
                     )
                 }
-            }
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onModeSelected(1) },
-                pressFeedbackType = PressFeedbackType.Tilt,
-                colors = CardDefaults.defaultColors(
-                    color = if (selectedMode == 1) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer
+                Text(
+                    text = stringResource(R.string.app_description),
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    style = MiuixTheme.textStyles.title3,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
                 )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = stringResource(R.string.title_dynamic_island_lyrics),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (selectedMode == 1) Color.White else MiuixTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.summary_dynamic_island_lyrics),
-                        fontSize = 14.sp,
-                        color = if (selectedMode == 1) Color.White.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceSecondary,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-fun PermissionPage(snackbarHostState: SnackbarHostState) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val failedMessage = stringResource(R.string.open_system_settings_failed)
-    val openSettings: (Intent) -> Unit = { intent ->
-        if (!tryStartExternalActivity(context, intent)) {
-            scope.launch { snackbarHostState.showSnackbar(message = failedMessage) }
-        }
-    }
-
-    val isNotificationGranted = remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            isNotificationGranted.value =
-                NotificationManagerCompat.getEnabledListenerPackages(context)
-                    .contains(context.packageName)
-            delay(1000.milliseconds)
-        }
-    }
-
+private fun DisclaimerPage() {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text(
-                text = stringResource(R.string.title_grant_permissions),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 20.dp)
-            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                BasicComponent(
+                    title = stringResource(R.string.title_disclaimer),
+                    summary = stringResource(R.string.summary_disclaimer)
+                )
+            }
         }
-
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column {
-                    ArrowPreference(
-                        title = stringResource(R.string.title_permission_listener),
-                        summary = if (isNotificationGranted.value) stringResource(R.string.toast_permission_granted) else stringResource(
-                            R.string.summary_permission_listener
-                        ),
-                        onClick = {
-                            openSettings(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                        }
+                    BasicComponent(
+                        title = stringResource(R.string.setup_app_list_permission_title),
+                        summary = stringResource(R.string.setup_app_list_permission_summary)
                     )
-                    ArrowPreference(
-                        title = stringResource(R.string.title_permission_post_notification),
-                        summary = stringResource(R.string.summary_permission_post_notification),
-                        onClick = {
-                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            }
-                            openSettings(intent)
-                        }
+                    BasicComponent(
+                        title = stringResource(R.string.setup_root_permission_title),
+                        summary = stringResource(R.string.setup_root_permission_summary)
                     )
                 }
             }
@@ -321,112 +308,72 @@ fun PermissionPage(snackbarHostState: SnackbarHostState) {
 }
 
 @Composable
-fun WhitelistPage() {
-    val context = LocalContext.current
-    val whitelistSet by ConfigRepository.whitelistState.collectAsState()
-
-    LaunchedEffect(Unit) {
-        ConfigRepository.initWhitelist(context)
-    }
-
-    Scaffold(
-        topBar = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = stringResource(R.string.title_add_whitelist),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
-                )
-
-                Text(
-                    text = stringResource(R.string.summary_add_whitelist),
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-            }
-        }
-    ) { padding ->
-        Card(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-        ) {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                commonMusicApps.forEach { (pkg: String, name: String) ->
-                    item(key = pkg) {
-                        val isChecked = whitelistSet.contains(pkg)
-                        BasicComponent(
-                            title = name,
-                            summary = pkg,
-                            onClick = {
-                                if (isChecked) {
-                                    ConfigRepository.removePackageFromWhitelist(context, pkg)
-                                } else {
-                                    ConfigRepository.addPackageToWhitelist(context, pkg)
-                                }
-                            },
-                            endActions = {
-                                Checkbox(
-                                    state = ToggleableState(isChecked),
-                                    onClick = {
-                                        val checked = !isChecked
-                                        if (checked) {
-                                            ConfigRepository.addPackageToWhitelist(context, pkg)
-                                        } else {
-                                            ConfigRepository.removePackageFromWhitelist(
-                                                context,
-                                                pkg
-                                            )
-                                        }
-                                    }
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun LyricSourceSelectionPage(selectedSource: String, onSourceSelected: (String) -> Unit, onOpenLink: (String) -> Unit) {
+private fun LyricConfigurationPage(
+    outputTarget: Int,
+    selectedSource: String,
+    onOutputTargetSelected: (Int) -> Unit,
+    onSourceSelected: (String) -> Unit,
+    onOpenLink: (String) -> Unit
+) {
+    val outputOptions = listOf(
+        stringResource(R.string.option_lyric_type_super_island),
+        stringResource(R.string.option_lyric_type_status_bar)
+    )
     val sourceOptions = listOf(
         stringResource(R.string.lyric_source_lyricon),
         stringResource(R.string.lyric_source_superlyric),
         stringResource(R.string.lyric_source_lyricinfo)
     )
     val sourceIds = listOf("lyricon", "superlyric", "lyricinfo")
+    val selectedSourceIndex = sourceIds.indexOf(selectedSource).coerceAtLeast(0)
+    val sourceSummary = when (selectedSource) {
+        "superlyric" -> stringResource(R.string.summary_help_source_superlyric)
+        "lyricinfo" -> stringResource(R.string.summary_help_source_lyricinfo)
+        else -> stringResource(R.string.summary_help_source_lyricon)
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text(
-                text = stringResource(R.string.setup_select_lyric_source),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 20.dp)
-            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                OverlayDropdownPreference(
+                    title = stringResource(R.string.title_lyric_type),
+                    items = outputOptions,
+                    selectedIndex = outputTarget.coerceIn(
+                        RootConstants.LYRIC_TYPE_SUPER_ISLAND,
+                        RootConstants.LYRIC_TYPE_STATUS_BAR
+                    ),
+                    onSelectedIndexChange = { index ->
+                        onOutputTargetSelected(
+                            index.coerceIn(
+                                RootConstants.LYRIC_TYPE_SUPER_ISLAND,
+                                RootConstants.LYRIC_TYPE_STATUS_BAR
+                            )
+                        )
+                    }
+                )
+            }
         }
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 OverlayDropdownPreference(
                     title = stringResource(R.string.title_lyric_source),
                     items = sourceOptions,
-                    selectedIndex = sourceIds.indexOf(selectedSource).coerceAtLeast(0),
+                    selectedIndex = selectedSourceIndex,
                     onSelectedIndexChange = { index ->
-                        onSourceSelected(sourceIds[index])
+                        sourceIds.getOrNull(index)?.let(onSourceSelected)
                     }
+                )
+            }
+        }
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                BasicComponent(
+                    title = sourceOptions[selectedSourceIndex],
+                    summary = sourceSummary
                 )
             }
         }
@@ -465,11 +412,14 @@ fun LyricSourceSelectionPage(selectedSource: String, onSourceSelected: (String) 
                     }
                 }
 
-                "lyricinfo" -> {
+                else -> {
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        BasicComponent(
-                            title = stringResource(R.string.setup_no_dependency),
-                            summary = stringResource(R.string.setup_no_dependency_summary)
+                        ArrowPreference(
+                            title = stringResource(R.string.tag_download_lyricinfo),
+                            summary = stringResource(R.string.setup_no_dependency_summary),
+                            onClick = {
+                                onOpenLink("https://github.com/limczhh/LyricInfo")
+                            }
                         )
                     }
                 }
@@ -479,17 +429,7 @@ fun LyricSourceSelectionPage(selectedSource: String, onSourceSelected: (String) 
 }
 
 @Composable
-fun CompletionPage(workMode: Int, selectedSource: String = "lyricon") {
-    val completionText = if (workMode == 0) {
-        when (selectedSource) {
-            "superlyric" -> stringResource(R.string.setup_completion_superlyric)
-            "lyricinfo" -> stringResource(R.string.setup_completion_lyricinfo)
-            else -> stringResource(R.string.setup_completion_lyricon)
-        }
-    } else {
-        stringResource(R.string.setup_completion_dynamic_island)
-    }
-
+private fun CompletionPage() {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
@@ -499,51 +439,10 @@ fun CompletionPage(workMode: Int, selectedSource: String = "lyricon") {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = MiuixIcons.Info,
+                    imageVector = MiuixIcons.Ok,
                     contentDescription = null,
                     modifier = Modifier.size(80.dp),
                     tint = MiuixTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = stringResource(R.string.title_setup_complete),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = completionText,
-                    fontSize = 14.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun DisclaimerPage() {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Text(
-                text = stringResource(R.string.title_disclaimer),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 20.dp)
-            )
-        }
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                BasicComponent(
-                    title = stringResource(R.string.title_disclaimer_notice),
-                    summary = stringResource(R.string.summary_disclaimer)
                 )
             }
         }
