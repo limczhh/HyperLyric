@@ -763,6 +763,15 @@ object MediaProgressStyleHooker {
                 val shaderField = runtimeShaderField
                     ?: error("HyperProgressSeekBar runtimeShader unavailable")
                 val context = original.context
+                val layoutParams = copyLayoutParams(original)
+                if (original.layoutParams != null && layoutParams == null) {
+                    HookLogger.w(
+                        TAG,
+                        "媒体进度条布局参数无法安全复制，保留系统原始进度条: " +
+                            original.layoutParams.javaClass.name
+                    )
+                    return
+                }
                 val replacement = (constructor.newInstance(context) as? SeekBar ?: return)
                     .also { createdReplacement = it }
                 if (shaderField.get(replacement) == null) {
@@ -770,7 +779,7 @@ object MediaProgressStyleHooker {
                     return
                 }
                 replacement.id = original.id
-                replacement.layoutParams = copyLayoutParams(original)
+                replacement.layoutParams = layoutParams
                 replacement.visibility = original.visibility
                 replacement.alpha = original.alpha
                 replacement.isEnabled = original.isEnabled
@@ -1032,16 +1041,18 @@ object MediaProgressStyleHooker {
         val parent = original.parent as? ViewGroup ?: return null
         val context = original.context
         val originalIndex = parent.indexOfChild(original).takeIf { it >= 0 } ?: return null
-        val layoutParams = original.layoutParams?.let { params ->
-            when (params) {
-                is ViewGroup.MarginLayoutParams ->
-                    ViewGroup.MarginLayoutParams(params).apply {
-                        topMargin = 0
-                        bottomMargin = 0
-                    }
-
-                else -> ViewGroup.LayoutParams(params)
-            }
+        val layoutParams = copyLayoutParams(original)
+        if (original.layoutParams != null && layoutParams == null) {
+            HookLogger.w(
+                TAG,
+                "媒体进度条布局参数无法安全复制，跳过波浪进度条替换: " +
+                    original.layoutParams.javaClass.name
+            )
+            return null
+        }
+        (layoutParams as? ViewGroup.MarginLayoutParams)?.apply {
+            topMargin = 0
+            bottomMargin = 0
         }
         val replacement = SquigglySeekBar(context).apply {
             id = original.id
@@ -1161,10 +1172,43 @@ object MediaProgressStyleHooker {
 
     private fun copyLayoutParams(view: View): ViewGroup.LayoutParams? {
         val params = view.layoutParams ?: return null
-        return when (params) {
-            is ViewGroup.MarginLayoutParams -> ViewGroup.MarginLayoutParams(params)
-            else -> ViewGroup.LayoutParams(params)
+        val copyConstructors = params.javaClass.declaredConstructors
+            .filter { constructor ->
+                constructor.parameterCount == 1 &&
+                    constructor.parameterTypes[0].isAssignableFrom(params.javaClass)
+            }
+            .sortedBy { constructor ->
+                copyConstructorDistance(params.javaClass, constructor.parameterTypes[0])
+            }
+        copyConstructors.forEach { constructor ->
+            runCatching {
+                constructor.isAccessible = true
+                constructor.newInstance(params) as? ViewGroup.LayoutParams
+            }.getOrNull()?.let { return it }
         }
+
+        // Keep generic Android params compatible, but never downgrade a custom
+        // parent params class (for example ConstraintLayout.LayoutParams): its
+        // constraints are required to place the replacement in the same slot.
+        return when (params.javaClass) {
+            ViewGroup.MarginLayoutParams::class.java ->
+                ViewGroup.MarginLayoutParams(params)
+
+            ViewGroup.LayoutParams::class.java -> ViewGroup.LayoutParams(params)
+            else -> null
+        }
+    }
+
+    private fun copyConstructorDistance(source: Class<*>, target: Class<*>): Int {
+        if (source == target) return 0
+        var type: Class<*>? = source
+        var distance = 1
+        while (type != null) {
+            if (type == target) return distance
+            type = type.superclass
+            distance++
+        }
+        return Int.MAX_VALUE
     }
 
     private fun holderFields(holderClass: Class<*>): HolderFields {
