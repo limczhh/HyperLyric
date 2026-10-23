@@ -26,6 +26,7 @@ object SystemUIHookRegistry {
 
     fun prepareForHotReload() {
         hookedClassLoaders.clear()
+        SodaIslandMiniWindowCompatHooker.prepareForHotReload()
         isHookedSuccess = false
     }
 
@@ -47,6 +48,7 @@ object SystemUIHookRegistry {
 
         try {
             IslandTextHooker.hook(module, cl)
+            SodaIslandMiniWindowCompatHooker.hookPlugin(module, cl)
             IslandMediaSwipeHooker.hook(module, cl)
             HookIslandGlow.init(module, cl)
             IslandProgressGlowHooker.hook(module, cl)

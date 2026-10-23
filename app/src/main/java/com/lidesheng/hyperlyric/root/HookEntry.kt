@@ -15,6 +15,7 @@ import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHook
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.SuperIslandHotReloadCoordinator
 import com.lidesheng.hyperlyric.root.island.hooks.SystemUIHookRegistry
+import com.lidesheng.hyperlyric.root.island.hooks.SodaIslandMiniWindowCompatHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
 import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoordinator
 import com.lidesheng.hyperlyric.root.island.renderer.BaseIslandRenderer
@@ -445,6 +446,7 @@ class HookEntry : XposedModule() {
     }
 
     private fun installSuperIslandLifecycleHooks(classLoader: ClassLoader, hotReload: Boolean) {
+        SodaIslandMiniWindowCompatHooker.hookSystemUi(this, classLoader)
         try {
             UnlockIslandWhitelist.hook(this, classLoader)
         } catch (e: Exception) {
