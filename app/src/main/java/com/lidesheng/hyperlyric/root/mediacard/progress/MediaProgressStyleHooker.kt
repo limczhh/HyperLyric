@@ -1145,21 +1145,7 @@ object MediaProgressStyleHooker {
             return
         }
         state.replacement.setOnSeekBarChangeListener(null)
-        val currentParent = state.replacement.parent as? ViewGroup
-        if (currentParent != null) {
-            currentParent.removeView(state.replacement)
-            if (state.original.parent == null) {
-                state.parent.addView(
-                    state.original,
-                    state.originalIndex.coerceIn(0, state.parent.childCount)
-                )
-            }
-        } else if (state.original.parent == null) {
-            state.parent.addView(
-                state.original,
-                state.originalIndex.coerceIn(0, state.parent.childCount)
-            )
-        }
+        restoreSeekBarView(state.original, state.replacement, state.parent, state.originalIndex)
         waveSeekBars.remove(holder)
     }
 
@@ -1171,22 +1157,28 @@ object MediaProgressStyleHooker {
         if (seekBarField.get(holder) === state.replacement) {
             seekBarField.set(holder, state.original)
         }
-        val currentParent = state.replacement.parent as? ViewGroup
-        if (currentParent != null) {
-            currentParent.removeView(state.replacement)
-            if (state.original.parent == null) {
-                state.parent.addView(
-                    state.original,
-                    state.originalIndex.coerceIn(0, state.parent.childCount)
-                )
-            }
-        } else if (state.original.parent == null) {
-            state.parent.addView(
-                state.original,
-                state.originalIndex.coerceIn(0, state.parent.childCount)
-            )
-        }
+        restoreSeekBarView(state.original, state.replacement, state.parent, state.originalIndex)
         nativeGlowSeekBars.remove(holder)
+    }
+
+    private fun restoreSeekBarView(
+        original: SeekBar,
+        replacement: SeekBar,
+        parent: ViewGroup,
+        index: Int
+    ) {
+        (replacement.parent as? ViewGroup)?.removeView(replacement)
+        if (original.parent != null) return
+
+        // SystemUI applies its ConstraintSet after the first attach. Only the
+        // visible replacement receives those updates; the detached original
+        // still has the inflation-time params. Hand the current params back
+        // before restoring it, since a reused card may only call attach again
+        // without reapplying its ConstraintSet. Neither view is attached here.
+        replacement.layoutParams?.let { original.layoutParams = it }
+        original.visibility = replacement.visibility
+        original.alpha = replacement.alpha
+        parent.addView(original, index.coerceIn(0, parent.childCount))
     }
 
     private fun copyLayoutParams(view: View): ViewGroup.LayoutParams? {

@@ -50,9 +50,17 @@ android {
         buildConfig = true
         aidl = true
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testRuntimeOnly(libs.libxposed.api)
+
     // --- 基本依赖 ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
