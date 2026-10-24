@@ -1,7 +1,7 @@
 <h1 align="center">HyperLyric</h1>
 
 <p align="center">
-  <strong>An Xposed module that brings lyrics to Xiaomi HyperIsland on HyperOS 3</strong>
+  <strong>System-level lyrics for Xiaomi devices</strong>
 </p>
 
 <p align="center">
@@ -23,60 +23,48 @@
 
 ---
 
-HyperLyric displays line-synced, word-synced, and separated lyrics in Xiaomi HyperIsland. It also lets you customize lyric styles, island content, and system media cards. Its primary mode uses **Xposed to integrate with SystemUI**, while a lightweight rootless notification mode remains available.
+<p align="center">
+  <a href="https://github.com/limczhh/HyperLyric/releases">Download</a> ·
+  <a href="docs/en/getting-started.md">Setup guide</a> ·
+  <a href="docs/en/faq.md">FAQ</a>
+</p>
 
-## Features
+## Lyrics
 
-### Lyric presentation
+Choose to display lyrics in either the **status bar or HyperIsland**. HyperLyric supports line-synced, word-synced, dual-line, and split lyrics, with translations, romanization, backing vocals, and duet parts. AMLL lyric enhancement and AI translation can add word-synced lyrics and translations.
 
-- **Line- and word-synced lyrics**: Lyrics are shown one line at a time. With word-level timing, each word is highlighted as the song plays; with line-level timing, the whole line changes together; lyrics without timing can still scroll.
-- **Separated lyrics**: Splits one lyric line across the left and right sides of HyperIsland while keeping word progress and scrolling. The width can stay fixed or change with the lyric.
-- **Second line**: Shows a translation, romanization, or the next lyric line. You can also swap the original and translation, show only the translation, or switch automatically.
-- ** AI translation**: After enabling it in Settings, HyperLyric can generate translations through an OpenAI-compatible API. You can set the target language, model, endpoint, and prompt, skip selected source languages, or replace translations supplied by the lyric source.
-- **Lyric time offset**: Each Lyricon provider can move lyrics earlier or later independently.
+Customize the font, size, weight, and italics. Text can use cover colors, gradients, or colors that follow the status bar, alongside lyric transitions, word highlighting, and word lift animations.
 
-### HyperIsland layout and content
+Lyric preview, interlude countdowns, and configurable behavior for missing lyrics and outros help handle the gaps between lines. You can also combine the title, artist, album, duration, and playback progress to display music information.
 
-- Each side of HyperIsland can show lyrics, music information, or nothing.
-- Music information can combine the title, artist, album, total duration, elapsed time, remaining time, and playback progress. Both lines and the field separator are configurable.
-- HyperIsland width can stay fixed or change with its content. Left and right padding are adjustable, and lyrics can be centered or right-aligned.
-- The cover art can use the default style, the app icon, or be hidden. Rhythm colors can use the default color, cover color, or cover gradient.
-- Edge glow, perimeter progress, and gradient progress can use cover colors, with adjustable start points and directions.
-- You can choose whether HyperIsland stays visible or collapses after pausing playback or changing tracks.
+## Media cards
 
-### Lyric styling and animation
+Customize the media cards in Notification Center and expanded HyperIsland. Choose a layout, add cover colors, gradients, or ambient flow to the background, then adjust the cover, playback buttons, and progress bar. Configure each location separately and swipe between cards from multiple music apps in Notification Center.
 
-- Set the font, font file, size, weight, narrow Latin/numeric font, and text color.
-- Text can use the default color, cover color, cover gradient, or the current status bar color.
-- Set lyric scrolling, lyric transitions, word highlighting, and progress styles.
-- Adjust lift, wave, and per-character motion separately for CJK and Latin text.
+## Feature reference
 
-### System media cards
-
-- Customize the **Notification Center media card** and **expanded HyperIsland media card** separately. You can also prevent the card from collapsing on the **Always On Display**.
-- Card layout styles include the system default, iOS, ColorOS, One UI, MIUI, and PixelOS, with additional layout controls.
-- Card background styles include default, cover collage, blurred cover, radial gradient, linear gradient, soft cover, and ambient flow. Brightness, blur, auto-invert, and transitions are also adjustable.
-- Adjust the cover shape, rotation, shadow, and flip animation. You can hide time, device switching, or custom action buttons, and change button order and alignment.
-- Choose a default or waveform progress bar, then adjust the trailing glow and thumb style.
-- Switching between multiple media cards supports single-card and multi-card views with a configurable display limit.
-
-### System restriction bypasses
-
-- Removes Xiaomi's allowlist restriction for sending Notification Spotlight notifications.
-- Removes the allowlist restriction for pulling a HyperIsland media card down into a mini window.
-
-> [!NOTE]
-> SystemUI plugins change with system updates. Media cards, allowlist bypasses, and HyperIsland extensions require compatible structures in the target version, so actual availability depends on the current release and device build.
+| Feature | Description | Version support |
+| :--- | :--- | :--- |
+| HyperIsland lyrics | Display lyrics in HyperIsland. Customize cover art, the music visualizer, edge glow, perimeter progress, and long-press, swipe, and pause behavior | HyperOS 3 / 4 |
+| Status bar lyrics | Display lyrics in the status bar. Customize placement, portrait/landscape widths, lock screen hiding, automatic spacing around HyperIsland, and cover icons; control clock, notification icon, and media island visibility, and configure gestures | MIUI / HyperOS |
+| Media card layouts | iOS, ColorOS, One UI, MIUI, PixelOS, and other layout styles | HyperOS 3 / 4 |
+| Media card elements | Customize backgrounds, cover styles, shadows, and flip animations; hide selected elements and adjust button order and alignment | HyperOS |
+| Multiple media cards | MIUI-style card switching for managing multiple media sessions | HyperOS 3 / 4 |
+| Notification Spotlight allowlist bypass | Remove restrictions on which apps can display Notification Spotlight notifications | HyperOS |
+| Pull-down mini-window allowlist bypass | Allow more music apps to open in mini windows by pulling down from HyperIsland | HyperOS 3.0.300+ / 4 |
+| Notification lyrics | Display lyrics through Notification Spotlight or Live Update notifications | HyperOS / Android 16+ |
 
 ## Lyric sources
 
-HyperLyric can switch between three Xposed lyric sources. Word timing, translations, and next-line support depend on what the selected source provides.
+Choose one of the following sources in module mode. Supported music apps and the completeness of lyric data depend on the selected source or provider.
 
-| Source | Main capabilities | Dependency |
+| Source | How it gets lyrics | Dependencies |
 | :--- | :--- | :--- |
-| **Lyricon** | Provides line-synced, word-synced, and translated lyrics through LyricProvider; exact capabilities depend on the player's LyricProvider | [Lyricon Central](https://github.com/tomakino/lyricon/releases/tag/core) + [LyricProvider](https://github.com/proify/LyricProvider/releases) |
-| **SuperLyric** | Continuously provides line-synced or word-synced lyrics through the SuperLyric module; next-line lyrics and AI translation are unavailable | [SuperLyric](https://github.com/HChenX/SuperLyric) |
-| **LyricInfo** | Reads normalized lyrics from media metadata; line/word timing, translations, and next-line lyrics depend on the metadata itself | [LyricInfo](https://github.com/limczhh/LyricInfo) (recommended; optional when the player writes lyric metadata into MediaSession itself) |
+| **Lyricon** | Uses a LyricProvider for the music app | [Lyricon Central](https://github.com/tomakino/lyricon/releases/tag/core) + [LyricProvider](https://github.com/proify/LyricProvider/releases) |
+| **SuperLyric** | The SuperLyric module provides and schedules lyrics | [SuperLyric](https://github.com/HChenX/SuperLyric) |
+| **LyricInfo** | Reads lyrics from the music app's MediaSession metadata | Use [LyricInfo](https://github.com/limczhh/LyricInfo) or [ColorOS Live Lyrics Bridge](https://github.com/Andrea-lyz/ColorOS-Live-Lyrics-Bridge) to provide LyricInfo lyric data; optional if the app already provides it |
+
+Use the in-app setup to choose where lyrics appear and which source to use, then follow the [setup guide](docs/en/getting-started.md) to enable the modules and restart as needed.
 
 ## Screenshots
 
@@ -92,32 +80,6 @@ HyperLyric can switch between three Xposed lyric sources. Word timing, translati
     <td><img src="https://github.com/limczhh/HyperLyric/blob/main/assets/006.webp?raw=true" width="300" alt="Screenshot 006"/></td>
   </tr>
 </table>
-
-## Compatibility
-
-> [!WARNING]
-> HyperOS and its SystemUI plugins change frequently. The table below describes the primary target range and does not claim device testing across every listed combination.
-
-| Feature | Android | System | Notes |
-| :--- | :--- | :--- | :--- |
-| **HyperIsland lyrics and media card enhancements** | Android 15+ | HyperOS 3 | Requires the LSPosed v2.0 framework |
-| **Notification Spotlight allowlist bypass** | Android 13+ | HyperOS 2, HyperOS 3 | Uses Xposed to bypass sending restrictions |
-| **Pull-down mini-window allowlist bypass** | Android 16 | HyperOS 3.0.300+ | Enables pull-down expansion for HyperIsland media cards |
-| **Live Update lyric notifications** | Android 16 | HyperOS 3.0.300+, ColorOS 16 | Uses the standard Android Live Update API |
-| **Notification Spotlight lyrics** | Android 13+ | HyperOS 2, HyperOS 3 | The standalone mode can use Shizuku |
-
-## Download
-
-Download the latest HyperLyric APK from [GitHub Releases](https://github.com/limczhh/HyperLyric/releases).
-
-## Standalone notification mode
-
-Without LSPosed, HyperLyric can listen to media metadata and display lyrics through Xiaomi Notification Spotlight or Android Live Update notifications. This mode includes a player allowlist, notification styling, and a Quick Settings tile.
-
-## Setup and troubleshooting
-
-- [Basic setup guide](docs/en/getting-started.md)
-- [FAQ](docs/en/faq.md)
 
 ## Credits and license
 
