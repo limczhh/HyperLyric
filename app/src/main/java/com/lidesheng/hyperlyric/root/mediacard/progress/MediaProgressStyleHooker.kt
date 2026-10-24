@@ -799,8 +799,7 @@ object MediaProgressStyleHooker {
                 )
                 val state = NativeGlowState(original, replacement, parent, originalIndex)
                 holderFields.seekBarField.set(holder, replacement)
-                parent.addView(replacement, originalIndex.coerceIn(0, parent.childCount))
-                parent.removeView(original)
+                replaceSeekBarView(original, replacement, parent, originalIndex)
                 nativeGlowStates[holder] = state
                 nativeGlowSeekBars[holder] = replacement
             } catch (error: Throwable) {
@@ -1085,8 +1084,7 @@ object MediaProgressStyleHooker {
         }
         val state = WaveSeekBarState(original, replacement, parent, originalIndex)
         try {
-            parent.addView(replacement, originalIndex.coerceIn(0, parent.childCount))
-            parent.removeView(original)
+            replaceSeekBarView(original, replacement, parent, originalIndex)
             waveStates[holder] = state
             waveSeekBars[holder] = replacement
         } catch (error: Throwable) {
@@ -1094,6 +1092,27 @@ object MediaProgressStyleHooker {
             throw error
         }
         return replacement
+    }
+
+    private fun replaceSeekBarView(
+        original: SeekBar,
+        replacement: SeekBar,
+        parent: ViewGroup,
+        index: Int
+    ) {
+        // Both views have the same id. ConstraintLayout.onViewRemoved removes
+        // that id from its child registry unconditionally, so remove the old
+        // view before registering its replacement, including on legacy builds.
+        parent.removeView(original)
+        try {
+            parent.addView(replacement, index.coerceIn(0, parent.childCount))
+        } catch (error: Throwable) {
+            if (replacement.parent === parent) parent.removeView(replacement)
+            if (original.parent == null) {
+                parent.addView(original, index.coerceIn(0, parent.childCount))
+            }
+            throw error
+        }
     }
 
     private fun ensureWaveAttached(state: WaveSeekBarState) {
