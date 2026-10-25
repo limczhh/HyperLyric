@@ -289,18 +289,20 @@ internal fun LazyListScope.contentLayoutSections(
                     ),
                     onSelectedIndexChange = onTailTimeoutBehaviorChange
                 )
-                ArrowPreference(
-                    title = stringResource(id = R.string.title_tail_timeout_delay),
-                    summary = stringResource(id = R.string.summary_tail_timeout_delay),
-                    endActions = {
-                        Text(
-                            "$tailTimeoutDelaySeconds",
-                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                        )
-                    },
-                    onClick = onTailTimeoutDelayClick
-                )
+                if (tailTimeoutBehavior != RootConstants.TAIL_TIMEOUT_BEHAVIOR_KEEP) {
+                    ArrowPreference(
+                        title = stringResource(id = R.string.title_tail_timeout_delay),
+                        summary = stringResource(id = R.string.summary_tail_timeout_delay),
+                        endActions = {
+                            Text(
+                                "$tailTimeoutDelaySeconds",
+                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                            )
+                        },
+                        onClick = onTailTimeoutDelayClick
+                    )
+                }
                 SwitchPreference(
                     title = stringResource(id = R.string.title_lyric_preview),
                     summary = stringResource(id = R.string.summary_lyric_preview),
