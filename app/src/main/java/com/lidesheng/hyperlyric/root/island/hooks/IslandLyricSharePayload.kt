@@ -7,6 +7,7 @@ import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 internal data class IslandLyricSharePayload(
     val title: String,
@@ -54,6 +55,7 @@ internal object IslandLyricSharePayloadBuilder {
     }
 
     private fun currentLyricText(): String? {
+        if (LyricPresentationScheduler.snapshot().hasMusicInfo) return null
         return LyriconDataBridge.currentLyric
             ?.trim()
             ?.takeIf(String::isNotEmpty)

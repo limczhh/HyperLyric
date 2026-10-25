@@ -5,6 +5,7 @@ import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplaySettings
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.sizing.IslandSlotGeometryConfig
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 internal data class IslandSlotRuntimeConfig(
     val activeMode: Int,
@@ -50,7 +51,8 @@ internal data class IslandSlotRuntimeConfig(
     val wordMotionCjkWave: Float,
     val wordMotionLatinByCharacter: Boolean,
     val wordMotionLatinLift: Float,
-    val wordMotionLatinWave: Float
+    val wordMotionLatinWave: Float,
+    val presentation: LyricPresentationScheduler.Presentation
 ) {
     val isSplitMode: Boolean
         get() = activeMode == 1
@@ -111,8 +113,12 @@ internal data class IslandSlotRuntimeConfig(
     ).joinToString("|")
 
     fun modeForTag(tag: String): Int {
-        return if (tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG) leftMode else rightMode
+        return resolveContentMode(
+            if (tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG) leftMode else rightMode
+        )
     }
+
+    fun resolveContentMode(configuredMode: Int): Int = presentation.resolveContentMode(configuredMode)
 
     fun isLeftTag(tag: String): Boolean {
         return tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG

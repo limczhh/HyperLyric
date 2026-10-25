@@ -16,6 +16,7 @@ import com.lidesheng.hyperlyric.root.island.presentation.IslandPresentationCoord
 import com.lidesheng.hyperlyric.root.island.presentation.IslandReconcileReason
 import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import java.util.concurrent.atomic.AtomicLong
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 /**
  * Projects one lyric/playback state into every attached Super Island presentation.
@@ -201,7 +202,7 @@ object BaseIslandRenderer : LyricRenderer {
     }
 
     private fun refreshForNoLyrics(): Boolean {
-        if (LyriconDataBridge.hasLyricsForPresentation()) return false
+        if (LyricPresentationScheduler.snapshot().hasLyrics) return false
         refreshActiveIsland()
         return true
     }

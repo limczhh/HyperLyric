@@ -3,10 +3,12 @@ package com.lidesheng.hyperlyric.root.island.content
 import android.content.Context
 import android.content.SharedPreferences
 import android.view.View
+import java.util.WeakHashMap
+import java.util.Collections
+import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
+import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
-import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
-import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
@@ -14,14 +16,14 @@ import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /**
- * Compatibility facade for injected slot content.
- *
- * Slot routing stays here while lyric content, metadata content and style application keep their
- * own implementation and caches in the content package.
+ * Applies one scheduled presentation to a slot and owns transitions between renderers.
+ * Lyric and metadata assemblers only update content within their own display mode.
  */
-internal object IslandSlotContentFacade {
+internal object SlotContentCoordinator {
+    private val renderedModes = Collections.synchronizedMap(WeakHashMap<View, Int>())
 
     fun invalidate(view: View? = null) {
+        if (view == null) renderedModes.clear() else renderedModes.remove(view)
         view?.let(IslandLyricViewController::stopRecursively)
         IslandMetadataContentAssembler.invalidate(view)
         IslandSlotStyleAssembler.invalidate(view)
@@ -36,11 +38,12 @@ internal object IslandSlotContentFacade {
         force: Boolean = false,
         coverPaletteBackgroundIsDark: Boolean = true
     ) {
-        val usePlainTextLyricClock = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC &&
+        val resolvedMode = renderedModes[view] ?: config.resolveContentMode(mode)
+        val usePlainTextLyricClock = resolvedMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC &&
                 config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
         IslandLyricViewController.useSharedMarqueeClock(
             view,
-            mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO ||
+            resolvedMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO ||
                     usePlainTextLyricClock,
             if (usePlainTextLyricClock) {
                 LyriconDataBridge.currentPlainTextMarqueeOriginActiveTimeMs()
@@ -52,7 +55,7 @@ internal object IslandSlotContentFacade {
             view = view,
             prefs = prefs,
             config = config,
-            mode = mode,
+            mode = resolvedMode,
             mediaInfo = mediaInfo,
             force = force,
             coverPaletteBackgroundIsDark = coverPaletteBackgroundIsDark
@@ -64,8 +67,6 @@ internal object IslandSlotContentFacade {
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
         mode: Int,
-        lineOverride: IRichLyricLine? = null,
-        secondaryLineOverride: IRichLyricLine? = null,
         force: Boolean = false,
         playbackActive: Boolean,
         suppressAnimation: Boolean = false,
@@ -77,26 +78,28 @@ internal object IslandSlotContentFacade {
         onLineApplied: (() -> Unit)? = null,
         onLineCancelled: (() -> Unit)? = null,
         forceUnsplit: Boolean = false,
-        forceNoLyricsPlaceholder: Boolean = false,
+        allowNoLyricsPlaceholder: Boolean = false,
         coverPaletteBackgroundIsDark: Boolean = true
     ): Boolean {
+        val resolvedMode = config.resolveContentMode(mode)
+        if (renderedModes[view] != resolvedMode) {
+            IslandLyricViewController.stopRecursively(view)
+            IslandMetadataContentAssembler.invalidate(view)
+            renderedModes[view] = resolvedMode
+        }
         configureView(
             view = view,
             prefs = prefs,
             config = config,
-            mode = mode,
+            mode = resolvedMode,
             mediaInfo = mediaInfo,
             force = force,
             coverPaletteBackgroundIsDark = coverPaletteBackgroundIsDark
         )
-        return if (mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
-            IslandMetadataContentAssembler.clearState(view)
+        return if (resolvedMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
             IslandLyricContentAssembler.apply(
                 view = view,
-                prefs = prefs,
                 config = config,
-                lineOverride = lineOverride,
-                secondaryLineOverride = secondaryLineOverride,
                 force = force,
                 playbackActive = playbackActive,
                 playbackClock = playbackClock,
@@ -105,14 +108,14 @@ internal object IslandSlotContentFacade {
                 onLineApplied = onLineApplied,
                 onLineCancelled = onLineCancelled,
                 forceUnsplit = forceUnsplit,
-                forceNoLyricsPlaceholder = forceNoLyricsPlaceholder
+                allowNoLyricsPlaceholder = allowNoLyricsPlaceholder && config.presentation.hasPlaceholder
             )
-        } else {
+        } else if (resolvedMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO) {
             val changed = IslandMetadataContentAssembler.apply(
                 view = view,
                 prefs = prefs,
                 config = config,
-                mode = mode,
+                mode = resolvedMode,
                 force = force,
                 mediaInfo = mediaInfo,
                 playbackPosition = playbackClock.positionMs,
@@ -126,51 +129,18 @@ internal object IslandSlotContentFacade {
                 active = playbackActive
             )
             changed
+        } else {
+            when (view) {
+                is RichLyricLineView -> view.setMetadataLine(null)
+                is SpaceGateRichLyricLineView -> view.setMetadataLine(null)
+            }
+            false
         }
-    }
-
-    fun clearMetadataState(view: View) {
-        IslandMetadataContentAssembler.clearState(view)
     }
 
     fun updatePlaybackProgress(view: View, position: Long): Boolean {
         return IslandMetadataContentAssembler.updatePlaybackProgress(view, position)
     }
-
-    fun applyLyricLineContent(
-        view: View,
-        prefs: SharedPreferences,
-        config: IslandSlotRuntimeConfig,
-        lineOverride: IRichLyricLine?,
-        secondaryLineOverride: IRichLyricLine? = null,
-        playbackActive: Boolean,
-        onLineWillApply: ((Float) -> Boolean)? = null,
-        onLineApplied: (() -> Unit)? = null,
-        onLineCancelled: (() -> Unit)? = null
-    ): Boolean = IslandLyricContentAssembler.applyLine(
-        view = view,
-        prefs = prefs,
-        config = config,
-        lineOverride = lineOverride,
-        secondaryLineOverride = secondaryLineOverride,
-        playbackActive = playbackActive,
-        onLineWillApply = onLineWillApply,
-        onLineApplied = onLineApplied,
-        onLineCancelled = onLineCancelled
-    )
-
-    fun buildSlotLyricPresentation(
-        view: View,
-        prefs: SharedPreferences,
-        config: IslandSlotRuntimeConfig,
-        isLeft: Boolean
-    ): LyricPresentation =
-        IslandLyricContentAssembler.buildSlotLyricPresentation(
-            view = view,
-            prefs = prefs,
-            config = config,
-            isLeft = isLeft
-        )
 
     private fun currentMediaInfo(context: Context): MediaMetadataHelper.MediaInfo {
         val targetPkg = LyriconDataBridge.currentLyricPackageName ?: ""

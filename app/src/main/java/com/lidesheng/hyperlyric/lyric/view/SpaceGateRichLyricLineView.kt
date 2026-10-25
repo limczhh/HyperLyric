@@ -261,7 +261,8 @@ class SpaceGateRichLyricLineView(
 
     fun setStyle(
         style: LyricViewStyle,
-        isLeftSplitSide: Boolean = false
+        isLeftSplitSide: Boolean = false,
+        useSplitAlignment: Boolean = true
     ) {
         displayLineByLine = style.lineDisplay
         assembler.updateFlags(
@@ -279,8 +280,8 @@ class SpaceGateRichLyricLineView(
         setTransitionConfig(style.transitionConfig)
 
         // 分离歌词的“居中”以左右容器的交界线为中心：左侧贴右，右侧保持默认左对齐。
-        val centerIfPossible = false
-        val rightIfPossible = if (style.centerIfPossible) {
+        val centerIfPossible = style.centerIfPossible && !useSplitAlignment
+        val rightIfPossible = if (style.centerIfPossible && useSplitAlignment) {
             isLeftSplitSide
         } else {
             style.rightIfPossible

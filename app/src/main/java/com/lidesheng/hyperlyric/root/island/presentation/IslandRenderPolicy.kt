@@ -17,9 +17,7 @@ internal object IslandRenderPolicy {
     data class Input(
         val owner: OwnerEvidence,
         val lyricPackageName: String?,
-        val hasLyricsForPresentation: Boolean,
-        val hasMusicInfoForPresentation: Boolean,
-        val showMusicInfoWhenNoLyrics: Boolean,
+        val hasManagedText: Boolean,
         val enabled: Boolean,
         val playbackActive: Boolean,
         val pauseBehavior: Int
@@ -50,15 +48,8 @@ internal object IslandRenderPolicy {
         if (!input.enabled) {
             return Evaluation(input, Decision.SUPPRESSED, "super_island_disabled")
         }
-        if (!input.hasLyricsForPresentation &&
-            (!input.showMusicInfoWhenNoLyrics || !input.hasMusicInfoForPresentation)
-        ) {
-            val reason = if (!input.showMusicInfoWhenNoLyrics) {
-                "has_lyric_false_music_info_fallback_disabled"
-            } else {
-                "has_lyric_false_music_info_unavailable"
-            }
-            return Evaluation(input, Decision.SUPPRESSED, reason)
+        if (!input.hasManagedText) {
+            return Evaluation(input, Decision.SUPPRESSED, "managed_text_unavailable")
         }
 
         val mediaOwner = input.owner as? OwnerEvidence.Media

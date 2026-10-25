@@ -17,7 +17,6 @@ import com.lidesheng.hyperlyric.lyric.view.InterludeTracker
 import com.lidesheng.hyperlyric.lyric.view.SongPreprocessor
 import com.lidesheng.hyperlyric.lyric.view.TimedLine
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
-import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -161,12 +160,6 @@ object LyriconDataBridge {
     @Volatile
     private var showLyricPreview = RootConstants.DEFAULT_HOOK_LYRIC_PREVIEW
 
-    @Volatile
-    private var noLyricsLyricBehavior = RootConstants.DEFAULT_HOOK_NO_LYRICS_LYRIC_BEHAVIOR
-
-    @Volatile
-    private var tailTimeoutBehavior = RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_BEHAVIOR
-
     /** 尾奏超时时长（秒），记为 n；只有开始时间的歌词额外多等 5 秒。 */
     @Volatile
     private var tailTimeoutDelaySeconds = RootConstants.DEFAULT_HOOK_TAIL_TIMEOUT_DELAY_SECONDS
@@ -186,10 +179,6 @@ object LyriconDataBridge {
     /** 时间线最后一句推导出的尾奏超时时刻；无歌词行时为 Long.MAX_VALUE，即永不超时。 */
     @Volatile
     private var tailTimeoutDeadlineMs: Long = Long.MAX_VALUE
-
-    /** 最近一次源推送的原始歌词行，用于纯音乐行为切换后重建显示内容。 */
-    @Volatile
-    private var rawActiveLyricLine: IRichLyricLine? = null
 
     fun updateLyricPackage(packageName: String?) {
         currentLyricPackageName = packageName
@@ -369,7 +358,6 @@ object LyriconDataBridge {
             currentSongIsPureMusic = false
             currentSongInTailTimeout = false
             tailTimeoutDeadlineMs = Long.MAX_VALUE
-            rawActiveLyricLine = null
             timingNavigator = TimingNavigator(emptyArray())
             interludeCountdownNavigator = TimingNavigator(emptyArray())
             leadingPlaceholderLine = null
@@ -437,7 +425,6 @@ object LyriconDataBridge {
         currentSongIsPureMusic = false
         currentSongInTailTimeout = false
         tailTimeoutDeadlineMs = Long.MAX_VALUE
-        rawActiveLyricLine = null
         currentLyric = null
         currentLyricLine = null
         currentLyricLines = emptyList()
@@ -508,34 +495,6 @@ object LyriconDataBridge {
         return true
     }
 
-    fun updateNoLyricsLyricBehavior(behavior: Int): Boolean {
-        if (noLyricsLyricBehavior == behavior) return false
-        noLyricsLyricBehavior = behavior
-
-        val song = currentSong?.takeIf {
-            !isTextMode && fullSongLyricsAvailable != null
-        }
-        if (song != null) {
-            rebuildTimeline(song, selectCurrentPosition = true)
-        } else if (currentSongIsPureMusic) {
-            currentLyricLine = resolveActiveLyricLine()
-            currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
-        }
-        return true
-    }
-
-    /** 切换尾奏超时行为：重算时间线让当前选行立刻套用新行为。 */
-    fun updateTailTimeoutBehavior(behavior: Int): Boolean {
-        if (tailTimeoutBehavior == behavior) return false
-        tailTimeoutBehavior = behavior
-
-        val song = currentSong?.takeIf {
-            !isTextMode && fullSongLyricsAvailable != null
-        } ?: return true
-        rebuildTimeline(song, selectCurrentPosition = true)
-        return true
-    }
-
     /** 切换尾奏超时时长：超时点由时长推导，需要重算时间线。 */
     fun updateTailTimeoutDelaySeconds(seconds: Int): Boolean {
         val normalized = RootConstants.normalizeTailTimeoutDelaySeconds(seconds)
@@ -555,8 +514,8 @@ object LyriconDataBridge {
         val song = currentSong ?: return false
         val lyrics = song.lyrics
         if (lyrics.isNullOrEmpty()) {
-            // 无歌词歌曲没有可选行的时间线，但"替换为音乐信息"里的时间字段仍需逐秒刷新。
-            return noLyricsBehaviorShowsMusicInfo()
+            // Music-information time fields are refreshed by the metadata renderer.
+            return false
         }
 
         // 先展示此刻有效的源歌词行；开唱前只有当前没有源内容时才补前奏占位行。
@@ -564,6 +523,7 @@ object LyriconDataBridge {
             timingNavigator.forEachAt(position) { add(it) }
         }
         // 仍有正在唱的行时不算尾奏：对唱里前一行可能晚于最后一行结束，只看超时点会截断它。
+        val wasInTailTimeout = isInTailTimeout
         currentSongInTailTimeout = activeLines.isEmpty() && position >= tailTimeoutDeadlineMs
         val preludePlaceholder = leadingPlaceholderLine?.takeIf {
             position >= it.begin && position < it.end
@@ -598,17 +558,13 @@ object LyriconDataBridge {
             // Without a preview candidate, retain the previous line through instrumental sections.
             else -> timingNavigator.findPreviousEntry(position)?.let(::listOf).orEmpty()
         }
-        val effectiveLines = applyTailTimeoutBehavior(
-            applyNoLyricsTimelineBehavior(selectedLines, position),
-            position
-        )
 
         val previousLines = currentLyricLines
         val previousNextLine = currentNextLyricLine
-        val foundLine = effectiveLines.firstOrNull()
-        currentLyricLines = effectiveLines
+        val foundLine = selectedLines.firstOrNull()
+        currentLyricLines = selectedLines
         currentLyricLine = foundLine
-        currentNextLyricLine = if (!showPreludePlaceholder && effectiveLines === selectedLines) {
+        currentNextLyricLine = if (!showPreludePlaceholder) {
             // An active long row's adjacent entry may already have finished. A future gap
             // preview is itself the selected main row, so look beyond it rather than repeat it.
             timingNavigator.findNextEntry(maxOf(position, selectedLines.lastOrNull()?.begin ?: position))
@@ -619,8 +575,9 @@ object LyriconDataBridge {
         val newText = foundLine?.text ?: currentLyric ?: ""
         // 占位符圆点没有文本，不能只靠文本变化判断是否需要刷新。
         // 切歌或切换到同文本歌词时，新的歌词行仍然需要传给渲染器。
-        val lineChanged = effectiveLines != previousLines ||
-                currentNextLyricLine !== previousNextLine
+        val lineChanged = selectedLines != previousLines ||
+                currentNextLyricLine !== previousNextLine ||
+                wasInTailTimeout != isInTailTimeout
 
         if (lineChanged || newText != currentLyric) {
             currentLyric = newText
@@ -638,7 +595,7 @@ object LyriconDataBridge {
         fullSongLyricsAvailable = null
         currentSongIsPureMusic = isPureMusicLyricText(text)
         currentLyric = text
-        rawActiveLyricLine = if (!text.isNullOrBlank()) {
+        currentLyricLine = if (!text.isNullOrBlank()) {
             val lines = text.lines()
             RichLyricLine(
                 text = lines.first(),
@@ -647,7 +604,6 @@ object LyriconDataBridge {
         } else {
             null
         }
-        currentLyricLine = resolveActiveLyricLine()
         currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
         currentNextLyricLine = null
     }
@@ -658,9 +614,8 @@ object LyriconDataBridge {
         plainTextMarqueeOriginActiveTimeMs = 0L
         fullSongLyricsAvailable = null
         currentSongIsPureMusic = isPureMusicMarkerLine(line.text)
-        rawActiveLyricLine = line
+        currentLyricLine = line
         currentLyric = line.text
-        currentLyricLine = resolveActiveLyricLine()
         currentLyricLines = currentLyricLine?.let(::listOf).orEmpty()
         currentNextLyricLine = null
     }
@@ -684,7 +639,6 @@ object LyriconDataBridge {
         currentSongIsPureMusic = false
         currentSongInTailTimeout = false
         tailTimeoutDeadlineMs = Long.MAX_VALUE
-        rawActiveLyricLine = null
         timingNavigator = TimingNavigator(emptyArray())
         interludeCountdownNavigator = TimingNavigator(emptyArray())
         leadingPlaceholderLine = null
@@ -696,31 +650,15 @@ object LyriconDataBridge {
      * Returns whether the current source has content that justifies owning the island text slots.
      * A whole-song source wins over the current line so an interlude cannot remove the view.
      */
-    fun hasLyricsForPresentation(): Boolean {
-        if (isContentSuppressedForPresentation()) return false
+    fun hasSourceLyrics(): Boolean {
         fullSongLyricsAvailable?.let { return it }
         return !currentLyric.isNullOrBlank() || hasRenderableLine(currentLyricLine)
     }
 
     /**
-     * Returns whether the active lyric source supplied displayable media fields of its own.
-     * This deliberately does not inspect MediaSession fallback fields: LyricInfo must be judged
-     * by the fields parsed from its lyricInfo JSON rather than by top-level MediaMetadata.
-     */
-    fun hasMusicInfoForPresentation(): Boolean {
-        val metadata = currentLyricMediaMetadata ?: return false
-        return !metadata.title.isNullOrBlank() ||
-                !metadata.artist.isNullOrBlank() ||
-                !metadata.album.isNullOrBlank()
-    }
-
-    /**
-     * 构造无歌词曲目使用的占位展示行。它与 [currentLyricLine] 刻意分离，因此"回退到默认"时
-     * 不会让无歌词源冒充成有歌词而通过歌词判定。
+     * 构造保留歌词模式下的无歌词占位行，不修改源歌词状态。
      */
     fun noLyricsPlaceholderLine(): IRichLyricLine? {
-        if (isPlaceholderSuppressed()) return null
-        if (noLyricsBehaviorShowsMusicInfo()) return musicInfoDisplayLine()
         val metadata = currentLyricMediaMetadata ?: return null
         return SongPreprocessor(
             resolveTitleSlot(placeholderFormat),
@@ -734,125 +672,13 @@ object LyriconDataBridge {
         )
     }
 
-    fun hasNoLyricsPlaceholderForPresentation(): Boolean {
-        if (isPlaceholderSuppressed()) return false
-        // 必须与实际合成的展示行保持一致：仅判断媒体信息是否存在，会在布局字段全为空时
-        // 声称有占位内容，渲染层却拿不到可显示的行。
-        if (noLyricsBehaviorShowsMusicInfo()) {
-            return musicInfoDisplayLine() != null
-        }
-        val metadata = currentLyricMediaMetadata ?: return false
-        return when (placeholderFormat) {
-            RootConstants.PLACEHOLDER_FORMAT_NONE -> false
-            RootConstants.PLACEHOLDER_FORMAT_TITLE_ARTIST,
-            RootConstants.PLACEHOLDER_FORMAT_TITLE -> !metadata.title.isNullOrBlank()
-            RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN -> hasMusicInfoForPresentation()
-            else -> false
-        }
-    }
+    /** Timeline fact only; presentation behavior is owned by LyricPresentationScheduler. */
+    val isInTailTimeout: Boolean
+        get() = !currentSongIsPureMusic && fullSongLyricsAvailable == true && currentSongInTailTimeout
 
-    /** 纯音乐且行为非"保持不变"时，标记文本不再作为歌词内容展示。 */
-    private fun isPureMusicLyricHandled(): Boolean =
-        currentSongIsPureMusic &&
-                noLyricsLyricBehavior != RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_KEEP
-
-    /**
-     * 纯音乐内容被"回退到默认"主动清空。此时选行结果已被丢弃，不能再让整首歌的"有歌词"结论
-     * 去占用文本槽位，否则会隐藏系统元素却不展示任何内容。"替换为音乐信息"不在此列：它把展示行
-     * 替换成音乐信息，内容始终存在。
-     */
-    private fun isPureMusicContentSuppressed(): Boolean =
-        currentSongIsPureMusic && isNoLyricsBehaviorRestoreDefault()
-
-    /**
-     * 尾奏超时只对"有完整时间线的整首歌"生效。流式与纯文本源没有可判定最后一句的时间线，
-     * 沿用上一次整首歌的超时点会误判。
-     */
-    private fun isTailTimeoutActive(): Boolean =
-        fullSongLyricsAvailable == true && currentSongInTailTimeout
-
-    /**
-     * 尾奏超时是否已经完全接管本首歌的展示。纯音乐由"无歌词/纯音乐歌词行为"负责，两者不叠加。
-     */
-    private fun isTailOverrideActive(): Boolean =
-        !currentSongIsPureMusic && isTailTimeoutActive()
-
-    /** 尾奏超时内容被"回退到默认"主动清空。 */
-    private fun isTailContentSuppressed(): Boolean =
-        isTailOverrideActive() &&
-                tailTimeoutBehavior == RootConstants.TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT
-
-    /** 任一行为要求交还系统默认展示，此时既不显示歌词也不显示任何占位内容。 */
-    private fun isContentSuppressedForPresentation(): Boolean =
-        isPureMusicContentSuppressed() || isTailContentSuppressed()
-
-    /**
-     * 占位符路径专用的抑制判定。能走到占位符就说明此刻没有可展示的歌词，因此"回退到默认"对
-     * 无歌词、纯音乐、尾奏超时三种情形一律生效，不需要再判断歌曲上下文。
-     *
-     * 不能与 [isContentSuppressedForPresentation] 混用：后者给 hasLyricsForPresentation 用，必须
-     * 保留纯音乐门控，否则正常播放中的歌词也会被"回退到默认"一并清掉；而本方法若沿用那个门控，
-     * 普通无歌词歌曲（不含纯音乐标记）选"回退到默认"时仍会注入标题/倒计时占位符。
-     */
-    private fun isPlaceholderSuppressed(): Boolean =
-        isNoLyricsBehaviorRestoreDefault() || isTailContentSuppressed()
-
-    /** 纯音乐被行为接管（非"保持不变"），对唱宽度锁定不适用。 */
-    fun isPureMusicLyricReplaced(): Boolean = isPureMusicLyricHandled()
-
-    /** 尾奏超时被行为接管（非"保持不变"），对唱宽度锁定不适用。 */
-    fun isTailLyricReplaced(): Boolean =
-        isTailOverrideActive() &&
-                tailTimeoutBehavior != RootConstants.TAIL_TIMEOUT_BEHAVIOR_KEEP
-
-    private fun isNoLyricsBehaviorRestoreDefault(): Boolean =
-        noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT
-
-    /**
-     * 无歌词/纯音乐时是否展示音乐信息占位。尾奏超时接管本首歌后必须让位：否则超级岛会用
-     * "无歌词"侧的选择判定自己仍应展示，却拿不到任何内容（占位行已按尾奏行为清空），
-     * 结果是被拉起并改写、内容为空的超级岛顶替掉状态栏歌词。
-     */
-    fun noLyricsBehaviorShowsMusicInfo(): Boolean =
-        !isTailOverrideActive() &&
-                noLyricsLyricBehavior == RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO
-
-    /**
-     * 模块是否真的在接管文本展示。时钟、通知图标与灵动岛的隐藏都依赖此判定，因此必须基于
-     * 实际可展示的内容而非设置项本身：否则选了"替换为音乐信息"却没有内容可渲染时，
-     * 系统元素会被一并隐藏，得到一条完全空白的状态栏。
-     */
-    fun isPresentingManagedContent(): Boolean =
-        hasLyricsForPresentation() || hasNoLyricsPlaceholderForPresentation()
-
-    /**
-     * 用用户配置的音乐信息布局合成展示行，没有可显示内容时返回 null 以便调用方回退。
-     * 无歌词/纯音乐与尾奏超时两种"替换为音乐信息"共用本方法。
-     */
-    private fun musicInfoDisplayLine(
-        position: Long = currentPlaybackClock().positionMs
-    ): IRichLyricLine? {
-        val prefs = HookEntry.instance?.prefs ?: return null
-        val mediaInfo = resolveMediaInfoForDisplay() ?: return null
-        val lines = IslandMetadataContentAssembler.buildConfiguredMusicInfoLines(
-            prefs = prefs,
-            mediaInfo = mediaInfo,
-            playbackPosition = position,
-            playbackDuration = currentSong?.duration?.takeIf { it > 0L } ?: mediaInfo.duration
-        )
-        val firstLine = lines.firstLine.takeIf { it.isNotBlank() }
-        val secondLine = lines.secondLine.takeIf { it.isNotBlank() }
-        // 主行是状态栏判定可见性的唯一依据，配置的首行为空时降级用次行顶上。
-        val primary = firstLine ?: secondLine ?: return null
-        return RichLyricLine(
-            text = primary,
-            translation = if (firstLine == null) null else secondLine
-        )
-    }
-
-    private fun resolveMediaInfoForDisplay(): MediaMetadataHelper.MediaInfo? {
+    internal fun resolveMediaInfoForDisplay(): MediaMetadataHelper.MediaInfo? {
         currentResolvedMediaInfo
-            ?.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+            ?.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }
             ?.let { return it }
         val metadata = currentLyricMediaMetadata ?: return null
         val fallback = MediaMetadataHelper.MediaInfo(
@@ -861,65 +687,11 @@ object LyriconDataBridge {
             album = metadata.album.orEmpty(),
             duration = metadata.duration ?: -1L
         )
-        return fallback.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() }
+        return fallback.takeIf { it.title.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }
     }
 
     private fun hasRenderableLine(line: IRichLyricLine?): Boolean {
         return line != null && (!line.text.isNullOrBlank() || !line.words.isNullOrEmpty())
-    }
-
-    /**
-     * 按无歌词/纯音乐行为替换源推送的单行内容。"替换为音乐信息"在媒体信息尚未就绪时必须回退到
-     * 原始行：直接置空会让 hasLyricsForPresentation 与 currentLyricLine 互相矛盾，渲染层拿到空
-     * 展示、系统元素却已按"有内容"被隐藏，切歌后状态栏就整条空白。
-     */
-    private fun resolveActiveLyricLine(): IRichLyricLine? {
-        val rawLine = rawActiveLyricLine ?: return null
-        if (!currentSongIsPureMusic) return rawLine
-        return when (noLyricsLyricBehavior) {
-            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO ->
-                musicInfoDisplayLine() ?: rawLine
-
-            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT -> null
-
-            else -> rawLine
-        }
-    }
-
-    /** 时间线选行结果的无歌词/纯音乐覆盖，返回原列表实例表示未覆盖。 */
-    private fun applyNoLyricsTimelineBehavior(
-        selectedLines: List<IRichLyricLine>,
-        position: Long
-    ): List<IRichLyricLine> {
-        if (!currentSongIsPureMusic) return selectedLines
-        return when (noLyricsLyricBehavior) {
-            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_MUSIC_INFO ->
-                musicInfoDisplayLine(position)?.let(::listOf) ?: selectedLines
-
-            RootConstants.NO_LYRICS_LYRIC_BEHAVIOR_RESTORE_DEFAULT -> emptyList()
-
-            else -> selectedLines
-        }
-    }
-
-    /**
-     * 尾奏超时后的时间线覆盖，与纯音乐替换同构：替换为音乐信息时换成音乐信息展示行，媒体信息
-     * 未就绪则回退原行；回退到默认时丢弃内容交还系统；保持不变时保留最后一句。
-     * 纯音乐已由上一个覆盖接管，这里不再叠加。
-     */
-    private fun applyTailTimeoutBehavior(
-        selectedLines: List<IRichLyricLine>,
-        position: Long
-    ): List<IRichLyricLine> {
-        if (!isTailOverrideActive()) return selectedLines
-        return when (tailTimeoutBehavior) {
-            RootConstants.TAIL_TIMEOUT_BEHAVIOR_MUSIC_INFO ->
-                musicInfoDisplayLine(position)?.let(::listOf) ?: selectedLines
-
-            RootConstants.TAIL_TIMEOUT_BEHAVIOR_RESTORE_DEFAULT -> emptyList()
-
-            else -> selectedLines
-        }
     }
 
     /**

@@ -7,6 +7,7 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 /**
  * Shared target facts for user-visible Super Island modifications.
@@ -38,7 +39,7 @@ internal object IslandModificationTargetPolicy {
         val mediaState: MediaState,
         val mediaInfo: IslandProbeUtils.MediaIslandInfo?,
         val isCurrentLyricOwner: Boolean,
-        val hasLyricsForPresentation: Boolean,
+        val hasManagedText: Boolean,
         val injectionState: InjectionState,
         val hostToken: IslandViewRegistry.HostToken?
     ) {
@@ -52,7 +53,7 @@ internal object IslandModificationTargetPolicy {
         val isCurrentLyricPresentationTarget: Boolean
             get() = isMediaTarget &&
                     isCurrentLyricOwner &&
-                    hasLyricsForPresentation
+                    hasManagedText
 
         /**
          * Strict physical target for the future "injected lyric islands only" scope.
@@ -77,11 +78,13 @@ internal object IslandModificationTargetPolicy {
         val injectionState = hostToken?.root?.let(::readInjectionState)
             ?: InjectionState.UNKNOWN
 
+        val presentation = LyricPresentationScheduler.snapshot()
         return TargetSnapshot(
             mediaState = mediaState,
             mediaInfo = mediaInfo,
             isCurrentLyricOwner = mediaInfo?.let(::isCurrentLyricOwner) == true,
-            hasLyricsForPresentation = LyriconDataBridge.hasLyricsForPresentation(),
+            hasManagedText = presentation.hasLyrics ||
+                    presentation.hasMusicInfo,
             injectionState = injectionState,
             hostToken = hostToken
         )

@@ -8,6 +8,7 @@ import com.lidesheng.hyperlyric.common.SuperIslandWidthPolicy
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
 import com.lidesheng.hyperlyric.common.getFloatCompat
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplayPolicy
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 import com.lidesheng.hyperlyric.root.island.sizing.IslandSlotGeometryConfig
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
@@ -87,6 +88,7 @@ internal object IslandSlotRuntimeConfigReader {
             RootConstants.ISLAND_DYNAMIC_WIDTH_BASIS_LYRIC_ONLY
         )
         val config = IslandSlotRuntimeConfig(
+            presentation = LyricPresentationScheduler.snapshot(prefs),
             activeMode = activeMode,
             leftMode = if (activeMode == 1) {
                 RootConstants.ISLAND_CONTENT_MODE_LYRIC

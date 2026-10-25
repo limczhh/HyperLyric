@@ -9,7 +9,7 @@ import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
-import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
+import com.lidesheng.hyperlyric.root.island.content.SlotContentCoordinator
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewHelper
@@ -97,7 +97,7 @@ internal object IslandSlotStructureInjector {
         val wrapper = rootView.findViewWithTag<View>(wrapperTag) ?: return changed
         val parent = wrapper.parent as? ViewGroup ?: return changed
         parent.removeView(wrapper)
-        IslandSlotContentFacade.invalidate(wrapper)
+        SlotContentCoordinator.invalidate(wrapper)
         changed = true
         return changed
     }
@@ -248,7 +248,7 @@ internal object IslandSlotStructureInjector {
                 changed = true
             } else if (!isViewTypeCorrect(targetView, config.activeMode)) {
                 existingWrapper.removeView(targetView)
-                IslandSlotContentFacade.invalidate(targetView)
+                SlotContentCoordinator.invalidate(targetView)
                 existingWrapper.addView(
                     createLyricView(
                         rootView,
@@ -536,7 +536,7 @@ internal object IslandSlotStructureInjector {
         IslandLyricViewController.configureProjection(view)
 
         if (prefs != null) {
-            IslandSlotContentFacade.applySlotContent(
+            SlotContentCoordinator.applySlotContent(
                 view,
                 prefs,
                 config,

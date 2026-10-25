@@ -112,7 +112,8 @@ internal object IslandSlotStyleAssembler {
                     view.secondaryContentOrder = lyricContentDisplay.order
                     view.setStyle(
                         style,
-                        isLeftSplitSide = config.isLeftTag(view.tag as? String ?: "")
+                        isLeftSplitSide = config.isLeftTag(view.tag as? String ?: ""),
+                        useSplitAlignment = mode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
                     )
                 } else {
                     view.updateColor(

@@ -17,6 +17,7 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.hooks.IslandPlaybackControllerResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 /** Handles gestures that start inside the status-bar lyric view or Clock. */
 internal class StatusBarLyricGestureController(
@@ -300,7 +301,7 @@ internal class StatusBarLyricGestureController(
     private fun resolveCurrentMediaAppLaunchTarget(): MediaAppLaunchTarget? {
         // 替换内容（音乐信息/占位行）也是模块自己展示的，点按同样应该能回到媒体应用。
         if (!LyriconDataBridge.isPlaybackActive() ||
-            !LyriconDataBridge.isPresentingManagedContent() ||
+            !LyricPresentationScheduler.snapshot().hasManagedContent ||
             StatusBarLyricHostRegistry.liveHosts().none(StatusBarLyricHost::isShowingLyric)
         ) {
             return null

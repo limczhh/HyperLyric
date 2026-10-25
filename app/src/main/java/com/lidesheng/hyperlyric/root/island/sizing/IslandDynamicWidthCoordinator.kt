@@ -199,12 +199,11 @@ internal object IslandDynamicWidthCoordinator {
      */
     private fun shouldLockToMaxWidth(config: IslandSlotRuntimeConfig): Boolean {
         if (!config.geometry.isDynamicWidth) return false
-        val hasLyricSlot = config.leftMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC ||
-                config.rightMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC
+        val hasLyricSlot = config.modeForTag(IslandProbeUtils.LEFT_TEST_VIEW_TAG) ==
+                RootConstants.ISLAND_CONTENT_MODE_LYRIC ||
+                config.modeForTag(IslandProbeUtils.RIGHT_TEST_VIEW_TAG) ==
+                RootConstants.ISLAND_CONTENT_MODE_LYRIC
         if (!hasLyricSlot) return false
-        // 纯音乐或尾奏超时替换后的展示内容没有对唱行，宽度跟随实际内容自适应。
-        if (LyriconDataBridge.isPureMusicLyricReplaced()) return false
-        if (LyriconDataBridge.isTailLyricReplaced()) return false
         return LyriconDataBridge.currentSong?.lyrics?.any { it.isAlignedRight } == true
     }
 

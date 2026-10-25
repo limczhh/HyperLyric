@@ -5,6 +5,7 @@ import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 /**
  * Builds the policy input from the current root-side presentation state.
@@ -62,12 +63,11 @@ internal class IslandPresentationDecisionEvaluator(
     }
 
     fun evaluateDetailed(owner: IslandRenderPolicy.OwnerEvidence): IslandRenderPolicy.Evaluation {
+        val presentation = LyricPresentationScheduler.snapshot()
         val input = IslandRenderPolicy.Input(
             owner = owner,
             lyricPackageName = LyriconDataBridge.currentLyricPackageName,
-            hasLyricsForPresentation = LyriconDataBridge.hasLyricsForPresentation(),
-            hasMusicInfoForPresentation = LyriconDataBridge.hasMusicInfoForPresentation(),
-            showMusicInfoWhenNoLyrics = LyriconDataBridge.noLyricsBehaviorShowsMusicInfo(),
+            hasManagedText = presentation.hasLyrics || presentation.hasMusicInfo,
             enabled = IslandProbeUtils.isSuperIslandEnabled(),
             playbackActive = presentationState.isPlaybackActive(),
             pauseBehavior = currentPauseBehavior()

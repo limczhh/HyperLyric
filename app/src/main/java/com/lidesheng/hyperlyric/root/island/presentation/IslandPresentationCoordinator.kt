@@ -487,9 +487,7 @@ internal object IslandPresentationCoordinator {
             owner,
             songName,
             input.lyricPackageName,
-            input.hasLyricsForPresentation,
-            input.hasMusicInfoForPresentation,
-            input.showMusicInfoWhenNoLyrics,
+            input.hasManagedText,
             input.enabled,
             input.playbackActive,
             input.pauseBehavior,
@@ -505,9 +503,7 @@ internal object IslandPresentationCoordinator {
             "超级岛歌词注入判定: song=${songName ?: "<none>"}, " +
                     "target=$target, owner=${ownerPackage ?: owner}, " +
                     "lyricPackage=${input.lyricPackageName ?: "<none>"}, " +
-                    "hasLyric=${input.hasLyricsForPresentation}, " +
-                    "hasMusicInfo=${input.hasMusicInfoForPresentation}, " +
-                    "showMusicInfoWhenNoLyrics=${input.showMusicInfoWhenNoLyrics}, " +
+                    "hasManagedText=${input.hasManagedText}, " +
                     "enabled=${input.enabled}, playbackActive=${input.playbackActive}, " +
                     "pauseBehavior=${input.pauseBehavior}, decision=${evaluation.decision}, " +
                     "reason=${evaluation.reason}, injectedSlots=${mutation.injectedSlotsPresent}, " +

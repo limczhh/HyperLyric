@@ -15,6 +15,7 @@ import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.hooks.StatusBarLyricMediaIslandCoordinator
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.concurrent.atomic.AtomicLong
+import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
 
 /** Renders the shared rich lyric presentation into Clock-anchored status-bar roots. */
 internal object StatusBarLyricRenderer {
@@ -90,7 +91,7 @@ internal object StatusBarLyricRenderer {
      * 否则锁屏隐藏、暂停策略等分支会让系统元素被藏掉而自有视图是空的。
      */
     private fun isOwningStatusBarContent(): Boolean =
-        renderingEnabled && LyriconDataBridge.isPresentingManagedContent()
+        renderingEnabled && LyricPresentationScheduler.snapshot().hasManagedContent
 
     fun ensureKeyguardStateListener(context: Context) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -327,11 +328,8 @@ internal object StatusBarLyricRenderer {
     }
 
     private fun shouldRender(prefs: android.content.SharedPreferences): Boolean {
-        val hasLyrics = LyriconDataBridge.hasLyricsForPresentation()
-        val hasPlaceholder = !hasLyrics &&
-                LyriconDataBridge.hasNoLyricsPlaceholderForPresentation()
         if (!LyricTypePreference.isEnabled(prefs, RootConstants.LYRIC_TYPE_STATUS_BAR) ||
-            (!hasLyrics && !hasPlaceholder)
+            !LyricPresentationScheduler.snapshot(prefs).hasManagedContent
         ) return false
         if (prefs.getBoolean(
                 RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN,

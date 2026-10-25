@@ -10,7 +10,7 @@ import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
-import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
+import com.lidesheng.hyperlyric.root.island.content.SlotContentCoordinator
 import com.lidesheng.hyperlyric.root.island.content.IslandSlotStyleAssembler
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
@@ -33,7 +33,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 internal object IslandContentUpdateCoordinator {
 
     fun invalidate() {
-        IslandSlotContentFacade.invalidate()
+        SlotContentCoordinator.invalidate()
     }
 
     fun updateContentForView(
@@ -68,9 +68,11 @@ internal object IslandContentUpdateCoordinator {
             mediaInfo,
             playbackActive
         )
-        if ((config.leftMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
+        if ((config.resolveContentMode(config.leftMode) ==
+                    RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
                     leftChanged) ||
-            (config.rightMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
+            (config.resolveContentMode(config.rightMode) ==
+                    RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
                     rightChanged)
         ) {
             IslandDynamicWidthCoordinator.requestRefresh(view)
@@ -82,7 +84,7 @@ internal object IslandContentUpdateCoordinator {
     }
 
     /**
-     * Refreshes only the user-configured music-information slots after a metadata callback.
+     * Refreshes music-information slots, including scheduled replacements, after a metadata callback.
      * Lyric slots stay untouched so a player changing its title metadata cannot restart lyric
      * content or its transition state.
      */
@@ -118,9 +120,11 @@ internal object IslandContentUpdateCoordinator {
             mediaInfo = mediaInfo,
             playbackActive = playbackActive
         )
-        if ((config.leftMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
+        if ((config.resolveContentMode(config.leftMode) ==
+                    RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
                     leftChanged) ||
-            (config.rightMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
+            (config.resolveContentMode(config.rightMode) ==
+                    RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
                     rightChanged)
         ) {
             IslandDynamicWidthCoordinator.requestRefresh(view)
@@ -142,7 +146,7 @@ internal object IslandContentUpdateCoordinator {
     ) {
         var contentChanged = false
         slotViews.forEach { slotView ->
-            if (!IslandSlotContentFacade.updatePlaybackProgress(slotView, position)) {
+            if (!SlotContentCoordinator.updatePlaybackProgress(slotView, position)) {
                 return@forEach
             }
             contentChanged = true
@@ -161,12 +165,16 @@ internal object IslandContentUpdateCoordinator {
         config: IslandSlotRuntimeConfig,
         playbackActive: Boolean
     ) {
+        val mediaInfo = CurrentMediaInfoResolver.getMediaInfo(
+            view.context, LyriconDataBridge.currentLyricPackageName.orEmpty(), HookLogger
+        )
         updateLyricSlot(
             view,
             IslandProbeUtils.LEFT_TEST_VIEW_TAG,
             config.leftMode,
             prefs,
             config,
+            mediaInfo,
             playbackActive
         )
         updateLyricSlot(
@@ -175,6 +183,7 @@ internal object IslandContentUpdateCoordinator {
             config.rightMode,
             prefs,
             config,
+            mediaInfo,
             playbackActive
         )
     }
@@ -280,38 +289,16 @@ internal object IslandContentUpdateCoordinator {
         mode: Int,
         prefs: SharedPreferences,
         config: IslandSlotRuntimeConfig,
+        mediaInfo: MediaMetadataHelper.MediaInfo,
         playbackActive: Boolean
     ) {
         if (mode != RootConstants.ISLAND_CONTENT_MODE_LYRIC) return
-        val lyricView = view.findViewWithTag<View>(tag) ?: return
-        val presentation = IslandSlotContentFacade.buildSlotLyricPresentation(
-            view = lyricView,
-            prefs = prefs,
-            config = config,
-            isLeft = tag == IslandProbeUtils.LEFT_TEST_VIEW_TAG
-        )
-        IslandSlotContentFacade.applyLyricLineContent(
-            view = lyricView,
-            prefs = prefs,
-            config = config,
-            lineOverride = presentation.primary,
-            secondaryLineOverride = presentation.secondary,
-            playbackActive = playbackActive,
-            onLineWillApply = { contentWidthPx ->
-                IslandDynamicWidthCoordinator.prepareLyricWidth(
-                    view,
-                    tag,
-                    contentWidthPx
-                )
-            },
-            onLineApplied = {
-                IslandDynamicWidthCoordinator.clearPreflight(view, tag)
-                IslandDynamicWidthCoordinator.requestRefresh(view)
-            },
-            onLineCancelled = {
-                IslandDynamicWidthCoordinator.clearPreflight(view, tag)
-            }
-        )
+        // Route each lyric refresh through the same mode/style resolver as an initial attach.
+        // This retires metadata state on return to lyrics and activates real metadata rendering
+        // when a no-lyrics or outro policy takes over.
+        if (updateSlot(view, tag, mode, prefs, config, mediaInfo, playbackActive)) {
+            IslandDynamicWidthCoordinator.requestRefresh(view)
+        }
     }
 
     private fun updateSlot(
@@ -323,12 +310,8 @@ internal object IslandContentUpdateCoordinator {
         mediaInfo: MediaMetadataHelper.MediaInfo,
         playbackActive: Boolean
     ): Boolean {
-        if (mode == RootConstants.ISLAND_CONTENT_MODE_NONE) {
-            view.findViewWithTag<View>(tag)?.let(IslandSlotContentFacade::clearMetadataState)
-            return false
-        }
         val slotView = view.findViewWithTag<View>(tag) ?: return false
-        val contentChanged = IslandSlotContentFacade.applySlotContent(
+        val contentChanged = SlotContentCoordinator.applySlotContent(
             view = slotView,
             prefs = prefs,
             config = config,
@@ -336,7 +319,6 @@ internal object IslandContentUpdateCoordinator {
             // Let applySlotContent configure the actual text paint first, then build the split
             // line from that paint. This keeps the split boundary in sync with custom fonts and
             // weight changes during a full island refresh.
-            lineOverride = null,
             playbackActive = playbackActive,
             mediaInfo = mediaInfo,
             onLineWillApply = { contentWidthPx ->
@@ -354,7 +336,8 @@ internal object IslandContentUpdateCoordinator {
                 IslandDynamicWidthCoordinator.clearPreflight(view, tag)
             }
         )
-        if (mode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
+        if (config.resolveContentMode(mode) ==
+            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
             IslandDynamicWidthCoordinator.cacheMetadataWidth(view, tag)
         ) {
             return true
@@ -371,20 +354,10 @@ internal object IslandContentUpdateCoordinator {
         mediaInfo: MediaMetadataHelper.MediaInfo,
         playbackActive: Boolean
     ): Boolean {
-        if (mode != RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO) return false
-        val slotView = view.findViewWithTag<View>(tag) ?: return false
-        val contentChanged = IslandSlotContentFacade.applySlotContent(
-            view = slotView,
-            prefs = prefs,
-            config = config,
-            mode = mode,
-            playbackActive = playbackActive,
-            mediaInfo = mediaInfo
-        )
-        if (IslandDynamicWidthCoordinator.cacheMetadataWidth(view, tag)) {
-            return true
-        }
-        return contentChanged
+        if (config.resolveContentMode(mode) !=
+            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO
+        ) return false
+        return updateSlot(view, tag, mode, prefs, config, mediaInfo, playbackActive)
     }
 
     private fun updateSlotColors(
@@ -397,7 +370,7 @@ internal object IslandContentUpdateCoordinator {
     ) {
         if (mode == RootConstants.ISLAND_CONTENT_MODE_NONE) return
         val slotView = view.findViewWithTag<View>(tag) ?: return
-        IslandSlotContentFacade.configureView(
+        SlotContentCoordinator.configureView(
             view = slotView,
             prefs = prefs,
             config = config,

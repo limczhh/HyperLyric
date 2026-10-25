@@ -12,7 +12,7 @@ import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
-import com.lidesheng.hyperlyric.root.island.content.IslandSlotContentFacade
+import com.lidesheng.hyperlyric.root.island.content.SlotContentCoordinator
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.renderer.LyricRenderer
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
@@ -411,7 +411,7 @@ internal class RootLyricSink(
                 "颜色绑定未就绪: trigger=$reason, reason=${update.reason}"
             }
             if (update.stateChanged) {
-                IslandSlotContentFacade.invalidate()
+                SlotContentCoordinator.invalidate()
                 IslandMusicWaveColorHooker.refresh()
                 renderer.updateTextColors()
             }
@@ -428,7 +428,7 @@ internal class RootLyricSink(
                     "tokenHash=${colorSession.sessionToken.hashCode()}"
         }
         if (update.stateChanged) {
-            IslandSlotContentFacade.invalidate()
+            SlotContentCoordinator.invalidate()
             IslandMusicWaveColorHooker.refresh()
             renderer.updateTextColors()
         }
@@ -437,7 +437,7 @@ internal class RootLyricSink(
     private fun endColorBinding() {
         cancelArtworkColorRefresh()
         if (LyricColorBindingCoordinator.clear()) {
-            IslandSlotContentFacade.invalidate()
+            SlotContentCoordinator.invalidate()
             IslandMusicWaveColorHooker.refresh()
         }
     }
