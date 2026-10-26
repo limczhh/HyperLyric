@@ -79,6 +79,7 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.NavigationRail
 import top.yukonga.miuix.kmp.basic.NavigationRailItem
+import top.yukonga.miuix.kmp.basic.rememberNavigationRailState
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -100,6 +101,7 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 fun MainPage() {
     val context = LocalContext.current
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val navigationRailState = rememberNavigationRailState()
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -436,7 +438,7 @@ fun MainPage() {
     ) { innerPadding ->
         Row(Modifier.fillMaxSize()) {
             if (isLandscape) {
-                NavigationRail {
+                NavigationRail(state = navigationRailState) {
                     navItems.forEachIndexed { index, item ->
                         NavigationRailItem(
                             selected = mainPagerState.selectedPage == index,
