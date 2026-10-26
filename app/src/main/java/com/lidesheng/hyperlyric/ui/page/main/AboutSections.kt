@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
@@ -128,6 +129,7 @@ fun AboutHeader(
 fun LazyListScope.aboutPageSections(
     onOpenLink: (String) -> Unit,
     logoSpacerHeight: Dp,
+    minimumContentHeight: Dp,
     contentBottomPadding: Dp,
     aboutDeviceModel: String,
     aboutOsVersion: String,
@@ -148,7 +150,7 @@ fun LazyListScope.aboutPageSections(
     item(key = "about_content") {
         Column(
             modifier = Modifier
-                .fillParentMaxHeight()
+                .heightIn(min = minimumContentHeight)
                 .padding(bottom = contentBottomPadding),
         ) {
             Card(

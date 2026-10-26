@@ -4,6 +4,7 @@ import com.lidesheng.hyperlyric.ui.utils.rememberExternalLinkOpener
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -99,7 +100,9 @@ fun AboutPage(
             isWideScreen = false,
         )
 
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        BoxWithConstraints(
+            modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier
+        ) {
             AboutHeader(
                 aboutAppVersion = aboutAppVersion,
                 topPadding = contentPadding.calculateTopPadding() + 92.dp,
@@ -120,6 +123,7 @@ fun AboutPage(
                 aboutPageSections(
                     onOpenLink = onOpenLink,
                     logoSpacerHeight = logoHeightDp + 218.dp,
+                    minimumContentHeight = maxHeight,
                     contentBottomPadding = contentPadding.calculateBottomPadding(),
                     aboutDeviceModel = aboutDeviceModel,
                     aboutOsVersion = aboutOsVersion,
