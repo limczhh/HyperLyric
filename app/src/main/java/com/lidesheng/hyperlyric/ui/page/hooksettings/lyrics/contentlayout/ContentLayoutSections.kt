@@ -176,6 +176,27 @@ internal fun LazyListScope.contentLayoutSections(
     item(key = "music_info_title") {
         SmallTitle(text = stringResource(id = R.string.title_content_layout_music_info))
     }
+    item(key = "music_info_alignment") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            OverlayDropdownPreference(
+                title = stringResource(id = R.string.title_content_layout_alignment),
+                items = ContentLayoutAlignment.values().map { alignment ->
+                    stringResource(id = alignment.labelRes)
+                },
+                selectedIndex = musicInfoAlignment.ordinal,
+                onSelectedIndexChange = { index ->
+                    ContentLayoutAlignment.values().getOrNull(index)?.let(
+                        onMusicInfoAlignmentChange
+                    )
+                }
+            )
+        }
+    }
     item(key = "music_info_content") {
         Card(
             modifier = Modifier
@@ -207,31 +228,55 @@ internal fun LazyListScope.contentLayoutSections(
                         ContentLayoutSeparator.values().getOrNull(index)?.let(onSeparatorChange)
                     }
                 )
-                OverlayDropdownPreference(
-                    title = stringResource(id = R.string.title_content_layout_alignment),
-                    items = ContentLayoutAlignment.values().map { alignment ->
-                        stringResource(id = alignment.labelRes)
-                    },
-                    selectedIndex = musicInfoAlignment.ordinal,
-                    onSelectedIndexChange = { index ->
-                        ContentLayoutAlignment.values().getOrNull(index)?.let(
-                            onMusicInfoAlignmentChange
-                        )
-                    }
-                )
-                SwitchPreference(
-                    title = stringResource(id = R.string.title_hide_title_alias),
-                    summary = stringResource(id = R.string.summary_hide_title_alias),
-                    checked = hideTitleAlias,
-                    onCheckedChange = onHideTitleAliasChange
-                )
             }
+        }
+    }
+    item(key = "music_info_hide_alias") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            SwitchPreference(
+                title = stringResource(id = R.string.title_hide_title_alias),
+                summary = stringResource(id = R.string.summary_hide_title_alias),
+                checked = hideTitleAlias,
+                onCheckedChange = onHideTitleAliasChange
+            )
         }
     }
     item(key = "lyrics_title") {
         SmallTitle(text = stringResource(id = R.string.title_content_layout_lyric))
     }
-    item(key = "lyrics_content") {
+    item(key = "lyrics_alignment") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            OverlayDropdownPreference(
+                title = stringResource(id = R.string.title_content_layout_alignment),
+                items = ContentLayoutAlignment.values().map { alignment ->
+                    stringResource(id = alignment.labelRes)
+                },
+                selectedIndex = lyricAlignment.ordinal,
+                onSelectedIndexChange = { index ->
+                    ContentLayoutAlignment.values().getOrNull(index)?.let(
+                        onLyricAlignmentChange
+                    )
+                }
+            )
+            SwitchPreference(
+                title = stringResource(id = R.string.title_auto_duet),
+                summary = stringResource(id = R.string.summary_auto_duet),
+                checked = autoDuet,
+                onCheckedChange = onAutoDuetChange
+            )
+        }
+    }
+    item(key = "lyrics_placeholder_and_behavior") {
         val placeholderOptions = listOf(
             stringResource(id = R.string.option_placeholder_none),
             stringResource(id = R.string.option_placeholder_title_artist),
@@ -250,18 +295,6 @@ internal fun LazyListScope.contentLayoutSections(
                 .fillMaxWidth()
         ) {
             Column {
-                OverlayDropdownPreference(
-                    title = stringResource(id = R.string.title_content_layout_alignment),
-                    items = ContentLayoutAlignment.values().map { alignment ->
-                        stringResource(id = alignment.labelRes)
-                    },
-                    selectedIndex = lyricAlignment.ordinal,
-                    onSelectedIndexChange = { index ->
-                        ContentLayoutAlignment.values().getOrNull(index)?.let(
-                            onLyricAlignmentChange
-                        )
-                    }
-                )
                 OverlayDropdownPreference(
                     title = stringResource(id = R.string.title_placeholder_format),
                     items = placeholderOptions,
@@ -303,6 +336,17 @@ internal fun LazyListScope.contentLayoutSections(
                         onClick = onTailTimeoutDelayClick
                     )
                 }
+            }
+        }
+    }
+    item(key = "lyrics_preview_and_interlude") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Column {
                 SwitchPreference(
                     title = stringResource(id = R.string.title_lyric_preview),
                     summary = stringResource(id = R.string.summary_lyric_preview),
@@ -340,12 +384,6 @@ internal fun LazyListScope.contentLayoutSections(
                     summary = displaySummary,
                     onClick = onEditLyricContent,
                     holdDownState = lyricContentSheetVisible
-                )
-                SwitchPreference(
-                    title = stringResource(id = R.string.title_auto_duet),
-                    summary = stringResource(id = R.string.summary_auto_duet),
-                    checked = autoDuet,
-                    onCheckedChange = onAutoDuetChange
                 )
                 SwitchPreference(
                     title = stringResource(id = R.string.title_only_secondary_lyric),
