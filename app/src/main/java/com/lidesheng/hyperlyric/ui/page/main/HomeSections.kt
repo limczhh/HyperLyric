@@ -27,7 +27,6 @@ fun LazyListScope.homePageSections(
     onSuperIslandConfigClick: () -> Unit,
     onMediaCardConfigClick: () -> Unit,
     onDynamicIslandConfigClick: () -> Unit,
-    onRestartClick: () -> Unit,
     removeFocusWhitelist: Boolean,
     onRemoveFocusWhitelistToggle: (Boolean) -> Unit,
     onAppSettingsClick: () -> Unit,
@@ -104,10 +103,6 @@ fun LazyListScope.homePageSections(
                 .fillMaxWidth()
         ) {
             Column {
-                ArrowPreference(
-                    title = stringResource(R.string.title_restart_ui),
-                    onClick = onRestartClick,
-                )
                 ArrowPreference(
                     title = stringResource(R.string.title_dynamic_island_lyrics),
                     summary = stringResource(R.string.summary_dynamic_island_lyrics),

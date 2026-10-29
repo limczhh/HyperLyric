@@ -7,15 +7,21 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -47,6 +53,14 @@ fun HomePage(
                     color = barColor,
                     title = "HyperLyric",
                     scrollBehavior = topAppBarScrollBehavior,
+                    actions = {
+                        IconButton(onClick = onRestartClick) {
+                            Icon(
+                                imageVector = MiuixIcons.Refresh,
+                                contentDescription = stringResource(id = R.string.dialog_restart_title)
+                            )
+                        }
+                    }
                 )
             }
         }
@@ -78,7 +92,6 @@ fun HomePage(
                     onSuperIslandConfigClick = onSuperIslandConfigClick,
                     onMediaCardConfigClick = onMediaCardConfigClick,
                     onDynamicIslandConfigClick = onDynamicIslandConfigClick,
-                    onRestartClick = onRestartClick,
                     removeFocusWhitelist = removeFocusWhitelist,
                     onRemoveFocusWhitelistToggle = onRemoveFocusWhitelistToggle,
                     onAppSettingsClick = onAppSettingsClick,
