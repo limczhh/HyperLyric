@@ -31,9 +31,9 @@ import java.util.Collections
 import java.util.WeakHashMap
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.sqrt
 
 private const val TAG = "IslandMusicWaveSpectrumView"
@@ -44,20 +44,13 @@ private const val TARGET_FPS = 60
 private const val MIN_FRAME_INTERVAL_NANOS = 1_000_000_000L / TARGET_FPS - 1_000_000L
 private const val MAX_FRAME_NANOS = 100_000_000L
 private const val SILENCE_NANOS = 350_000_000L
-private const val ATTACK_TIME_NANOS = 45_000_000L
-private const val RELEASE_TIME_NANOS = 150_000_000L
-private const val GAIN_TARGET = 0.75f
-private const val GAIN_LOUDER_TIME_NANOS = 350_000_000L
-private const val GAIN_QUIETER_TIME_NANOS = 1_000_000_000L
-// Adapt band sensitivity to recent energy without fully equalizing or amplifying the noise floor.
-private const val BAND_REFERENCE_TIME_NANOS = 3_000_000_000L
-private const val BAND_REFERENCE_FLOOR = 1f
-private const val BAND_REFERENCE_FLOOR_FRACTION = 0.05f
-private const val MIN_BAND_SENSITIVITY = 0.7f
-private const val MAX_BAND_SENSITIVITY = 1.5f
-private const val LEVEL_COMPRESSION_EXPONENT = 0.75f
-private const val MIN_GAIN = 1e-4f
-private const val MAX_GAIN = 1e3f
+private const val ATTACK_TIME_NANOS = 35_000_000L
+private const val RELEASE_TIME_NANOS = 70_000_000L
+// A signed 8-bit complex FFT bin tops out at hypot(-128, -128) ≈ 181.
+private const val FFT_MAGNITUDE_FULL_SCALE = 181.02f
+// This floor is about 3 dB above the smallest representable non-zero magnitude.
+private const val FFT_DISPLAY_MIN_DB = -42f
+private const val FFT_DISPLAY_MAX_DB = 0f
 private const val LEVEL_EPSILON = 0.01f
 private const val REDRAW_EPSILON = 0.005f
 private const val DEBUG_METRICS_INTERVAL_NANOS = 1_000_000_000L
@@ -68,6 +61,8 @@ private const val NATIVE_BAR_CENTER_SPACING = 12f
 private const val NATIVE_BAR_WIDTH = 5.4f
 private const val NATIVE_PAUSE_HALF_HEIGHT = 8.7f
 private const val NATIVE_MAX_WAVE_HALF_HEIGHT = 22.359f
+// Keep the highest range on the last bar; boundaries are fractions of the sampled upper bin.
+private val BAND_EDGE_FRACTIONS = floatArrayOf(0f, 0.04f, 0.12f, 0.23f, 0.36f, 1f)
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR = 0xFF57F2FF.toInt()
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR = 0xFFF5E6FF.toInt()
 
@@ -79,6 +74,16 @@ private fun warnOnce(key: String, message: String) {
 
 private fun smoothingAlpha(elapsedNanos: Long, timeConstantNanos: Long): Float =
     (1.0 - exp(-elapsedNanos.toDouble() / timeConstantNanos)).toFloat()
+
+private fun fftMagnitudeDb(magnitude: Float): Float =
+    if (magnitude <= 0f) Float.NEGATIVE_INFINITY else
+        20f * log10(magnitude / FFT_MAGNITUDE_FULL_SCALE)
+
+private fun normalizedFftLevel(magnitude: Float): Float {
+    val decibels = fftMagnitudeDb(magnitude)
+    return ((decibels - FFT_DISPLAY_MIN_DB) /
+            (FFT_DISPLAY_MAX_DB - FFT_DISPLAY_MIN_DB)).coerceIn(0f, 1f)
+}
 
 internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -287,13 +292,7 @@ private object VisualizerSource {
     private val lock = Any()
     private val clients = Collections.newSetFromMap(WeakHashMap<IslandMusicWaveSpectrumView, Boolean>())
     private val scratch = FloatArray(BAR_COUNT)
-    private val bandReference = FloatArray(BAR_COUNT)
-    private val bandSensitivity = FloatArray(BAR_COUNT)
     private var visualizer: Visualizer? = null
-    private var gain = MIN_GAIN
-    private var lastGainUpdateAtNanos = 0L
-    private var bandReferenceInitialized = false
-    private var lastBandReferenceUpdateAtNanos = 0L
     private var lastMetricsLogAtNanos = 0L
 
     @Volatile
@@ -342,7 +341,7 @@ private object VisualizerSource {
             state = "active"
         ) {
             "实时频谱采样器已启动: session=$SYSTEM_AUDIO_SESSION, captureSize=$CAPTURE_SIZE, " +
-                    "captureRate=$captureRate, bars=$BAR_COUNT, response=balanced"
+                    "captureRate=$captureRate, bars=$BAR_COUNT, response=fast"
         }
         true
     }
@@ -366,12 +365,6 @@ private object VisualizerSource {
         val active = visualizer
         visualizer = null
         lastAudioAtNanos = 0L
-        gain = MIN_GAIN
-        lastGainUpdateAtNanos = 0L
-        bandReference.fill(0f)
-        bandSensitivity.fill(1f)
-        bandReferenceInitialized = false
-        lastBandReferenceUpdateAtNanos = 0L
         lastMetricsLogAtNanos = 0L
         levelSnapshot = FloatArray(BAR_COUNT)
         active?.let {
@@ -428,54 +421,13 @@ private object VisualizerSource {
             val snapshot = FloatArray(BAR_COUNT)
             val now = System.nanoTime()
             val wasSilent = lastAudioAtNanos == 0L || now - lastAudioAtNanos >= SILENCE_NANOS
-            val appliedGain = synchronized(lock) {
-                if (!bandReferenceInitialized) {
-                    for (index in 0 until BAR_COUNT) bandReference[index] = scratch[index]
-                    bandReferenceInitialized = true
-                } else {
-                    val referenceElapsed = (now - lastBandReferenceUpdateAtNanos).coerceAtLeast(0L)
-                    val referenceAlpha = smoothingAlpha(referenceElapsed, BAND_REFERENCE_TIME_NANOS)
-                    for (index in 0 until BAR_COUNT) {
-                        bandReference[index] +=
-                                (scratch[index] - bandReference[index]) * referenceAlpha
-                    }
-                }
-                lastBandReferenceUpdateAtNanos = now
-                val averageReference = bandReference.average().toFloat()
-                val referenceFloor = max(
-                    BAND_REFERENCE_FLOOR,
-                    averageReference * BAND_REFERENCE_FLOOR_FRACTION
-                )
+            synchronized(lock) {
                 for (index in 0 until BAR_COUNT) {
-                    val reference = max(bandReference[index], referenceFloor)
-                    bandSensitivity[index] = sqrt(averageReference / reference)
-                        .coerceIn(MIN_BAND_SENSITIVITY, MAX_BAND_SENSITIVITY)
-                }
-
-                val impliedGain = (GAIN_TARGET / frameMax).coerceIn(MIN_GAIN, MAX_GAIN)
-                if (lastGainUpdateAtNanos == 0L) {
-                    gain = impliedGain
-                } else {
-                    val gainElapsed = (now - lastGainUpdateAtNanos).coerceAtLeast(0L)
-                    val timeConstant = if (impliedGain < gain) {
-                        GAIN_LOUDER_TIME_NANOS
-                    } else {
-                        GAIN_QUIETER_TIME_NANOS
-                    }
-                    val gainAlpha = smoothingAlpha(gainElapsed, timeConstant)
-                    gain += (impliedGain - gain) * gainAlpha
-                }
-                lastGainUpdateAtNanos = now
-                gain = gain.coerceIn(MIN_GAIN, MAX_GAIN)
-                for (index in 0 until BAR_COUNT) {
-                    val normalized =
-                        (scratch[index] * gain * bandSensitivity[index]).coerceIn(0f, 1f)
-                    snapshot[index] = normalized.pow(LEVEL_COMPRESSION_EXPONENT)
+                    snapshot[index] = normalizedFftLevel(scratch[index])
                 }
                 lastAudioAtNanos = now
                 levelSnapshot = snapshot
                 clients.toList().forEach(IslandMusicWaveSpectrumView::onAudioFrame)
-                gain
             }
             if (wasSilent) {
                 HookLogger.dState(
@@ -501,18 +453,17 @@ private object VisualizerSource {
                     val rawPeaks = scratch.joinToString(separator = ",", prefix = "[", postfix = "]") {
                         it.toInt().toString()
                     }
-                    val sensitivities = bandSensitivity.joinToString(
-                        separator = ",",
-                        prefix = "[",
-                        postfix = "]"
-                    ) { "%.2f".format(it) }
+                    val dbBands = scratch.joinToString(separator = ",", prefix = "[", postfix = "]") {
+                        val decibels = fftMagnitudeDb(it)
+                        if (decibels <= FFT_DISPLAY_MIN_DB) "≤${FFT_DISPLAY_MIN_DB.toInt()}dB" else
+                            "${decibels.toInt()}dB"
+                    }
                     val levels = snapshot.joinToString(separator = ",", prefix = "[", postfix = "]") {
                         "${(it * 100).toInt()}%"
                     }
                     HookLogger.d(
                         TAG,
-                        "实时频谱幅度: peakBands=$rawPeaks, sensitivity=$sensitivities, " +
-                                "levels=$levels, gain=$appliedGain"
+                        "实时频谱幅度: peakBands=$rawPeaks, dbBands=$dbBands, levels=$levels"
                     )
                 }
             }
@@ -520,7 +471,7 @@ private object VisualizerSource {
     }
 
     private fun frequencyBin(index: Int, maxBin: Int): Int =
-        (maxBin * (index.toFloat() / BAR_COUNT).pow(2f)).toInt()
+        (maxBin * BAND_EDGE_FRACTIONS[index]).toInt()
             .coerceIn(1, maxBin - 1)
 }
 

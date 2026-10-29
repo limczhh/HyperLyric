@@ -251,7 +251,7 @@ internal object IslandMusicWaveSpectrumHooker {
         logDebugTransition(
             state,
             "spectrum:$isPlaying",
-            "实时频谱已接管: pic=$pic, bars=5, response=balanced"
+            "实时频谱已接管: pic=$pic, bars=5, response=fast"
         )
     }
 
