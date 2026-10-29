@@ -5,10 +5,12 @@ import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SuperIslandContentStylePolicy
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
 import com.lidesheng.hyperlyric.root.managedHook
+import com.lidesheng.hyperlyric.root.island.effects.spectrum.IslandMusicWaveSpectrumHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
@@ -153,8 +155,11 @@ internal object IslandMusicWaveColorHooker {
             val disabledReason = when {
                 sharedPrefs == null -> "no_remote_preferences"
                 !SystemUiEnhancementGate.isEnabled() -> "system_ui_enhancement_disabled"
+                SuperIslandContentStylePolicy.readMusicWaveMode(sharedPrefs) ==
+                        RootConstants.ISLAND_MUSIC_WAVE_MODE_HIDDEN ->
+                    "music_wave_hidden"
                 !SuperIslandContentStylePolicy.usesMusicWaveCoverColor(
-                    SuperIslandContentStylePolicy.readMusicWaveStyle(sharedPrefs)
+                    SuperIslandContentStylePolicy.readMusicWaveColorStyle(sharedPrefs)
                 ) -> "music_wave_cover_color_disabled"
 
                 else -> null
@@ -288,6 +293,7 @@ internal object IslandMusicWaveColorHooker {
             }.onFailure { HookLogger.e(TAG, "接管音频律动颜色回调失败", it) }
         }
         refresh()
+        IslandMusicWaveSpectrumHooker.refresh()
     }
 
     private fun installNativeGradientHook(xposedModule: XposedModule, method: Method, dataField: Field?) {
@@ -378,7 +384,7 @@ internal object IslandMusicWaveColorHooker {
     ): Boolean {
         if (!CoverColorHelper.isCurrentSession(colorSession)) return false
         val useGradient = SuperIslandContentStylePolicy.usesMusicWaveGradient(
-            SuperIslandContentStylePolicy.readMusicWaveStyle(sharedPrefs)
+            SuperIslandContentStylePolicy.readMusicWaveColorStyle(sharedPrefs)
         )
         val colors = CoverColorHelper
             .getCachedColors(useGradient = true, session = colorSession)
@@ -396,7 +402,7 @@ internal object IslandMusicWaveColorHooker {
     ): Boolean {
         if (!CoverColorHelper.isCurrentArtwork(artworkRequest)) return false
         val useGradient = SuperIslandContentStylePolicy.usesMusicWaveGradient(
-            SuperIslandContentStylePolicy.readMusicWaveStyle(sharedPrefs)
+            SuperIslandContentStylePolicy.readMusicWaveColorStyle(sharedPrefs)
         )
         val colors = CoverColorHelper
             .getCachedColors(useGradient = true, request = artworkRequest)
@@ -414,7 +420,7 @@ internal object IslandMusicWaveColorHooker {
         if (!isAllowedTarget(holder, tracked)) return false
         val palette = latestArtworkPalette ?: return false
         val useGradient = SuperIslandContentStylePolicy.usesMusicWaveGradient(
-            SuperIslandContentStylePolicy.readMusicWaveStyle(sharedPrefs)
+            SuperIslandContentStylePolicy.readMusicWaveColorStyle(sharedPrefs)
         )
         val colors = colorsFromPalette(palette.toList(), useGradient) ?: return false
         applyOptimizedColors(colors)
@@ -531,12 +537,14 @@ internal object IslandMusicWaveColorHooker {
                         if (!target.isMediaTarget) {
                             untrackHolder(holder)
                             refresh()
+                            IslandMusicWaveSpectrumHooker.refresh()
                             return@runCatching
                         }
                         val lottieView = lottieViewField.get(holder) as? View
                         trackHolder(holder, data, lottieView)
                         rememberArtworkPalette(holder, artworkPalette, bitmap)
                         refresh()
+                        IslandMusicWaveSpectrumHooker.refresh()
                     }.onFailure { HookLogger.e(TAG, "应用音频律动封面色失败", it) }
                 }
             }.onFailure { HookLogger.e(TAG, "读取原生音频律动颜色失败", it) }
@@ -599,6 +607,7 @@ internal object IslandMusicWaveColorHooker {
                 if (!isMusicWave(picInfoField.get(holder))) {
                     untrackHolder(holder)
                     refresh()
+                    IslandMusicWaveSpectrumHooker.refresh()
                     return@runCatching
                 }
 
@@ -607,6 +616,7 @@ internal object IslandMusicWaveColorHooker {
                 if (data == null) {
                     untrackHolder(holder)
                     refresh()
+                    IslandMusicWaveSpectrumHooker.refresh()
                     return@runCatching
                 }
                 val target = IslandModificationTargetPolicy.resolve(
@@ -616,10 +626,12 @@ internal object IslandMusicWaveColorHooker {
                 if (!target.isMediaTarget) {
                     untrackHolder(holder)
                     refresh()
+                    IslandMusicWaveSpectrumHooker.refresh()
                     return@runCatching
                 }
                 trackHolder(holder, data, lottieView)
                 refresh()
+                IslandMusicWaveSpectrumHooker.refresh()
                 lottieView.invalidate()
             }.onFailure { e ->
                 HookLogger.e(TAG, "刷新音频律动动画失败", e)

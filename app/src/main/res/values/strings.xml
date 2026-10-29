@@ -530,7 +530,9 @@
     <string name="option_audio_cover_style_monochrome">单色图标</string>
     <string name="option_audio_cover_style_hidden">隐藏封面</string>
     <string name="title_audio_rhythm">音乐律动</string>
+    <string name="title_audio_rhythm_color">音乐律动颜色</string>
     <string name="option_audio_rhythm_default">默认</string>
+    <string name="option_audio_rhythm_spectrum">实时频谱</string>
     <string name="option_audio_rhythm_cover_color">封面色</string>
     <string name="option_audio_rhythm_cover_gradient">封面渐变色</string>
     <string name="option_island_component_hidden">隐藏</string>

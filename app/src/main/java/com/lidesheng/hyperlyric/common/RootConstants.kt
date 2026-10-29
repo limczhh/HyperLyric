@@ -223,7 +223,9 @@ object RootConstants {
     const val KEY_HOOK_NO_LYRICS_LYRIC_BEHAVIOR = "key_hook_no_lyrics_lyric_behavior"
     const val KEY_HOOK_TAIL_TIMEOUT_BEHAVIOR = "key_hook_tail_timeout_behavior"
     const val KEY_HOOK_TAIL_TIMEOUT_DELAY_SECONDS = "key_hook_tail_timeout_delay_seconds"
-    const val KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE = "key_hook_island_music_wave_style"
+    const val KEY_HOOK_ISLAND_MUSIC_WAVE_COLOR_STYLE =
+        "key_hook_island_music_wave_color_style"
+    const val KEY_HOOK_ISLAND_MUSIC_WAVE_MODE = "key_hook_island_music_wave_mode"
 
     // ================= ANIMATION & MARQUEE KEYS =================
     const val KEY_HOOK_ANIM_ENABLE = "key_hook_anim_enable"
@@ -641,8 +643,12 @@ object RootConstants {
     const val ISLAND_MUSIC_WAVE_STYLE_DEFAULT = 0
     const val ISLAND_MUSIC_WAVE_STYLE_COVER_COLOR = 1
     const val ISLAND_MUSIC_WAVE_STYLE_COVER_GRADIENT = 2
-    const val ISLAND_MUSIC_WAVE_STYLE_HIDDEN = 3
-    const val DEFAULT_HOOK_ISLAND_MUSIC_WAVE_STYLE = ISLAND_MUSIC_WAVE_STYLE_DEFAULT
+    const val DEFAULT_HOOK_ISLAND_MUSIC_WAVE_COLOR_STYLE =
+        ISLAND_MUSIC_WAVE_STYLE_DEFAULT
+    const val ISLAND_MUSIC_WAVE_MODE_DEFAULT = 0
+    const val ISLAND_MUSIC_WAVE_MODE_REALTIME_SPECTRUM = 1
+    const val ISLAND_MUSIC_WAVE_MODE_HIDDEN = 2
+    const val DEFAULT_HOOK_ISLAND_MUSIC_WAVE_MODE = ISLAND_MUSIC_WAVE_MODE_DEFAULT
     const val DEFAULT_HOOK_ANIM_ENABLE = false
     const val DEFAULT_HOOK_ANIM_ID = "default"
     const val DEFAULT_HOOK_ANIM_SPEED_RATE = 100

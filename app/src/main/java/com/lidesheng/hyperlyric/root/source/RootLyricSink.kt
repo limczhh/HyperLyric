@@ -13,7 +13,7 @@ import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.content.SlotContentCoordinator
-import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.IslandMusicWaveEffects
 import com.lidesheng.hyperlyric.root.island.renderer.LyricRenderer
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.media.LyricColorBindingCoordinator
@@ -412,7 +412,7 @@ internal class RootLyricSink(
             }
             if (update.stateChanged) {
                 SlotContentCoordinator.invalidate()
-                IslandMusicWaveColorHooker.refresh()
+                IslandMusicWaveEffects.refresh()
                 renderer.updateTextColors()
             }
             return
@@ -429,7 +429,7 @@ internal class RootLyricSink(
         }
         if (update.stateChanged) {
             SlotContentCoordinator.invalidate()
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
             renderer.updateTextColors()
         }
     }
@@ -438,7 +438,7 @@ internal class RootLyricSink(
         cancelArtworkColorRefresh()
         if (LyricColorBindingCoordinator.clear()) {
             SlotContentCoordinator.invalidate()
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
         }
     }
 

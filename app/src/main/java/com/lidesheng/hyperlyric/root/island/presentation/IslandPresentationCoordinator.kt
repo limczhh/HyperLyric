@@ -3,7 +3,7 @@ package com.lidesheng.hyperlyric.root.island.presentation
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
-import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.IslandMusicWaveEffects
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
@@ -522,7 +522,7 @@ internal object IslandPresentationCoordinator {
             return
         }
         IslandAlbumCoverStyleHooker.refresh()
-        IslandMusicWaveColorHooker.refresh()
+        IslandMusicWaveEffects.refresh()
     }
 
     private fun targetFor(token: IslandViewRegistry.HostToken): IslandInjectionReconciler.Target {

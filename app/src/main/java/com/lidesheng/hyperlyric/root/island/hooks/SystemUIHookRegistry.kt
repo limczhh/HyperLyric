@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.island.hooks
 
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.spectrum.IslandMusicWaveSpectrumHooker
 import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowHooker
 import com.lidesheng.hyperlyric.root.utils.DynamicFinder
@@ -53,6 +54,7 @@ object SystemUIHookRegistry {
             HookIslandGlow.init(module, cl)
             IslandProgressGlowHooker.hook(module, cl)
             IslandMusicWaveColorHooker.hook(module, cl)
+            IslandMusicWaveSpectrumHooker.hook(module, cl)
             IslandAlbumCoverStyleHooker.hook(module, cl)
 
             isHookedSuccess = true

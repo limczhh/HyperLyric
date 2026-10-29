@@ -30,7 +30,7 @@ internal object IslandSlotRuntimeConfigReader {
             SuperIslandContentStylePolicy.readAlbumCoverStyle(prefs)
         )
         val showRhythm = SuperIslandContentStylePolicy.isMusicWaveVisible(
-            SuperIslandContentStylePolicy.readMusicWaveStyle(prefs)
+            SuperIslandContentStylePolicy.readMusicWaveMode(prefs)
         )
         val disableWidthLimit = prefs.getBoolean(
             RootConstants.KEY_HOOK_ISLAND_DISABLE_WIDTH_LIMIT,

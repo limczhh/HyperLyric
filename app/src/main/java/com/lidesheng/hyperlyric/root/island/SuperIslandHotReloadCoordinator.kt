@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root.island
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
+import com.lidesheng.hyperlyric.root.island.effects.spectrum.IslandMusicWaveSpectrumHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHooker
 import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
@@ -42,6 +43,7 @@ internal class SuperIslandHotReloadCoordinator(
             IslandProgressGlowController.clearAll()
             IslandProgressGlowHooker.cleanupForHotReload()
             IslandAlbumCoverStyleHooker.cleanup()
+            val musicWaveHolders = IslandMusicWaveSpectrumHooker.prepareForHotReload()
             val musicWaveCallbacks = IslandMusicWaveColorHooker.prepareForHotReload()
             IslandMediaSwipeHooker.prepareForHotReload()
             IslandNativeRefreshCoordinator.clear()
@@ -51,6 +53,7 @@ internal class SuperIslandHotReloadCoordinator(
                 islandHosts = islandHosts,
                 statusBarRoots = statusBarRoots,
                 musicWaveCallbacks = musicWaveCallbacks,
+                musicWaveHolders = musicWaveHolders,
             )
         }
 
@@ -110,6 +113,7 @@ internal class SuperIslandHotReloadCoordinator(
                 HookIslandGlow.cleanupForHotReload()
                 IslandProgressGlowHooker.cleanupForHotReload()
                 IslandAlbumCoverStyleHooker.cleanup()
+                IslandMusicWaveSpectrumHooker.cleanup()
                 IslandMusicWaveColorHooker.cleanup()
                 IslandMediaSwipeHooker.prepareForHotReload()
                 IslandWidthLimitHooker.prepareForHotReload()
@@ -134,6 +138,7 @@ internal class SuperIslandHotReloadCoordinator(
         val islandHosts: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
         val statusBarRoots: List<ViewGroup>,
         val musicWaveCallbacks: ArrayList<Any?>,
+        val musicWaveHolders: ArrayList<Any?>,
     )
 
     private companion object {

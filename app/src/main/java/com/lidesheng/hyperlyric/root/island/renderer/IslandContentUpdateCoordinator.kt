@@ -13,7 +13,7 @@ import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
 import com.lidesheng.hyperlyric.root.island.content.SlotContentCoordinator
 import com.lidesheng.hyperlyric.root.island.content.IslandSlotStyleAssembler
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
-import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.IslandMusicWaveEffects
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
@@ -78,7 +78,7 @@ internal object IslandContentUpdateCoordinator {
             IslandDynamicWidthCoordinator.requestRefresh(view)
         }
         if (hostKind == IslandViewRegistry.HostKind.REAL) {
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
         }
         updateMonochromeIconTextColor(view, config)
     }
@@ -130,7 +130,7 @@ internal object IslandContentUpdateCoordinator {
             IslandDynamicWidthCoordinator.requestRefresh(view)
         }
         if (hostKind == IslandViewRegistry.HostKind.REAL) {
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
         }
         updateMonochromeIconTextColor(view, config)
     }
@@ -392,9 +392,11 @@ internal object IslandContentUpdateCoordinator {
             LyricTextColorStylePolicy.usesCoverColor(
                 LyricTextColorStylePolicy.read(prefs)
             ) ||
-                    SuperIslandContentStylePolicy.usesMusicWaveCoverColor(
-                        SuperIslandContentStylePolicy.readMusicWaveStyle(prefs)
-                    ) ||
+                    (SuperIslandContentStylePolicy.isMusicWaveVisible(
+                        SuperIslandContentStylePolicy.readMusicWaveMode(prefs)
+                    ) && SuperIslandContentStylePolicy.usesMusicWaveCoverColor(
+                        SuperIslandContentStylePolicy.readMusicWaveColorStyle(prefs)
+                    )) ||
                     prefs.getBoolean(
                         RootConstants.KEY_HOOK_ISLAND_GLOW_EXTRACT_COLOR,
                         RootConstants.DEFAULT_HOOK_ISLAND_GLOW_EXTRACT_COLOR
@@ -408,12 +410,12 @@ internal object IslandContentUpdateCoordinator {
             if (previousArtworkRevision != null &&
                 CoverColorHelper.currentArtworkRequest() == null
             ) {
-                IslandMusicWaveColorHooker.refresh()
+                IslandMusicWaveEffects.refresh()
             }
             return
         }
         if (artworkRequest != null && artworkRequest.revision != previousArtworkRevision) {
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
         }
     }
 }

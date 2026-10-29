@@ -525,7 +525,9 @@
     <string name="option_audio_cover_style_monochrome">Monochrome icon</string>
     <string name="option_audio_cover_style_hidden">Hide cover</string>
     <string name="title_audio_rhythm">Music Rhythm</string>
+    <string name="title_audio_rhythm_color">Music Rhythm Color</string>
     <string name="option_audio_rhythm_default">Default</string>
+    <string name="option_audio_rhythm_spectrum">Real-time spectrum</string>
     <string name="option_audio_rhythm_cover_color">Cover color</string>
     <string name="option_audio_rhythm_cover_gradient">Cover gradient</string>
     <string name="option_island_component_hidden">Hidden</string>

@@ -98,9 +98,14 @@ fun SuperIslandSettingsPage() {
             SuperIslandContentStylePolicy.readAlbumCoverStyle(prefs)
         )
     }
-    var audioRhythmStyle by remember {
+    var audioRhythmMode by remember {
         mutableIntStateOf(
-            SuperIslandContentStylePolicy.readMusicWaveStyle(prefs)
+            SuperIslandContentStylePolicy.readMusicWaveMode(prefs)
+        )
+    }
+    var audioRhythmColorStyle by remember {
+        mutableIntStateOf(
+            SuperIslandContentStylePolicy.readMusicWaveColorStyle(prefs)
         )
     }
     var islandModificationScope by remember {
@@ -123,7 +128,7 @@ fun SuperIslandSettingsPage() {
         )
     }
     val audioCover = SuperIslandContentStylePolicy.isAlbumCoverVisible(audioCoverStyle)
-    val audioRhythm = SuperIslandContentStylePolicy.isMusicWaveVisible(audioRhythmStyle)
+    val audioRhythm = audioRhythmMode != RootConstants.ISLAND_MUSIC_WAVE_MODE_HIDDEN
     val islandWidthMin = SuperIslandWidthPolicy.minIslandWidth(audioCover, audioRhythm)
     val islandWidthMax = SuperIslandWidthPolicy.maxIslandWidth(
         showRhythm = audioRhythm,
@@ -384,12 +389,17 @@ fun SuperIslandSettingsPage() {
         clampDynamicWidthRangeIfNeeded(showAlbum = visible, showRhythm = audioRhythm)
     }
 
-    fun saveAudioRhythmStyle(style: Int) {
-        val visible = SuperIslandContentStylePolicy.isMusicWaveVisible(style)
-        audioRhythmStyle = style
-        saveConfig(RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE, style)
+    fun saveAudioRhythmMode(mode: Int) {
+        val visible = mode != RootConstants.ISLAND_MUSIC_WAVE_MODE_HIDDEN
+        audioRhythmMode = mode
+        saveConfig(RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_MODE, mode)
         clampIslandWidthIfNeeded(showAlbum = audioCover, showRhythm = visible)
         clampDynamicWidthRangeIfNeeded(showAlbum = audioCover, showRhythm = visible)
+    }
+
+    fun saveAudioRhythmColorStyle(style: Int) {
+        audioRhythmColorStyle = style
+        saveConfig(RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_COLOR_STYLE, style)
     }
 
     val islandWidthKeyPoints = remember(islandWidthMin, islandWidthMax) {
@@ -445,20 +455,32 @@ fun SuperIslandSettingsPage() {
             R.string.option_island_component_hidden
         )
     }.map { stringResource(id = it) }
-    val audioRhythmStyleValues = remember {
+    val audioRhythmModeValues = remember {
+        listOf(
+            RootConstants.ISLAND_MUSIC_WAVE_MODE_DEFAULT,
+            RootConstants.ISLAND_MUSIC_WAVE_MODE_REALTIME_SPECTRUM,
+            RootConstants.ISLAND_MUSIC_WAVE_MODE_HIDDEN
+        )
+    }
+    val audioRhythmModeOptions = remember {
+        listOf(
+            R.string.option_audio_rhythm_default,
+            R.string.option_audio_rhythm_spectrum,
+            R.string.option_island_component_hidden
+        )
+    }.map { stringResource(id = it) }
+    val audioRhythmColorStyleValues = remember {
         listOf(
             RootConstants.ISLAND_MUSIC_WAVE_STYLE_DEFAULT,
             RootConstants.ISLAND_MUSIC_WAVE_STYLE_COVER_COLOR,
-            RootConstants.ISLAND_MUSIC_WAVE_STYLE_COVER_GRADIENT,
-            RootConstants.ISLAND_MUSIC_WAVE_STYLE_HIDDEN
+            RootConstants.ISLAND_MUSIC_WAVE_STYLE_COVER_GRADIENT
         )
     }
-    val audioRhythmStyleOptions = remember {
+    val audioRhythmColorStyleOptions = remember {
         listOf(
             R.string.option_audio_rhythm_default,
             R.string.option_audio_rhythm_cover_color,
-            R.string.option_audio_rhythm_cover_gradient,
-            R.string.option_island_component_hidden
+            R.string.option_audio_rhythm_cover_gradient
         )
     }.map { stringResource(id = it) }
     val contentModeValues = remember {
@@ -802,14 +824,31 @@ fun SuperIslandSettingsPage() {
                             }
                             OverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_audio_rhythm),
-                                items = audioRhythmStyleOptions,
-                                selectedIndex = audioRhythmStyleValues.indexOf(
-                                    audioRhythmStyle
+                                items = audioRhythmModeOptions,
+                                selectedIndex = audioRhythmModeValues.indexOf(
+                                    audioRhythmMode
                                 ).coerceAtLeast(0),
                                 onSelectedIndexChange = { index ->
-                                    saveAudioRhythmStyle(audioRhythmStyleValues[index])
+                                    saveAudioRhythmMode(audioRhythmModeValues[index])
                                 }
                             )
+                            AnimatedVisibility(
+                                visible = audioRhythmMode !=
+                                        RootConstants.ISLAND_MUSIC_WAVE_MODE_HIDDEN
+                            ) {
+                                OverlayDropdownPreference(
+                                    title = stringResource(id = R.string.title_audio_rhythm_color),
+                                    items = audioRhythmColorStyleOptions,
+                                    selectedIndex = audioRhythmColorStyleValues.indexOf(
+                                        audioRhythmColorStyle
+                                    ).coerceAtLeast(0),
+                                    onSelectedIndexChange = { index ->
+                                        audioRhythmColorStyleValues.getOrNull(index)?.let(
+                                            ::saveAudioRhythmColorStyle
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }

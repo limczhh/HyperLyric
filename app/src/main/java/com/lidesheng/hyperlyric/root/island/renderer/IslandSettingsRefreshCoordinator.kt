@@ -4,7 +4,7 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
-import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.IslandMusicWaveEffects
 import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
 import com.lidesheng.hyperlyric.root.island.hooks.IslandWidthLimitHooker
 import com.lidesheng.hyperlyric.root.island.presentation.IslandNativeRefreshCoordinator
@@ -27,7 +27,7 @@ internal object IslandSettingsRefreshCoordinator {
                         forceRefresh = true
                     )
                 }
-                IslandMusicWaveColorHooker.refresh()
+                IslandMusicWaveEffects.refresh()
                 refreshHyperLyricContentIfNeeded(root, presentationRevision)
             }
         )

@@ -9,11 +9,13 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.source.SourceManager
+import com.lidesheng.hyperlyric.root.island.SuperIslandHotReloadCoordinator
+import com.lidesheng.hyperlyric.root.island.effects.IslandMusicWaveEffects
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHooker
+import com.lidesheng.hyperlyric.root.island.effects.spectrum.IslandMusicWaveSpectrumHooker
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowController
-import com.lidesheng.hyperlyric.root.island.SuperIslandHotReloadCoordinator
 import com.lidesheng.hyperlyric.root.island.hooks.SystemUIHookRegistry
 import com.lidesheng.hyperlyric.root.island.hooks.SodaIslandMiniWindowCompatHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
@@ -54,7 +56,7 @@ private const val TAG = "HookEntry"
 class HookEntry : XposedModule() {
 
     companion object {
-        private const val HOT_RELOAD_TRANSFER_VERSION = 1
+        private const val HOT_RELOAD_TRANSFER_VERSION = 2
         private const val STATE_RUNTIME_READY = "runtimeReady"
         private const val STATE_SYSTEM_UI_LOADED = "systemUiLoaded"
         private const val STATE_STATUS_BAR_TEXT_COLOR = "statusBarTextColor"
@@ -329,6 +331,9 @@ class HookEntry : XposedModule() {
                 }
                 runOnMainAndWait {
                     IslandMusicWaveColorHooker.adoptHotReloadCallbacks(state?.musicWaveCallbacks.orEmpty())
+                    IslandMusicWaveSpectrumHooker.adoptHotReloadHolders(
+                        state?.musicWaveHolders.orEmpty()
+                    )
                 }
 
                 val restoredSnapshot = if (state?.runtimeReady == true) {
@@ -776,14 +781,15 @@ class HookEntry : XposedModule() {
                         RootConstants.KEY_HOOK_ISLAND_MODIFICATION_SCOPE -> {
                             Handler(Looper.getMainLooper()).post {
                                 IslandAlbumCoverStyleHooker.refresh()
-                                IslandMusicWaveColorHooker.refresh()
+                                IslandMusicWaveEffects.refresh()
                                 IslandSettingsRefreshCoordinator.request()
                             }
                         }
 
-                        RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_STYLE -> {
+                        RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_COLOR_STYLE,
+                        RootConstants.KEY_HOOK_ISLAND_MUSIC_WAVE_MODE -> {
                             Handler(Looper.getMainLooper()).post {
-                                IslandMusicWaveColorHooker.refresh()
+                                IslandMusicWaveEffects.refresh()
                                 IslandSettingsRefreshCoordinator.request()
                             }
                         }
@@ -831,13 +837,13 @@ class HookEntry : XposedModule() {
     private fun updateSystemUiEnhancements(enabled: Boolean) {
         updateLyricSourceRuntime()
         if (enabled) {
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
             IslandSettingsRefreshCoordinator.request()
         } else {
             BaseIslandRenderer.clearAllViews()
             IslandProgressGlowController.clearAll()
             IslandAlbumCoverStyleHooker.refresh()
-            IslandMusicWaveColorHooker.refresh()
+            IslandMusicWaveEffects.refresh()
         }
         StatusBarLyricRenderer.updateLyricLine()
         HookLogger.d(TAG, "更新系统界面增强状态: enabled=$enabled")
@@ -927,27 +933,29 @@ class HookEntry : XposedModule() {
         }
         val hosts = ArrayList<Any?>(transfers.islandHosts.size * 4)
         transfers.islandHosts.forEach { transfer ->
-            // The ArrayList/Bundle containers are framework objects.  The only non-container
-            // reference is the native host ViewGroup, after removeInjectedViewsForHotReload has
-            // removed every HyperLyric View, tag and listener-owned child from its tree.
+            // The ArrayList/Bundle containers are framework objects. ViewGroups have had all
+            // module-owned children removed; music-wave holders are SystemUI plugin objects
+            // needed to restore the optional spectrum after the new hook generation is installed.
             hosts += transfer.root
             hosts += transfer.packageName
             hosts += transfer.kind.name
             hosts += transfer.moduleType
         }
-        return ArrayList<Any?>(6).apply {
+        return ArrayList<Any?>(7).apply {
             add(HOT_RELOAD_TRANSFER_VERSION)
             add(meta)
             add(dispatcher)
             add(hosts)
             add(ArrayList(transfers.statusBarRoots))
             add(transfers.musicWaveCallbacks)
+            add(transfers.musicWaveHolders)
         }
     }
 
     private fun decodeHotReloadState(raw: Any?): HotReloadState? {
         val transfer = raw as? ArrayList<*> ?: return null
-        if (transfer.firstOrNull() != HOT_RELOAD_TRANSFER_VERSION) return null
+        val transferVersion = transfer.firstOrNull() as? Int ?: return null
+        if (transferVersion !in 1..HOT_RELOAD_TRANSFER_VERSION) return null
         val meta = transfer.getOrNull(1) as? Bundle ?: return null
         val hosts = transfer.getOrNull(3) as? ArrayList<*> ?: return null
         val restoredHosts = mutableListOf<IslandPresentationCoordinator.HotReloadHostTransfer>()
@@ -981,6 +989,7 @@ class HookEntry : XposedModule() {
                 .orEmpty(),
             // Older builds have no callback payload; their dynamic handles are still reclaimed above.
             musicWaveCallbacks = (transfer.getOrNull(5) as? ArrayList<*>).orEmpty(),
+            musicWaveHolders = (transfer.getOrNull(6) as? ArrayList<*>).orEmpty(),
         )
     }
 
@@ -1051,6 +1060,7 @@ class HookEntry : XposedModule() {
         val islandTransfers: List<IslandPresentationCoordinator.HotReloadHostTransfer>,
         val statusBarRoots: List<ViewGroup>,
         val musicWaveCallbacks: List<*>,
+        val musicWaveHolders: List<*>,
     )
 
     private fun findCurrentApplication(): Application? {

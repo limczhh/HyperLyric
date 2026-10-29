@@ -14,18 +14,18 @@ internal object IslandHostFacade {
         val showAlbum = SuperIslandContentStylePolicy.isAlbumCoverVisible(
             albumStyle
         )
-        val rhythmStyle = SuperIslandContentStylePolicy.readMusicWaveStyle(prefs)
+        val rhythmMode = SuperIslandContentStylePolicy.readMusicWaveMode(prefs)
         val showRhythm = SuperIslandContentStylePolicy.isMusicWaveVisible(
-            rhythmStyle
+            rhythmMode
         )
         val rootId = System.identityHashCode(rootView)
         HookLogger.dState(
             stateId = "IslandHostFacade:$rootId",
             tag = "IslandHostFacade",
-            state = "$albumStyle|$rhythmStyle|$showAlbum|$showRhythm"
+            state = "$albumStyle|$rhythmMode|$showAlbum|$showRhythm"
         ) {
             "宿主显示配置: root=$rootId, albumStyle=$albumStyle, showAlbum=$showAlbum, " +
-                    "musicWaveStyle=$rhythmStyle, showRhythm=$showRhythm"
+                    "musicWaveMode=$rhythmMode, showRhythm=$showRhythm"
         }
 
         IslandViewHelper.toggleContainer(
