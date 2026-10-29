@@ -30,6 +30,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.util.Collections
 import java.util.WeakHashMap
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -39,22 +40,27 @@ private const val TAG = "IslandMusicWaveSpectrumView"
 private const val BAR_COUNT = 5
 private const val SYSTEM_AUDIO_SESSION = 0
 private const val CAPTURE_SIZE = 512
-private const val FRAME_NANOS = 8_333_333L
 private const val TARGET_FPS = 60
 private const val MIN_FRAME_INTERVAL_NANOS = 1_000_000_000L / TARGET_FPS - 1_000_000L
 private const val MAX_FRAME_NANOS = 100_000_000L
 private const val SILENCE_NANOS = 350_000_000L
-private const val DECAY_STEP = 0.08f
-private const val GAIN_TARGET = 1f
+private const val ATTACK_TIME_NANOS = 80_000_000L
+private const val RELEASE_TIME_NANOS = 180_000_000L
+private const val GAIN_TARGET = 0.55f
 private const val GAIN_ATTACK = 0.02f
 private const val GAIN_RELEASE = 0.004f
 private const val MIN_GAIN = 1e-4f
 private const val MAX_GAIN = 1e3f
 private const val LEVEL_EPSILON = 0.01f
 private const val REDRAW_EPSILON = 0.005f
-private const val BAR_WIDTH_FRACTION = 0.72f
-private const val MIN_BAR_HALF_FRACTION = 0.16f
-private const val MAX_BAR_HALF_FRACTION = 0.45f
+private const val DEBUG_METRICS_INTERVAL_NANOS = 1_000_000_000L
+// Geometry from the SystemUI plugin's native 66x66 music_pause/music_wave Lottie compositions.
+private const val NATIVE_COMPOSITION_SIZE = 66f
+private const val NATIVE_BAR_FIRST_CENTER_X = 9f
+private const val NATIVE_BAR_CENTER_SPACING = 12f
+private const val NATIVE_BAR_WIDTH = 5.4f
+private const val NATIVE_PAUSE_HALF_HEIGHT = 8.7f
+private const val NATIVE_MAX_WAVE_HALF_HEIGHT = 22.359f
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR = 0xFF57F2FF.toInt()
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR = 0xFFF5E6FF.toInt()
 
@@ -100,8 +106,10 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
                 postFrame()
                 return
             }
-            val elapsed = if (sinceLastFrame == Long.MAX_VALUE) FRAME_NANOS else
+            val elapsed = if (sinceLastFrame == Long.MAX_VALUE) MIN_FRAME_INTERVAL_NANOS else
                 sinceLastFrame.coerceAtMost(MAX_FRAME_NANOS)
+            val attackAlpha = smoothingAlpha(elapsed, ATTACK_TIME_NANOS)
+            val releaseAlpha = smoothingAlpha(elapsed, RELEASE_TIME_NANOS)
             val active = VisualizerSource.isAudioActive()
             var settled = true
             var changed = false
@@ -109,8 +117,8 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
             for (index in 0 until BAR_COUNT) {
                 val current = levels[index]
                 val target = if (active) targets[index] else 0f
-                val next = if (target >= current) target else max(0f, current - DECAY_STEP *
-                        elapsed.toFloat() / FRAME_NANOS)
+                val alpha = if (target >= current) attackAlpha else releaseAlpha
+                val next = current + (target - current) * alpha
                 if (abs(next - current) > REDRAW_EPSILON) changed = true
                 if (next > LEVEL_EPSILON) settled = false
                 levels[index] = next
@@ -119,6 +127,9 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
             if (active || !settled) postFrame() else lastFrameNanos = 0L
         }
     }
+
+    private fun smoothingAlpha(elapsedNanos: Long, timeConstantNanos: Long): Float =
+        (1.0 - exp(-elapsedNanos.toDouble() / timeConstantNanos)).toFloat()
 
     fun setColors(top: Int, bottom: Int) {
         if (topColor == top && bottomColor == bottom) return
@@ -219,20 +230,22 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
         val width = width.toFloat()
         val height = height.toFloat()
         if (width <= 0f || height <= 0f) return
-        val usableWidth = width * BAR_WIDTH_FRACTION
-        val unit = usableWidth / (BAR_COUNT * 2f + BAR_COUNT - 1)
-        val barWidth = unit * 2f
-        val startX = (width - usableWidth) / 2f
-        val centerY = height / 2f
-        val minHalfHeight = height * MIN_BAR_HALF_FRACTION
-        val maxHalfHeight = height * MAX_BAR_HALF_FRACTION
+        val scale = min(width, height) / NATIVE_COMPOSITION_SIZE
+        val contentLeft = (width - NATIVE_COMPOSITION_SIZE * scale) / 2f
+        val contentTop = (height - NATIVE_COMPOSITION_SIZE * scale) / 2f
+        val barWidth = NATIVE_BAR_WIDTH * scale
+        val centerY = contentTop + NATIVE_COMPOSITION_SIZE / 2f * scale
+        val minHalfHeight = NATIVE_PAUSE_HALF_HEIGHT * scale
+        val maxHalfHeight = NATIVE_MAX_WAVE_HALF_HEIGHT * scale
         System.arraycopy(levels, 0, drawnLevels, 0, BAR_COUNT)
         for (index in 0 until BAR_COUNT) {
             val fraction = drawnLevels[index].coerceIn(0f, 1f)
             val halfHeight = minHalfHeight + (maxHalfHeight - minHalfHeight) * fraction
+            val centerX = contentLeft +
+                    (NATIVE_BAR_FIRST_CENTER_X + index * NATIVE_BAR_CENTER_SPACING) * scale
             val top = centerY - halfHeight
             val bottom = centerY + halfHeight
-            val left = startX + index * (barWidth + unit)
+            val left = centerX - barWidth / 2f
             bar.set(left, top, left + barWidth, bottom)
             paint.shader = barShader(index, top, bottom)
             canvas.drawRoundRect(bar, barWidth / 2f, barWidth / 2f, paint)
@@ -269,6 +282,7 @@ private object VisualizerSource {
     private val scratch = FloatArray(BAR_COUNT)
     private var visualizer: Visualizer? = null
     private var gain = MIN_GAIN
+    private var lastMetricsLogAtNanos = 0L
 
     @Volatile
     private var lastAudioAtNanos = 0L
@@ -340,6 +354,7 @@ private object VisualizerSource {
         val active = visualizer
         visualizer = null
         lastAudioAtNanos = 0L
+        lastMetricsLogAtNanos = 0L
         levelSnapshot = FloatArray(BAR_COUNT)
         active?.let {
             runCatching { it.enabled = false }
@@ -382,20 +397,21 @@ private object VisualizerSource {
             for (index in 0 until BAR_COUNT) {
                 val start = frequencyBin(index, maxBin)
                 val end = max(frequencyBin(index + 1, maxBin), start + 1)
-                var peak = 0f
+                var powerSum = 0f
                 for (bin in start until end) {
                     val real = fft[2 * bin].toInt()
                     val imaginary = fft[2 * bin + 1].toInt()
-                    peak = max(peak, sqrt((real * real + imaginary * imaginary).toFloat()))
+                    powerSum += (real * real + imaginary * imaginary).toFloat()
                 }
-                scratch[index] = peak
-                frameMax = max(frameMax, peak)
+                val rms = sqrt(powerSum / (end - start))
+                scratch[index] = rms
+                frameMax = max(frameMax, rms)
             }
             if (frameMax <= 0f) return
             val snapshot = FloatArray(BAR_COUNT)
             val now = System.nanoTime()
             val wasSilent = lastAudioAtNanos == 0L || now - lastAudioAtNanos >= SILENCE_NANOS
-            synchronized(lock) {
+            val appliedGain = synchronized(lock) {
                 val impliedGain = GAIN_TARGET / frameMax
                 gain = if (impliedGain > gain) min(gain + GAIN_ATTACK, impliedGain) else
                     max(gain - GAIN_RELEASE, impliedGain)
@@ -406,6 +422,7 @@ private object VisualizerSource {
                 lastAudioAtNanos = now
                 levelSnapshot = snapshot
                 clients.toList().forEach(IslandMusicWaveSpectrumView::onAudioFrame)
+                gain
             }
             if (wasSilent) {
                 HookLogger.dState(
@@ -414,6 +431,27 @@ private object VisualizerSource {
                     state = "active"
                 ) {
                     "收到实时频谱 FFT 数据: fftSize=${fft.size}, samplingRate=$samplingRate"
+                }
+            }
+            if (HookLogger.isDebugEnabled) {
+                val shouldLogMetrics = synchronized(lock) {
+                    if (lastMetricsLogAtNanos != 0L &&
+                        now - lastMetricsLogAtNanos < DEBUG_METRICS_INTERVAL_NANOS
+                    ) {
+                        false
+                    } else {
+                        lastMetricsLogAtNanos = now
+                        true
+                    }
+                }
+                if (shouldLogMetrics) {
+                    val levels = snapshot.joinToString(separator = ",", prefix = "[", postfix = "]") {
+                        "${(it * 100).toInt()}%"
+                    }
+                    HookLogger.d(
+                        TAG,
+                        "实时频谱幅度: bands=$levels, rmsPeak=${frameMax.toInt()}, gain=$appliedGain"
+                    )
                 }
             }
         }
