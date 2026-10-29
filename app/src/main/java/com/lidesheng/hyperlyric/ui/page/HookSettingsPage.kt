@@ -280,24 +280,21 @@ private fun LazyListScope.hookSettingsSections(
                     },
                     onClick = { navigator.navigate(Route.LyricSource) }
                 )
-                if (lyricType == RootConstants.LYRIC_TYPE_STATUS_BAR) {
-                    ArrowPreference(
-                        title = stringResource(R.string.title_status_bar),
-                        onClick = { navigator.navigate(Route.StatusBarLyricSettings) },
-                    )
-                } else {
-                    ArrowPreference(
-                        title = stringResource(R.string.title_super_island),
-                        endActions = {
-                            Text(
-                                text = widthModeLabel,
-                                fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                            )
-                        },
-                        onClick = { navigator.navigate(Route.SuperIslandSettings) },
-                    )
-                }
+                ArrowPreference(
+                    title = stringResource(R.string.title_super_island),
+                    endActions = {
+                        Text(
+                            text = widthModeLabel,
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                        )
+                    },
+                    onClick = { navigator.navigate(Route.SuperIslandSettings) },
+                )
+                ArrowPreference(
+                    title = stringResource(R.string.title_status_bar),
+                    onClick = { navigator.navigate(Route.StatusBarLyricSettings) },
+                )
                 ArrowPreference(
                     title = stringResource(R.string.title_content_layout),
                     summary = stringResource(R.string.summary_content_layout),
