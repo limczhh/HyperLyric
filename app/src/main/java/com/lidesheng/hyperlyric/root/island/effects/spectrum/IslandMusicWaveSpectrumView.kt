@@ -55,7 +55,7 @@ private const val FFT_LEVEL_FLOOR = 0.4f
 private const val FFT_LEVEL_GAIN = 1.67f
 private const val LEVEL_EPSILON = 0.01f
 private const val REDRAW_EPSILON = 0.005f
-private const val DEBUG_METRICS_INTERVAL_NANOS = 1_000_000_000L
+private const val DEBUG_METRICS_INTERVAL_NANOS = 10_000_000_000L
 // Geometry from the SystemUI plugin's native 66x66 music_pause/music_wave Lottie compositions.
 private const val NATIVE_COMPOSITION_SIZE = 66f
 private const val NATIVE_BAR_FIRST_CENTER_X = 9f
@@ -295,8 +295,10 @@ private object VisualizerSource {
     private val lock = Any()
     private val clients = Collections.newSetFromMap(WeakHashMap<IslandMusicWaveSpectrumView, Boolean>())
     private val scratch = FloatArray(BAR_COUNT)
+    private val metricsMinLevels = FloatArray(BAR_COUNT)
+    private val metricsMaxLevels = FloatArray(BAR_COUNT)
     private var visualizer: Visualizer? = null
-    private var lastMetricsLogAtNanos = 0L
+    private var metricsWindowStartedAtNanos = 0L
 
     @Volatile
     private var lastAudioAtNanos = 0L
@@ -308,6 +310,39 @@ private object VisualizerSource {
 
     fun isAudioActive(): Boolean = lastAudioAtNanos != 0L &&
             System.nanoTime() - lastAudioAtNanos < SILENCE_NANOS
+
+    private fun collectLevelRangeLog(
+        now: Long,
+        levels: FloatArray,
+        reset: Boolean,
+    ): String? = synchronized(lock) {
+        if (reset || metricsWindowStartedAtNanos == 0L) {
+            metricsWindowStartedAtNanos = now
+            for (index in 0 until BAR_COUNT) {
+                metricsMinLevels[index] = levels[index]
+                metricsMaxLevels[index] = levels[index]
+            }
+            return@synchronized null
+        }
+
+        for (index in 0 until BAR_COUNT) {
+            metricsMinLevels[index] = min(metricsMinLevels[index], levels[index])
+            metricsMaxLevels[index] = max(metricsMaxLevels[index], levels[index])
+        }
+        val elapsed = now - metricsWindowStartedAtNanos
+        if (elapsed < DEBUG_METRICS_INTERVAL_NANOS) return@synchronized null
+
+        val ranges = (0 until BAR_COUNT).joinToString(",", "[", "]") { index ->
+            "${(metricsMinLevels[index] * 100).toInt()}-" +
+                    "${(metricsMaxLevels[index] * 100).toInt()}%"
+        }
+        metricsWindowStartedAtNanos = now
+        for (index in 0 until BAR_COUNT) {
+            metricsMinLevels[index] = levels[index]
+            metricsMaxLevels[index] = levels[index]
+        }
+        "实时频谱柱高变化范围: window=${elapsed / 1_000_000_000L}s, levels=$ranges"
+    }
 
     fun acquire(view: IslandMusicWaveSpectrumView): Boolean = synchronized(lock) {
         if (visualizer != null) {
@@ -368,7 +403,7 @@ private object VisualizerSource {
         val active = visualizer
         visualizer = null
         lastAudioAtNanos = 0L
-        lastMetricsLogAtNanos = 0L
+        metricsWindowStartedAtNanos = 0L
         levelSnapshot = FloatArray(BAR_COUNT)
         active?.let {
             runCatching { it.enabled = false }
@@ -442,32 +477,8 @@ private object VisualizerSource {
                 }
             }
             if (HookLogger.isDebugEnabled) {
-                val shouldLogMetrics = synchronized(lock) {
-                    if (lastMetricsLogAtNanos != 0L &&
-                        now - lastMetricsLogAtNanos < DEBUG_METRICS_INTERVAL_NANOS
-                    ) {
-                        false
-                    } else {
-                        lastMetricsLogAtNanos = now
-                        true
-                    }
-                }
-                if (shouldLogMetrics) {
-                    val rawPeaks = scratch.joinToString(separator = ",", prefix = "[", postfix = "]") {
-                        it.toInt().toString()
-                    }
-                    val dbBands = scratch.joinToString(separator = ",", prefix = "[", postfix = "]") {
-                        val decibels = fftMagnitudeDb(it)
-                        if (decibels <= FFT_DISPLAY_MIN_DB) "≤${FFT_DISPLAY_MIN_DB.toInt()}dB" else
-                            "${decibels.toInt()}dB"
-                    }
-                    val levels = snapshot.joinToString(separator = ",", prefix = "[", postfix = "]") {
-                        "${(it * 100).toInt()}%"
-                    }
-                    HookLogger.d(
-                        TAG,
-                        "实时频谱幅度: peakBands=$rawPeaks, dbBands=$dbBands, levels=$levels"
-                    )
+                collectLevelRangeLog(now, snapshot, reset = wasSilent)?.let {
+                    HookLogger.d(TAG, it)
                 }
             }
         }
