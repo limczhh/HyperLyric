@@ -39,12 +39,13 @@ import kotlin.math.sqrt
 private const val TAG = "IslandMusicWaveSpectrumView"
 private const val BAR_COUNT = 5
 private const val SYSTEM_AUDIO_SESSION = 0
-private const val CAPTURE_SIZE = 512
+private const val PREFERRED_CAPTURE_SIZE = 1024
 private const val TARGET_FPS = 60
 private const val MIN_FRAME_INTERVAL_NANOS = 1_000_000_000L / TARGET_FPS - 1_000_000L
 private const val MAX_FRAME_NANOS = 100_000_000L
 private const val SILENCE_NANOS = 350_000_000L
 private const val ATTACK_TIME_NANOS = 35_000_000L
+private const val EDGE_ATTACK_TIME_NANOS = 24_000_000L
 private const val RELEASE_TIME_NANOS = 70_000_000L
 // A signed 8-bit complex FFT bin tops out at hypot(-128, -128) ≈ 181.
 private const val FFT_MAGNITUDE_FULL_SCALE = 181.02f
@@ -53,6 +54,11 @@ private const val FFT_DISPLAY_MAX_DB = 0f
 // Drop the persistent low-level baseline, then amplify the remaining height changes.
 private const val FFT_LEVEL_FLOOR = 0.4f
 private const val FFT_LEVEL_GAIN = 1.67f
+// Give the narrow low band and the treble edge a lower gate and a little more response.
+private const val LOW_EDGE_LEVEL_FLOOR = 0.32f
+private const val LOW_EDGE_LEVEL_GAIN = 1.65f
+private const val HIGH_EDGE_LEVEL_FLOOR = 0.38f
+private const val HIGH_EDGE_LEVEL_GAIN = 1.72f
 private const val LEVEL_EPSILON = 0.01f
 private const val REDRAW_EPSILON = 0.005f
 private const val DEBUG_METRICS_INTERVAL_NANOS = 10_000_000_000L
@@ -63,8 +69,8 @@ private const val NATIVE_BAR_CENTER_SPACING = 12f
 private const val NATIVE_BAR_WIDTH = 5.4f
 private const val NATIVE_PAUSE_HALF_HEIGHT = 8.7f
 private const val NATIVE_MAX_WAVE_HALF_HEIGHT = 22.359f
-// Keep the highest range on the last bar; boundaries are fractions of the sampled upper bin.
-private val BAND_EDGE_FRACTIONS = floatArrayOf(0f, 0.04f, 0.12f, 0.23f, 0.36f, 1f)
+// At a 48 kHz mix, these fractions of Fs/4 divide the bars near 130, 420, 1.3k, and 4k Hz.
+private val BAND_EDGE_FRACTIONS = floatArrayOf(0f, 0.012f, 0.035f, 0.11f, 0.34f, 1f)
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR = 0xFF57F2FF.toInt()
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR = 0xFFF5E6FF.toInt()
 
@@ -81,11 +87,28 @@ private fun fftMagnitudeDb(magnitude: Float): Float =
     if (magnitude <= 0f) Float.NEGATIVE_INFINITY else
         20f * log10(magnitude / FFT_MAGNITUDE_FULL_SCALE)
 
-private fun normalizedFftLevel(magnitude: Float): Float {
+private fun normalizedFftLevel(magnitude: Float, barIndex: Int): Float {
     val decibels = fftMagnitudeDb(magnitude)
     val level = ((decibels - FFT_DISPLAY_MIN_DB) /
             (FFT_DISPLAY_MAX_DB - FFT_DISPLAY_MIN_DB)).coerceIn(0f, 1f)
-    return ((level - FFT_LEVEL_FLOOR) * FFT_LEVEL_GAIN).coerceIn(0f, 1f)
+    val floor = when (barIndex) {
+        0 -> LOW_EDGE_LEVEL_FLOOR
+        BAR_COUNT - 1 -> HIGH_EDGE_LEVEL_FLOOR
+        else -> FFT_LEVEL_FLOOR
+    }
+    val gain = when (barIndex) {
+        0 -> LOW_EDGE_LEVEL_GAIN
+        BAR_COUNT - 1 -> HIGH_EDGE_LEVEL_GAIN
+        else -> FFT_LEVEL_GAIN
+    }
+    return ((level - floor) * gain).coerceIn(0f, 1f)
+}
+
+private fun preferredCaptureSize(): Int {
+    val range = Visualizer.getCaptureSizeRange()
+    val target = minOf(PREFERRED_CAPTURE_SIZE, range[1]).coerceAtLeast(range[0])
+    val captureSize = Integer.highestOneBit(target)
+    return if (captureSize < range[0]) captureSize shl 1 else captureSize
 }
 
 internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
@@ -128,6 +151,7 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
                 sinceLastFrame.coerceAtMost(MAX_FRAME_NANOS)
             val attackAlpha = smoothingAlpha(elapsed, ATTACK_TIME_NANOS)
             val releaseAlpha = smoothingAlpha(elapsed, RELEASE_TIME_NANOS)
+            val edgeAttackAlpha = smoothingAlpha(elapsed, EDGE_ATTACK_TIME_NANOS)
             val active = VisualizerSource.isAudioActive()
             var settled = true
             var changed = false
@@ -135,7 +159,12 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
             for (index in 0 until BAR_COUNT) {
                 val current = levels[index]
                 val target = if (active) targets[index] else 0f
-                val alpha = if (target >= current) attackAlpha else releaseAlpha
+                val attack = if (index == 0 || index == BAR_COUNT - 1) {
+                    edgeAttackAlpha
+                } else {
+                    attackAlpha
+                }
+                val alpha = if (target >= current) attack else releaseAlpha
                 val next = current + (target - current) * alpha
                 if (abs(next - current) > REDRAW_EPSILON) changed = true
                 if (next > LEVEL_EPSILON) settled = false
@@ -350,11 +379,12 @@ private object VisualizerSource {
             return@synchronized true
         }
         var instance: Visualizer? = null
+        val captureSize = preferredCaptureSize()
         val captureRate = Visualizer.getMaxCaptureRate()
         val created = try {
             Visualizer(SYSTEM_AUDIO_SESSION).also {
                 instance = it
-                it.captureSize = CAPTURE_SIZE
+                it.captureSize = captureSize
                 it.setDataCaptureListener(
                     captureListener,
                     captureRate,
@@ -378,7 +408,7 @@ private object VisualizerSource {
             tag = TAG,
             state = "active"
         ) {
-            "实时频谱采样器已启动: session=$SYSTEM_AUDIO_SESSION, captureSize=$CAPTURE_SIZE, " +
+            "实时频谱采样器已启动: session=$SYSTEM_AUDIO_SESSION, captureSize=$captureSize, " +
                     "captureRate=$captureRate, bars=$BAR_COUNT, response=fast"
         }
         true
@@ -461,7 +491,7 @@ private object VisualizerSource {
             val wasSilent = lastAudioAtNanos == 0L || now - lastAudioAtNanos >= SILENCE_NANOS
             synchronized(lock) {
                 for (index in 0 until BAR_COUNT) {
-                    snapshot[index] = normalizedFftLevel(scratch[index])
+                    snapshot[index] = normalizedFftLevel(scratch[index], index)
                 }
                 lastAudioAtNanos = now
                 levelSnapshot = snapshot
