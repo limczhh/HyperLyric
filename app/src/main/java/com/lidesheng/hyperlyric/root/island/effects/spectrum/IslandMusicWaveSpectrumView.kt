@@ -44,11 +44,18 @@ private const val TARGET_FPS = 60
 private const val MIN_FRAME_INTERVAL_NANOS = 1_000_000_000L / TARGET_FPS - 1_000_000L
 private const val MAX_FRAME_NANOS = 100_000_000L
 private const val SILENCE_NANOS = 350_000_000L
-private const val ATTACK_TIME_NANOS = 80_000_000L
-private const val RELEASE_TIME_NANOS = 180_000_000L
-private const val GAIN_TARGET = 0.55f
-private const val GAIN_ATTACK = 0.02f
-private const val GAIN_RELEASE = 0.004f
+private const val ATTACK_TIME_NANOS = 45_000_000L
+private const val RELEASE_TIME_NANOS = 150_000_000L
+private const val GAIN_TARGET = 0.75f
+private const val GAIN_LOUDER_TIME_NANOS = 350_000_000L
+private const val GAIN_QUIETER_TIME_NANOS = 1_000_000_000L
+// Adapt band sensitivity to recent energy without fully equalizing or amplifying the noise floor.
+private const val BAND_REFERENCE_TIME_NANOS = 3_000_000_000L
+private const val BAND_REFERENCE_FLOOR = 1f
+private const val BAND_REFERENCE_FLOOR_FRACTION = 0.05f
+private const val MIN_BAND_SENSITIVITY = 0.7f
+private const val MAX_BAND_SENSITIVITY = 1.5f
+private const val LEVEL_COMPRESSION_EXPONENT = 0.75f
 private const val MIN_GAIN = 1e-4f
 private const val MAX_GAIN = 1e3f
 private const val LEVEL_EPSILON = 0.01f
@@ -69,6 +76,9 @@ private val warningStates = Collections.synchronizedSet(mutableSetOf<String>())
 private fun warnOnce(key: String, message: String) {
     if (warningStates.add(key)) HookLogger.w(TAG, message)
 }
+
+private fun smoothingAlpha(elapsedNanos: Long, timeConstantNanos: Long): Float =
+    (1.0 - exp(-elapsedNanos.toDouble() / timeConstantNanos)).toFloat()
 
 internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -127,9 +137,6 @@ internal class IslandMusicWaveSpectrumView(context: Context) : View(context) {
             if (active || !settled) postFrame() else lastFrameNanos = 0L
         }
     }
-
-    private fun smoothingAlpha(elapsedNanos: Long, timeConstantNanos: Long): Float =
-        (1.0 - exp(-elapsedNanos.toDouble() / timeConstantNanos)).toFloat()
 
     fun setColors(top: Int, bottom: Int) {
         if (topColor == top && bottomColor == bottom) return
@@ -280,8 +287,13 @@ private object VisualizerSource {
     private val lock = Any()
     private val clients = Collections.newSetFromMap(WeakHashMap<IslandMusicWaveSpectrumView, Boolean>())
     private val scratch = FloatArray(BAR_COUNT)
+    private val bandReference = FloatArray(BAR_COUNT)
+    private val bandSensitivity = FloatArray(BAR_COUNT)
     private var visualizer: Visualizer? = null
     private var gain = MIN_GAIN
+    private var lastGainUpdateAtNanos = 0L
+    private var bandReferenceInitialized = false
+    private var lastBandReferenceUpdateAtNanos = 0L
     private var lastMetricsLogAtNanos = 0L
 
     @Volatile
@@ -330,7 +342,7 @@ private object VisualizerSource {
             state = "active"
         ) {
             "实时频谱采样器已启动: session=$SYSTEM_AUDIO_SESSION, captureSize=$CAPTURE_SIZE, " +
-                    "captureRate=$captureRate, bars=$BAR_COUNT, response=high"
+                    "captureRate=$captureRate, bars=$BAR_COUNT, response=balanced"
         }
         true
     }
@@ -354,6 +366,12 @@ private object VisualizerSource {
         val active = visualizer
         visualizer = null
         lastAudioAtNanos = 0L
+        gain = MIN_GAIN
+        lastGainUpdateAtNanos = 0L
+        bandReference.fill(0f)
+        bandSensitivity.fill(1f)
+        bandReferenceInitialized = false
+        lastBandReferenceUpdateAtNanos = 0L
         lastMetricsLogAtNanos = 0L
         levelSnapshot = FloatArray(BAR_COUNT)
         active?.let {
@@ -397,27 +415,62 @@ private object VisualizerSource {
             for (index in 0 until BAR_COUNT) {
                 val start = frequencyBin(index, maxBin)
                 val end = max(frequencyBin(index + 1, maxBin), start + 1)
-                var powerSum = 0f
+                var peak = 0f
                 for (bin in start until end) {
                     val real = fft[2 * bin].toInt()
                     val imaginary = fft[2 * bin + 1].toInt()
-                    powerSum += (real * real + imaginary * imaginary).toFloat()
+                    peak = max(peak, sqrt((real * real + imaginary * imaginary).toFloat()))
                 }
-                val rms = sqrt(powerSum / (end - start))
-                scratch[index] = rms
-                frameMax = max(frameMax, rms)
+                scratch[index] = peak
+                frameMax = max(frameMax, peak)
             }
             if (frameMax <= 0f) return
             val snapshot = FloatArray(BAR_COUNT)
             val now = System.nanoTime()
             val wasSilent = lastAudioAtNanos == 0L || now - lastAudioAtNanos >= SILENCE_NANOS
             val appliedGain = synchronized(lock) {
-                val impliedGain = GAIN_TARGET / frameMax
-                gain = if (impliedGain > gain) min(gain + GAIN_ATTACK, impliedGain) else
-                    max(gain - GAIN_RELEASE, impliedGain)
+                if (!bandReferenceInitialized) {
+                    for (index in 0 until BAR_COUNT) bandReference[index] = scratch[index]
+                    bandReferenceInitialized = true
+                } else {
+                    val referenceElapsed = (now - lastBandReferenceUpdateAtNanos).coerceAtLeast(0L)
+                    val referenceAlpha = smoothingAlpha(referenceElapsed, BAND_REFERENCE_TIME_NANOS)
+                    for (index in 0 until BAR_COUNT) {
+                        bandReference[index] +=
+                                (scratch[index] - bandReference[index]) * referenceAlpha
+                    }
+                }
+                lastBandReferenceUpdateAtNanos = now
+                val averageReference = bandReference.average().toFloat()
+                val referenceFloor = max(
+                    BAND_REFERENCE_FLOOR,
+                    averageReference * BAND_REFERENCE_FLOOR_FRACTION
+                )
+                for (index in 0 until BAR_COUNT) {
+                    val reference = max(bandReference[index], referenceFloor)
+                    bandSensitivity[index] = sqrt(averageReference / reference)
+                        .coerceIn(MIN_BAND_SENSITIVITY, MAX_BAND_SENSITIVITY)
+                }
+
+                val impliedGain = (GAIN_TARGET / frameMax).coerceIn(MIN_GAIN, MAX_GAIN)
+                if (lastGainUpdateAtNanos == 0L) {
+                    gain = impliedGain
+                } else {
+                    val gainElapsed = (now - lastGainUpdateAtNanos).coerceAtLeast(0L)
+                    val timeConstant = if (impliedGain < gain) {
+                        GAIN_LOUDER_TIME_NANOS
+                    } else {
+                        GAIN_QUIETER_TIME_NANOS
+                    }
+                    val gainAlpha = smoothingAlpha(gainElapsed, timeConstant)
+                    gain += (impliedGain - gain) * gainAlpha
+                }
+                lastGainUpdateAtNanos = now
                 gain = gain.coerceIn(MIN_GAIN, MAX_GAIN)
                 for (index in 0 until BAR_COUNT) {
-                    snapshot[index] = min(1f, scratch[index] * gain)
+                    val normalized =
+                        (scratch[index] * gain * bandSensitivity[index]).coerceIn(0f, 1f)
+                    snapshot[index] = normalized.pow(LEVEL_COMPRESSION_EXPONENT)
                 }
                 lastAudioAtNanos = now
                 levelSnapshot = snapshot
@@ -445,12 +498,21 @@ private object VisualizerSource {
                     }
                 }
                 if (shouldLogMetrics) {
+                    val rawPeaks = scratch.joinToString(separator = ",", prefix = "[", postfix = "]") {
+                        it.toInt().toString()
+                    }
+                    val sensitivities = bandSensitivity.joinToString(
+                        separator = ",",
+                        prefix = "[",
+                        postfix = "]"
+                    ) { "%.2f".format(it) }
                     val levels = snapshot.joinToString(separator = ",", prefix = "[", postfix = "]") {
                         "${(it * 100).toInt()}%"
                     }
                     HookLogger.d(
                         TAG,
-                        "实时频谱幅度: bands=$levels, rmsPeak=${frameMax.toInt()}, gain=$appliedGain"
+                        "实时频谱幅度: peakBands=$rawPeaks, sensitivity=$sensitivities, " +
+                                "levels=$levels, gain=$appliedGain"
                     )
                 }
             }
