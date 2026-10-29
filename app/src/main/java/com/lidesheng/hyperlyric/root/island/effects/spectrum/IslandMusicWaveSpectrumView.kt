@@ -48,9 +48,9 @@ private const val ATTACK_TIME_NANOS = 35_000_000L
 private const val RELEASE_TIME_NANOS = 70_000_000L
 // A signed 8-bit complex FFT bin tops out at hypot(-128, -128) ≈ 181.
 private const val FFT_MAGNITUDE_FULL_SCALE = 181.02f
-// This floor is about 3 dB above the smallest representable non-zero magnitude.
-private const val FFT_DISPLAY_MIN_DB = -42f
-private const val FFT_DISPLAY_MAX_DB = 0f
+// Gate low-level FFT noise and reserve more display range for changes in audible peaks.
+private const val FFT_DISPLAY_MIN_DB = -30f
+private const val FFT_DISPLAY_MAX_DB = -6f
 private const val LEVEL_EPSILON = 0.01f
 private const val REDRAW_EPSILON = 0.005f
 private const val DEBUG_METRICS_INTERVAL_NANOS = 1_000_000_000L
@@ -313,10 +313,28 @@ private object VisualizerSource {
         }
         var instance: Visualizer? = null
         val captureRate = Visualizer.getMaxCaptureRate()
+        var scalingMode = "normalized"
         val created = try {
             Visualizer(SYSTEM_AUDIO_SESSION).also {
                 instance = it
                 it.captureSize = CAPTURE_SIZE
+                val scalingResult = runCatching {
+                    it.setScalingMode(Visualizer.SCALING_MODE_AS_PLAYED)
+                }.getOrElse { error ->
+                    warnOnce(
+                        "visualizer_scaling_mode_failed",
+                        "设置实时频谱采样模式失败: ${error.javaClass.simpleName}"
+                    )
+                    Visualizer.ERROR
+                }
+                if (scalingResult == Visualizer.SUCCESS) {
+                    scalingMode = "as_played"
+                } else {
+                    warnOnce(
+                        "visualizer_scaling_mode_failed",
+                        "设置实时频谱采样模式失败: result=$scalingResult"
+                    )
+                }
                 it.setDataCaptureListener(
                     captureListener,
                     captureRate,
@@ -341,7 +359,8 @@ private object VisualizerSource {
             state = "active"
         ) {
             "实时频谱采样器已启动: session=$SYSTEM_AUDIO_SESSION, captureSize=$CAPTURE_SIZE, " +
-                    "captureRate=$captureRate, bars=$BAR_COUNT, response=fast"
+                    "captureRate=$captureRate, scalingMode=$scalingMode, " +
+                    "bars=$BAR_COUNT, response=fast"
         }
         true
     }
