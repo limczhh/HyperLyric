@@ -17,9 +17,18 @@ import android.widget.LinearLayout
 import androidx.core.graphics.withScale
 import androidx.core.view.forEach
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
+import com.lidesheng.hyperlyric.common.lyric.METADATA_SPLIT_LYRIC_FRAGMENT
+import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.view.line.SpaceGateLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.yoyo.YoYoAnimation
+
+internal fun splitLyricRightAlignment(
+    metadata: LyricMetadata?,
+    centeredLeftSlot: Boolean,
+    defaultRight: Boolean
+): Boolean = defaultRight ||
+        (centeredLeftSlot && metadata?.getBoolean(METADATA_SPLIT_LYRIC_FRAGMENT) == true)
 
 @SuppressLint("ViewConstructor")
 class SpaceGateRichLyricLineView(
@@ -49,6 +58,8 @@ class SpaceGateRichLyricLineView(
         secondaryContentOrder = secondaryContentOrder
     )
     private var displayLineByLine = false
+    private var centeredLeftSlot = false
+    private var defaultRightAlignment = false
 
     private var pendingMainLineWillApply: ((Float) -> Boolean)? = null
     private var pendingMainLineApplied: (() -> Unit)? = null
@@ -279,10 +290,11 @@ class SpaceGateRichLyricLineView(
 
         setTransitionConfig(style.transitionConfig)
 
-        // 分离歌词的“居中”以左右容器的交界线为中心：左侧贴右，右侧保持默认左对齐。
+        // 只有拆分片段以槽位交界线为中心；完整对唱行保留演唱者方向。
         val centerIfPossible = style.centerIfPossible && !useSplitAlignment
-        val rightIfPossible = if (style.centerIfPossible && useSplitAlignment) {
-            isLeftSplitSide
+        centeredLeftSlot = style.centerIfPossible && useSplitAlignment && isLeftSplitSide
+        defaultRightAlignment = if (style.centerIfPossible && useSplitAlignment) {
+            false
         } else {
             style.rightIfPossible
         }
@@ -296,7 +308,7 @@ class SpaceGateRichLyricLineView(
             style.fadingEdge,
             style.wordMotion,
             centerIfPossible,
-            rightIfPossible
+            rightAlignment(committedLine?.metadata)
         )
         applyLineStyle(
             secondary,
@@ -307,7 +319,7 @@ class SpaceGateRichLyricLineView(
             style.fadingEdge,
             style.wordMotion,
             centerIfPossible,
-            rightIfPossible
+            rightAlignment(committedSecondaryLine?.metadata ?: committedLine?.metadata)
         )
     }
 
@@ -472,6 +484,7 @@ class SpaceGateRichLyricLineView(
             }
         }
 
+        main.rightIfPossible = rightAlignment(line?.metadata)
         val hasMainVisualContent = currentMainText != null || main.model.isCountdownLine()
         val shouldPromote = allowNextLinePromotion &&
                 secondaryIsNextLinePreview && secResult.isNextLinePreview &&
@@ -499,6 +512,8 @@ class SpaceGateRichLyricLineView(
 
         alwaysShowSecondary = secResult.alwaysShow
         secondaryIsNextLinePreview = secResult.isNextLinePreview
+        // Translation and preview render data can replace metadata; use the source row's marker.
+        secondary.rightIfPossible = rightAlignment(rawSecondaryLine?.metadata ?: line?.metadata)
         secondary.visibleIfChanged = secResult.alwaysShow
         secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.isSustainProgressEnabled = secResult.sustainAwareProgress
@@ -519,6 +534,10 @@ class SpaceGateRichLyricLineView(
         if (requestMarquee) requestStartMarquee()
         dispatchMainLineApplied()
     }
+
+    private fun rightAlignment(metadata: LyricMetadata?): Boolean = splitLyricRightAlignment(
+        metadata, centeredLeftSlot, defaultRightAlignment
+    )
 
     private fun dispatchMainLineApplied() {
         val callback = pendingMainLineApplied

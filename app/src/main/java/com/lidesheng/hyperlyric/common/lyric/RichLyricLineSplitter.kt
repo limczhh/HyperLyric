@@ -4,10 +4,13 @@ import android.graphics.Paint
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
+import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
 import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
+
+internal const val METADATA_SPLIT_LYRIC_FRAGMENT = "hyperlyric:split-lyric-fragment"
 
 /**
  * Splits one rich lyric line for the separated Super Island mode.
@@ -138,12 +141,16 @@ object RichLyricLineSplitter {
             null
         }
 
+        val splitMetadata = lyricMetadataOf(
+            *(line.metadata?.entries?.map { it.key to it.value }.orEmpty()).toTypedArray(),
+            METADATA_SPLIT_LYRIC_FRAGMENT to "true"
+        )
         val leftLine = RichLyricLine(
             begin = line.begin,
             end = timelineSplit?.splitTimeMs ?: line.end,
             duration = 0,
             isAlignedRight = false,
-            metadata = line.metadata,
+            metadata = splitMetadata,
             text = primary.leftText.orEmpty(),
             words = primary.leftWords,
             secondary = secondary.leftText,
@@ -160,7 +167,7 @@ object RichLyricLineSplitter {
             end = timelineSplit?.endTimeMs ?: line.end,
             duration = 0,
             isAlignedRight = false,
-            metadata = line.metadata,
+            metadata = splitMetadata,
             text = primary.rightText.orEmpty(),
             words = primary.rightWords,
             secondary = secondary.rightText,

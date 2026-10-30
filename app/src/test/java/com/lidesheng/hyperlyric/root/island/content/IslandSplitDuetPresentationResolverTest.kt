@@ -5,6 +5,7 @@ import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
 import com.lidesheng.hyperlyric.common.lyric.LyricPresentationResolver
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
 import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_ALIGNMENT_RESOLVED
+import com.lidesheng.hyperlyric.common.lyric.METADATA_SPLIT_LYRIC_FRAGMENT
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
@@ -13,6 +14,7 @@ import com.lidesheng.hyperlyric.lyric.view.LyricLineAssembler
 import com.lidesheng.hyperlyric.lyric.view.METADATA_LYRIC_ROW_PLACEHOLDER
 import com.lidesheng.hyperlyric.lyric.view.METADATA_NEXT_LINE_PREVIEW
 import com.lidesheng.hyperlyric.lyric.view.METADATA_PLACEHOLDER_WORD_MOTION
+import com.lidesheng.hyperlyric.lyric.view.splitLyricRightAlignment
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -38,6 +40,35 @@ class IslandSplitDuetPresentationResolverTest {
             assertPlaceholder(lowerSlot.primary)
             assertSame(secondary, lowerSlot.secondary)
         }
+    }
+
+    @Test
+    fun centeredDuetRowsKeepSingerAlignmentInEitherRowOrder() {
+        for (primaryOnRight in listOf(false, true)) {
+            val source = LyricPresentation(line("A", primaryOnRight), line("B", !primaryOnRight))
+            for (isLeft in listOf(false, true)) {
+                val slot = resolve(source, isLeft)
+                for (row in listOfNotNull(slot.primary, slot.secondary)) {
+                    if (row.metadata?.getBoolean(METADATA_LYRIC_ROW_PLACEHOLDER) == true) continue
+                    val right = row.isAlignedRight || splitLyricRightAlignment(
+                        row.metadata, centeredLeftSlot = isLeft, defaultRight = false
+                    )
+                    assertEquals(!isLeft, right)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun centeredFragmentsAlignToInnerEdgesAndRestoreExplicitRightStyle() {
+        // Split fragments retain the source singer's metadata, but no longer own a vocal side.
+        val fragmentMetadata = LyricMetadata(mapOf(
+            "agent" to "A", METADATA_SPLIT_LYRIC_FRAGMENT to "true"
+        ))
+        assertTrue(splitLyricRightAlignment(fragmentMetadata, centeredLeftSlot = true, defaultRight = false))
+        assertFalse(splitLyricRightAlignment(fragmentMetadata, centeredLeftSlot = false, defaultRight = false))
+        assertFalse(splitLyricRightAlignment(line("A").metadata, centeredLeftSlot = true, defaultRight = false))
+        assertTrue(splitLyricRightAlignment(line("A").metadata, centeredLeftSlot = false, defaultRight = true))
     }
 
     @Test

@@ -139,7 +139,7 @@ internal object IslandDynamicWidthCoordinator {
     ): Boolean {
         if (!config.geometry.isDynamicWidth) return false
 
-        // 对唱宽度锁定：目标宽度直接取用户设定最大值，不做内容自适应收缩
+        // 非分离模式保留原有对唱宽度锁定；分离模式按各槽位实际内容自适应。
         val lockedToMaxWidth = shouldLockToMaxWidth(config)
         val slotBaseWidthDp = if (lockedToMaxWidth) {
             config.geometry.rightMaxWidthDp.toFloat()
@@ -195,10 +195,10 @@ internal object IslandDynamicWidthCoordinator {
     /**
      * 对唱宽度锁定判定：动态宽度模式 + 至少一个槽位为歌词模式 + 当前歌词存在对唱行
      * （任意行 isAlignedRight=true，解析器已透传到内部模型）→ 锁定为用户设定最大宽度。
-     * 固定宽度模式忽略；每次刷新按当前歌词重新判定，切歌自动解除。
+     * 固定宽度和分离歌词模式忽略；每次刷新按当前歌词重新判定，切歌自动解除。
      */
     private fun shouldLockToMaxWidth(config: IslandSlotRuntimeConfig): Boolean {
-        if (!config.geometry.isDynamicWidth) return false
+        if (!config.geometry.isDynamicWidth || config.isSplitMode) return false
         val hasLyricSlot = config.modeForTag(IslandProbeUtils.LEFT_TEST_VIEW_TAG) ==
                 RootConstants.ISLAND_CONTENT_MODE_LYRIC ||
                 config.modeForTag(IslandProbeUtils.RIGHT_TEST_VIEW_TAG) ==
