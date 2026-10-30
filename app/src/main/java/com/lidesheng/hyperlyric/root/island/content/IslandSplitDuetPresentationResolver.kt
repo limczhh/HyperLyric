@@ -1,7 +1,6 @@
 package com.lidesheng.hyperlyric.root.island.content
 
 import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
-import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_ALIGNMENT_RESOLVED
 import com.lidesheng.hyperlyric.common.lyric.agentId
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
@@ -12,15 +11,21 @@ import com.lidesheng.hyperlyric.lyric.view.METADATA_NEXT_LINE_PREVIEW
 
 /** Projects resolved vocal sides into one split slot without changing the original row order. */
 internal object IslandSplitDuetPresentationResolver {
+    private data class VocalTiming(val begin: Long, val end: Long, val agent: String)
+
+    private var cachedSongLines: List<IRichLyricLine>? = null
+    private val overlapByLine = HashMap<VocalTiming, Boolean>()
+
     fun resolve(
         presentation: LyricPresentation,
-        isDuetTrack: Boolean,
+        enabled: Boolean,
         isLeft: Boolean,
-        nextLine: IRichLyricLine? = null
+        songLines: List<IRichLyricLine>?,
+        nextLine: IRichLyricLine? = null,
+        splitLine: (IRichLyricLine, Boolean) -> IRichLyricLine
     ): LyricPresentation? {
-        if (!isDuetTrack) return null
+        if (!enabled) return null
         val sourcePrimary = presentation.primary ?: return null
-        if (!sourcePrimary.hasResolvedVocalSide()) return null
 
         val isPreview = sourcePrimary.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
         val primary = if (isPreview && nextLine != null) {
@@ -35,6 +40,8 @@ internal object IslandSplitDuetPresentationResolver {
         }
         val secondary = presentation.secondary ?: if (isPreview && nextLine != null) {
             RichLyricLine(
+                begin = nextLine.begin,
+                end = nextLine.end,
                 text = sourcePrimary.secondary,
                 words = emptyList(),
                 isAlignedRight = nextLine.isAlignedRight,
@@ -46,18 +53,20 @@ internal object IslandSplitDuetPresentationResolver {
         } else {
             null
         }
-        if (secondary != null && !secondary.hasResolvedVocalSide()) return null
+        val routePrimary = participatesInOverlap(primary, songLines)
+        val routeSecondary = secondary != null && participatesInOverlap(secondary, songLines)
+        if (!routePrimary && !routeSecondary) return null
 
-        val primaryHere = !primary.isAlignedRight == isLeft
-        val secondaryHere = secondary != null && !secondary.isAlignedRight == isLeft
+        val primaryHere = !routePrimary || !primary.isAlignedRight == isLeft
+        val secondaryHere = secondary != null && (!routeSecondary || !secondary.isAlignedRight == isLeft)
         return LyricPresentation(
             primary = when {
-                primaryHere -> primary
+                primaryHere -> if (routePrimary) primary else splitLine(primary, false)
                 secondaryHere -> rowPlaceholder(primary)
                 else -> null
             },
             secondary = when {
-                secondaryHere -> secondary
+                secondaryHere -> if (routeSecondary) secondary else splitLine(secondary, true)
                 primaryHere && secondary != null -> rowPlaceholder(secondary)
                 else -> null
             },
@@ -65,9 +74,25 @@ internal object IslandSplitDuetPresentationResolver {
         )
     }
 
-    private fun IRichLyricLine.hasResolvedVocalSide(): Boolean =
-        isAlignedRight || agentId() != null ||
-                metadata?.getBoolean(METADATA_KEY_ALIGNMENT_RESOLVED) == true
+    /** Membership belongs to the complete source line, independent of the playback position. */
+    private fun participatesInOverlap(
+        line: IRichLyricLine,
+        songLines: List<IRichLyricLine>?
+    ): Boolean {
+        if (songLines !== cachedSongLines) {
+            cachedSongLines = songLines
+            overlapByLine.clear()
+        }
+        val agent = line.agentId() ?: return false
+        if (line.end <= line.begin) return false
+        return overlapByLine.getOrPut(VocalTiming(line.begin, line.end, agent)) {
+            songLines.orEmpty().any { other ->
+                other.end > other.begin && other.begin < line.end && line.begin < other.end &&
+                        (!other.text.isNullOrBlank() || !other.words.isNullOrEmpty()) &&
+                        other.agentId()?.let { it != agent } == true
+            }
+        }
+    }
 
     // Keep the source row's timing and words for measurement; the assembler suppresses its text.
     private fun rowPlaceholder(reference: IRichLyricLine): IRichLyricLine =

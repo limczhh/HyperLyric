@@ -239,31 +239,27 @@ internal object IslandLyricContentAssembler {
         } else {
             null
         }
-        IslandSplitDuetPresentationResolver.resolve(
-            presentation = rawPresentation,
-            isDuetTrack = useDuetSlots,
-            isLeft = isLeft,
-            nextLine = previewLine
-        )?.let { return it }
-        if (rawLine.text.isNullOrEmpty()) return rawPresentation
-
         val density = view.resources.displayMetrics.density
-        val fallbackPaint = TextPaint().apply {
-            textSize = config.textSizeSp.toFloat() * density
+        val fallbackPaint by lazy {
+            TextPaint().apply { textSize = config.textSizeSp.toFloat() * density }
         }
-        val textPaint = when (view) {
-            is RichLyricLineView -> TextPaint(view.main.textPaint)
-            is SpaceGateRichLyricLineView -> TextPaint(view.main.textPaint)
-            else -> fallbackPaint
-        }.takeIf { it.textSize > 0f } ?: fallbackPaint
-        val secondaryPaint = when (view) {
-            is RichLyricLineView -> TextPaint(view.secondary.textPaint)
-            is SpaceGateRichLyricLineView -> TextPaint(view.secondary.textPaint)
-            else -> TextPaint(textPaint).apply {
+        val textPaint by lazy {
+            when (view) {
+                is RichLyricLineView -> TextPaint(view.main.textPaint)
+                is SpaceGateRichLyricLineView -> TextPaint(view.main.textPaint)
+                else -> fallbackPaint
+            }.takeIf { it.textSize > 0f } ?: fallbackPaint
+        }
+        val secondaryPaint by lazy {
+            when (view) {
+                is RichLyricLineView -> TextPaint(view.secondary.textPaint)
+                is SpaceGateRichLyricLineView -> TextPaint(view.secondary.textPaint)
+                else -> TextPaint(textPaint).apply {
+                    textSize *= config.textSizeRatio
+                }
+            }.takeIf { it.textSize > 0f } ?: TextPaint(textPaint).apply {
                 textSize *= config.textSizeRatio
             }
-        }.takeIf { it.textSize > 0f } ?: TextPaint(textPaint).apply {
-            textSize *= config.textSizeRatio
         }
 
         fun contentWidthPx(widthDp: Int, parentName: String): Float {
@@ -273,63 +269,56 @@ internal object IslandLyricContentAssembler {
             return (wrapperWidthPx - paddingPx).coerceAtLeast(1f)
         }
 
-        val leftMinContentPx = contentWidthPx(
-            config.geometry.leftMinWidthDp,
-            IslandProbeUtils.LEFT_PARENT_NAME
-        )
-        val leftMaxContentPx = contentWidthPx(
-            config.geometry.leftMaxWidthDp,
-            IslandProbeUtils.LEFT_PARENT_NAME
-        )
-        val rightMinContentPx = contentWidthPx(
-            config.geometry.rightMinWidthDp,
-            IslandProbeUtils.RIGHT_PARENT_NAME
-        )
-        val rightMaxContentPx = contentWidthPx(
-            config.geometry.rightMaxWidthDp,
-            IslandProbeUtils.RIGHT_PARENT_NAME
-        )
-        val containerWidthSpec = if (config.geometry.isDynamicWidth) {
-            RichLyricLineSplitter.ContainerWidthSpec.Dynamic(
-                leftMinWidthPx = leftMinContentPx,
-                leftMaxWidthPx = leftMaxContentPx,
-                rightMinWidthPx = rightMinContentPx,
-                rightMaxWidthPx = rightMaxContentPx
+        val containerWidthSpec by lazy {
+            val leftMaxContentPx = contentWidthPx(
+                config.geometry.leftMaxWidthDp, IslandProbeUtils.LEFT_PARENT_NAME
             )
-        } else {
-            RichLyricLineSplitter.ContainerWidthSpec.Fixed(
-                leftWidthPx = leftMaxContentPx,
-                rightWidthPx = rightMaxContentPx
+            val rightMaxContentPx = contentWidthPx(
+                config.geometry.rightMaxWidthDp, IslandProbeUtils.RIGHT_PARENT_NAME
             )
-        }
-        val primarySplit = RichLyricLineSplitter.split(
-            line = rawLine,
-            primaryPaint = textPaint,
-            // A next-line preview is rendered in the secondary slot only temporarily. It will
-            // be promoted to the primary slot on the next lyric change, so keep its split
-            // boundary identical to the primary row even though its current paint is smaller.
-            secondaryPaint = if (rawLine.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true) {
-                textPaint
+            if (config.geometry.isDynamicWidth) {
+                RichLyricLineSplitter.ContainerWidthSpec.Dynamic(
+                    leftMinWidthPx = contentWidthPx(
+                        config.geometry.leftMinWidthDp, IslandProbeUtils.LEFT_PARENT_NAME
+                    ),
+                    leftMaxWidthPx = leftMaxContentPx,
+                    rightMinWidthPx = contentWidthPx(
+                        config.geometry.rightMinWidthDp, IslandProbeUtils.RIGHT_PARENT_NAME
+                    ),
+                    rightMaxWidthPx = rightMaxContentPx
+                )
             } else {
-                secondaryPaint
-            },
-            containerWidthSpec = containerWidthSpec,
-            partitionUntimedTimeline = config.syllableRelative
-        )
-        val secondarySplit = rawPresentation.secondary?.let { secondaryLine ->
-            RichLyricLineSplitter.split(
-                line = secondaryLine,
-                primaryPaint = secondaryPaint,
-                secondaryPaint = secondaryPaint,
+                RichLyricLineSplitter.ContainerWidthSpec.Fixed(
+                    leftWidthPx = leftMaxContentPx,
+                    rightWidthPx = rightMaxContentPx
+                )
+            }
+        }
+        fun splitLine(line: IRichLyricLine, isSecondary: Boolean): IRichLyricLine {
+            val isPreview = line.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
+            val split = RichLyricLineSplitter.split(
+                line = line,
+                // Previews use the main row's split boundary so promotion doesn't move text.
+                primaryPaint = if (isSecondary && !isPreview) secondaryPaint else textPaint,
+                secondaryPaint = if (isPreview) textPaint else secondaryPaint,
                 containerWidthSpec = containerWidthSpec,
                 partitionUntimedTimeline = config.syllableRelative
             )
+            return if (isLeft) split.left else split.right
         }
+        IslandSplitDuetPresentationResolver.resolve(
+            presentation = rawPresentation,
+            enabled = useDuetSlots,
+            isLeft = isLeft,
+            songLines = LyriconDataBridge.currentSong?.lyrics,
+            nextLine = previewLine,
+            splitLine = ::splitLine
+        )?.let { return it }
+        if (rawLine.text.isNullOrEmpty()) return rawPresentation
+
         return LyricPresentation(
-            primary = if (isLeft) primarySplit.left else primarySplit.right,
-            secondary = secondarySplit?.let {
-                if (isLeft) it.left else it.right
-            },
+            primary = splitLine(rawLine, false),
+            secondary = rawPresentation.secondary?.let { splitLine(it, true) },
             secondaryContent = rawPresentation.secondaryContent
         )
     }
