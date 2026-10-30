@@ -69,8 +69,8 @@ private const val NATIVE_BAR_CENTER_SPACING = 12f
 private const val NATIVE_BAR_WIDTH = 5.4f
 private const val NATIVE_PAUSE_HALF_HEIGHT = 8.7f
 private const val NATIVE_MAX_WAVE_HALF_HEIGHT = 22.359f
-// At a 48 kHz mix, these fractions of Fs/4 divide the bars near 130, 420, 1.3k, and 4k Hz.
-private val BAND_EDGE_FRACTIONS = floatArrayOf(0f, 0.012f, 0.035f, 0.11f, 0.34f, 1f)
+// At a 48 kHz mix, these fractions of Fs/4 divide the bars near 130, 420, 1.3k, and 2.5k Hz.
+private val BAND_EDGE_FRACTIONS = floatArrayOf(0f, 0.012f, 0.035f, 0.11f, 0.21f, 1f)
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR = 0xFF57F2FF.toInt()
 internal const val ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR = 0xFFF5E6FF.toInt()
 
