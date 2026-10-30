@@ -10,6 +10,17 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "7.10-1943",
+                title = "修复了一些问题",
+                summary = "- 新增超级岛音乐律动实时频谱功能\n" +
+                        "- 新增逐字歌词浮现动效\n" +
+                        "- 优化分离歌词下对唱歌词的表现\n" +
+                        "- 优化音乐信息的展示\n" +
+                        "- 优化多处 ui 布局显示\n" +
+                        "- 修复媒体卡片进度条丢失的问题\n" +
+                        "- 修复汽水音乐超级岛通知下拉小窗不生效的问题"
+            ),
+            ChangelogItem(
                 version = "7.9-1942",
                 title = "适配了 HyperOS 4！",
                 summary = "- 新增状态栏歌词播放时通知图标移至摄像头区域右侧的功能\n" +
