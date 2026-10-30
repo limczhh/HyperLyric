@@ -214,6 +214,8 @@ object RootConstants {
     const val KEY_HOOK_FONT_ITALIC = "key_hook_font_italic"
     const val KEY_HOOK_FADING_EDGE_LENGTH = "key_hook_fading_edge_length"
     const val KEY_HOOK_GRADIENT_PROGRESS = "key_hook_gradient_progress"
+    const val KEY_HOOK_WORD_EFFECT = "key_hook_word_effect"
+    const val KEY_HOOK_WORD_REVEAL_ANIMATION = "key_hook_word_reveal_animation"
     const val KEY_HOOK_LYRIC_ALIGNMENT = "key_hook_lyric_alignment"
     const val KEY_HOOK_MUSIC_INFO_ALIGNMENT = "key_hook_music_info_alignment"
     const val KEY_HOOK_PLACEHOLDER_FORMAT = "key_hook_placeholder_format"
@@ -577,6 +579,10 @@ object RootConstants {
     const val DEFAULT_HOOK_NARROW_LATIN_FONT = false
     const val DEFAULT_HOOK_FADING_EDGE_LENGTH = 15
     const val DEFAULT_HOOK_GRADIENT_PROGRESS = true
+    const val WORD_EFFECT_HIGHLIGHT = 0
+    const val WORD_EFFECT_REVEAL = 1
+    const val DEFAULT_HOOK_WORD_EFFECT = WORD_EFFECT_HIGHLIGHT
+    const val DEFAULT_HOOK_WORD_REVEAL_ANIMATION = 0
     const val CONTENT_ALIGNMENT_LEFT = 0
     const val CONTENT_ALIGNMENT_CENTER = 1
     const val CONTENT_ALIGNMENT_RIGHT = 2

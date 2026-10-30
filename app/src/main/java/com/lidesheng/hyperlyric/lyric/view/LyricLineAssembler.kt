@@ -51,7 +51,7 @@ internal class LyricLineAssembler(
     data class MainResult(
         val line: LyricLine,
         val isScrollOnly: Boolean,
-        val sustainAwareProgress: Boolean,
+        val hasSourceWordTiming: Boolean,
         val isLineTimeline: Boolean
     )
 
@@ -87,7 +87,7 @@ internal class LyricLineAssembler(
         return MainResult(
             line = line,
             isScrollOnly = generated && !enableRelativeHighlight,
-            sustainAwareProgress = hasOriginalWords && !useLineTimeline,
+            hasSourceWordTiming = hasOriginalWords && !useLineTimeline,
             isLineTimeline = useLineTimeline
         )
     }
@@ -97,7 +97,7 @@ internal class LyricLineAssembler(
         val alwaysShow: Boolean,
         val isScrollOnly: Boolean,
         val isNextLinePreview: Boolean,
-        val sustainAwareProgress: Boolean,
+        val hasSourceWordTiming: Boolean,
         val isLineTimeline: Boolean
     )
 
@@ -209,7 +209,7 @@ internal class LyricLineAssembler(
             alwaysShow = alwaysShow,
             isScrollOnly = generated && !enableRelativeHighlight,
             isNextLinePreview = isNextLinePreview,
-            sustainAwareProgress = hasOriginalWords && !lineTimelineGenerated,
+            hasSourceWordTiming = hasOriginalWords && !lineTimelineGenerated,
             isLineTimeline = lineTimelineGenerated
         )
     }
@@ -224,7 +224,7 @@ internal class LyricLineAssembler(
                 alwaysShow = !source.text.isNullOrBlank(),
                 isScrollOnly = true,
                 isNextLinePreview = true,
-                sustainAwareProgress = false,
+                hasSourceWordTiming = false,
                 isLineTimeline = false
             )
         }
@@ -237,7 +237,7 @@ internal class LyricLineAssembler(
                     source.metadata?.getBoolean(METADATA_LYRIC_ROW_PLACEHOLDER) == true,
             isScrollOnly = mainResult.isScrollOnly,
             isNextLinePreview = false,
-            sustainAwareProgress = mainResult.sustainAwareProgress,
+            hasSourceWordTiming = mainResult.hasSourceWordTiming,
             isLineTimeline = mainResult.isLineTimeline
         )
     }

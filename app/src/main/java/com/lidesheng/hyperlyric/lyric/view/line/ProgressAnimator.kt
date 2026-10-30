@@ -30,6 +30,9 @@ internal class ProgressAnimator {
     private var wordPlaybackSpeed = 1f
     private var wordSustainStrength = 0f
 
+    val currentWordPositionMs: Float?
+        get() = wordPositionMs.takeIf { mode == Mode.WORD }
+
     fun jumpTo(width: Float) {
         currentWidth = width
         targetWidth = width

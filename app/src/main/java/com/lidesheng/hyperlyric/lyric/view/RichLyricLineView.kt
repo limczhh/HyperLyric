@@ -252,6 +252,10 @@ class RichLyricLineView(
 
     fun setStyle(style: LyricViewStyle) {
         displayLineByLine = style.lineDisplay
+        main.wordReveal = style.wordReveal
+        secondary.wordReveal = style.wordReveal
+        main.wordRevealAnimation = style.wordRevealAnimation
+        secondary.wordRevealAnimation = style.wordRevealAnimation
         assembler.updateFlags(
             displayTranslation = displayTranslation,
             displayRoma = displayRoma,
@@ -462,7 +466,7 @@ class RichLyricLineView(
             return
         }
 
-        main.isSustainProgressEnabled = mainResult.sustainAwareProgress
+        main.hasSourceWordTiming = mainResult.hasSourceWordTiming
         // 内容没变就不重设:重设会 reset + 重新 seek 渲染器,长行还会重算滚动窗口——另一行换行时
         // 本行会跟着动一下(owner 2026-10-09 真机反馈「第二行会影响第一行」)。
         if (mainContent.changed(mainResult.line, mainResult.isLineTimeline)) {
@@ -480,7 +484,7 @@ class RichLyricLineView(
         secondaryIsNextLinePreview = secResult.isNextLinePreview
         secondary.visibleIfChanged = secResult.alwaysShow
         secondary.isStaticPreview = secResult.isNextLinePreview
-        secondary.isSustainProgressEnabled = secResult.sustainAwareProgress
+        secondary.hasSourceWordTiming = secResult.hasSourceWordTiming
         if (secondaryContent.changed(secResult.line, secResult.isLineTimeline)) {
             secondaryNeedsSynchronization = true
             if (preserveMarquee) {

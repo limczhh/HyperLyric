@@ -23,6 +23,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 internal class TextDrawer {
+    private val revealDrawer = WordRevealDrawer()
     private var bgColors = intArrayOf(Color.GRAY)
     private var hlColors = intArrayOf(Color.WHITE)
 
@@ -119,6 +120,10 @@ internal class TextDrawer {
         scrollX: Float,
         isOverflow: Boolean,
         highlightWidth: Float,
+        positionMs: Double,
+        revealWords: Boolean,
+        revealAnimation: WordRevealAnimation,
+        revealDurationMs: Int,
         useGradient: Boolean,
         scrollOnly: Boolean,
         charMotionEnabled: Boolean,
@@ -130,7 +135,9 @@ internal class TextDrawer {
         gradientStartX: Float,
         gradientEndX: Float
     ) {
-        val motionPadding = if (charMotionEnabled && !scrollOnly) {
+        val motionPadding = if (revealWords && !scrollOnly) {
+            0f
+        } else if (charMotionEnabled && !scrollOnly) {
             motionBottomPadding(model, bgPaint.textSize)
         } else {
             0f
@@ -151,6 +158,20 @@ internal class TextDrawer {
 
             if (scrollOnly) {
                 canvas.drawText(model.wordText, 0f, y, normPaint)
+                return@withSave
+            }
+
+            if (revealWords) {
+                hlPaint.shader = if (isRainbowHl) {
+                    getOrCreateRainbowShader(gradientStartX, gradientEndX, hlColors, hlRainbowCache)
+                } else {
+                    null
+                }
+                revealDrawer.draw(
+                    canvas, model, positionMs, revealAnimation, revealDurationMs,
+                    visibleStart, visibleEnd, viewHeight.toFloat(), y,
+                    fontMetrics.descent - fontMetrics.ascent, hlPaint
+                )
                 return@withSave
             }
 

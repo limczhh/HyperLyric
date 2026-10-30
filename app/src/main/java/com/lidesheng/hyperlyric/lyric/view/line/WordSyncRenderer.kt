@@ -29,15 +29,20 @@ internal class WordSyncRenderer(private val view: LyricLineView) : LineRenderer 
     override var rightIfPossible = false
 
     var isCharMotionEnabled = true
+    var isWordRevealEnabled = false
+    var wordRevealAnimation = WordRevealAnimation.NONE
+    private val revealDurationMs = view.resources.getInteger(android.R.integer.config_shortAnimTime)
 
-    var isSustainProgressEnabled: Boolean
+    var hasSourceWordTiming: Boolean
         get() = progressController.sustainAware
         set(value) {
             progressController.sustainAware = value
         }
 
     fun motionBottomPadding(model: LyricModel): Float =
-        if (isCharMotionEnabled && !isScrollOnly) {
+        if (isWordRevealEnabled && hasSourceWordTiming && !isScrollOnly) {
+            0f
+        } else if (isCharMotionEnabled && !isScrollOnly) {
             textDrawer.motionBottomPadding(model, bgPaint.textSize)
         } else {
             0f
@@ -178,6 +183,9 @@ internal class WordSyncRenderer(private val view: LyricLineView) : LineRenderer 
             canvas, model, viewWidth, viewHeight,
             state.scrollOffset, model.width > viewWidth,
             progressController.animator.currentWidth,
+            progressController.currentPositionMs,
+            isWordRevealEnabled && hasSourceWordTiming,
+            wordRevealAnimation, revealDurationMs,
             isGradientEnabled, isScrollOnly, isCharMotionEnabled,
             centerIfPossible, rightIfPossible,
             bgPaint, hlPaint, paint,

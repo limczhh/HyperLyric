@@ -173,6 +173,14 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_GRADIENT_PROGRESS,
                 RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS
             ),
+            wordEffect = prefs.getInt(
+                RootConstants.KEY_HOOK_WORD_EFFECT,
+                RootConstants.DEFAULT_HOOK_WORD_EFFECT
+            ),
+            wordRevealAnimation = prefs.getInt(
+                RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION,
+                RootConstants.DEFAULT_HOOK_WORD_REVEAL_ANIMATION
+            ),
             lyricAlignment = RootConstants.normalizeHookContentAlignment(
                 prefs.getInt(
                     RootConstants.KEY_HOOK_LYRIC_ALIGNMENT,

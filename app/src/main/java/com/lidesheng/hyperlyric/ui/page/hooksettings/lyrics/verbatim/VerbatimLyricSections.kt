@@ -9,14 +9,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.common.RootConstants
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.verbatimLyricSections(
+    wordEffect: Int,
+    onWordEffectChange: (Int) -> Unit,
+    wordRevealAnimation: Int,
+    onWordRevealAnimationChange: (Int) -> Unit,
     gradientStyle: Boolean,
     onGradientStyleChange: (Boolean) -> Unit,
     lineDisplay: Boolean,
@@ -76,72 +82,104 @@ fun LazyListScope.verbatimLyricSections(
                     .fillMaxWidth()
             ) {
                 Column {
-                    SwitchPreference(
-                        title = stringResource(id = R.string.title_gradient_progress),
-                        checked = gradientStyle,
-                        onCheckedChange = onGradientStyleChange
+                    OverlayDropdownPreference(
+                        title = stringResource(id = R.string.title_word_effect),
+                        items = listOf(
+                            stringResource(id = R.string.option_word_effect_highlight),
+                            stringResource(id = R.string.option_word_effect_reveal)
+                        ),
+                        selectedIndex = wordEffect,
+                        onSelectedIndexChange = onWordEffectChange
                     )
-                    SwitchPreference(
-                        title = stringResource(id = R.string.title_word_motion),
-                        checked = wordMotionEnabled,
-                        onCheckedChange = onWordMotionEnabledChange
-                    )
-                    AnimatedVisibility(visible = wordMotionEnabled) {
+                    AnimatedVisibility(visible = wordEffect == RootConstants.WORD_EFFECT_REVEAL) {
+                        OverlayDropdownPreference(
+                            title = stringResource(id = R.string.title_word_reveal_animation),
+                            items = listOf(
+                                stringResource(id = R.string.option_anim_none),
+                                stringResource(id = R.string.option_word_reveal_fade_in),
+                                stringResource(id = R.string.option_word_reveal_slide_up),
+                                stringResource(id = R.string.option_word_reveal_slide_down),
+                                stringResource(id = R.string.option_word_reveal_slide_right),
+                                stringResource(id = R.string.option_word_reveal_slide_left),
+                                stringResource(id = R.string.option_word_reveal_zoom_in),
+                                stringResource(id = R.string.option_word_reveal_bounce_in),
+                                stringResource(id = R.string.option_word_reveal_flip_in),
+                                stringResource(id = R.string.option_word_reveal_wipe_in)
+                            ),
+                            selectedIndex = wordRevealAnimation,
+                            onSelectedIndexChange = onWordRevealAnimationChange
+                        )
+                    }
+                    AnimatedVisibility(visible = wordEffect == RootConstants.WORD_EFFECT_HIGHLIGHT) {
                         Column {
                             SwitchPreference(
-                                title = stringResource(
-                                    id = R.string.title_word_motion_latin_by_character
-                                ),
-                                summary = stringResource(
-                                    id = R.string.summary_word_motion_latin_by_character
-                                ),
-                                checked = wordMotionLatinByCharacter,
-                                onCheckedChange = onWordMotionLatinByCharacterChange
+                                title = stringResource(id = R.string.title_gradient_progress),
+                                checked = gradientStyle,
+                                onCheckedChange = onGradientStyleChange
                             )
-                            ArrowPreference(
-                                title = stringResource(id = R.string.title_word_motion_cjk_lift),
-                                onClick = onWordMotionCjkLiftClick,
-                                endActions = {
-                                    Text(
-                                        String.format("%.2f", wordMotionCjkLift),
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                            SwitchPreference(
+                                title = stringResource(id = R.string.title_word_motion),
+                                checked = wordMotionEnabled,
+                                onCheckedChange = onWordMotionEnabledChange
+                            )
+                            AnimatedVisibility(visible = wordMotionEnabled) {
+                                Column {
+                                    SwitchPreference(
+                                        title = stringResource(
+                                            id = R.string.title_word_motion_latin_by_character
+                                        ),
+                                        summary = stringResource(
+                                            id = R.string.summary_word_motion_latin_by_character
+                                        ),
+                                        checked = wordMotionLatinByCharacter,
+                                        onCheckedChange = onWordMotionLatinByCharacterChange
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.title_word_motion_cjk_lift),
+                                        onClick = onWordMotionCjkLiftClick,
+                                        endActions = {
+                                            Text(
+                                                String.format("%.2f", wordMotionCjkLift),
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        }
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.title_word_motion_cjk_wave),
+                                        endActions = {
+                                            Text(
+                                                String.format("%.2f", wordMotionCjkWave),
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = onWordMotionCjkWaveClick
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.title_word_motion_latin_lift),
+                                        endActions = {
+                                            Text(
+                                                String.format("%.2f", wordMotionLatinLift),
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = onWordMotionLatinLiftClick
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(id = R.string.title_word_motion_latin_wave),
+                                        endActions = {
+                                            Text(
+                                                String.format("%.2f", wordMotionLatinWave),
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = onWordMotionLatinWaveClick
                                     )
                                 }
-                            )
-                            ArrowPreference(
-                                title = stringResource(id = R.string.title_word_motion_cjk_wave),
-                                endActions = {
-                                    Text(
-                                        String.format("%.2f", wordMotionCjkWave),
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                    )
-                                },
-                                onClick = onWordMotionCjkWaveClick
-                            )
-                            ArrowPreference(
-                                title = stringResource(id = R.string.title_word_motion_latin_lift),
-                                endActions = {
-                                    Text(
-                                        String.format("%.2f", wordMotionLatinLift),
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                    )
-                                },
-                                onClick = onWordMotionLatinLiftClick
-                            )
-                            ArrowPreference(
-                                title = stringResource(id = R.string.title_word_motion_latin_wave),
-                                endActions = {
-                                    Text(
-                                        String.format("%.2f", wordMotionLatinWave),
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                                    )
-                                },
-                                onClick = onWordMotionLatinWaveClick
-                            )
+                            }
                         }
                     }
                 }

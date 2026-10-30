@@ -14,6 +14,7 @@ import com.lidesheng.hyperlyric.lyric.view.Marquee
 import com.lidesheng.hyperlyric.lyric.view.TextLook
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
 import com.lidesheng.hyperlyric.lyric.view.WordMotion
+import com.lidesheng.hyperlyric.lyric.view.line.WordRevealAnimation
 
 /**
  * 歌词样式构建助手
@@ -229,6 +230,14 @@ object LyricStyleHelper {
                 RootConstants.KEY_HOOK_GRADIENT_PROGRESS,
                 RootConstants.DEFAULT_HOOK_GRADIENT_PROGRESS
             ),
+            wordReveal = isLyricMode && prefs.getInt(
+                RootConstants.KEY_HOOK_WORD_EFFECT,
+                RootConstants.DEFAULT_HOOK_WORD_EFFECT
+            ) == RootConstants.WORD_EFFECT_REVEAL,
+            wordRevealAnimation = WordRevealAnimation.entries[prefs.getInt(
+                RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION,
+                RootConstants.DEFAULT_HOOK_WORD_REVEAL_ANIMATION
+            )],
             lineDisplay = syllableSettings.lineDisplay,
             fadingEdge = prefs.getInt(
                 RootConstants.KEY_HOOK_FADING_EDGE_LENGTH,

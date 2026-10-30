@@ -8,6 +8,7 @@ package com.lidesheng.hyperlyric.lyric.view
 
 import android.graphics.Color
 import android.graphics.Typeface
+import com.lidesheng.hyperlyric.lyric.view.line.WordRevealAnimation
 
 data class LyricViewStyle(
     val primary: TextLook = TextLook(),
@@ -16,6 +17,8 @@ data class LyricViewStyle(
     val marquee: Marquee = Marquee(),
     val wordMotion: WordMotion = WordMotion(),
     val gradient: Boolean = true,
+    val wordReveal: Boolean = false,
+    val wordRevealAnimation: WordRevealAnimation = WordRevealAnimation.NONE,
     val lineDisplay: Boolean = false,
     val fadingEdge: Int = 10,
     val scaleMultiLine: Float = 1f,

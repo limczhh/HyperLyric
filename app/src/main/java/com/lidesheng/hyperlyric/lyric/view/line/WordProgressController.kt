@@ -18,12 +18,23 @@ internal class WordProgressController {
         private set
 
     private var activeWord: WordModel? = null
+    private var settledPositionMs = Long.MIN_VALUE.toDouble()
+
+    /** Uses the same interpolated media clock as the highlight, before its visual easing. */
+    val currentPositionMs: Double
+        get() {
+            val word = activeWord
+            val offset = animator.currentWordPositionMs
+            return if (word != null && offset != null) word.begin.toDouble() + offset
+            else settledPositionMs
+        }
 
     fun seek(posMs: Long, model: LyricModel): Boolean {
         val previousWidth = animator.currentWidth
         animator.jumpTo(exactTargetWidth(posMs, model))
         activeWord = null
         lastPosition = posMs
+        settledPositionMs = posMs.toDouble()
         reconcileLifecycleFlags(model)
         return animator.currentWidth != previousWidth
     }
@@ -60,13 +71,19 @@ internal class WordProgressController {
 
         activeWord = word
         lastPosition = posMs
+        settledPositionMs = posMs.toDouble()
         reconcileLifecycleFlags(model)
         return animator.currentWidth != previousWidth
     }
 
-    fun step(deltaNanos: Long): Boolean = animator.step(deltaNanos)
+    fun step(deltaNanos: Long): Boolean {
+        val changed = animator.step(deltaNanos)
+        settledPositionMs = currentPositionMs
+        return changed
+    }
 
     fun freeze() {
+        settledPositionMs = currentPositionMs
         animator.stopAtCurrent()
         activeWord = null
     }
@@ -75,12 +92,14 @@ internal class WordProgressController {
         animator.reset()
         activeWord = null
         lastPosition = Long.MIN_VALUE
+        settledPositionMs = Long.MIN_VALUE.toDouble()
     }
 
     fun syncFrom(other: WordProgressController) {
         animator.syncFrom(other.animator)
         sustainAware = other.sustainAware
         lastPosition = other.lastPosition
+        settledPositionMs = other.currentPositionMs
         activeWord = null
     }
 

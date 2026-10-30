@@ -96,10 +96,13 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             countdownRenderer.centerIfPossible = value
         }
 
-    var isSustainProgressEnabled: Boolean
-        get() = syncRenderer.isSustainProgressEnabled
+    var hasSourceWordTiming: Boolean
+        get() = syncRenderer.hasSourceWordTiming
         set(value) {
-            syncRenderer.isSustainProgressEnabled = value
+            if (syncRenderer.hasSourceWordTiming == value) return
+            syncRenderer.hasSourceWordTiming = value
+            requestLayout()
+            invalidate()
         }
 
     var rightIfPossible: Boolean = false
@@ -123,6 +126,23 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             if (syncRenderer.isCharMotionEnabled == value) return
             syncRenderer.isCharMotionEnabled = value
             requestLayout()
+            invalidate()
+        }
+
+    var wordReveal: Boolean
+        get() = syncRenderer.isWordRevealEnabled
+        set(value) {
+            if (syncRenderer.isWordRevealEnabled == value) return
+            syncRenderer.isWordRevealEnabled = value
+            requestLayout()
+            invalidate()
+        }
+
+    var wordRevealAnimation: WordRevealAnimation
+        get() = syncRenderer.wordRevealAnimation
+        set(value) {
+            if (syncRenderer.wordRevealAnimation == value) return
+            syncRenderer.wordRevealAnimation = value
             invalidate()
         }
 

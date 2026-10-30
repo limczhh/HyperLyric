@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.verbatim
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,6 +23,18 @@ fun VerbatimLyricPage() {
     val saveConfig = rememberHookConfigSaver(prefs)
     val syllableSettings = remember(prefs) { SyllablePreferencePolicy.read(prefs) }
     val wordMotionSettings = remember(prefs) { WordMotionPreferencePolicy.read(prefs) }
+    var wordEffect by remember {
+        mutableIntStateOf(prefs.getInt(
+            RootConstants.KEY_HOOK_WORD_EFFECT,
+            RootConstants.DEFAULT_HOOK_WORD_EFFECT
+        ))
+    }
+    var wordRevealAnimation by remember {
+        mutableIntStateOf(prefs.getInt(
+            RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION,
+            RootConstants.DEFAULT_HOOK_WORD_REVEAL_ANIMATION
+        ))
+    }
 
     var gradientStyle by remember {
         mutableStateOf(
@@ -141,6 +154,16 @@ fun VerbatimLyricPage() {
 
     XposedLyricSettingPage(title = stringResource(id = R.string.title_verbatim_lyric)) {
         verbatimLyricSections(
+            wordEffect = wordEffect,
+            onWordEffectChange = {
+                wordEffect = it
+                saveConfig(RootConstants.KEY_HOOK_WORD_EFFECT, it)
+            },
+            wordRevealAnimation = wordRevealAnimation,
+            onWordRevealAnimationChange = {
+                wordRevealAnimation = it
+                saveConfig(RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION, it)
+            },
             gradientStyle = gradientStyle,
             onGradientStyleChange = {
                 gradientStyle = it
