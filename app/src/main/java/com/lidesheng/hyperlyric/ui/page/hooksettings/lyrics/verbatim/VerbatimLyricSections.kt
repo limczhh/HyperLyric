@@ -47,7 +47,7 @@ fun LazyListScope.verbatimLyricSections(
     onWordMotionLatinWaveClick: () -> Unit
 ) {
     item(key = "verbatim_lyric") {
-        val animationSpeedOptions = RootConstants.HOOK_ANIM_SPEED_RATES.map { rate ->
+        val animationSpeedOptions = RootConstants.HOOK_WORD_REVEAL_SPEED_RATES.map { rate ->
             stringResource(
                 id = R.string.format_anim_speed,
                 RootConstants.hookAnimSpeedLabel(rate)
@@ -206,10 +206,10 @@ fun LazyListScope.verbatimLyricSections(
                         OverlayDropdownPreference(
                             title = stringResource(id = R.string.title_anim_speed),
                             items = animationSpeedOptions,
-                            selectedIndex = RootConstants.HOOK_ANIM_SPEED_RATES
+                            selectedIndex = RootConstants.HOOK_WORD_REVEAL_SPEED_RATES
                                 .indexOf(wordRevealSpeedRate),
                             onSelectedIndexChange = { index ->
-                                RootConstants.HOOK_ANIM_SPEED_RATES.getOrNull(index)?.let(
+                                RootConstants.HOOK_WORD_REVEAL_SPEED_RATES.getOrNull(index)?.let(
                                     onWordRevealSpeedRateChange
                                 )
                             }

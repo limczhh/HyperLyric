@@ -216,6 +216,7 @@ object RootConstants {
     const val KEY_HOOK_GRADIENT_PROGRESS = "key_hook_gradient_progress"
     const val KEY_HOOK_WORD_EFFECT = "key_hook_word_effect"
     const val KEY_HOOK_WORD_REVEAL_ANIMATION = "key_hook_word_reveal_animation"
+    const val KEY_HOOK_WORD_REVEAL_SPEED_RATE = "key_hook_word_reveal_speed_rate"
     const val KEY_HOOK_LYRIC_ALIGNMENT = "key_hook_lyric_alignment"
     const val KEY_HOOK_MUSIC_INFO_ALIGNMENT = "key_hook_music_info_alignment"
     const val KEY_HOOK_PLACEHOLDER_FORMAT = "key_hook_placeholder_format"
@@ -658,9 +659,16 @@ object RootConstants {
     const val DEFAULT_HOOK_ANIM_ENABLE = false
     const val DEFAULT_HOOK_ANIM_ID = "default"
     const val DEFAULT_HOOK_ANIM_SPEED_RATE = 100
+    const val DEFAULT_HOOK_WORD_REVEAL_SPEED_RATE = 100
     val HOOK_ANIM_SPEED_RATES = listOf(75, 100, 125, 150, 175, 200, 300)
+    val HOOK_WORD_REVEAL_SPEED_RATES = listOf(50, 75, 100, 125, 150, 175, 200)
+
+    fun normalizeHookWordRevealSpeedRate(value: Int): Int =
+        value.takeIf { it in HOOK_WORD_REVEAL_SPEED_RATES }
+            ?: DEFAULT_HOOK_WORD_REVEAL_SPEED_RATE
 
     fun hookAnimSpeedLabel(rate: Int): String = when (rate) {
+        50 -> "0.5"
         75 -> "0.75"
         100 -> "1"
         125 -> "1.25"

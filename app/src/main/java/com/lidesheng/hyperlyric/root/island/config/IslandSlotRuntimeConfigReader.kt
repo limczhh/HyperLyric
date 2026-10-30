@@ -181,6 +181,12 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION,
                 RootConstants.DEFAULT_HOOK_WORD_REVEAL_ANIMATION
             ),
+            wordRevealSpeedRate = RootConstants.normalizeHookWordRevealSpeedRate(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_WORD_REVEAL_SPEED_RATE,
+                    RootConstants.DEFAULT_HOOK_WORD_REVEAL_SPEED_RATE
+                )
+            ),
             lyricAlignment = RootConstants.normalizeHookContentAlignment(
                 prefs.getInt(
                     RootConstants.KEY_HOOK_LYRIC_ALIGNMENT,
@@ -319,6 +325,7 @@ internal object IslandSlotRuntimeConfigReader {
             "text=${config.textSizeSp}/${config.textSizeRatio}/${config.fontWeight}/${config.fontItalic}",
             "alignment=${config.musicInfoAlignment}/${config.lyricAlignment}",
             "animation=${config.lyricAnimationEnabled}:${config.lyricAnimationId}:${config.lyricAnimationSpeedRate}",
+            "wordReveal=${config.wordEffect}:${config.wordRevealAnimation}:${config.wordRevealSpeedRate}",
             "marquee=${config.lyricMarqueeEnabled}:${config.lyricMarqueeSpeed}",
             "metadataMarquee=${config.metadataMarqueeEnabled}:${config.metadataMarqueeSpeed}",
             "secondaryTransform=${config.onlySecondary}/${config.swapSecondary}",

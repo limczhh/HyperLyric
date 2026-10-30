@@ -37,10 +37,10 @@ fun VerbatimLyricPage() {
     }
     var wordRevealSpeedRate by remember {
         mutableIntStateOf(
-            RootConstants.normalizeHookAnimSpeedRate(
+            RootConstants.normalizeHookWordRevealSpeedRate(
                 prefs.getInt(
-                    RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
-                    RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+                    RootConstants.KEY_HOOK_WORD_REVEAL_SPEED_RATE,
+                    RootConstants.DEFAULT_HOOK_WORD_REVEAL_SPEED_RATE
                 )
             )
         )
@@ -177,7 +177,7 @@ fun VerbatimLyricPage() {
             wordRevealSpeedRate = wordRevealSpeedRate,
             onWordRevealSpeedRateChange = {
                 wordRevealSpeedRate = it
-                saveConfig(RootConstants.KEY_HOOK_ANIM_SPEED_RATE, it)
+                saveConfig(RootConstants.KEY_HOOK_WORD_REVEAL_SPEED_RATE, it)
             },
             gradientStyle = gradientStyle,
             onGradientStyleChange = {

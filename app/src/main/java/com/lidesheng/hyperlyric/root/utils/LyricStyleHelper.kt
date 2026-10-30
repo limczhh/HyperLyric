@@ -238,10 +238,10 @@ object LyricStyleHelper {
                 RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION,
                 RootConstants.DEFAULT_HOOK_WORD_REVEAL_ANIMATION
             )],
-            wordRevealSpeedRate = RootConstants.normalizeHookAnimSpeedRate(
+            wordRevealSpeedRate = RootConstants.normalizeHookWordRevealSpeedRate(
                 prefs.getInt(
-                    RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
-                    RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+                    RootConstants.KEY_HOOK_WORD_REVEAL_SPEED_RATE,
+                    RootConstants.DEFAULT_HOOK_WORD_REVEAL_SPEED_RATE
                 )
             ),
             lineDisplay = syllableSettings.lineDisplay,
