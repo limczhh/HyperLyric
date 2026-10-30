@@ -19,6 +19,7 @@ data class LyricViewStyle(
     val gradient: Boolean = true,
     val wordReveal: Boolean = false,
     val wordRevealAnimation: WordRevealAnimation = WordRevealAnimation.NONE,
+    val wordRevealSpeedRate: Int = 100,
     val lineDisplay: Boolean = false,
     val fadingEdge: Int = 10,
     val scaleMultiLine: Float = 1f,

@@ -146,6 +146,14 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             invalidate()
         }
 
+    var wordRevealSpeedRate: Int
+        get() = syncRenderer.wordRevealSpeedRate
+        set(value) {
+            if (syncRenderer.wordRevealSpeedRate == value) return
+            syncRenderer.wordRevealSpeedRate = value
+            invalidate()
+        }
+
     var wordMotion: WordMotion = WordMotion()
         set(value) {
             if (field == value) return

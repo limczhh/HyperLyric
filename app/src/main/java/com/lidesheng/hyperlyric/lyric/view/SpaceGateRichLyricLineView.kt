@@ -280,6 +280,8 @@ class SpaceGateRichLyricLineView(
         secondary.wordReveal = style.wordReveal
         main.wordRevealAnimation = style.wordRevealAnimation
         secondary.wordRevealAnimation = style.wordRevealAnimation
+        main.wordRevealSpeedRate = style.wordRevealSpeedRate
+        secondary.wordRevealSpeedRate = style.wordRevealSpeedRate
         assembler.updateFlags(
             displayTranslation = displayTranslation,
             displayRoma = displayRoma,

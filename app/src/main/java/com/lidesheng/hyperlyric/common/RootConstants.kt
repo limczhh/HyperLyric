@@ -660,6 +660,17 @@ object RootConstants {
     const val DEFAULT_HOOK_ANIM_SPEED_RATE = 100
     val HOOK_ANIM_SPEED_RATES = listOf(75, 100, 125, 150, 175, 200, 300)
 
+    fun hookAnimSpeedLabel(rate: Int): String = when (rate) {
+        75 -> "0.75"
+        100 -> "1"
+        125 -> "1.25"
+        150 -> "1.5"
+        175 -> "1.75"
+        200 -> "2"
+        300 -> "3"
+        else -> rate.toString()
+    }
+
     fun normalizeHookAnimSpeedRate(value: Int): Int {
         return value.takeIf { it in HOOK_ANIM_SPEED_RATES } ?: DEFAULT_HOOK_ANIM_SPEED_RATE
     }

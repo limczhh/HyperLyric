@@ -31,7 +31,12 @@ internal class WordSyncRenderer(private val view: LyricLineView) : LineRenderer 
     var isCharMotionEnabled = true
     var isWordRevealEnabled = false
     var wordRevealAnimation = WordRevealAnimation.NONE
-    private val revealDurationMs = view.resources.getInteger(android.R.integer.config_shortAnimTime)
+    var wordRevealSpeedRate = 100
+    private val baseRevealDurationMs = view.resources.getInteger(android.R.integer.config_shortAnimTime)
+    private val revealDurationMs: Int
+        get() = (baseRevealDurationMs.toLong() * 100L / wordRevealSpeedRate)
+            .coerceAtLeast(1L)
+            .toInt()
 
     var hasSourceWordTiming: Boolean
         get() = progressController.sustainAware

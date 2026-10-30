@@ -72,17 +72,6 @@ private val animLabelResMap = mapOf(
     "zoom_out_zoom_in" to R.string.option_anim_zoom,
 )
 
-private fun animationSpeedLabel(rate: Int): String = when (rate) {
-    75 -> "0.75"
-    100 -> "1"
-    125 -> "1.25"
-    150 -> "1.5"
-    175 -> "1.75"
-    200 -> "2"
-    300 -> "3"
-    else -> rate.toString()
-}
-
 @Composable
 fun LyricAnimationPage() {
     LocalContext.current
@@ -153,7 +142,7 @@ private fun LazyListScope.animationPageSections() {
         val animSpeedOptions = RootConstants.HOOK_ANIM_SPEED_RATES.map { rate ->
             stringResource(
                 id = R.string.format_anim_speed,
-                animationSpeedLabel(rate)
+                RootConstants.hookAnimSpeedLabel(rate)
             )
         }
 

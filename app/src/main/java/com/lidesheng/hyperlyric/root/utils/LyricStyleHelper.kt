@@ -238,6 +238,12 @@ object LyricStyleHelper {
                 RootConstants.KEY_HOOK_WORD_REVEAL_ANIMATION,
                 RootConstants.DEFAULT_HOOK_WORD_REVEAL_ANIMATION
             )],
+            wordRevealSpeedRate = RootConstants.normalizeHookAnimSpeedRate(
+                prefs.getInt(
+                    RootConstants.KEY_HOOK_ANIM_SPEED_RATE,
+                    RootConstants.DEFAULT_HOOK_ANIM_SPEED_RATE
+                )
+            ),
             lineDisplay = syllableSettings.lineDisplay,
             fadingEdge = prefs.getInt(
                 RootConstants.KEY_HOOK_FADING_EDGE_LENGTH,
