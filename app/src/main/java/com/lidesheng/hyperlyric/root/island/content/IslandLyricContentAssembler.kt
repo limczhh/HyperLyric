@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.island.content
 
 import android.text.TextPaint
 import android.view.View
+import com.lidesheng.hyperlyric.common.lyric.METADATA_KEY_AMLL_TTML_SOURCE
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.METADATA_RESOLVED_SECONDARY_CONTENT
 import com.lidesheng.hyperlyric.common.lyric.LyricPresentation
@@ -53,7 +54,8 @@ internal object IslandLyricContentAssembler {
         }
         val targetLine = targetPresentation.primary
         val nextLinePreviewEnabledForView =
-            targetLine?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
+            targetLine?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true ||
+                    targetPresentation.secondary?.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
         val targetLineSignature = presentationSignature(targetPresentation)
         val signature = "lyric|$targetLineSignature|${config.styleSignature}"
         val useSharedMarqueeClock = config.lyricMarqueeEnabled && LyriconDataBridge.isTextMode
@@ -218,6 +220,31 @@ internal object IslandLyricContentAssembler {
                 rawPresentation
             }
         }
+
+        val useDuetSlots = config.autoDuet && LyriconDataBridge.currentSongHasDuet &&
+                (config.amllDuetPerformance ||
+                        rawLine.metadata?.getBoolean(METADATA_KEY_AMLL_TTML_SOURCE) != true)
+        val previewLine = if (useDuetSlots &&
+            rawLine.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true
+        ) {
+            LyriconDataBridge.currentNextLyricLine?.let { next ->
+                LyricPresentationResolver.resolve(
+                    activeLines = listOf(next),
+                    nextLine = null,
+                    songLines = LyriconDataBridge.currentSong?.lyrics,
+                    settings = config.lyricContentDisplay,
+                    autoDuet = true
+                ).primary
+            }
+        } else {
+            null
+        }
+        IslandSplitDuetPresentationResolver.resolve(
+            presentation = rawPresentation,
+            isDuetTrack = useDuetSlots,
+            isLeft = isLeft,
+            nextLine = previewLine
+        )?.let { return it }
         if (rawLine.text.isNullOrEmpty()) return rawPresentation
 
         val density = view.resources.displayMetrics.density

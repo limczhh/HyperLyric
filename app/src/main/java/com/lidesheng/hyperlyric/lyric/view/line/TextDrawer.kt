@@ -15,6 +15,7 @@ import android.graphics.PorterDuff
 import android.graphics.Shader
 import android.text.TextPaint
 import androidx.core.graphics.withSave
+import com.lidesheng.hyperlyric.lyric.view.METADATA_PLACEHOLDER_WORD_MOTION
 import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
 import com.lidesheng.hyperlyric.lyric.view.line.model.WordModel
 import kotlin.math.abs
@@ -102,7 +103,9 @@ internal class TextDrawer {
     }
 
     fun motionBottomPadding(model: LyricModel, textSize: Float): Float {
-        if (model.words.isEmpty()) return 0f
+        if (model.words.isEmpty() &&
+            model.metadata?.getBoolean(METADATA_PLACEHOLDER_WORD_MOTION) != true
+        ) return 0f
         val cjkOffset = cjkMotionSpec.effectiveOffset(textSize)
         val latinOffset = latinMotionSpec.effectiveOffset(textSize)
         return max(cjkOffset, latinOffset)

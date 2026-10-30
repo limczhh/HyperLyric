@@ -19,6 +19,8 @@ import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.lyricMetadataOf
 
 internal const val METADATA_NEXT_LINE_PREVIEW = "nextLinePreview"
+internal const val METADATA_LYRIC_ROW_PLACEHOLDER = "hyperlyric:lyric-row-placeholder"
+internal const val METADATA_PLACEHOLDER_WORD_MOTION = "hyperlyric:placeholder-word-motion"
 
 internal class LyricLineAssembler(
     private var displayTranslation: Boolean = true,
@@ -67,11 +69,20 @@ internal class LyricLineAssembler(
         }
 
         val generated = !useLineTimeline && !hasOriginalWords && words !== source.words
+        val placeholder = source.metadata?.getBoolean(METADATA_LYRIC_ROW_PLACEHOLDER) == true
+        val metadata = if (placeholder) {
+            lyricMetadataOf(
+                *(source.metadata?.entries?.map { it.key to it.value }.orEmpty()).toTypedArray(),
+                METADATA_PLACEHOLDER_WORD_MOTION to (!words.isNullOrEmpty()).toString()
+            )
+        } else {
+            source.metadata
+        }
         val line = LyricLine(
             begin = source.begin, end = source.end, duration = source.duration,
-            isAlignedRight = source.isAlignedRight, metadata = source.metadata,
-            text = if (useLineTimeline) lineText else source.text,
-            words = words
+            isAlignedRight = source.isAlignedRight, metadata = metadata,
+            text = if (placeholder) "" else if (useLineTimeline) lineText else source.text,
+            words = if (placeholder) emptyList() else words
         )
         return MainResult(
             line = line,
@@ -204,12 +215,26 @@ internal class LyricLineAssembler(
     }
 
     private fun buildExplicitSecondary(source: IRichLyricLine): SecondaryResult {
+        if (source.metadata?.getBoolean(METADATA_NEXT_LINE_PREVIEW) == true &&
+            source.metadata?.getBoolean(METADATA_LYRIC_ROW_PLACEHOLDER) != true
+        ) {
+            return SecondaryResult(
+                line = LyricLine(text = source.text, words = emptyList(),
+                    isAlignedRight = source.isAlignedRight, metadata = source.metadata),
+                alwaysShow = !source.text.isNullOrBlank(),
+                isScrollOnly = true,
+                isNextLinePreview = true,
+                sustainAwareProgress = false,
+                isLineTimeline = false
+            )
+        }
         val mainResult = buildMain(source)
         val hasContent = mainResult.line.text?.isNotBlank() == true ||
                 !mainResult.line.words.isNullOrEmpty()
         return SecondaryResult(
             line = mainResult.line,
-            alwaysShow = hasContent,
+            alwaysShow = hasContent ||
+                    source.metadata?.getBoolean(METADATA_LYRIC_ROW_PLACEHOLDER) == true,
             isScrollOnly = mainResult.isScrollOnly,
             isNextLinePreview = false,
             sustainAwareProgress = mainResult.sustainAwareProgress,

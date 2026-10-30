@@ -258,6 +258,10 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_LYRIC_AUTO_DUET,
                 RootConstants.DEFAULT_HOOK_LYRIC_AUTO_DUET
             ),
+            amllDuetPerformance = prefs.getBoolean(
+                RootConstants.KEY_HOOK_AMLL_TTML_DUET_PERFORMANCE,
+                RootConstants.DEFAULT_HOOK_AMLL_TTML_DUET_PERFORMANCE
+            ),
             lyricContentDisplay = lyricContentDisplay,
             textColorStyle = LyricTextColorStylePolicy.read(prefs),
             customFontPath = prefs.getString(RootConstants.KEY_HOOK_CUSTOM_FONT_PATH, null)
