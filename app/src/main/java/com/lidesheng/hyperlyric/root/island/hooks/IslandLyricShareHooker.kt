@@ -442,7 +442,22 @@ internal object IslandLyricShareHooker {
     }
 
     private object TemplateShareDataAdapter {
-        private const val COPY_PARAMETER_COUNT = 14
+        private val BASE_COPY_GETTERS = listOf(
+            "getBigIslandArea",
+            "getSmallIslandArea",
+            "getShareData",
+            "getBusiness",
+            "getDismissIsland",
+            "getIslandTimeout",
+            "getHighlightColor",
+            "getIslandProperty",
+            "getIslandPriority",
+            "getIslandOrder",
+            "getNeedCloseAnimation",
+            "getExpandedTime",
+            "getMaxSize",
+            "getAppContentDescription"
+        )
 
         fun apply(view: Any, payload: IslandLyricSharePayload): AppliedTemplate? {
             val template = invokeGetter(view, "getTemplate") ?: return null
@@ -464,26 +479,21 @@ internal object IslandLyricShareHooker {
 
             val copyMethod = template.javaClass.methods.firstOrNull {
                 it.name == "copy" &&
-                        it.parameterTypes.size == COPY_PARAMETER_COUNT &&
+                        (it.parameterTypes.size == BASE_COPY_GETTERS.size ||
+                                it.parameterTypes.size == BASE_COPY_GETTERS.size + 1) &&
                         it.parameterTypes[2].name == SHARE_DATA_CLASS
             } ?: return null
             copyMethod.isAccessible = true
+            val getterNames = if (copyMethod.parameterTypes.size == BASE_COPY_GETTERS.size) {
+                BASE_COPY_GETTERS
+            } else {
+                BASE_COPY_GETTERS + "getClickDirectIntent"
+            }
             val copiedTemplate = copyMethod.invoke(
                 template,
-                invokeGetter(template, "getBigIslandArea"),
-                invokeGetter(template, "getSmallIslandArea"),
-                shareData,
-                invokeGetter(template, "getBusiness"),
-                invokeRequiredGetter(template, "getDismissIsland"),
-                invokeRequiredGetter(template, "getIslandTimeout"),
-                invokeGetter(template, "getHighlightColor"),
-                invokeGetter(template, "getIslandProperty"),
-                invokeGetter(template, "getIslandPriority"),
-                invokeRequiredGetter(template, "getIslandOrder"),
-                invokeGetter(template, "getNeedCloseAnimation"),
-                invokeRequiredGetter(template, "getExpandedTime"),
-                invokeGetter(template, "getMaxSize"),
-                invokeGetter(template, "getAppContentDescription")
+                *getterNames.mapIndexed { index, getter ->
+                    if (index == 2) shareData else invokeGetter(template, getter)
+                }.toTypedArray()
             ) ?: return null
 
             val setTemplate = view.javaClass.methods.firstOrNull {
