@@ -99,9 +99,9 @@ object MediaProgressStyleHooker {
             notificationStyle == RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE ||
                 islandStyle == RootConstants.ISLAND_EXPANDED_MEDIA_PROGRESS_STYLE_WAVE
         val commonApi = if (needsWaveProgressApi) {
-            runCatching { CommonApi.create(classLoader) }
+            runCatching { CommonApi.create(xposedModule, classLoader) }
                 .onFailure {
-                    HookLogger.w(TAG, "媒体进度数据接口不可用: reason=${it.message}")
+                    HookLogger.w(TAG, "媒体进度数据接口不可用: reason=${it.message}", it)
                 }
                 .getOrNull()
         } else {
@@ -517,9 +517,7 @@ object MediaProgressStyleHooker {
         private val durationField: Field,
         private val elapsedTimeField: Field,
         private val falsingManagerField: Field,
-        private val seekBarChangeListenerConstructor: Constructor<*>,
-        private val listenerViewModelField: Field?,
-        private val listenerFalsingManagerField: Field?,
+        private val changeListenerFactory: (Any, Any) -> SeekBar.OnSeekBarChangeListener,
         private val renderStateApi: RenderStateApi?,
         private val mediaDataIsPlayingField: Field?
     ) {
@@ -617,53 +615,66 @@ object MediaProgressStyleHooker {
             }.getOrDefault(false)
         }
 
-        fun createChangeListener(viewModel: Any): SeekBar.OnSeekBarChangeListener? {
-            val falsingManager = falsingManagerField.get(viewModel) ?: return null
-            return runCatching {
-                when (seekBarChangeListenerConstructor.parameterCount) {
-                    0 -> seekBarChangeListenerConstructor.newInstance().also { listener ->
-                        listenerViewModelField?.set(listener, viewModel)
-                        listenerFalsingManagerField?.set(listener, falsingManager)
-                    }
-
-                    2 -> seekBarChangeListenerConstructor.newInstance(
-                        viewModel,
-                        falsingManager
-                    )
-
-                    else -> return null
-                } as? SeekBar.OnSeekBarChangeListener
-            }.getOrNull()
+        fun createChangeListener(viewModel: Any): SeekBar.OnSeekBarChangeListener {
+            val falsingManager = checkNotNull(falsingManagerField.get(viewModel)) {
+                "SeekBarViewModel falsingManager unavailable"
+            }
+            return changeListenerFactory(viewModel, falsingManager)
         }
 
         companion object {
-            fun create(classLoader: ClassLoader): CommonApi {
+            fun create(xposedModule: XposedModule, classLoader: ClassLoader): CommonApi {
                 val progressClass = classLoader.loadClass(PROGRESS_CLASS)
                 val viewModelClass = classLoader.loadClass(SEEK_BAR_VIEW_MODEL_CLASS)
                 val listenerClass = classLoader.loadClass(SEEK_BAR_CHANGE_LISTENER_CLASS)
                 fun field(owner: Class<*>, name: String): Field {
                     return owner.getDeclaredField(name).apply { isAccessible = true }
                 }
-                // OS 4 exposes a no-argument listener whose fields are assigned after creation;
-                // older builds expose the original two-argument constructor.
-                val listenerConstructor = (
-                    listenerClass.declaredConstructors.firstOrNull {
-                        it.parameterCount == 2
-                    } ?: listenerClass.declaredConstructors.firstOrNull {
-                        it.parameterCount == 0
-                    } ?: error("SeekBarChangeListener constructor unavailable")
-                    ).apply { isAccessible = true }
-                val listenerViewModelField = if (listenerConstructor.parameterCount == 0) {
-                    findField(listenerClass, "viewModel")
-                        ?: error("SeekBarChangeListener viewModel field unavailable")
+                val falsingField = field(viewModelClass, "falsingManager")
+                val constructors = listenerClass.declaredConstructors
+                HookLogger.d(
+                    TAG,
+                    "媒体拖动监听接口: class=${listenerClass.name}, " +
+                        "constructors=${constructors.joinToString { it.toGenericString() }.ifEmpty { "<none>" }}"
+                )
+                val legacyConstructor = constructors.firstOrNull {
+                    it.parameterTypes.contentEquals(arrayOf(viewModelClass, falsingField.type))
+                }?.apply { isAccessible = true }
+                val listenerFactory: (Any, Any) -> SeekBar.OnSeekBarChangeListener
+                if (legacyConstructor != null) {
+                    listenerFactory = { viewModel, falsingManager ->
+                        legacyConstructor.newInstance(viewModel, falsingManager) as
+                            SeekBar.OnSeekBarChangeListener
+                    }
+                    HookLogger.d(TAG, "媒体拖动监听创建方式: legacy_constructor")
                 } else {
-                    null
-                }
-                val listenerFalsingManagerField = if (listenerConstructor.parameterCount == 0) {
-                    findField(listenerClass, "falsingManager")
-                        ?: error("SeekBarChangeListener falsingManager field unavailable")
-                } else {
-                    null
+                    val viewModelField = field(listenerClass, "viewModel")
+                    val falsingManagerField = field(listenerClass, "falsingManager")
+                    check(viewModelField.type == viewModelClass &&
+                        falsingManagerField.type == falsingField.type) {
+                        "SeekBarChangeListener field types unavailable"
+                    }
+                    val noArgs = constructors.firstOrNull { it.parameterCount == 0 }
+                        ?.apply { isAccessible = true }
+                    // R8 removes this constructor on OS 4. Native attach allocates the
+                    // listener and invokes Object.<init> before assigning these fields.
+                    val allocator = if (noArgs == null) {
+                        xposedModule.getInvoker(Any::class.java.getDeclaredConstructor())
+                    } else {
+                        null
+                    }
+                    listenerFactory = { viewModel, falsingManager ->
+                        val listener = noArgs?.newInstance()
+                            ?: requireNotNull(allocator).newInstanceSpecial(listenerClass)
+                        viewModelField.set(listener, viewModel)
+                        falsingManagerField.set(listener, falsingManager)
+                        listener as SeekBar.OnSeekBarChangeListener
+                    }
+                    HookLogger.d(
+                        TAG,
+                        "媒体拖动监听创建方式: " +
+                            if (noArgs != null) "no_args_constructor" else "object_constructor_special"
+                    )
                 }
                 return CommonApi(
                     listeningField = field(progressClass, "listening"),
@@ -673,10 +684,8 @@ object MediaProgressStyleHooker {
                     enabledField = field(progressClass, "enabled"),
                     durationField = field(progressClass, "duration"),
                     elapsedTimeField = field(progressClass, "elapsedTime"),
-                    falsingManagerField = field(viewModelClass, "falsingManager"),
-                    seekBarChangeListenerConstructor = listenerConstructor,
-                    listenerViewModelField = listenerViewModelField,
-                    listenerFalsingManagerField = listenerFalsingManagerField,
+                    falsingManagerField = falsingField,
+                    changeListenerFactory = listenerFactory,
                     renderStateApi = runCatching {
                         RenderStateApi.create(classLoader.loadClass(RENDER_STATE_CLASS))
                     }.getOrNull(),
@@ -866,6 +875,7 @@ object MediaProgressStyleHooker {
             val viewModel = getSeekBarViewModel(controller) ?: return
             val listener = common?.createChangeListener(viewModel) ?: return
             seekBar.setOnSeekBarChangeListener(listener)
+            HookLogger.d(TAG, "通知中心波浪进度条已绑定: holder=${System.identityHashCode(holder)}")
         }
 
         fun detachProgress(holder: Any) {
@@ -992,9 +1002,8 @@ object MediaProgressStyleHooker {
                 } ?: return
             getHolders(binder).forEach { holder ->
                 val seekBar = replaceWithWave(holder) ?: return@forEach
-                common.createChangeListener(viewModel)?.let { listener ->
-                    seekBar.setOnSeekBarChangeListener(listener)
-                }
+                seekBar.setOnSeekBarChangeListener(common.createChangeListener(viewModel))
+                HookLogger.d(TAG, "超级岛波浪进度条已绑定: holder=${System.identityHashCode(holder)}")
             }
         }
 
