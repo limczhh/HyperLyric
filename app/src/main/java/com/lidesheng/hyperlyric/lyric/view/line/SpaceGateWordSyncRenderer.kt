@@ -44,8 +44,10 @@ internal class SpaceGateWordSyncRenderer(private val view: SpaceGateLyricLineVie
             progressController.sustainAware = value
         }
 
+    var hasSimulatedWordTiming = false
+
     fun motionBottomPadding(model: LyricModel): Float =
-        if (isWordRevealEnabled && hasSourceWordTiming && !isScrollOnly) {
+        if (isWordRevealEnabled && hasRevealWordTiming && !isScrollOnly) {
             0f
         } else if (isCharMotionEnabled && !isScrollOnly) {
             textDrawer.motionBottomPadding(model, bgPaint.textSize)
@@ -189,7 +191,7 @@ internal class SpaceGateWordSyncRenderer(private val view: SpaceGateLyricLineVie
             state.scrollOffset, model.width > viewWidth,
             progressController.animator.currentWidth,
             progressController.currentPositionMs,
-            isWordRevealEnabled && hasSourceWordTiming,
+            isWordRevealEnabled && hasRevealWordTiming,
             wordRevealAnimation, revealDurationMs,
             isGradientEnabled, isScrollOnly, isCharMotionEnabled,
             centerIfPossible, rightIfPossible,
@@ -198,6 +200,9 @@ internal class SpaceGateWordSyncRenderer(private val view: SpaceGateLyricLineVie
             view.resolveSplitGradientEndX(model.width)
         )
     }
+
+    private val hasRevealWordTiming: Boolean
+        get() = hasSourceWordTiming || hasSimulatedWordTiming
 
     fun clearGradientShaderCache() {
         textDrawer.clearShaderCache()

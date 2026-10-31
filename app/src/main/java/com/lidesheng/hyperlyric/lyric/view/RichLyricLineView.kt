@@ -469,6 +469,7 @@ class RichLyricLineView(
         }
 
         main.hasSourceWordTiming = mainResult.hasSourceWordTiming
+        main.hasSimulatedWordTiming = mainResult.hasSimulatedWordTiming
         // 内容没变就不重设:重设会 reset + 重新 seek 渲染器,长行还会重算滚动窗口——另一行换行时
         // 本行会跟着动一下(owner 2026-10-09 真机反馈「第二行会影响第一行」)。
         if (mainContent.changed(mainResult.line, mainResult.isLineTimeline)) {
@@ -487,6 +488,7 @@ class RichLyricLineView(
         secondary.visibleIfChanged = secResult.alwaysShow
         secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.hasSourceWordTiming = secResult.hasSourceWordTiming
+        secondary.hasSimulatedWordTiming = secResult.hasSimulatedWordTiming
         if (secondaryContent.changed(secResult.line, secResult.isLineTimeline)) {
             secondaryNeedsSynchronization = true
             if (preserveMarquee) {

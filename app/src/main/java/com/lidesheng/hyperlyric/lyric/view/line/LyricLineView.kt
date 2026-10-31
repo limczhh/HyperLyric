@@ -105,6 +105,15 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             invalidate()
         }
 
+    var hasSimulatedWordTiming: Boolean
+        get() = syncRenderer.hasSimulatedWordTiming
+        set(value) {
+            if (syncRenderer.hasSimulatedWordTiming == value) return
+            syncRenderer.hasSimulatedWordTiming = value
+            requestLayout()
+            invalidate()
+        }
+
     var rightIfPossible: Boolean = false
         set(value) {
             field = value

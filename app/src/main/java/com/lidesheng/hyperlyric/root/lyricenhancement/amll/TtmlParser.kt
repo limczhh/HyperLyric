@@ -30,7 +30,7 @@ import java.util.Locale
  * - head 的 iTunesMetadata/translations 块级翻译（无逐字时间轴）：
  *   `<translation xml:lang>` 内 `<text for="key">` 经 `itunes:key` 关联正文行，
  *   行内无 x-translation 时回填为该行翻译候选（同样受 x-bg 优先级约束），
- *   词表留空由宿主 RelativeWordBuilder 生成整行词
+ *   词表留空由宿主 RelativeWordBuilder 生成模拟字词时间轴
  * - `ttm:role="x-roman"` 罗马音 → roma（行内无 x-bg 时）
  * - 同 begin 时间多行压缩：第一行主行、第二行副行（secondary）、第三行及以后丢弃
  * - `itunes:song-part` 段落标记忽略
@@ -526,7 +526,7 @@ internal class TtmlParser {
         val merged = mutableListOf<RichLyricLine>()
         for (paragraph in paragraphs) {
             // 行内无 x-translation 时回填 head iTunesMetadata 块级翻译
-            // （itunes:key 关联；候选无词表，宿主 RelativeWordBuilder 生成整行词）
+            // （itunes:key 关联；候选无词表，宿主 RelativeWordBuilder 生成模拟字词时间轴）
             if (paragraph.translations.isEmpty()) {
                 paragraph.itunesKey?.let { key ->
                     paragraph.translations.addAll(itunesTranslations[key].orEmpty())

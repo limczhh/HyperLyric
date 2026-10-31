@@ -52,11 +52,12 @@ internal class LyricLineAssembler(
         val line: LyricLine,
         val isScrollOnly: Boolean,
         val hasSourceWordTiming: Boolean,
+        val hasSimulatedWordTiming: Boolean,
         val isLineTimeline: Boolean
     )
 
     fun buildMain(source: IRichLyricLine?): MainResult {
-        if (source == null) return MainResult(LyricLine(), false, false, false)
+        if (source == null) return MainResult(LyricLine(), false, false, false, false)
 
         val hasOriginalWords = !source.words.isNullOrEmpty()
         val shouldGen = enableRelativeProgress && source.isTitleLine().not()
@@ -88,6 +89,7 @@ internal class LyricLineAssembler(
             line = line,
             isScrollOnly = generated && !enableRelativeHighlight,
             hasSourceWordTiming = hasOriginalWords && !useLineTimeline,
+            hasSimulatedWordTiming = generated && !words.isNullOrEmpty(),
             isLineTimeline = useLineTimeline
         )
     }
@@ -98,6 +100,7 @@ internal class LyricLineAssembler(
         val isScrollOnly: Boolean,
         val isNextLinePreview: Boolean,
         val hasSourceWordTiming: Boolean,
+        val hasSimulatedWordTiming: Boolean,
         val isLineTimeline: Boolean
     )
 
@@ -106,7 +109,9 @@ internal class LyricLineAssembler(
         explicitSecondary: IRichLyricLine? = null
     ): SecondaryResult {
         if (explicitSecondary != null) return buildExplicitSecondary(explicitSecondary)
-        if (source == null) return SecondaryResult(LyricLine(), false, false, false, false, false)
+        if (source == null) {
+            return SecondaryResult(LyricLine(), false, false, false, false, false, false)
+        }
 
         var generated = false
         var hasOriginalWords = false
@@ -210,6 +215,7 @@ internal class LyricLineAssembler(
             isScrollOnly = generated && !enableRelativeHighlight,
             isNextLinePreview = isNextLinePreview,
             hasSourceWordTiming = hasOriginalWords && !lineTimelineGenerated,
+            hasSimulatedWordTiming = generated && !line.words.isNullOrEmpty(),
             isLineTimeline = lineTimelineGenerated
         )
     }
@@ -225,6 +231,7 @@ internal class LyricLineAssembler(
                 isScrollOnly = true,
                 isNextLinePreview = true,
                 hasSourceWordTiming = false,
+                hasSimulatedWordTiming = false,
                 isLineTimeline = false
             )
         }
@@ -238,6 +245,7 @@ internal class LyricLineAssembler(
             isScrollOnly = mainResult.isScrollOnly,
             isNextLinePreview = false,
             hasSourceWordTiming = mainResult.hasSourceWordTiming,
+            hasSimulatedWordTiming = mainResult.hasSimulatedWordTiming,
             isLineTimeline = mainResult.isLineTimeline
         )
     }
