@@ -518,6 +518,8 @@ object MediaProgressStyleHooker {
         private val elapsedTimeField: Field,
         private val falsingManagerField: Field,
         private val seekBarChangeListenerConstructor: Constructor<*>,
+        private val listenerViewModelField: Field?,
+        private val listenerFalsingManagerField: Field?,
         private val renderStateApi: RenderStateApi?,
         private val mediaDataIsPlayingField: Field?
     ) {
@@ -617,10 +619,21 @@ object MediaProgressStyleHooker {
 
         fun createChangeListener(viewModel: Any): SeekBar.OnSeekBarChangeListener? {
             val falsingManager = falsingManagerField.get(viewModel) ?: return null
-            return seekBarChangeListenerConstructor.newInstance(
-                viewModel,
-                falsingManager
-            ) as? SeekBar.OnSeekBarChangeListener
+            return runCatching {
+                when (seekBarChangeListenerConstructor.parameterCount) {
+                    0 -> seekBarChangeListenerConstructor.newInstance().also { listener ->
+                        listenerViewModelField?.set(listener, viewModel)
+                        listenerFalsingManagerField?.set(listener, falsingManager)
+                    }
+
+                    2 -> seekBarChangeListenerConstructor.newInstance(
+                        viewModel,
+                        falsingManager
+                    )
+
+                    else -> return null
+                } as? SeekBar.OnSeekBarChangeListener
+            }.getOrNull()
         }
 
         companion object {
@@ -631,10 +644,27 @@ object MediaProgressStyleHooker {
                 fun field(owner: Class<*>, name: String): Field {
                     return owner.getDeclaredField(name).apply { isAccessible = true }
                 }
-                val listenerConstructor = listenerClass.declaredConstructors.firstOrNull {
-                    it.parameterCount == 2
-                }?.apply { isAccessible = true }
-                    ?: error("SeekBarChangeListener constructor unavailable")
+                // OS 4 exposes a no-argument listener whose fields are assigned after creation;
+                // older builds expose the original two-argument constructor.
+                val listenerConstructor = (
+                    listenerClass.declaredConstructors.firstOrNull {
+                        it.parameterCount == 2
+                    } ?: listenerClass.declaredConstructors.firstOrNull {
+                        it.parameterCount == 0
+                    } ?: error("SeekBarChangeListener constructor unavailable")
+                    ).apply { isAccessible = true }
+                val listenerViewModelField = if (listenerConstructor.parameterCount == 0) {
+                    findField(listenerClass, "viewModel")
+                        ?: error("SeekBarChangeListener viewModel field unavailable")
+                } else {
+                    null
+                }
+                val listenerFalsingManagerField = if (listenerConstructor.parameterCount == 0) {
+                    findField(listenerClass, "falsingManager")
+                        ?: error("SeekBarChangeListener falsingManager field unavailable")
+                } else {
+                    null
+                }
                 return CommonApi(
                     listeningField = field(progressClass, "listening"),
                     seekAvailableField = field(progressClass, "seekAvailable"),
@@ -645,6 +675,8 @@ object MediaProgressStyleHooker {
                     elapsedTimeField = field(progressClass, "elapsedTime"),
                     falsingManagerField = field(viewModelClass, "falsingManager"),
                     seekBarChangeListenerConstructor = listenerConstructor,
+                    listenerViewModelField = listenerViewModelField,
+                    listenerFalsingManagerField = listenerFalsingManagerField,
                     renderStateApi = runCatching {
                         RenderStateApi.create(classLoader.loadClass(RENDER_STATE_CLASS))
                     }.getOrNull(),
