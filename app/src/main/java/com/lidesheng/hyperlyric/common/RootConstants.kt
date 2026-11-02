@@ -310,6 +310,10 @@ object RootConstants {
     const val KEY_HOOK_WORD_MOTION_LATIN_LIFT = "key_hook_word_motion_latin_lift"
     const val KEY_HOOK_WORD_MOTION_LATIN_WAVE = "key_hook_word_motion_latin_wave"
 
+    // ================= WORD HIGHLIGHT KEYS =================
+    const val KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY =
+        "key_hook_word_highlight_unsung_opacity"
+
     // ================= DEFAULTS =================
     const val MIN_HOOK_WORD_MOTION_LIFT = 0f
     const val MAX_HOOK_WORD_MOTION_LIFT = 0.20f
@@ -767,4 +771,8 @@ object RootConstants {
     const val DEFAULT_HOOK_WORD_MOTION_LATIN_BY_CHARACTER = false
     const val DEFAULT_HOOK_WORD_MOTION_LATIN_LIFT = 0.12f
     const val DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE = 0.8f
+    /** 未演唱歌词的不透明度：0 为全透明，1 为与已演唱歌词一致。 */
+    const val MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY = 0f
+    const val MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY = 1f
+    const val DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY = 0.50f
 }
