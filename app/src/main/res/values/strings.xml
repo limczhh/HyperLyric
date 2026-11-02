@@ -432,6 +432,9 @@
     <string name="summary_default_font">默认</string>
     <string name="title_verbatim_lyric">逐字歌词</string>
     <string name="title_lyric_effects">歌词动效</string>
+    <string name="title_word_highlight_unsung_opacity">未演唱歌词不透明度</string>
+    <string name="summary_word_highlight_unsung_opacity">0 为完全透明，1 与已演唱歌词一致</string>
+    <string name="label_word_highlight_unsung_opacity_range">范围：0.00 ~ 1.00</string>
 
 
     <!-- ———————————————————————— LyricProviderPage ———————————————————————— -->

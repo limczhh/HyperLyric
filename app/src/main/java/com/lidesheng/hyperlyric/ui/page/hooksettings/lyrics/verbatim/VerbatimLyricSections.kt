@@ -27,6 +27,8 @@ fun LazyListScope.verbatimLyricSections(
     onWordRevealSpeedRateChange: (Int) -> Unit,
     gradientStyle: Boolean,
     onGradientStyleChange: (Boolean) -> Unit,
+    wordHighlightUnsungOpacity: Float,
+    onWordHighlightUnsungOpacityClick: () -> Unit,
     lineDisplay: Boolean,
     onLineDisplayChange: (Boolean) -> Unit,
     syllableRelative: Boolean,
@@ -111,6 +113,22 @@ fun LazyListScope.verbatimLyricSections(
                             title = stringResource(id = R.string.title_gradient_progress),
                             checked = gradientStyle,
                             onCheckedChange = onGradientStyleChange
+                        )
+                        ArrowPreference(
+                            title = stringResource(
+                                id = R.string.title_word_highlight_unsung_opacity
+                            ),
+                            summary = stringResource(
+                                id = R.string.summary_word_highlight_unsung_opacity
+                            ),
+                            onClick = onWordHighlightUnsungOpacityClick,
+                            endActions = {
+                                Text(
+                                    String.format("%.2f", wordHighlightUnsungOpacity),
+                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                )
+                            }
                         )
                         SwitchPreference(
                             title = stringResource(id = R.string.title_word_motion),

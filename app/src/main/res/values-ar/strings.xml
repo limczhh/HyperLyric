@@ -327,6 +327,9 @@
   <string name="summary_default_font">افتراضي</string>
   <string name="title_verbatim_lyric">الكلمات الحرفية</string>
   <string name="title_lyric_effects">تأثيرات كلمات الأغاني</string>
+  <string name="title_word_highlight_unsung_opacity">شفافية الكلمات غير المُغنّاة</string>
+  <string name="summary_word_highlight_unsung_opacity">0 شفاف تمامًا، و1 مطابق للكلمات المُغنّاة</string>
+  <string name="label_word_highlight_unsung_opacity_range">النطاق: 0.00 ~ 1.00</string>
   <string name="refresh_pull_down">اسحب لتحت عشان تحدّث</string>
   <string name="refresh_release">سيب عشان يحدّث</string>
   <string name="refreshing">جارٍ التحديث…</string>
