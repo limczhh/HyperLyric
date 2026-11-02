@@ -21,39 +21,74 @@ import org.robolectric.annotation.GraphicsMode
 class SegmentedMiniBarDrawableTest {
     @After fun cleanup() = IslandMediaMiniBarIndicator.clear()
 
-    class NativeContent(val bar: View, val canSlide: Boolean, val fake: NativeContent? = null) {
+    class NativeContent(val bar: View, var canSlide: Boolean, val fake: NativeContent? = null) {
         fun getMiniBar(): View = bar
         fun getMiniBarVisible(): Boolean = canSlide
         fun getFakeView(): NativeContent? = fake
-        fun updateMiniBarTranslationForTest(real: NativeContent) { bar.translationY = 100f }
+        fun getExpandedViewHeight(): Int = 200
+        fun getMiniBarMarginBottom(): Float = 10f
+        fun getCurrentIslandData(): Any? = null
     }
 
-    @Test fun anInformationalBarDoesNotGrantNativeMiniWindowCapability() {
+    private fun hostBar(visibility: Int = View.VISIBLE): View {
         val context = RuntimeEnvironment.getApplication()
-        val window = View(context)
-        val bar = View(context).apply {
+        return View(context).apply {
             background = nativeBar()
-            visibility = View.GONE
-            layoutParams = FrameLayout.LayoutParams(120, 8)
+            this.visibility = visibility
+            FrameLayout(context).addView(this, FrameLayout.LayoutParams(120, 8).apply {
+                gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
+            })
+            (parent as View).apply {
+                measure(View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY))
+                layout(0, 0, 300, 300)
+            }
         }
+    }
+
+    @Test fun anInformationalOverlayDoesNotChangeNativeVisibilityOrMiniWindowCapability() {
+        val window = View(RuntimeEnvironment.getApplication())
+        val bar = hostBar(View.GONE)
         val original = bar.background
         val params = bar.layoutParams
         val real = NativeContent(bar, canSlide = false)
         IslandMediaMiniBarIndicator.update(window, real, intArrayOf(2, 0))
-        assertEquals(View.VISIBLE, bar.visibility)
+        assertEquals(View.GONE, bar.visibility)
         assertFalse(real.getMiniBarVisible())
         assertFalse(bar.isClickable)
         assertFalse(bar.isFocusable)
         assertSame(params, bar.layoutParams)
+        assertEquals(1, (bar.parent as FrameLayout).childCount)
+        assertEquals(Color.TRANSPARENT, (bar.background as android.graphics.drawable.ColorDrawable).color)
+        val bitmap = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888)
+        (bar.parent as View).draw(Canvas(bitmap))
+        assertEquals(Color.WHITE, bitmap.getPixel(110, 186))
+        assertEquals(0x33ffffff, bitmap.getPixel(190, 186))
         IslandMediaMiniBarIndicator.clear()
         assertSame(original, bar.background)
         assertEquals(View.GONE, bar.visibility)
     }
 
-    @Test fun replacingTheNativeBackgroundPreservesTheInformationalVisibilityCleanup() {
-        val context = RuntimeEnvironment.getApplication()
-        val window = View(context)
-        val bar = View(context).apply { background = nativeBar(); visibility = View.GONE }
+    @Test fun nativeCapabilityChangesRemainIndependentFromTheIndicatorAcrossSwitches() {
+        val window = View(RuntimeEnvironment.getApplication())
+        val bar = hostBar()
+        val content = NativeContent(bar, canSlide = true)
+        IslandMediaMiniBarIndicator.update(window, content, intArrayOf(3, 0))
+        content.canSlide = false
+        bar.visibility = View.GONE
+        IslandMediaMiniBarIndicator.update(window, content, intArrayOf(3, 1))
+        assertFalse(content.canSlide)
+        assertEquals(View.GONE, bar.visibility)
+        content.canSlide = true
+        bar.visibility = View.VISIBLE
+        IslandMediaMiniBarIndicator.update(window, content, intArrayOf(3, 0))
+        assertTrue(content.canSlide)
+        assertEquals(View.VISIBLE, bar.visibility)
+    }
+
+    @Test fun replacingTheNativeBackgroundRestoresTheNewBackgroundWithoutChangingVisibility() {
+        val window = View(RuntimeEnvironment.getApplication())
+        val bar = hostBar(View.GONE)
         val content = NativeContent(bar, canSlide = false)
         IslandMediaMiniBarIndicator.update(window, content, intArrayOf(2, 0))
         val newBackground = nativeBar()
@@ -62,19 +97,18 @@ class SegmentedMiniBarDrawableTest {
         IslandMediaMiniBarIndicator.clear()
         assertSame(newBackground, bar.background)
         assertEquals(View.GONE, bar.visibility)
-        assertFalse(content.getMiniBarVisible())
     }
 
-    @Test fun realAndTransitionBarsShareThePageWhileRetainingNativeAnimationProperties() {
-        val context = RuntimeEnvironment.getApplication()
-        fun view() = View(context).apply { background = nativeBar(); alpha = 0.4f; scaleX = 0.8f }
-        val real = NativeContent(view(), canSlide = true, fake = NativeContent(view(), canSlide = true))
-        IslandMediaMiniBarIndicator.update(View(context), real, intArrayOf(3, 1))
-        for (bar in listOf(real.bar, real.fake!!.bar)) {
-            assertTrue(bar.background is SegmentedMiniBarDrawable)
-            assertEquals(0.4f, bar.alpha, 0f)
-            assertEquals(0.8f, bar.scaleX, 0f)
-        }
+    @Test fun realAndTransitionBarsRetainNativeAnimationAndInputProperties() {
+        val real = NativeContent(hostBar().apply { alpha = 0.4f; scaleX = 0.8f }, canSlide = true,
+            fake = NativeContent(hostBar(View.GONE), canSlide = false))
+        IslandMediaMiniBarIndicator.update(View(RuntimeEnvironment.getApplication()), real, intArrayOf(3, 1))
+        assertEquals(0.4f, real.bar.alpha, 0f)
+        assertEquals(0.8f, real.bar.scaleX, 0f)
+        assertEquals(View.VISIBLE, real.bar.visibility)
+        assertEquals(View.GONE, real.fake!!.bar.visibility)
+        assertTrue(real.canSlide)
+        assertFalse(real.fake.canSlide)
     }
 
     private fun nativeBar() = GradientDrawable().apply {
@@ -95,12 +129,25 @@ class SegmentedMiniBarDrawableTest {
         assertEquals(0x33ffffff, bitmap.getPixel(15, 4))
         assertEquals(0x33ffffff, bitmap.getPixel(104, 4))
         val selected = bitmap.getPixel(60, 4)
-        assertTrue(Color.alpha(selected) > 0x33)
+        assertEquals(255, Color.alpha(selected))
         assertEquals(255, Color.red(selected))
         assertEquals(255, Color.green(selected))
         assertEquals(255, Color.blue(selected))
         assertEquals(Color.TRANSPARENT, bitmap.getPixel(39, 4))
         assertEquals(Color.TRANSPARENT, bitmap.getPixel(80, 4))
+        assertEquals(Color.TRANSPARENT, bitmap.getPixel(35, 4))
+    }
+
+    @Test fun selectedSegmentUsesTheMediaActionColor() {
+        val selectedColor = Color.rgb(120, 210, 90)
+        val drawable = SegmentedMiniBarDrawable(nativeBar()).apply {
+            setBounds(0, 0, 120, 8)
+            update(3, 1, selectedColor)
+        }
+        val bitmap = Bitmap.createBitmap(120, 8, Bitmap.Config.ARGB_8888)
+        drawable.draw(Canvas(bitmap))
+        assertEquals(selectedColor, bitmap.getPixel(60, 4))
+        assertEquals(0x33ffffff, bitmap.getPixel(15, 4))
     }
 
     @Test fun oneSessionKeepsTheNativeSingleLine() {

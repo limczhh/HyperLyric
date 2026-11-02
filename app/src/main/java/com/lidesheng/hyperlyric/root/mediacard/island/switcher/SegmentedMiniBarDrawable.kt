@@ -3,8 +3,8 @@ package com.lidesheng.hyperlyric.root.mediacard.island.switcher
 import android.content.res.ColorStateList
 import android.graphics.BlendMode
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorFilter
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
@@ -18,23 +18,15 @@ import android.graphics.drawable.Drawable
 internal class SegmentedMiniBarDrawable(private val native: Drawable) : Drawable(), Drawable.Callback {
     private val segment = RectF()
     private val clip = Path()
-    private val highlight = Paint().apply {
-        // Both supplied plugin generations use a translucent native bar. Raising its alpha
-        // brightens the selected segment while leaving native RGB/tint and unselected segments intact.
-        colorFilter = ColorMatrixColorFilter(floatArrayOf(
-            1f, 0f, 0f, 0f, 0f,
-            0f, 1f, 0f, 0f, 0f,
-            0f, 0f, 1f, 0f, 0f,
-            0f, 0f, 0f, 2.5f, 0f,
-        ))
-    }
+    private val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private var pageCount = 1
     private var selectedIndex = 0
 
-    fun update(count: Int, selected: Int) {
-        if (pageCount == count && selectedIndex == selected) return
+    fun update(count: Int, selected: Int, selectedColor: Int = Color.WHITE) {
+        if (pageCount == count && selectedIndex == selected && highlight.color == selectedColor) return
         pageCount = count
         selectedIndex = selected
+        highlight.color = selectedColor
         invalidateSelf()
     }
 
@@ -47,19 +39,21 @@ internal class SegmentedMiniBarDrawable(private val native: Drawable) : Drawable
         }
         val width = bounds.width().toFloat()
         val height = bounds.height().toFloat()
-        val gap = minOf(height * 0.75f, width / (pageCount * 3f))
+        val gap = minOf(height * 1.15f, width / (pageCount * 3f))
         val segmentWidth = (width - gap * (pageCount - 1)) / pageCount
         if (segmentWidth <= 0f || height <= 0f) return
         repeat(pageCount) { index ->
             val left = bounds.left + index * (segmentWidth + gap)
             segment.set(left, bounds.top.toFloat(), left + segmentWidth, bounds.bottom.toFloat())
+            if (index == selectedIndex) {
+                canvas.drawRoundRect(segment, height / 2f, height / 2f, highlight)
+                return@repeat
+            }
             clip.reset()
             clip.addRoundRect(segment, height / 2f, height / 2f, Path.Direction.CW)
             val save = canvas.save()
             canvas.clipPath(clip)
-            val layer = if (index == selectedIndex) canvas.saveLayer(segment, highlight) else -1
             native.draw(canvas)
-            if (layer >= 0) canvas.restoreToCount(layer)
             canvas.restoreToCount(save)
         }
     }

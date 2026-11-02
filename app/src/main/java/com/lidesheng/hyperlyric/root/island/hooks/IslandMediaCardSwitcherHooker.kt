@@ -56,6 +56,30 @@ internal object IslandMediaCardSwitcherHooker {
                             it.javaClass.name.endsWith(".DynamicIslandData")
                         }
                         window?.let { IslandMediaSessionCoordinator.connect(it, data) }
+                        if (method.name == "handleContentViewUpdateOperate") {
+                            val content = chain.args.firstOrNull()
+                            val currentData = IslandProbeUtils.getCurrentIslandData(content)
+                            val bridge = window?.let { IslandMediaSessionCoordinator.connect(it, currentData) }
+                            if (bridge?.apply(arrayOf("single")) == true &&
+                                call(content, "getState")?.javaClass?.simpleName == "Expanded"
+                            ) {
+                                // Expanded -> Expanded does not run the native state-change capability
+                                // refresh. Both real and fake payloads have been bound at this point.
+                                val events = call(content, "getDynamicIslandEventCoordinator")
+                                events?.javaClass?.methods?.first {
+                                    it.name == "updateMiniBar" && it.parameterCount == 1
+                                }?.invoke(events, content)
+                                val pkg = IslandProbeUtils.extractMediaIslandInfo(currentData)?.packageName
+                                val realCanSlide = call(content, "getMiniBarVisible")
+                                val fakeCanSlide = call(call(content, "getFakeView"), "getMiniBarVisible")
+                                HookLogger.dState(
+                                    stateId = "$TAG.mini_window", tag = TAG,
+                                    state = "$pkg/$realCanSlide/$fakeCanSlide",
+                                ) {
+                                    "单岛下拉能力已刷新: pkg=$pkg, real=$realCanSlide, fake=$fakeCanSlide"
+                                }
+                            }
+                        }
                         refreshForWindow(window)
                         return result
                     }
@@ -70,14 +94,32 @@ internal object IslandMediaCardSwitcherHooker {
                 module.managedHook(method, "island.media_switcher.mini_bar", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val result = chain.proceed()
-                        val owner = chain.thisObject ?: return result
                         val real = chain.args.firstOrNull() ?: return result
-                        IslandMediaMiniBarIndicator.nativeVisibilityUpdated(owner)
                         val events = call(real, "getDynamicIslandEventCoordinator") ?: return result
                         val window = call(events, "getWindowView") as? View ?: return result
                         IslandMediaSessionCoordinator.connect(window, IslandProbeUtils.getCurrentIslandData(real))
                         refresh(window)
                         return result
+                    }
+                })
+            }
+            val animations = loader.loadClass("miui.systemui.dynamicisland.anim.DynamicIslandAnimationController")
+            animations.declaredMethods.first {
+                it.name == "onStateChange" && it.parameterCount == 1
+            }.let { method ->
+                module.managedHook(method, "island.media_switcher.presentation", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val real = chain.args.firstOrNull()
+                        val data = IslandProbeUtils.getCurrentIslandData(real)
+                        val events = call(real, "getDynamicIslandEventCoordinator")
+                        val window = events?.let { call(it, "getWindowView") } as? View
+                        val bridge = window?.let { IslandMediaSessionCoordinator.connect(it, data) }
+                        val key = data?.let(::key)
+                        val state = call(real, "getState")?.javaClass?.simpleName
+                        if (key != null && state != null) {
+                            bridge?.apply(arrayOf("presentation", key, state))
+                        }
+                        return chain.proceed()
                     }
                 })
             }
@@ -186,7 +228,8 @@ internal object IslandMediaCardSwitcherHooker {
     }
 
     private fun key(data: Any): String? = call(data, "getKey") as? String
-    private fun call(target: Any, name: String): Any? = runCatching {
+    private fun call(target: Any?, name: String): Any? = runCatching {
+        target ?: return null
         target.javaClass.methods.first { it.name == name && it.parameterCount == 0 }
             .apply { isAccessible = true }.invoke(target)
     }.getOrNull()
