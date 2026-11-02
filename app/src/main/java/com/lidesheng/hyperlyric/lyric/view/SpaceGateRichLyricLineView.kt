@@ -313,6 +313,7 @@ class SpaceGateRichLyricLineView(
             style.gradient,
             style.fadingEdge,
             style.wordMotion,
+            style.wordHighlight,
             centerIfPossible,
             rightAlignment(committedLine?.metadata)
         )
@@ -324,6 +325,7 @@ class SpaceGateRichLyricLineView(
             style.gradient,
             style.fadingEdge,
             style.wordMotion,
+            style.wordHighlight,
             centerIfPossible,
             rightAlignment(committedSecondaryLine?.metadata ?: committedLine?.metadata)
         )
@@ -557,9 +559,10 @@ class SpaceGateRichLyricLineView(
     private fun applyLineStyle(
         view: SpaceGateLyricLineView, text: TextLook, highlight: Highlight,
         marquee: Marquee, gradient: Boolean, fadingEdge: Int, wordMotion: WordMotion,
-        centerIfPossible: Boolean, rightIfPossible: Boolean
+        wordHighlight: WordHighlight, centerIfPossible: Boolean, rightIfPossible: Boolean
     ) {
         view.wordMotion = wordMotion
+        view.wordHighlight = wordHighlight
         view.configureWith(
             text, highlight, marquee, gradient, fadingEdge,
             centerIfPossible, rightIfPossible

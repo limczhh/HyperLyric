@@ -280,6 +280,7 @@ class RichLyricLineView(
             style.gradient,
             style.fadingEdge,
             style.wordMotion,
+            style.wordHighlight,
             style.centerIfPossible,
             style.rightIfPossible
         )
@@ -291,6 +292,7 @@ class RichLyricLineView(
             style.gradient,
             style.fadingEdge,
             style.wordMotion,
+            style.wordHighlight,
             style.centerIfPossible,
             style.rightIfPossible
         )
@@ -517,9 +519,10 @@ class RichLyricLineView(
     private fun applyLineStyle(
         view: LyricLineView, text: TextLook, highlight: Highlight,
         marquee: Marquee, gradient: Boolean, fadingEdge: Int, wordMotion: WordMotion,
-        centerIfPossible: Boolean, rightIfPossible: Boolean
+        wordHighlight: WordHighlight, centerIfPossible: Boolean, rightIfPossible: Boolean
     ) {
         view.wordMotion = wordMotion
+        view.wordHighlight = wordHighlight
         view.configureWith(
             text, highlight, marquee, gradient, fadingEdge,
             centerIfPossible, rightIfPossible

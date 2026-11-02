@@ -16,6 +16,7 @@ import android.graphics.Shader
 import android.text.TextPaint
 import androidx.core.graphics.withSave
 import com.lidesheng.hyperlyric.lyric.view.METADATA_PLACEHOLDER_WORD_MOTION
+import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
 import com.lidesheng.hyperlyric.lyric.view.line.model.WordModel
 import kotlin.math.abs
@@ -26,6 +27,9 @@ internal class TextDrawer {
     private val revealDrawer = WordRevealDrawer()
     private var bgColors = intArrayOf(Color.GRAY)
     private var hlColors = intArrayOf(Color.WHITE)
+
+    /** 按 [unsungOpacity] 烘好 alpha 的背景色；只在颜色或不透明度变化时重建，绘制期直接复用。 */
+    private var effectiveBgColors = UnsungOpacity.tint(bgColors, WordHighlight.DEFAULT_UNSUNG_OPACITY)
 
     private val cjkMotionSpec = MotionSpec(
         animateByChar = true,
@@ -70,6 +74,24 @@ internal class TextDrawer {
     val isRainbowBg get() = bgColors.size > 1
     val isRainbowHl get() = hlColors.size > 1
 
+    /**
+     * 未演唱（背景色）部分的绝对不透明度：0f 完全透明，1f 与已演唱颜色一致。
+     *
+     * 变化时重建烘好 alpha 的背景色并清空 shader 缓存，绘制期不再做任何换算。
+     */
+    var unsungOpacity: Float = WordHighlight.DEFAULT_UNSUNG_OPACITY
+        set(value) {
+            val normalized = if (value.isFinite()) {
+                value.coerceIn(0f, 1f)
+            } else {
+                WordHighlight.DEFAULT_UNSUNG_OPACITY
+            }
+            if (field == normalized) return
+            field = normalized
+            rebuildBackgroundColors()
+            clearShaderCache()
+        }
+
     private val fontMetrics = Paint.FontMetrics()
     private var baselineOffset = 0f
 
@@ -85,6 +107,12 @@ internal class TextDrawer {
     fun setColors(background: IntArray, highlight: IntArray) {
         if (background.isNotEmpty()) bgColors = background
         if (highlight.isNotEmpty()) hlColors = highlight
+        rebuildBackgroundColors()
+    }
+
+    /** 把 [unsungOpacity] 烘进背景色；只在配置变化时调用，结果供每帧绘制直接复用。 */
+    private fun rebuildBackgroundColors() {
+        effectiveBgColors = UnsungOpacity.tint(bgColors, unsungOpacity)
     }
 
     fun updateMetrics(paint: TextPaint) {
@@ -175,11 +203,14 @@ internal class TextDrawer {
                 return@withSave
             }
 
+            // 未演唱部分按 unsungOpacity 的绝对值绘制：透明度已烘进 effectiveBgColors，
+            // 纯色走 paint.color、彩虹走 shader 都带同一 alpha，且与上浮姿态用同一支画笔一次画完。
+            bgPaint.color = effectiveBgColors[0]
             if (isRainbowBg) {
                 bgPaint.shader = getOrCreateRainbowShader(
                     gradientStartX,
                     gradientEndX,
-                    bgColors,
+                    effectiveBgColors,
                     bgRainbowCache
                 )
             } else {

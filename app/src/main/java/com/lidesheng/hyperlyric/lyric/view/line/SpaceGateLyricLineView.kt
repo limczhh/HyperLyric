@@ -23,6 +23,7 @@ import com.lidesheng.hyperlyric.lyric.view.LyricPlayListener
 import com.lidesheng.hyperlyric.lyric.view.Marquee
 import com.lidesheng.hyperlyric.lyric.view.TextLook
 import com.lidesheng.hyperlyric.lyric.view.UpdatableColor
+import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.WordMotion
 import com.lidesheng.hyperlyric.lyric.view.dp
 import com.lidesheng.hyperlyric.lyric.view.isCountdownLine
@@ -205,6 +206,14 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
             syncRenderer.latinMotionLiftFactor = value.latinLiftFactor
             syncRenderer.latinMotionWaveFactor = value.latinWaveFactor
             requestLayout()
+            invalidate()
+        }
+
+    var wordHighlight: WordHighlight = WordHighlight()
+        set(value) {
+            if (field == value) return
+            field = value
+            syncRenderer.unsungOpacity = value.unsungOpacity
             invalidate()
         }
 
