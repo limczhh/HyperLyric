@@ -171,6 +171,8 @@
     <string name="option_notification_media_card_switcher_multi">Multi-card view</string>
     <string name="title_notification_media_card_switcher_max_count">Maximum card display count</string>
     <string name="label_notification_media_card_switcher_max_count">Range: 2 ~ 6</string>
+    <string name="option_island_media_card_switcher_single">Single-island view</string>
+    <string name="option_island_media_card_switcher_multi">Multi-island view</string>
     <string name="title_notification_media_layout_style">Card layout style</string>
     <string name="prompt_media_layout_style">Custom card layout styles may be incompatible with or even conflict with changes to related element or layout settings. Please change and test with caution. Related issues are not currently handled.</string>
     <string name="option_notification_media_layout_system">System default</string>

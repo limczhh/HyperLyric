@@ -26,6 +26,7 @@ import com.lidesheng.hyperlyric.root.island.renderer.SystemUiLyricRenderer
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardConfigurationRefreshHooker
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardElementBehaviorHooker
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
+import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaSessionCoordinator
 import com.lidesheng.hyperlyric.root.mediacard.island.IslandExpandedMediaAmbientFlowHooker
 import com.lidesheng.hyperlyric.root.mediacard.island.layout.IslandExpandedMediaLayoutHooker
 import com.lidesheng.hyperlyric.root.mediacard.notification.NotificationMediaAmbientFlowHooker
@@ -439,6 +440,7 @@ class HookEntry : XposedModule() {
 
     private fun installMediaCardHooks(classLoader: ClassLoader) {
         MediaCardRuntimeConfig.load(prefs)
+        IslandMediaSessionCoordinator.hook(this, classLoader)
         MediaCardConfigurationRefreshHooker.hook(this, classLoader)
         MediaProgressStyleHooker.hook(this, classLoader)
         MediaCardElementBehaviorHooker.hook(this, classLoader)

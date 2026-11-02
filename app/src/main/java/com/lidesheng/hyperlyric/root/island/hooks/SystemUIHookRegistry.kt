@@ -50,6 +50,7 @@ object SystemUIHookRegistry {
         try {
             IslandTextHooker.hook(module, cl)
             SodaIslandMiniWindowCompatHooker.hookPlugin(module, cl)
+            IslandMediaCardSwitcherHooker.hook(module, cl)
             IslandMediaSwipeHooker.hook(module, cl)
             HookIslandGlow.init(module, cl)
             IslandProgressGlowHooker.hook(module, cl)

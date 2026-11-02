@@ -21,6 +21,9 @@ internal object MediaCardRuntimeConfig {
                 "expanded(layout=${snapshot.islandExpanded.layoutStyle}, " +
                 "theme=${snapshot.islandExpanded.cardTheme}, " +
                 "cover=${snapshot.islandExpanded.coverStyle}, " +
+                "switcher=${snapshot.islandExpanded.cardSwitcherEnabled}/" +
+                "${snapshot.islandExpanded.cardSwitcherMode}/" +
+                "${snapshot.islandExpanded.cardSwitcherMaxCount}, " +
                 "ambient=${snapshot.islandExpanded.ambientFlowMode}, " +
                 "progress=${snapshot.islandExpanded.progressStyle}), " +
                 "aodCollapseDisabled=${snapshot.alwaysOnDisplay.disableMediaCardCollapsing}"
@@ -280,6 +283,9 @@ internal object MediaCardRuntimeConfig {
     }
 
     data class IslandExpanded(
+        val cardSwitcherEnabled: Boolean,
+        val cardSwitcherMode: Int,
+        val cardSwitcherMaxCount: Int,
         val layoutStyle: Int,
         val ambientFlowMode: Int,
         val cardTheme: Int,
@@ -302,6 +308,12 @@ internal object MediaCardRuntimeConfig {
     ) {
         companion object {
             fun defaults() = IslandExpanded(
+                cardSwitcherEnabled =
+                    RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_ENABLED,
+                cardSwitcherMode =
+                    RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MODE,
+                cardSwitcherMaxCount =
+                    RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
                 layoutStyle = RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_LAYOUT_STYLE,
                 ambientFlowMode =
                     RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_AMBIENT_FLOW_MODE,
@@ -334,6 +346,24 @@ internal object MediaCardRuntimeConfig {
             )
 
             fun from(prefs: SharedPreferences) = IslandExpanded(
+                cardSwitcherEnabled = prefs.getBoolean(
+                    RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_ENABLED,
+                    RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_ENABLED
+                ),
+                cardSwitcherMode = prefs.getInt(
+                    RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MODE,
+                    RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MODE
+                ).coerceIn(
+                    RootConstants.ISLAND_MEDIA_CARD_SWITCHER_MODE_SINGLE,
+                    RootConstants.ISLAND_MEDIA_CARD_SWITCHER_MODE_MULTI
+                ),
+                cardSwitcherMaxCount = prefs.getInt(
+                    RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
+                    RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT
+                ).coerceIn(
+                    RootConstants.MIN_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
+                    RootConstants.MAX_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT
+                ),
                 layoutStyle = prefs.getInt(
                     RootConstants.KEY_HOOK_ISLAND_EXPANDED_MEDIA_LAYOUT_STYLE,
                     RootConstants.DEFAULT_HOOK_ISLAND_EXPANDED_MEDIA_LAYOUT_STYLE

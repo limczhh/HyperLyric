@@ -171,6 +171,8 @@
     <string name="option_notification_media_card_switcher_multi">多卡片视图</string>
     <string name="title_notification_media_card_switcher_max_count">卡片显示数量上限</string>
     <string name="label_notification_media_card_switcher_max_count">范围：2 ~ 6</string>
+    <string name="option_island_media_card_switcher_single">单岛视图</string>
+    <string name="option_island_media_card_switcher_multi">多岛视图</string>
     <string name="title_notification_media_layout_style">卡片布局样式</string>
     <string name="prompt_media_layout_style">自定义卡片布局样式可能与相关元素或布局等设置的改动不兼容甚至冲突，请谨慎更改并测试。暂不处理相关问题</string>
     <string name="option_notification_media_layout_system">系统默认</string>

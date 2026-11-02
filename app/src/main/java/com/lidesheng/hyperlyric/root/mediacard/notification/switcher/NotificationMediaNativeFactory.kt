@@ -149,6 +149,37 @@ internal class NotificationMediaNativeFactory(
         }
     }
 
+    /** Island binders also need their own progress owner, buttons and cancellable collectors. */
+    fun createIslandBinder(constructor: Constructor<*>, arguments: List<Any?>): Controller {
+        check(arguments.any { it === (templateOwner ?: templateViewModel) }) {
+            "Island binder progress dependency unavailable"
+        }
+        val viewModel = createViewModel()
+        val templateScope = read(templateController, "scope")
+        val scope = templateScope?.let(scopeApi::create)
+        try {
+            val owner = templateOwner?.let {
+                construct(it.javaClass, listOf(required(it, "context"), viewModel, required(it, "bgExecutor")))
+            }
+            val templateButtons = required(templateController, "miuiMediaActionButtonUtils")
+            val buttons = createActionButtons(scope?.value)
+            val values = arguments.map { value ->
+                when {
+                    value === templateViewModel -> viewModel
+                    templateOwner != null && value === templateOwner -> requireNotNull(owner)
+                    templateScope != null && value === templateScope -> requireNotNull(scope).value
+                    value === templateButtons -> buttons
+                    else -> value
+                }
+            }
+            constructor.isAccessible = true
+            return Controller(constructor.newInstance(*values.toTypedArray()), viewModel, owner, scope)
+        } catch (error: Throwable) {
+            scope?.close()
+            throw error
+        }
+    }
+
     private fun createViewModel(): Any {
         val arguments = listOf(
             required(templateViewModel, "bgExecutor"), required(templateViewModel, "falsingManager")

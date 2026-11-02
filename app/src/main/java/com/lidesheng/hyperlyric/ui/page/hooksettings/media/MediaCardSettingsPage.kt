@@ -89,6 +89,36 @@ fun MediaCardSettingsPage() {
             )
         )
     }
+    var islandMediaCardSwitcherEnabled by remember {
+        mutableStateOf(
+            prefs.getBoolean(
+                RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_ENABLED,
+                RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_ENABLED
+            )
+        )
+    }
+    var islandMediaCardSwitcherMode by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MODE,
+                RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MODE
+            ).coerceIn(
+                RootConstants.ISLAND_MEDIA_CARD_SWITCHER_MODE_SINGLE,
+                RootConstants.ISLAND_MEDIA_CARD_SWITCHER_MODE_MULTI
+            )
+        )
+    }
+    var islandMediaCardSwitcherMaxCount by remember {
+        mutableIntStateOf(
+            prefs.getInt(
+                RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
+                RootConstants.DEFAULT_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT
+            ).coerceIn(
+                RootConstants.MIN_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
+                RootConstants.MAX_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT
+            )
+        )
+    }
     var removeIslandWhitelist by remember {
         mutableStateOf(
             prefs.getBoolean(
@@ -106,6 +136,7 @@ fun MediaCardSettingsPage() {
     val snackbarHostState = remember { SnackbarHostState() }
     var showRestartDialog by remember { mutableStateOf(false) }
     var showMaxCountDialog by remember { mutableStateOf(false) }
+    var showIslandMediaCardSwitcherMaxCountDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
@@ -258,6 +289,76 @@ fun MediaCardSettingsPage() {
                         }
                     }
                 }
+                item(key = "island_media_card_switcher") {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column {
+                            SwitchPreference(
+                                title = stringResource(R.string.title_notification_media_card_switcher),
+                                summary = stringResource(R.string.summary_remove_island_whitelist),
+                                checked = islandMediaCardSwitcherEnabled,
+                                onCheckedChange = { enabled ->
+                                    islandMediaCardSwitcherEnabled = enabled
+                                    PrefsBridge.putBoolean(
+                                        RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_ENABLED,
+                                        enabled
+                                    )
+                                }
+                            )
+                            AnimatedVisibility(visible = islandMediaCardSwitcherEnabled) {
+                                Column {
+                                    val modeValues = listOf(
+                                        RootConstants.ISLAND_MEDIA_CARD_SWITCHER_MODE_SINGLE,
+                                        RootConstants.ISLAND_MEDIA_CARD_SWITCHER_MODE_MULTI
+                                    )
+                                    OverlayDropdownPreference(
+                                        title = stringResource(
+                                            R.string.title_notification_media_card_switcher_mode
+                                        ),
+                                        items = listOf(
+                                            stringResource(
+                                                R.string.option_island_media_card_switcher_single
+                                            ),
+                                            stringResource(
+                                                R.string.option_island_media_card_switcher_multi
+                                            )
+                                        ),
+                                        selectedIndex = modeValues.indexOf(
+                                            islandMediaCardSwitcherMode
+                                        ).coerceAtLeast(0),
+                                        onSelectedIndexChange = { index ->
+                                            val mode = modeValues[index]
+                                            islandMediaCardSwitcherMode = mode
+                                            PrefsBridge.putInt(
+                                                RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MODE,
+                                                mode
+                                            )
+                                        }
+                                    )
+                                    ArrowPreference(
+                                        title = stringResource(
+                                            R.string.title_notification_media_card_switcher_max_count
+                                        ),
+                                        endActions = {
+                                            Text(
+                                                text = islandMediaCardSwitcherMaxCount.toString(),
+                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            )
+                                        },
+                                        onClick = {
+                                            showIslandMediaCardSwitcherMaxCountDialog = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -274,6 +375,23 @@ fun MediaCardSettingsPage() {
             mediaCardSwitcherMaxCount = maxCount
             PrefsBridge.putInt(
                 RootConstants.KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_MAX_COUNT,
+                maxCount
+            )
+        }
+    )
+
+    NumberInputDialog(
+        show = showIslandMediaCardSwitcherMaxCountDialog,
+        title = stringResource(R.string.title_notification_media_card_switcher_max_count),
+        label = stringResource(R.string.label_notification_media_card_switcher_max_count),
+        initialValue = islandMediaCardSwitcherMaxCount,
+        min = RootConstants.MIN_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
+        max = RootConstants.MAX_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
+        onDismiss = { showIslandMediaCardSwitcherMaxCountDialog = false },
+        onConfirm = { maxCount ->
+            islandMediaCardSwitcherMaxCount = maxCount
+            PrefsBridge.putInt(
+                RootConstants.KEY_HOOK_ISLAND_MEDIA_CARD_SWITCHER_MAX_COUNT,
                 maxCount
             )
         }

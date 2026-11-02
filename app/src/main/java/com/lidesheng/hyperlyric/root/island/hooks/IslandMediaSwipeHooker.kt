@@ -172,6 +172,11 @@ internal object IslandMediaSwipeHooker {
                 MotionEvent.ACTION_CANCEL -> {
                     GestureTracker.clear(interactor)
                 }
+
+                MotionEvent.ACTION_UP ->
+                    IslandMediaCardSwitcherHooker.refreshForWindow(
+                        GestureTracker.windowView(interactor)
+                    )
             }
             return result
         }
@@ -193,6 +198,27 @@ internal object IslandMediaSwipeHooker {
                     x = event.getX(),
                     y = event.getY()
                 )
+                val sessionGesture = GestureTracker.takeForSessionSwipe(interactor)
+                if (sessionGesture != null) {
+                    // End the native drag at its origin so stopSwipe/resetSwipe and FakeView
+                    // cancellation still run, without dispatching the horizontal collapse.
+                    val cancel = MotionEvent.obtain(event).apply {
+                        this.action = MotionEvent.ACTION_CANCEL
+                        setLocation(sessionGesture.downX, sessionGesture.downY)
+                    }
+                    try {
+                        val args = chain.args.toTypedArray()
+                        args[0] = cancel
+                        chain.proceed(args)
+                    } finally {
+                        cancel.recycle()
+                        GestureTracker.clear(interactor)
+                    }
+                    IslandMediaCardSwitcherHooker.switchToAdjacent(
+                        sessionGesture.windowView, sessionGesture.targetData, sessionGesture.finalDx
+                    )
+                    return true
+                }
             }
 
             val previousThresholdOverride = activeSwipeThresholdOverride.get()
@@ -207,6 +233,9 @@ internal object IslandMediaSwipeHooker {
                     if (gesture != null) {
                         performShortSwipe(gesture)
                     }
+                    IslandMediaCardSwitcherHooker.refreshForWindow(
+                        GestureTracker.windowView(interactor)
+                    )
                 }
                 result
             } finally {
@@ -281,6 +310,22 @@ internal object IslandMediaSwipeHooker {
             }
         }
 
+        fun takeForSessionSwipe(interactor: Any): GestureState? {
+            synchronized(gestures) {
+                val state = gestures[interactor] ?: return null
+                if (!state.sessionSwitchEligible) return null
+                gestures.remove(interactor)
+                val dx = state.finalDx
+                val dy = state.finalDy
+                if (!dx.isFinite() || !dy.isFinite() || dx == 0f) return null
+                if (abs(dx) <= abs(dy) || abs(dx) <= state.nativeTouchSlop) return null
+                if (state.nativeSwipeThreshold.isFinite() &&
+                    abs(dx) < state.nativeSwipeThreshold
+                ) return null
+                return state
+            }
+        }
+
         fun nativeThresholdOverride(interactor: Any): Int? {
             synchronized(gestures) {
                 val threshold = gestures[interactor]?.nativeSwipeThreshold ?: return null
@@ -293,6 +338,8 @@ internal object IslandMediaSwipeHooker {
                 gestures.remove(interactor)
             }
         }
+
+        fun windowView(interactor: Any): Any? = readField(interactor, "windowView")
     }
 
     private class GestureState(
@@ -301,7 +348,8 @@ internal object IslandMediaSwipeHooker {
         val nativeTouchSlop: Float,
         val nativeSwipeThreshold: Float,
         val downX: Float,
-        val downY: Float
+        val downY: Float,
+        val sessionSwitchEligible: Boolean
     ) {
         var finalDx: Float = Float.NaN
         var finalDy: Float = Float.NaN
@@ -316,7 +364,10 @@ internal object IslandMediaSwipeHooker {
         if (windowView == null) return null
         val targetData = findMediaTouchTarget(interactor, windowView) ?: return null
         val touchSlop = resolveTouchSlop(interactor, windowView)
-        val nativeThreshold = if (nativeThresholdOverrideInstalled) {
+        val sessionSwitchEligible = isSessionSwitchTarget(interactor)
+        val nativeThreshold = if (sessionSwitchEligible) {
+            resolveSwipeThreshold(interactor, windowView)
+        } else if (nativeThresholdOverrideInstalled) {
             resolveConfiguredSwipeThreshold(windowView)
         } else {
             resolveSwipeThreshold(interactor, windowView)
@@ -328,7 +379,8 @@ internal object IslandMediaSwipeHooker {
             nativeTouchSlop = touchSlop,
             nativeSwipeThreshold = nativeThreshold,
             downX = downX,
-            downY = downY
+            downY = downY,
+            sessionSwitchEligible = sessionSwitchEligible
         )
     }
 
@@ -397,20 +449,31 @@ internal object IslandMediaSwipeHooker {
         interactor: Any,
         windowView: Any
     ): Any? {
-        if (readSwipeBehavior() == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT) return null
+        val sessionSwitchEnabled = IslandMediaCardSwitcherHooker.canSwitch(windowView)
+        if (!sessionSwitchEnabled &&
+            readSwipeBehavior() == RootConstants.ISLAND_SWIPE_BEHAVIOR_DEFAULT
+        ) return null
 
         // Keep native media-button, seek-bar, freeform-animation and long-press gestures intact.
         val downInSeekBar = readBoolean(interactor, "downInSeekBar")
         val downInMedia = readBoolean(interactor, "downInMedia")
+        val downInExpanded = readBoolean(interactor, "downInExpanded")
         val downInFreeformAnim = readBoolean(interactor, "downInFreeformAnim")
         val longClickReceived = readBoolean(interactor, "longClickReceived")
         if (downInSeekBar != false ||
-            downInMedia != false ||
             downInFreeformAnim != false ||
             longClickReceived != false
         ) {
             return null
         }
+
+        if (sessionSwitchEnabled && downInExpanded == true) {
+            val view = callNoArg(windowView, "getCurrentExpandedState") ?: return null
+            val data = IslandProbeUtils.getCurrentIslandData(view) ?: return null
+            return data.takeIf(IslandProbeUtils::isMediaIsland)
+        }
+
+        if (downInMedia != false) return null
 
         // The feature belongs only to Xiaomi's summary big island. Small/expanded/show-once
         // targets remain fully native, which is important when another island is promoted after
@@ -439,6 +502,11 @@ internal object IslandMediaSwipeHooker {
                     it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH ||
                     it == RootConstants.ISLAND_SWIPE_BEHAVIOR_TRACK_SWITCH_REVERSED
         } ?: RootConstants.DEFAULT_HOOK_ISLAND_SWIPE_BEHAVIOR
+    }
+
+    private fun isSessionSwitchTarget(interactor: Any): Boolean {
+        return IslandMediaCardSwitcherHooker.canSwitch(readField(interactor, "windowView")) &&
+                readBoolean(interactor, "downInExpanded") == true
     }
 
     private fun resolveTouchSlop(
