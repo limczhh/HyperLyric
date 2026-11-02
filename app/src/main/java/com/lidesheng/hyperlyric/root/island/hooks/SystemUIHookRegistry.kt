@@ -31,7 +31,7 @@ object SystemUIHookRegistry {
         isHookedSuccess = false
     }
 
-    fun hook(xposedModule: XposedModule, cl: ClassLoader) {
+    fun hook(xposedModule: XposedModule, cl: ClassLoader, installMediaCardHooks: Boolean = true) {
         if (cl.javaClass.name.contains("BootClassLoader")) return
 
         val islandPkg = "miui.systemui.dynamicisland"
@@ -50,7 +50,10 @@ object SystemUIHookRegistry {
         try {
             IslandTextHooker.hook(module, cl)
             SodaIslandMiniWindowCompatHooker.hookPlugin(module, cl)
-            IslandMediaCardSwitcherHooker.hook(module, cl)
+            if (installMediaCardHooks) {
+                IslandMediaCardSwitcherHooker.hook(module, cl)
+                IslandMediaSwipeHooker.hookCardSwitcher(module, cl)
+            }
             IslandMediaSwipeHooker.hook(module, cl)
             HookIslandGlow.init(module, cl)
             IslandProgressGlowHooker.hook(module, cl)

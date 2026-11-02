@@ -16,15 +16,6 @@ internal object IslandMediaCardSwitcherHooker {
     private const val TAG = "IslandMediaCardSwitcher"
     private val watchedWindows = WeakHashMap<View, Boolean>()
 
-    fun prepareForHotReload() {
-        watchedWindows.keys.toList().forEach {
-            IslandMediaSessionCoordinator.connect(it)?.apply(arrayOf("resetPresentation"))
-            IslandMediaSessionCoordinator.setRefresh(it, null)
-        }
-        watchedWindows.clear()
-        IslandMediaMiniBarIndicator.clear()
-    }
-
     fun hook(module: XposedModule, loader: ClassLoader) {
         runCatching {
             val controller = loader.loadClass(
@@ -39,7 +30,7 @@ internal object IslandMediaCardSwitcherHooker {
                 "Native island publication interfaces unavailable"
             }
             publications.forEach { method ->
-                module.managedHook(method, "island.media_switcher.preview.${method.name}", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.preview.${method.name}", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val window = chain.thisObject?.let { call(it, "getView") } as? View
                             ?: return chain.proceed()
@@ -64,7 +55,7 @@ internal object IslandMediaCardSwitcherHooker {
             val pending = type.declaredMethods.first {
                 it.name == "hasPendingMedia" && it.parameterCount == 1
             }
-            module.managedHook(pending, "island.media_switcher.pending_media", object : Hooker {
+            module.managedHook(pending, "media.island_switcher.plugin.pending_media", object : Hooker {
                 override fun intercept(chain: Chain): Any? {
                     val data = chain.args.firstOrNull()
                     // Multi-island cards own different Views; never reuse another card's pending
@@ -84,7 +75,7 @@ internal object IslandMediaCardSwitcherHooker {
                     "handleContentViewUpdateOperate", "removeDynamicIslandData"
                 )
             }.forEach { method ->
-                module.managedHook(method, "island.media_switcher.refresh.${method.name}", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.refresh.${method.name}", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val result = chain.proceed()
                         val window = chain.thisObject as? View
@@ -103,7 +94,7 @@ internal object IslandMediaCardSwitcherHooker {
             base.declaredMethods.first {
                 it.name == "updateMiniBar" && it.parameterCount == 1
             }.let { method ->
-                module.managedHook(method, "island.media_switcher.mini_bar", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.mini_bar", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val result = chain.proceed()
                         val real = chain.args.firstOrNull() ?: return result
@@ -119,7 +110,7 @@ internal object IslandMediaCardSwitcherHooker {
             animations.declaredMethods.first {
                 it.name == "onStateChange" && it.parameterCount == 1
             }.let { method ->
-                module.managedHook(method, "island.media_switcher.presentation", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.presentation", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val real = chain.args.firstOrNull()
                         val data = IslandProbeUtils.getCurrentIslandData(real)
@@ -139,7 +130,7 @@ internal object IslandMediaCardSwitcherHooker {
             // that R8 can inline into the native click/update callers.
             val events = loader.loadClass("miui.systemui.dynamicisland.event.DynamicIslandEventCoordinator")
             events.declaredMethods.first { it.name == "handleEvent" && it.parameterCount == 2 }.let { method ->
-                module.managedHook(method, "island.media_switcher.event_complete", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.event_complete", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val result = chain.proceed()
                         val window = chain.thisObject?.let { call(it, "getWindowView") } as? View
@@ -152,7 +143,7 @@ internal object IslandMediaCardSwitcherHooker {
             }
             val updates = loader.loadClass("miui.systemui.dynamicisland.event.UpdateEventCoordinator")
             updates.declaredMethods.first { it.name == "handleAppEvent" && it.parameterCount == 3 }.let { method ->
-                module.managedHook(method, "island.media_switcher.activity_order", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.activity_order", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         if (chain.args.firstOrNull()?.javaClass?.simpleName != "UpdateDynamicIsland") {
                             return chain.proceed()

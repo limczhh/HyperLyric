@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.managedHook
+import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaSessionCoordinator
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -23,7 +24,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Adds previous/next track gestures to the currently visible media island.
+ * Handles compact-island track switching and expanded-card session switching independently.
  *
  * Xiaomi still owns hit testing, direction detection and the follow animation. We remember which
  * summary big island was touched and add a track-switch command only for a short gesture below
@@ -40,7 +41,9 @@ internal object IslandMediaSwipeHooker {
         "miui.systemui.dynamicisland.touch.domain.interactor.DynamicIslandTouchInteractor"
     private const val TOUCH_CONSTANTS_REPOSITORY_CLASS =
         "miui.systemui.dynamicisland.touch.data.repository.DynamicIslandTouchConstantsRepository"
-    private val gestures = WeakHashMap<Any, GestureState>()
+    // Card gestures live with the retained media hooks; lyric hot reload clears only compact gestures.
+    private val compactGestures = GestureTracker(cards = false)
+    private val cardGestures = GestureTracker(cards = true)
     private val overriddenThresholdFlows = WeakHashMap<Any, Any>()
     private val activeSwipeThresholdOverride = ThreadLocal<Int>()
 
@@ -48,20 +51,26 @@ internal object IslandMediaSwipeHooker {
     private var nativeThresholdOverrideInstalled = false
 
     fun prepareForHotReload() {
-        synchronized(gestures) { gestures.clear() }
+        compactGestures.clearAll()
         synchronized(overriddenThresholdFlows) { overriddenThresholdFlows.clear() }
         activeSwipeThresholdOverride.remove()
         nativeThresholdOverrideInstalled = false
     }
 
-    fun hook(module: XposedModule, cl: ClassLoader) {
+    fun hook(module: XposedModule, cl: ClassLoader) = install(module, cl, compactGestures)
+
+    fun hookCardSwitcher(module: XposedModule, cl: ClassLoader) = install(module, cl, cardGestures)
+
+    private fun install(module: XposedModule, cl: ClassLoader, tracker: GestureTracker) {
         try {
             val touchInteractorClass = cl.loadClass(TOUCH_INTERACTOR_CLASS)
 
-            nativeThresholdOverrideInstalled = hookNativeSwipeThreshold(
-                module = module,
-                classLoader = touchInteractorClass.classLoader ?: cl
-            )
+            if (!tracker.cards) {
+                nativeThresholdOverrideInstalled = hookNativeSwipeThreshold(
+                    module = module,
+                    classLoader = touchInteractorClass.classLoader ?: cl
+                )
+            }
 
             val onInterceptTouchEvent = touchInteractorClass.declaredMethods.firstOrNull {
                 it.name == "onInterceptTouchEvent" &&
@@ -84,18 +93,19 @@ internal object IslandMediaSwipeHooker {
             }
             module.managedHook(
                 executable = onInterceptTouchEvent,
-                capability = "island.swipe.intercept_touch",
-                hooker = InterceptTouchHook(),
+                capability = if (tracker.cards) "media.island_switcher.swipe.intercept_touch"
+                    else "island.swipe.intercept_touch",
+                hooker = InterceptTouchHook(tracker),
             )
             module.managedHook(
                 executable = onTouchEvent,
-                capability = "island.swipe.touch",
-                hooker = TouchEventHook(),
+                capability = if (tracker.cards) "media.island_switcher.swipe.touch" else "island.swipe.touch",
+                hooker = TouchEventHook(tracker),
             )
 
             HookLogger.d(
                 TAG,
-                "媒体超级岛横滑切歌 Hook 已初始化: " +
+                "媒体岛横滑 Hook 已初始化: cards=${tracker.cards}, " +
                         "nativeThresholdOverride=$nativeThresholdOverrideInstalled"
             )
         } catch (e: ClassNotFoundException) {
@@ -153,7 +163,7 @@ internal object IslandMediaSwipeHooker {
         }
     }
 
-    private class InterceptTouchHook : Hooker {
+    private class InterceptTouchHook(private val tracker: GestureTracker) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val interactor = chain.thisObject
             val event = chain.args.getOrNull(0) as? MotionEvent
@@ -163,46 +173,44 @@ internal object IslandMediaSwipeHooker {
             if (interactor == null || event == null) return result
             when (action) {
                 MotionEvent.ACTION_DOWN ->
-                    GestureTracker.begin(
+                    tracker.begin(
                         interactor = interactor,
                         downX = event.getX(),
                         downY = event.getY()
                     )
 
                 MotionEvent.ACTION_CANCEL -> {
-                    GestureTracker.clear(interactor)
+                    tracker.clear(interactor)
                 }
 
                 MotionEvent.ACTION_UP ->
-                    IslandMediaCardSwitcherHooker.refreshForWindow(
-                        GestureTracker.windowView(interactor)
-                    )
+                    (tracker.windowView(interactor) as? View)?.let(IslandMediaSessionCoordinator::requestRefresh)
             }
             return result
         }
     }
 
-    private class TouchEventHook : Hooker {
+    private class TouchEventHook(private val tracker: GestureTracker) : Hooker {
         override fun intercept(chain: Chain): Any? {
             val interactor = chain.thisObject
             val event = chain.args.getOrNull(0) as? MotionEvent
             val action = event?.actionMasked
 
-            if (interactor == null || event == null) {
+            if (interactor == null || event == null || !tracker.hasGesture(interactor)) {
                 return chain.proceed()
             }
 
             if (action == MotionEvent.ACTION_MOVE &&
-                GestureTracker.ownsSessionSwipe(interactor, event.x, event.y)
+                tracker.ownsSessionSwipe(interactor, event.x, event.y)
             ) return true
 
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                GestureTracker.markUp(
+                tracker.markUp(
                     interactor = interactor,
                     x = event.getX(),
                     y = event.getY()
                 )
-                val sessionGesture = GestureTracker.takeForSessionSwipe(interactor)
+                val sessionGesture = tracker.takeForSessionSwipe(interactor)
                 if (sessionGesture != null) {
                     // End the native drag at its origin so stopSwipe/resetSwipe and FakeView
                     // cancellation still run, without dispatching the horizontal collapse.
@@ -216,7 +224,7 @@ internal object IslandMediaSwipeHooker {
                         chain.proceed(args)
                     } finally {
                         cancel.recycle()
-                        GestureTracker.clear(interactor)
+                        tracker.clear(interactor)
                     }
                     if (action == MotionEvent.ACTION_UP &&
                         abs(sessionGesture.finalDx) >= sessionGesture.nativeSwipeThreshold &&
@@ -231,20 +239,15 @@ internal object IslandMediaSwipeHooker {
             }
 
             val previousThresholdOverride = activeSwipeThresholdOverride.get()
-            val thresholdOverride = GestureTracker.nativeThresholdOverride(interactor)
+            val thresholdOverride = if (tracker.cards) null else tracker.nativeThresholdOverride(interactor)
             thresholdOverride?.let {
                 activeSwipeThresholdOverride.set(it)
             }
             return try {
                 val result = chain.proceed()
                 if (action == MotionEvent.ACTION_UP) {
-                    val gesture = GestureTracker.takeForCustomSwipe(interactor)
-                    if (gesture != null) {
-                        performShortSwipe(gesture)
-                    }
-                    IslandMediaCardSwitcherHooker.refreshForWindow(
-                        GestureTracker.windowView(interactor)
-                    )
+                    if (!tracker.cards) tracker.takeForCustomSwipe(interactor)?.let(::performShortSwipe)
+                    (tracker.windowView(interactor) as? View)?.let(IslandMediaSessionCoordinator::requestRefresh)
                 }
                 result
             } finally {
@@ -254,14 +257,21 @@ internal object IslandMediaSwipeHooker {
                     activeSwipeThresholdOverride.set(previousThresholdOverride)
                 }
                 if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                    GestureTracker.clear(interactor)
+                    tracker.clear(interactor)
                 }
             }
         }
     }
 
-    private object GestureTracker {
+    private class GestureTracker(val cards: Boolean) {
+        private val gestures = WeakHashMap<Any, GestureState>()
+
+        fun clearAll() = synchronized(gestures) { gestures.clear() }
+        fun hasGesture(interactor: Any): Boolean = synchronized(gestures) { interactor in gestures }
+
         fun begin(interactor: Any, downX: Float, downY: Float) {
+            clear(interactor)
+            if (isSessionSwitchTarget(interactor) != cards) return
             val state = buildGestureState(interactor, downX, downY) ?: return
             synchronized(gestures) {
                 gestures[interactor] = state

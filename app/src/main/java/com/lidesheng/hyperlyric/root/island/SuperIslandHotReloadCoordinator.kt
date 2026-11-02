@@ -9,7 +9,6 @@ import com.lidesheng.hyperlyric.root.island.effects.color.StatusBarTextColorHook
 import com.lidesheng.hyperlyric.root.island.effects.glow.HookIslandGlow
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowController
 import com.lidesheng.hyperlyric.root.island.effects.glow.IslandProgressGlowHooker
-import com.lidesheng.hyperlyric.root.island.hooks.IslandMediaCardSwitcherHooker
 import com.lidesheng.hyperlyric.root.island.hooks.IslandMediaSwipeHooker
 import com.lidesheng.hyperlyric.root.island.hooks.IslandWidthLimitHooker
 import com.lidesheng.hyperlyric.root.island.hooks.SystemUIHookRegistry
@@ -46,7 +45,6 @@ internal class SuperIslandHotReloadCoordinator(
             IslandAlbumCoverStyleHooker.cleanup()
             val musicWaveHolders = IslandMusicWaveSpectrumHooker.prepareForHotReload()
             val musicWaveCallbacks = IslandMusicWaveColorHooker.prepareForHotReload()
-            IslandMediaCardSwitcherHooker.prepareForHotReload()
             IslandMediaSwipeHooker.prepareForHotReload()
             IslandNativeRefreshCoordinator.clear()
             // Strip status-bar module views only after the other fallible cleanup checks pass.
@@ -68,7 +66,7 @@ internal class SuperIslandHotReloadCoordinator(
 
     fun installPluginHooks(module: XposedModule, classLoaders: Iterable<ClassLoader>) {
         classLoaders.forEach { classLoader ->
-            SystemUIHookRegistry.hook(module, classLoader)
+            SystemUIHookRegistry.hook(module, classLoader, installMediaCardHooks = false)
         }
     }
 
@@ -117,7 +115,6 @@ internal class SuperIslandHotReloadCoordinator(
                 IslandAlbumCoverStyleHooker.cleanup()
                 IslandMusicWaveSpectrumHooker.cleanup()
                 IslandMusicWaveColorHooker.cleanup()
-                IslandMediaCardSwitcherHooker.prepareForHotReload()
                 IslandMediaSwipeHooker.prepareForHotReload()
                 IslandWidthLimitHooker.prepareForHotReload()
                 IslandDynamicWidthCoordinator.prepareForHotReload()

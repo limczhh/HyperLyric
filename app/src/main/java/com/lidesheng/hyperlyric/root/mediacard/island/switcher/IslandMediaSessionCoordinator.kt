@@ -47,7 +47,6 @@ internal object IslandMediaSessionCoordinator {
             "switch" -> switchRelative(args[1] as String, args[2] as Float)
             "preview" -> (readPlayer(args[1]!!)?.getTag(PREVIEW_TAG) == true)
             "render" -> { runtime?.let { state -> state.guard { state.renderSingle(args[1]!!) } }; null }
-            "resetPresentation" -> { runtime?.let { state -> state.guard { state.resetSingle() } }; null }
             "published" -> { runtime?.onNativePublished(args[1]!!, args[2] as Boolean); null }
             "consumePromotion" -> runtime?.nativePromotions?.remove(args[1] as String)
             "watch" -> { windows[args[1] as View] = true; null }
