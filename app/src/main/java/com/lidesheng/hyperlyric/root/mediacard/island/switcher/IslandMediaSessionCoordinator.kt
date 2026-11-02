@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root.mediacard.island.switcher
 import android.content.Context
 import android.media.session.MediaController
 import android.media.session.MediaSession
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -27,6 +28,7 @@ import java.util.function.Function
 /** Owns the media source and native card lifetimes in SystemUI, independently of the plugin. */
 internal object IslandMediaSessionCoordinator {
     private const val TAG = "IslandMediaCardSwitcher"
+    const val ACTIVITY_ORDER_EXTRA = "hyperlyric.media.activity_order"
     private const val PREFIX = "com.android.systemui.statusbar.notification.mediaisland."
     private val main = Handler(Looper.getMainLooper())
     private val constructingCard = ThreadLocal<Boolean>()
@@ -136,7 +138,7 @@ internal object IslandMediaSessionCoordinator {
         val index = pages.indexOfFirst { it.first == currentKey }
         if (index < 0) return false
         val target = (index + if (dx < 0f) 1 else -1).coerceIn(0, pages.lastIndex)
-        if (target == index) return true // Consume outward swipes even with a single session.
+        if (target == index) return false
         return state.guard {
             state.selection.selectKey(pages[target].first)
             state.sync()
@@ -171,6 +173,7 @@ internal object IslandMediaSessionCoordinator {
         private val factory = NotificationMediaNativeFactory(notification, binder) {
             error("Island holders must use the native factory")
         }
+        private var pendingPromotion: String? = null
         var expandedKey: String? = null
         private var listener: Any? = null
         var failed = false
@@ -223,6 +226,9 @@ internal object IslandMediaSessionCoordinator {
                     selection.seed(entries.map { it.key to it.value })
                     entries.forEach { (key, data) -> observe(key, data) }
                     selection.onActivityOrderChanged()
+                    pendingPromotion = policy.orderedKeys(entries.keys.toList()).firstOrNull {
+                        accessor.isPlaying(entries.getValue(it)) == true
+                    }
                     sync()
                 }
             }
@@ -231,6 +237,11 @@ internal object IslandMediaSessionCoordinator {
         private fun update(key: String, oldKey: String?, data: Any) {
             if (failed) return
             if (oldKey != null && oldKey != key) remove(oldKey)
+            // A session callback is authoritative. Only tokenless media has to rely on
+            // MediaData's delayed playback flag for native island promotion.
+            if (multi && accessor.sessionToken(data) == null && accessor.isPlaying(data) == true &&
+                entries[key]?.let(accessor::isPlaying) != true
+            ) pendingPromotion = key
             policy.onMediaDataLoaded(key, oldKey, data)
             selection.onMediaDataLoaded(key, oldKey, data)
             if (accessor.isActive(data)) {
@@ -251,13 +262,16 @@ internal object IslandMediaSessionCoordinator {
                 runOnMain {
                     guard {
                         policy.onPlaybackSignal(key, playing)
+                        if (multi && playing) pendingPromotion = key
                         selection.onActivityOrderChanged()
                         sync()
                     }
                 }
             })
             observers[key] = token to observer
-            policy.onPlaybackSignal(key, controller.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING)
+            val playing = controller.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING
+            policy.onPlaybackSignal(key, playing)
+            if (multi && playing) pendingPromotion = key
             observer.bind(controller)
         }
 
@@ -289,6 +303,10 @@ internal object IslandMediaSessionCoordinator {
                     cards[slot] = card
                 }
                 if (card.key != entry.first || entry.first in changed) card.bind(entry.first, entry.second)
+            }
+            if (multi) pendingPromotion?.let { key ->
+                cards[key]?.promote()
+                pendingPromotion = null
             }
             HookLogger.dState(
                 stateId = "$TAG.pages", tag = TAG,
@@ -384,6 +402,18 @@ internal object IslandMediaSessionCoordinator {
             }
             method(callback, "onMediaDataChanged", 1).invoke(callback, data)
             key = nextKey
+        }
+        fun promote() {
+            val payload = data() ?: return
+            val extras = method(payload, "getExtras", 0).invoke(payload) as? Bundle ?: return
+            val plugin = required(controller, "dynamicIslandPluginController")
+            val content = plugin.javaClass.methods.first {
+                it.name.startsWith("getContent") && it.parameterCount == 0
+            }.invoke(plugin) ?: return
+            // Let the plugin's normal update path refresh time and run its priority/state machine.
+            extras.putBoolean(ACTIVITY_ORDER_EXTRA, true)
+            method(content, "updateDynamicIslandView", 2).invoke(content, payload, false)
+            HookLogger.d(TAG, "请求原生媒体岛排序更新: key=$key")
         }
         fun close() {
             try {

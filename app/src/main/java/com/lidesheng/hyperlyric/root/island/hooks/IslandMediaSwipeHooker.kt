@@ -192,7 +192,11 @@ internal object IslandMediaSwipeHooker {
                 return chain.proceed()
             }
 
-            if (action == MotionEvent.ACTION_UP) {
+            if (action == MotionEvent.ACTION_MOVE &&
+                GestureTracker.ownsSessionSwipe(interactor, event.x, event.y)
+            ) return true
+
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                 GestureTracker.markUp(
                     interactor = interactor,
                     x = event.getX(),
@@ -214,9 +218,14 @@ internal object IslandMediaSwipeHooker {
                         cancel.recycle()
                         GestureTracker.clear(interactor)
                     }
-                    IslandMediaCardSwitcherHooker.switchToAdjacent(
-                        sessionGesture.windowView, sessionGesture.targetData, sessionGesture.finalDx
-                    )
+                    if (action == MotionEvent.ACTION_UP &&
+                        abs(sessionGesture.finalDx) >= sessionGesture.nativeSwipeThreshold &&
+                        abs(sessionGesture.finalDx) > abs(sessionGesture.finalDy)
+                    ) {
+                        IslandMediaCardSwitcherHooker.switchToAdjacent(
+                            sessionGesture.windowView, sessionGesture.targetData, sessionGesture.finalDx
+                        )
+                    }
                     return true
                 }
             }
@@ -310,18 +319,26 @@ internal object IslandMediaSwipeHooker {
             }
         }
 
+        fun ownsSessionSwipe(interactor: Any, x: Float, y: Float): Boolean {
+            synchronized(gestures) {
+                val state = gestures[interactor] ?: return false
+                if (!state.sessionSwitchEligible) return false
+                if (state.ownsSessionSwipe == null) {
+                    val dx = x - state.downX
+                    val dy = y - state.downY
+                    if (abs(dx) <= state.nativeTouchSlop && abs(dy) <= state.nativeTouchSlop) return false
+                    state.ownsSessionSwipe = abs(dx) > abs(dy) &&
+                        IslandMediaCardSwitcherHooker.hasAdjacent(state.windowView, state.targetData, dx)
+                }
+                return state.ownsSessionSwipe == true
+            }
+        }
+
         fun takeForSessionSwipe(interactor: Any): GestureState? {
             synchronized(gestures) {
                 val state = gestures[interactor] ?: return null
-                if (!state.sessionSwitchEligible) return null
+                if (state.ownsSessionSwipe != true) return null
                 gestures.remove(interactor)
-                val dx = state.finalDx
-                val dy = state.finalDy
-                if (!dx.isFinite() || !dy.isFinite() || dx == 0f) return null
-                if (abs(dx) <= abs(dy) || abs(dx) <= state.nativeTouchSlop) return null
-                if (state.nativeSwipeThreshold.isFinite() &&
-                    abs(dx) < state.nativeSwipeThreshold
-                ) return null
                 return state
             }
         }
@@ -351,6 +368,7 @@ internal object IslandMediaSwipeHooker {
         val downY: Float,
         val sessionSwitchEligible: Boolean
     ) {
+        var ownsSessionSwipe: Boolean? = null
         var finalDx: Float = Float.NaN
         var finalDy: Float = Float.NaN
     }

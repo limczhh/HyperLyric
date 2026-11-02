@@ -20,7 +20,7 @@ import com.lidesheng.hyperlyric.root.SystemUiEnhancementGate
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.managedHook
-import com.lidesheng.hyperlyric.root.utils.CoverColorHelper
+import com.lidesheng.hyperlyric.root.island.effects.color.IslandMusicWaveColorHooker
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -172,8 +172,6 @@ internal object IslandMusicWaveSpectrumHooker {
         }
         state.containerRef = container?.let(::WeakReference)
         state.lottieRef = lottie?.let(::WeakReference)
-        state.nativeTopColorField = field(holder, null, "gradientTopColor")
-        state.nativeBottomColorField = field(holder, null, "gradientBottomColor")
 
         val preferences = prefs
         val mode = preferences?.let { SuperIslandContentStylePolicy.readMusicWaveMode(it) }
@@ -225,7 +223,7 @@ internal object IslandMusicWaveSpectrumHooker {
             restoreNative(holder, state)
             return
         }
-        val colorPair = resolveColors(activePrefs, state)
+        val colorPair = resolveColors(holder)
         activeSpectrum.setColors(colorPair.first, colorPair.second)
         activeSpectrum.visibility = View.VISIBLE
         activeSpectrum.setOnCaptureFailure {
@@ -329,39 +327,10 @@ internal object IslandMusicWaveSpectrumHooker {
         }?.invoke(picInfo) as? String
     }.getOrNull()
 
-    private fun resolveColors(
-        prefs: SharedPreferences,
-        state: HolderState
-    ): Pair<Int, Int> {
-        val colorStyle = SuperIslandContentStylePolicy.readMusicWaveColorStyle(prefs)
-        if (!SuperIslandContentStylePolicy.usesMusicWaveCoverColor(colorStyle)) {
-            return readNativeDefaultColors(state)
-        }
-        val palette = CoverColorHelper.currentArtworkRequest()?.let { request ->
-            CoverColorHelper.getCachedColors(useGradient = true, request = request)
-        } ?: CoverColorHelper.currentSession()?.let { session ->
-            CoverColorHelper.getCachedColors(useGradient = true, session = session)
-        }?.second?.let { colors -> colors to colors }
-        val colors = palette?.second ?: return ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR to
-                ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR
-        val first = colors.getOrNull(0) ?: return ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR to
-                ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR
-        val second = if (SuperIslandContentStylePolicy.usesMusicWaveGradient(colorStyle)) {
-            colors.getOrNull(1) ?: first
-        } else {
-            first
-        }
-        return first to second
-    }
-
-    private fun readNativeDefaultColors(state: HolderState): Pair<Int, Int> {
-        val top = state.nativeTopColorField?.let { field ->
-            runCatching { field.getInt(null) }.getOrDefault(-1)
-        }?.takeIf { it != -1 } ?: ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR
-        val bottom = state.nativeBottomColorField?.let { field ->
-            runCatching { field.getInt(null) }.getOrDefault(-1)
-        }?.takeIf { it != -1 } ?: ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR
-        return top to bottom
+    private fun resolveColors(holder: Any): Pair<Int, Int> {
+        val colors = IslandMusicWaveColorHooker.colorsForHolder(holder)
+        return (colors?.getOrNull(0) ?: ISLAND_MUSIC_WAVE_DEFAULT_TOP_COLOR) to
+            (colors?.getOrNull(1) ?: ISLAND_MUSIC_WAVE_DEFAULT_BOTTOM_COLOR)
     }
 
     private fun runOnMain(block: () -> Unit) {
@@ -402,8 +371,6 @@ internal object IslandMusicWaveSpectrumHooker {
         var holderRef: WeakReference<Any>? = null
         var containerRef: WeakReference<ViewGroup>? = null
         var lottieRef: WeakReference<View>? = null
-        var nativeTopColorField: Field? = null
-        var nativeBottomColorField: Field? = null
         var nativeVisibility: Int? = null
         var hiddenLottie: Boolean = false
         var lastDebugState: String? = null

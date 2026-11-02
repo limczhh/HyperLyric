@@ -26,6 +26,7 @@ import java.util.WeakHashMap
 
 internal object IslandMusicWaveColorHooker {
     private const val TAG = "IslandMusicWaveColorHooker"
+    private val DEFAULT_NATIVE_COLORS = arrayOf(-1, -1)
     private const val ICON_HOLDER_CLASS =
         "miui.systemui.dynamicisland.module.IslandIconViewHolder"
     const val NATIVE_GRADIENT_CAPABILITY = "island.music_wave.native_gradient"
@@ -46,18 +47,6 @@ internal object IslandMusicWaveColorHooker {
     private var module: XposedModule? = null
 
     @Volatile
-    private var callbackColors: Array<Int>? = null
-
-    @Volatile
-    private var latestArtworkHolder: WeakReference<Any>? = null
-
-    @Volatile
-    private var latestArtworkPalette: IntArray? = null
-
-    @Volatile
-    private var latestArtworkBitmap: WeakReference<Bitmap>? = null
-
-    @Volatile
     private var overrideApplied = false
 
     private val prefs: SharedPreferences?
@@ -72,16 +61,6 @@ internal object IslandMusicWaveColorHooker {
             val api = IslandMusicWaveNativeApi.create(holderClass)
             // Keep Lottie's frame caller interpreted so an inlined callback cannot bypass the Hook.
             api.gradientCallers.forEach(xposedModule::deoptimize)
-            api.gradientMethods.forEach { method ->
-                method.isAccessible = true
-                xposedModule.managedHook(
-                    executable = method,
-                    capability = if (method.returnType == Any::class.java)
-                        "island.music_wave.gradient_bridge"
-                    else "island.music_wave.gradient_value",
-                    hooker = GradientValueHook(),
-                )
-            }
             val dataField = holderClass.declaredFields.firstOrNull {
                 it.name == "data"
             }?.apply {
@@ -109,7 +88,7 @@ internal object IslandMusicWaveColorHooker {
                         "island.music_wave.set_lottie_color"
                     else "island.music_wave.get_lottie_color",
                     hooker = ArtworkPaletteHook(
-                        dataField, lottieViewField,
+                        api, dataField, lottieViewField,
                         holderClass.declaredFields.firstOrNull {
                             paletteMethod.name == "getLottieColor" && it.name == "cachedBitmap"
                         }?.apply { isAccessible = true }
@@ -178,7 +157,7 @@ internal object IslandMusicWaveColorHooker {
                 val scope = IslandModificationTargetPolicy.currentScope(effectivePrefs)
                 val synced = when (scope) {
                     IslandModificationTargetPolicy.Scope.ALL_MEDIA ->
-                        applyLatestMediaColors(effectivePrefs)
+                        applyMediaColors(effectivePrefs)
 
                     IslandModificationTargetPolicy.Scope.INJECTED_LYRIC -> {
                         val colorSession = CoverColorHelper.currentSession()
@@ -224,10 +203,8 @@ internal object IslandMusicWaveColorHooker {
                 val tracked = synchronized(trackedHolders) { trackedHolders[holder] }
                     ?: return@forEach
                 val data = tracked.dataRef.get() ?: return@forEach
-                val isLatest = latestArtworkHolder?.get() === holder
-                val bitmap = if (isLatest) latestArtworkBitmap?.get() else null
-                val palette = if (isLatest) latestArtworkPalette else null
-                callbacks.add(arrayListOf(callback, holder, data, bitmap, palette?.copyOf()))
+                callbacks.add(arrayListOf(callback, holder, data, tracked.bitmapRef?.get(),
+                    tracked.palette?.copyOf(), tracked.nativeColors?.copyOf()))
             }
         }
         cleanup()
@@ -285,11 +262,12 @@ internal object IslandMusicWaveColorHooker {
                     holderClass.getDeclaredField("cachedBitmap").apply { isAccessible = true }.get(holder)
                 }.getOrNull() as? Bitmap
                 val palette = entry.getOrNull(4) as? IntArray
-                if (palette != null && bitmap != null && bitmap === entry.getOrNull(3)) {
-                    latestArtworkHolder = WeakReference(holder)
-                    latestArtworkPalette = palette.copyOf()
-                    latestArtworkBitmap = WeakReference(bitmap)
+                if (palette != null && (bitmap == null || bitmap === entry.getOrNull(3))) {
+                    rememberArtworkPalette(holder, palette, bitmap, null)
                 }
+                @Suppress("UNCHECKED_CAST")
+                val nativeColors = entry.getOrNull(5) as? Array<Int>
+                synchronized(trackedHolders) { trackedHolders[holder]?.nativeColors = nativeColors }
             }.onFailure { HookLogger.e(TAG, "接管音频律动颜色回调失败", it) }
         }
         refresh()
@@ -319,11 +297,7 @@ internal object IslandMusicWaveColorHooker {
             synchronized(trackedHolders) {
                 trackedHolders.clear()
             }
-            latestArtworkHolder = null
-            latestArtworkPalette = null
-            latestArtworkBitmap = null
             hookedClassLoaders.clear()
-            callbackColors = null
             module = null
         }
     }
@@ -340,7 +314,12 @@ internal object IslandMusicWaveColorHooker {
             if (overrideApplied) restoreNativeColors()
             return
         }
-        callbackColors = arrayOf(colors.top, colors.bottom)
+        synchronized(trackedHolders) {
+            trackedHolders.forEach { (holder, tracked) ->
+                tracked.overrideColors = if (isAllowedTarget(holder, tracked))
+                    arrayOf(colors.top, colors.bottom) else null
+            }
+        }
         overrideApplied = true
         HookLogger.dState(
             stateId = "IslandMusicWaveColorHooker.apply",
@@ -355,7 +334,7 @@ internal object IslandMusicWaveColorHooker {
     }
 
     private fun restoreNativeColors() {
-        callbackColors = null
+        synchronized(trackedHolders) { trackedHolders.values.forEach { it.overrideColors = null } }
         if (overrideApplied) {
             overrideApplied = false
             HookLogger.dState(
@@ -414,46 +393,67 @@ internal object IslandMusicWaveColorHooker {
         return true
     }
 
-    private fun applyLatestMediaColors(sharedPrefs: SharedPreferences): Boolean {
-        val holder = latestArtworkHolder?.get() ?: return false
-        val tracked = synchronized(trackedHolders) { trackedHolders[holder] } ?: return false
-        if (!isAllowedTarget(holder, tracked)) return false
-        val palette = latestArtworkPalette ?: return false
+    private fun applyMediaColors(sharedPrefs: SharedPreferences): Boolean {
         val useGradient = SuperIslandContentStylePolicy.usesMusicWaveGradient(
             SuperIslandContentStylePolicy.readMusicWaveColorStyle(sharedPrefs)
         )
-        val colors = colorsFromPalette(palette.toList(), useGradient) ?: return false
-        applyOptimizedColors(colors)
-        return true
+        var applied = 0
+        synchronized(trackedHolders) {
+            trackedHolders.forEach { (holder, tracked) ->
+                val colors = tracked.palette?.toList()?.let { colorsFromPalette(it, useGradient) }
+                tracked.overrideColors = if (colors != null && isAllowedTarget(holder, tracked)) {
+                    applied++
+                    arrayOf(colors.top, colors.bottom)
+                } else null
+            }
+        }
+        overrideApplied = applied > 0
+        invalidateTrackedLottieViews()
+        return applied > 0
+    }
+
+    /** Shared by the original Lottie and the spectrum renderer; always scoped to one holder. */
+    fun colorsForHolder(holder: Any): Array<Int>? = synchronized(trackedHolders) {
+        val tracked = trackedHolders[holder] ?: return@synchronized null
+        tracked.overrideColors?.takeIf { isAllowedTarget(holder, tracked) } ?: tracked.nativeColors
     }
 
     private fun trackHolder(holder: Any, data: Any, lottieView: View?) {
         val holderRoot = IslandProbeUtils.getHolderRootView(holder)
         synchronized(trackedHolders) {
+            val previous = trackedHolders[holder]
+            if (previous?.dataRef?.get() === data) {
+                trackedHolders[holder] = previous.copy(
+                    lottieViewRef = lottieView?.let(::WeakReference),
+                    holderRootRef = holderRoot?.let(::WeakReference),
+                )
+                return
+            }
+            val previousData = previous?.dataRef?.get()
+            val sameIsland = previousData != null && previousData.javaClass.getMethod("getKey").invoke(previousData) ==
+                data.javaClass.getMethod("getKey").invoke(data)
             trackedHolders[holder] = TrackedHolder(
-                dataRef = WeakReference<Any>(data),
-                lottieViewRef = lottieView?.let { WeakReference<View>(it) },
-                holderRootRef = holderRoot?.let {
-                    WeakReference<android.view.ViewGroup>(it)
-                }
+                dataRef = WeakReference(data),
+                lottieViewRef = lottieView?.let(::WeakReference),
+                holderRootRef = holderRoot?.let(::WeakReference),
+                bitmapRef = previous?.bitmapRef?.takeIf { sameIsland },
+                palette = previous?.palette?.takeIf { sameIsland },
+                nativeColors = previous?.nativeColors?.takeIf { sameIsland },
+                overrideColors = previous?.overrideColors?.takeIf { sameIsland },
             )
         }
     }
 
     private fun rememberArtworkPalette(
-        holder: Any,
-        palette: Pair<IntArray, IntArray>?,
-        bitmap: Bitmap?,
+        holder: Any, palette: IntArray?, bitmap: Bitmap?, nativeColors: Array<Int>?,
     ) {
-        if (palette == null || palette.first.isEmpty() && palette.second.isEmpty()) {
-            latestArtworkHolder = null
-            latestArtworkPalette = null
-            latestArtworkBitmap = null
-            return
+        synchronized(trackedHolders) {
+            trackedHolders[holder]?.let { tracked ->
+                tracked.palette = palette?.copyOf()
+                tracked.bitmapRef = bitmap?.let(::WeakReference)
+                tracked.nativeColors = nativeColors?.copyOf() ?: tracked.nativeColors
+            }
         }
-        latestArtworkHolder = WeakReference(holder)
-        latestArtworkPalette = palette.second.copyOf()
-        latestArtworkBitmap = bitmap?.let(::WeakReference)
     }
 
     private fun untrackHolder(holder: Any) {
@@ -503,6 +503,7 @@ internal object IslandMusicWaveColorHooker {
     }
 
     private class ArtworkPaletteHook(
+        private val api: IslandMusicWaveNativeApi,
         private val dataField: Field?,
         private val lottieViewField: Field,
         private val cachedBitmapField: Field?
@@ -511,7 +512,17 @@ internal object IslandMusicWaveColorHooker {
             val requestGeneration = generation
             val holder = chain.thisObject
             val data = runCatching { holder?.let { dataField?.get(it) } }.getOrNull()
-            val result = chain.proceed()
+            var nativeColors: Array<Int>? = null
+            fun proceedAndCapture(): Any? {
+                val result = chain.proceed()
+                if (holder != null) nativeColors = runCatching { api.nativeColors(holder, result) }.getOrNull()
+                return result
+            }
+            // The legacy setter writes two static fields. Read them under the same lock as
+            // the native call so another holder cannot overwrite them between capture steps.
+            val result = if (api.paletteMethod?.name == "setLottieColor") {
+                synchronized(requireNotNull(api.paletteMethod).declaringClass) { proceedAndCapture() }
+            } else proceedAndCapture()
             if (holder == null || data == null) return result
             runCatching {
                 // New getLottieColor() runs on Dispatchers.IO. Extract there, then touch Views on main.
@@ -542,7 +553,7 @@ internal object IslandMusicWaveColorHooker {
                         }
                         val lottieView = lottieViewField.get(holder) as? View
                         trackHolder(holder, data, lottieView)
-                        rememberArtworkPalette(holder, artworkPalette, bitmap)
+                        rememberArtworkPalette(holder, artworkPalette?.second, bitmap, nativeColors)
                         refresh()
                         IslandMusicWaveSpectrumHooker.refresh()
                     }.onFailure { HookLogger.e(TAG, "应用音频律动封面色失败", it) }
@@ -558,34 +569,38 @@ internal object IslandMusicWaveColorHooker {
         private val lottieViewField: Field
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
+            val args = chain.args.toTypedArray()
             runCatching {
                 val holder = registeringHolder.get() ?: return@runCatching
                 val view = lottieViewField.get(holder) ?: return@runCatching
                 if (api.drawableField?.get(view) !== chain.thisObject) return@runCatching
-                val callback = chain.args.getOrNull(2) ?: return@runCatching
+                var callback = args.getOrNull(2) ?: return@runCatching
+                if (api.gradientMethods.isNotEmpty()) {
+                    // Legacy SystemUI registers a singleton callback. Give each holder its own
+                    // instance before Lottie retains it, so its native palette can stay independent.
+                    callback = callback.javaClass.getDeclaredConstructor()
+                        .apply { isAccessible = true }.newInstance()
+                    args[2] = callback
+                }
                 val methods = api.callbackMethods(callback.javaClass)
                 check(methods.isNotEmpty()) { "Native music-wave value callback unavailable" }
-                methods.forEach { method ->
-                    installNativeGradientHook(requireNotNull(module), method, dataField)
-                }
+                methods.forEach { installNativeGradientHook(requireNotNull(module), it, dataField) }
                 synchronized(callbackHolders) { callbackHolders[callback] = WeakReference(holder) }
             }.onFailure { HookLogger.e(TAG, "跟踪原生音频律动颜色回调失败", it) }
-            return chain.proceed()
+            return chain.proceed(args)
         }
     }
 
     private class NativeGradientValueHook(private val dataField: Field?) : Hooker {
         override fun intercept(chain: Chain): Any? {
-            val colors = callbackColors ?: return chain.proceed()
             val holder = synchronized(callbackHolders) {
                 callbackHolders[chain.thisObject]?.get()
             } ?: return chain.proceed()
             val tracked = synchronized(trackedHolders) { trackedHolders[holder] }
                 ?: return chain.proceed()
-            val allowed = runCatching {
-                tracked.dataRef.get() === dataField?.get(holder) && isAllowedTarget(holder, tracked)
-            }.getOrDefault(false)
-            return if (allowed) colors else chain.proceed()
+            val current = runCatching { tracked.dataRef.get() === dataField?.get(holder) }.getOrDefault(false)
+            if (!current) return chain.proceed()
+            return colorsForHolder(holder) ?: DEFAULT_NATIVE_COLORS
         }
     }
 
@@ -650,7 +665,11 @@ internal object IslandMusicWaveColorHooker {
     private data class TrackedHolder(
         val dataRef: WeakReference<Any>,
         val lottieViewRef: WeakReference<View>?,
-        val holderRootRef: WeakReference<android.view.ViewGroup>?
+        val holderRootRef: WeakReference<android.view.ViewGroup>?,
+        var bitmapRef: WeakReference<Bitmap>? = null,
+        var palette: IntArray? = null,
+        var nativeColors: Array<Int>? = null,
+        var overrideColors: Array<Int>? = null,
     )
 
     private data class WaveColors(
@@ -658,11 +677,4 @@ internal object IslandMusicWaveColorHooker {
         val bottom: Int
     )
 
-    // Xiaomi's callback reads shared native colors on every animation frame. Supply the
-    // committed palette here so background native palette updates cannot leak into a frame.
-    private class GradientValueHook : Hooker {
-        override fun intercept(chain: Chain): Any? {
-            return callbackColors ?: chain.proceed()
-        }
-    }
 }

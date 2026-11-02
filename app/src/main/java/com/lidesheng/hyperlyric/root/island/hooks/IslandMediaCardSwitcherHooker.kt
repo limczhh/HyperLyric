@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
+import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.managedHook
@@ -64,12 +65,68 @@ internal object IslandMediaCardSwitcherHooker {
                     }
                 })
             }
+            val events = loader.loadClass("miui.systemui.dynamicisland.event.DynamicIslandEventCoordinator")
+            events.declaredMethods.first {
+                it.name == "dispatchEvent" && it.parameterCount == 2
+            }.let { method ->
+                module.managedHook(method, "island.media_switcher.activity_order", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        if (chain.args.firstOrNull()?.javaClass?.simpleName != "UpdateDynamicIsland") {
+                            return chain.proceed()
+                        }
+                        val content = chain.args.getOrNull(1) ?: return chain.proceed()
+                        val data = IslandProbeUtils.getCurrentIslandData(content)
+                        val extras = data?.let { call(it, "getExtras") } as? Bundle
+                        if (extras?.getBoolean(IslandMediaSessionCoordinator.ACTIVITY_ORDER_EXTRA) == true) {
+                            extras.remove(IslandMediaSessionCoordinator.ACTIVITY_ORDER_EXTRA)
+                            val state = call(content, "getState")
+                            if (state != null) {
+                                val now = System.currentTimeMillis()
+                                // Use native update-order handling on both plugin generations.
+                                // Tablets compare postTime; phones compare time, with native
+                                // notification priorities still taking precedence on both.
+                                mapOf("setTime" to now, "setPostTime" to now, "setUpdateOrder" to true)
+                                    .forEach { (name, value) ->
+                                        state.javaClass.methods.first {
+                                            it.name == name && it.parameterCount == 1
+                                        }.invoke(state, value)
+                                    }
+                            }
+                        }
+                        return chain.proceed()
+                    }
+                })
+            }
+
+            // Expansion can finish after the add/update coroutine has returned. Watch the native
+            // state owner instead of depending on the next touch or media update to mount dots.
+            val expandedHandler = loader.loadClass(
+                "miui.systemui.dynamicisland.event.handler.ExpandedStateHandler"
+            )
+            expandedHandler.declaredMethods.first {
+                it.name == "setCurrent" && it.parameterCount == 1
+            }.let { method ->
+                module.managedHook(method, "island.media_switcher.expanded_state", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val result = chain.proceed()
+                        watchedWindows.keys.toList().forEach(::refreshForWindow)
+                        return result
+                    }
+                })
+            }
         }.onFailure { HookLogger.w(TAG, "超级岛媒体卡片展示接口不可用", it) }
     }
 
     fun canSwitch(window: Any?): Boolean = (window as? View)?.let {
         IslandMediaSessionCoordinator.connect(it)?.apply(arrayOf("single")) == true
     } ?: false
+
+    fun hasAdjacent(window: Any, data: Any, dx: Float): Boolean {
+        val view = window as? View ?: return false
+        val bridge = IslandMediaSessionCoordinator.connect(view, data) ?: return false
+        val page = key(data)?.let { bridge.apply(arrayOf("pages", it)) } as? IntArray ?: return false
+        return if (dx < 0f) page[1] + 1 < page[0] else page[1] > 0
+    }
 
     fun switchToAdjacent(windowView: Any, currentData: Any, dx: Float): Boolean {
         val key = key(currentData) ?: return false
@@ -99,9 +156,17 @@ internal object IslandMediaCardSwitcherHooker {
             indicators.remove(window)?.detach()
             return
         }
-        val indicator = indicators.getOrPut(window) { NotificationMediaPageIndicator() }
+        val player = call(data, "getView") as? View ?: return
+        val indicator = indicators.getOrPut(window) {
+            // The plugin loader cannot resolve SystemUI's PageIndicator. Use the media player,
+            // which is inflated by SystemUI and retains that component's class loader.
+            NotificationMediaPageIndicator(player.javaClass.classLoader, player.context)
+        }
         indicator.attachTo(parent)
         indicator.update(page[0], page[1], enabled = true)
+        HookLogger.dState(
+            stateId = "$TAG.indicator", tag = TAG, state = "${page[0]}/${page[1]}",
+        ) { "单岛指示器更新: pages=${page[0]}, selected=${page[1]}" }
     }
 
     private fun key(data: Any): String? = call(data, "getKey") as? String

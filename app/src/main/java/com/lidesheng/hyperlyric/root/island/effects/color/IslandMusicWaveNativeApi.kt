@@ -21,6 +21,21 @@ internal class IslandMusicWaveNativeApi private constructor(
                 (method.returnType == Any::class.java || method.returnType == BOXED_COLORS)
         }
 
+    fun nativeColors(holder: Any, result: Any?): Array<Int>? {
+        if (paletteMethod?.name == "setLottieColor") {
+            return arrayOf("gradientTopColor", "gradientBottomColor").map { name ->
+                holder.javaClass.getDeclaredField(name).apply { isAccessible = true }.getInt(null)
+            }.toTypedArray()
+        }
+        result ?: return null
+        // Kotlin Pair's accessors can be removed by R8. Its two ordered value fields remain.
+        val fields = result.javaClass.declaredFields.filterNot { Modifier.isStatic(it.modifiers) }
+            .sortedBy { it.name }
+        if (fields.size != 2) return null
+        val values = fields.map { it.apply { isAccessible = true }.get(result) as? Number ?: return null }
+        return arrayOf(values[0].toInt(), values[1].toInt())
+    }
+
     companion object {
         private val BOXED_COLORS = arrayOf<Int>().javaClass
         private val FLOAT = Float::class.javaPrimitiveType
@@ -51,9 +66,10 @@ internal class IslandMusicWaveNativeApi private constructor(
                 }
                 val typed = methods.firstOrNull { it.returnType == BOXED_COLORS }
                     ?: error("Legacy music-wave gradient callback unavailable")
+                val registration = callbackRegistration(holderClass, legacy)
                 return IslandMusicWaveNativeApi(
                     palette, methods, frameCallers(requireNotNull(legacy.superclass)),
-                    typed.parameterTypes[0], null, null
+                    typed.parameterTypes[0], registration.first, registration.second
                 )
             }
 
@@ -80,6 +96,20 @@ internal class IslandMusicWaveNativeApi private constructor(
                 palette, emptyList(), frameCallers(addCallback.parameterTypes[2]),
                 lambda.parameterTypes[0], registration, drawable
             )
+        }
+
+        private fun callbackRegistration(holderClass: Class<*>, callbackType: Class<*>): Pair<Method, Field> {
+            val lottieClass = holderClass.getDeclaredField("lottieView").type
+            val add = lottieClass.methods.single {
+                it.name == "addValueCallback" && it.parameterCount == 3 &&
+                    it.parameterTypes[1] == Any::class.java &&
+                    !it.parameterTypes[2].isInterface && it.parameterTypes[2].isAssignableFrom(callbackType)
+            }
+            val drawable = lottieClass.getDeclaredField("lottieDrawable").apply { isAccessible = true }
+            val registration = drawable.type.declaredMethods.single {
+                it.returnType == Void.TYPE && it.parameterTypes.contentEquals(add.parameterTypes)
+            }
+            return registration to drawable
         }
 
         private fun frameCallers(owner: Class<*>): List<Method> =
