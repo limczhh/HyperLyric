@@ -7,12 +7,14 @@ import android.util.TypedValue
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
+import com.lidesheng.hyperlyric.common.WordHighlightPreferencePolicy
 import com.lidesheng.hyperlyric.common.getFloatCompat
 import com.lidesheng.hyperlyric.lyric.view.Highlight
 import com.lidesheng.hyperlyric.lyric.view.LyricViewStyle
 import com.lidesheng.hyperlyric.lyric.view.Marquee
 import com.lidesheng.hyperlyric.lyric.view.TextLook
 import com.lidesheng.hyperlyric.lyric.view.TitleSlot
+import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.WordMotion
 import com.lidesheng.hyperlyric.lyric.view.line.WordRevealAnimation
 
@@ -278,6 +280,16 @@ object LyricStyleHelper {
                     RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE,
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE
                 ),
+            ),
+            // 未演唱歌词的不透明度：先按偏好归一化，再交给 View 层渲染。
+            wordHighlight = WordHighlight(
+                unsungOpacity = WordHighlightPreferencePolicy.normalizeUnsungOpacity(
+                    getFloatCompat(
+                        prefs,
+                        RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+                        RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY
+                    )
+                )
             ),
             placeholder = TitleSlot.NONE,
             centerIfPossible = centerIfPossible,
