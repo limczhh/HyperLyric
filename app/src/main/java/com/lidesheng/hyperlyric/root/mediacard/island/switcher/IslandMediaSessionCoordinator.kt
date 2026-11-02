@@ -3,7 +3,6 @@ package com.lidesheng.hyperlyric.root.mediacard.island.switcher
 import android.content.Context
 import android.media.session.MediaController
 import android.media.session.MediaSession
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -28,10 +27,10 @@ import java.util.function.Function
 /** Owns the media source and native card lifetimes in SystemUI, independently of the plugin. */
 internal object IslandMediaSessionCoordinator {
     private const val TAG = "IslandMediaCardSwitcher"
-    const val ACTIVITY_ORDER_EXTRA = "hyperlyric.media.activity_order"
     private const val PREFIX = "com.android.systemui.statusbar.notification.mediaisland."
     private val main = Handler(Looper.getMainLooper())
     private val constructingCard = ThreadLocal<Boolean>()
+    private val ownedControllers = WeakHashMap<Any, String?>()
     private val binderTemplates = WeakHashMap<Any, Pair<Constructor<*>, List<Any?>>>()
     private var runtime: Runtime? = null
     // Boot-class interfaces and native View tags keep the persistent media runtime reachable
@@ -44,7 +43,9 @@ internal object IslandMediaSessionCoordinator {
             "ready" -> isRunning()
             "single" -> runtime?.let { !it.failed && !it.multi } == true
             "pages" -> pageState(args[1] as String)?.let { intArrayOf(it.first, it.second) }
-            "switch" -> switchRelative(args[1]!!, args[2] as String, args[3] as Float)
+            "switch" -> switchRelative(args[2] as String, args[3] as Float)
+            "prepareUpdate" -> runtime?.prepareUpdate(args[1]!!, args[2]!!, args[3] as Boolean)
+            "consumePromotion" -> runtime?.nativePromotions?.remove(args[1] as String)
             "watch" -> { windows[args[1] as View] = true; null }
             "expanded" -> { runtime?.expandedKey = args[1] as? String; null }
             else -> null
@@ -91,6 +92,33 @@ internal object IslandMediaSessionCoordinator {
                     }
                 })
             }
+            controller.declaredMethods.filter {
+                it.name == "addDynamicIslandView" && it.parameterCount == 3
+            }.forEach { method ->
+                module.managedHook(method, "media.island_switcher.card_publish", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        if (ownedControllers.containsKey(chain.thisObject)) {
+                            chain.args.take(2).forEach { holder ->
+                                (holder?.let { read(it, "player") } as? View)?.setTag(BRIDGE_TAG, bridge)
+                            }
+                        }
+                        return chain.proceed()
+                    }
+                })
+            }
+            controller.declaredMethods.filter {
+                it.name.startsWith("removeDynamicIslandView") && it.parameterCount == 2 &&
+                    it.parameterTypes[0] == String::class.java
+            }.forEach { method ->
+                module.managedHook(method, "media.island_switcher.remove_key", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val displayKey = ownedControllers[chain.thisObject] ?: return chain.proceed()
+                        val args = chain.args.toTypedArray()
+                        args[0] = displayKey
+                        return chain.proceed(args)
+                    }
+                })
+            }
             controller.declaredConstructors.forEach { constructor ->
                 module.managedHook(constructor, "media.island_switcher.source", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
@@ -127,23 +155,27 @@ internal object IslandMediaSessionCoordinator {
         val state = runtime ?: return null
         if (state.multi || state.failed) return null
         val keys = state.pages().map { it.first }
-        val index = keys.indexOf(currentKey)
+        val card = state.cards["single"] ?: return null
+        if (card.islandKey != currentKey) return null
+        val selectedKey = card.key
+        val index = keys.indexOf(selectedKey)
         return if (index >= 0) keys.size to index else null
     }
 
-    private fun switchRelative(windowController: Any, currentKey: String, dx: Float): Boolean {
+    private fun switchRelative(currentKey: String, dx: Float): Boolean {
         val state = runtime ?: return false
         if (state.multi || state.failed) return false
         val pages = state.pages()
-        val index = pages.indexOfFirst { it.first == currentKey }
+        val card = state.cards["single"] ?: return false
+        if (card.islandKey != currentKey) return false
+        val selectedKey = card.key
+        val index = pages.indexOfFirst { it.first == selectedKey }
         if (index < 0) return false
         val target = (index + if (dx < 0f) 1 else -1).coerceIn(0, pages.lastIndex)
         if (target == index) return false
         return state.guard {
             state.selection.selectKey(pages[target].first)
             state.sync()
-            val data = state.cards.values.single().data() ?: error("Selected island data unavailable")
-            method(windowController, "updateDynamicIslandView", 2).invoke(windowController, data, true)
             notifyPagesChanged()
             HookLogger.d(TAG, "单岛切换媒体会话: from=$currentKey, to=${pages[target].first}")
         }
@@ -173,6 +205,7 @@ internal object IslandMediaSessionCoordinator {
         private val factory = NotificationMediaNativeFactory(notification, binder) {
             error("Island holders must use the native factory")
         }
+        val nativePromotions = LinkedHashMap<String, Long>()
         private var pendingPromotion: String? = null
         var expandedKey: String? = null
         private var listener: Any? = null
@@ -277,9 +310,22 @@ internal object IslandMediaSessionCoordinator {
 
         private fun remove(key: String) {
             entries.remove(key)
+            nativePromotions.remove(key)
             observers.remove(key)?.second?.clear()
             policy.onMediaDataRemoved(key)
             selection.onMediaDataRemoved(key)
+        }
+
+        fun prepareUpdate(window: Any, data: Any, expanded: Boolean): Boolean {
+            if (multi || failed) return expanded
+            val card = cards["single"] ?: return expanded
+            if (card.data() !== data) return expanded
+            val displayKey = card.islandKey ?: return expanded
+            method(data, "setKey", 1).invoke(data, displayKey)
+            val current = method(window, "getCurrentExpandedState", 0).invoke(window)
+            val currentData = current?.let { method(it, "getCurrentIslandData", 0).invoke(it) }
+            val currentKey = currentData?.let { method(it, "getKey", 0).invoke(it) }
+            return expanded || currentKey == displayKey
         }
 
         fun pages(): List<Pair<String, Any>> = selection.snapshot(limit).entries
@@ -305,7 +351,10 @@ internal object IslandMediaSessionCoordinator {
                 if (card.key != entry.first || entry.first in changed) card.bind(entry.first, entry.second)
             }
             if (multi) pendingPromotion?.let { key ->
-                cards[key]?.promote()
+                cards[key]?.let { card ->
+                    nativePromotions[key] = System.currentTimeMillis()
+                    card.promote()
+                }
                 pendingPromotion = null
             }
             HookLogger.dState(
@@ -366,12 +415,13 @@ internal object IslandMediaSessionCoordinator {
                 val controller = constructor.newInstance(*args.toTypedArray())
                 val callback = (topListeners - before).single()
                 topListeners.remove(callback)
+                ownedControllers[controller] = null
                 method(controller, "resetPlayerHolder", 0).invoke(controller)
                 listOf("miuiPlayerHolder", "miuiDummyPlayerHolder").forEach { name ->
                     val holder = required(controller, name)
                     (required(holder, "player") as View).setTag(BRIDGE_TAG, bridge)
                 }
-                return Card(controller, callback, native, registrations)
+                return Card(controller, callback, native, registrations, single = !multi)
             } catch (error: Throwable) {
                 registrations.asReversed().forEach { runCatching(it) }
                 native?.close()
@@ -388,30 +438,35 @@ internal object IslandMediaSessionCoordinator {
         private val callback: Any,
         private val native: NotificationMediaNativeFactory.Controller,
         private val registrations: List<() -> Unit>,
+        private val single: Boolean,
     ) {
+        var islandKey: String? = null
+            private set
         var key: String? = null
             private set
         fun data(): Any? = read(controller, "dynamicIslandData")
         fun bind(nextKey: String, data: Any) {
             native.prepareBind(data)
-            if (key != nextKey) {
-                key?.let { old -> method(controller, "removeDynamicIslandView", 2).invoke(controller, old, true) }
-                // Native add gates a brand-new island on isPlaying. An existing-key update also
-                // creates a missing plugin View, so paused sessions remain selectable unchanged.
+            val previous = key
+            if (islandKey == null || !single) islandKey = nextKey
+            ownedControllers[controller] = islandKey
+            if (previous != nextKey) {
+                if (!single) previous?.let { old ->
+                    method(controller, "removeDynamicIslandView", 2).invoke(controller, old, true)
+                }
+                // Keep the native builder on its update path, including for paused sessions.
                 field(controller, "currentKey").set(controller, nextKey)
             }
-            method(callback, "onMediaDataChanged", 1).invoke(callback, data)
             key = nextKey
+            method(callback, "onMediaDataChanged", 1).invoke(callback, data)
         }
         fun promote() {
             val payload = data() ?: return
-            val extras = method(payload, "getExtras", 0).invoke(payload) as? Bundle ?: return
             val plugin = required(controller, "dynamicIslandPluginController")
             val content = plugin.javaClass.methods.first {
                 it.name.startsWith("getContent") && it.parameterCount == 0
             }.invoke(plugin) ?: return
             // Let the plugin's normal update path refresh time and run its priority/state machine.
-            extras.putBoolean(ACTIVITY_ORDER_EXTRA, true)
             method(content, "updateDynamicIslandView", 2).invoke(content, payload, false)
             HookLogger.d(TAG, "请求原生媒体岛排序更新: key=$key")
         }
@@ -433,6 +488,7 @@ internal object IslandMediaSessionCoordinator {
                 registrations.asReversed().forEach { unregister ->
                     runCatching(unregister).onFailure { HookLogger.w(TAG, "注销媒体卡片回调失败", it) }
                 }
+                ownedControllers.remove(controller)
                 native.close()
             }
         }

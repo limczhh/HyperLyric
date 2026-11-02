@@ -21,10 +21,7 @@ import kotlin.math.roundToInt
  * one to [MiuiMediaHeaderView]. Reusing that class keeps the native dot
  * drawable and tint consistent with SystemUI.
  */
-internal class NotificationMediaPageIndicator(
-    private val nativeClassLoader: ClassLoader? = null,
-    private val nativeContext: Context? = null,
-) {
+internal class NotificationMediaPageIndicator {
     private companion object {
         const val TAG = "NotificationMediaPageIndicator"
         const val PAGE_INDICATOR = "com.android.systemui.qs.PageIndicator"
@@ -184,12 +181,12 @@ internal class NotificationMediaPageIndicator(
     }
 
     private fun createNativeIndicator(player: View): View? {
-        val classLoader = nativeClassLoader ?: player.javaClass.classLoader ?: run {
+        val loader = player.javaClass.classLoader ?: run {
             warnOnce("无法取得 SystemUI classLoader")
             return null
         }
         return runCatching {
-            val indicatorClass = classLoader.loadClass(PAGE_INDICATOR)
+            val indicatorClass = loader.loadClass(PAGE_INDICATOR)
             if (!View::class.java.isAssignableFrom(indicatorClass)) {
                 error("$PAGE_INDICATOR 不是 View")
             }
@@ -198,7 +195,7 @@ internal class NotificationMediaPageIndicator(
                 AttributeSet::class.java
             )
             val pageIndicator = constructor.newInstance(
-                nativeContext ?: player.context,
+                player.context,
                 null as AttributeSet?
             ) as View
             setNumPages = indicatorClass.getMethod(

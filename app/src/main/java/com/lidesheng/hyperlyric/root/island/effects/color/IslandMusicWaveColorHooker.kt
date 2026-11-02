@@ -26,7 +26,6 @@ import java.util.WeakHashMap
 
 internal object IslandMusicWaveColorHooker {
     private const val TAG = "IslandMusicWaveColorHooker"
-    private val DEFAULT_NATIVE_COLORS = arrayOf(-1, -1)
     private const val ICON_HOLDER_CLASS =
         "miui.systemui.dynamicisland.module.IslandIconViewHolder"
     const val NATIVE_GRADIENT_CAPABILITY = "island.music_wave.native_gradient"
@@ -36,6 +35,7 @@ internal object IslandMusicWaveColorHooker {
         Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     )
     private val trackedHolders = WeakHashMap<Any, TrackedHolder>()
+    private val islandPalettes = IslandMusicWavePaletteStore()
     private val registeringHolder = ThreadLocal<Any>()
     private val callbackHolders = WeakHashMap<Any, WeakReference<Any>>()
     private val hookedGradientMethods = mutableSetOf<Method>()
@@ -203,8 +203,9 @@ internal object IslandMusicWaveColorHooker {
                 val tracked = synchronized(trackedHolders) { trackedHolders[holder] }
                     ?: return@forEach
                 val data = tracked.dataRef.get() ?: return@forEach
-                callbacks.add(arrayListOf(callback, holder, data, tracked.bitmapRef?.get(),
-                    tracked.palette?.copyOf(), tracked.nativeColors?.copyOf()))
+                val palette = islandPalettes.get(islandKey(data))
+                callbacks.add(arrayListOf(callback, holder, data, null,
+                    palette?.cover?.copyOf(), palette?.native?.copyOf()))
             }
         }
         cleanup()
@@ -258,16 +259,10 @@ internal object IslandMusicWaveColorHooker {
                 }
                 trackHolder(holder, data, view)
                 synchronized(callbackHolders) { callbackHolders[callback] = WeakReference(holder) }
-                val bitmap = runCatching {
-                    holderClass.getDeclaredField("cachedBitmap").apply { isAccessible = true }.get(holder)
-                }.getOrNull() as? Bitmap
                 val palette = entry.getOrNull(4) as? IntArray
-                if (palette != null && (bitmap == null || bitmap === entry.getOrNull(3))) {
-                    rememberArtworkPalette(holder, palette, bitmap, null)
-                }
                 @Suppress("UNCHECKED_CAST")
                 val nativeColors = entry.getOrNull(5) as? Array<Int>
-                synchronized(trackedHolders) { trackedHolders[holder]?.nativeColors = nativeColors }
+                rememberArtworkPalette(holder, palette, nativeColors)
             }.onFailure { HookLogger.e(TAG, "接管音频律动颜色回调失败", it) }
         }
         refresh()
@@ -296,6 +291,7 @@ internal object IslandMusicWaveColorHooker {
             registeringHolder.remove()
             synchronized(trackedHolders) {
                 trackedHolders.clear()
+                islandPalettes.clear()
             }
             hookedClassLoaders.clear()
             module = null
@@ -400,7 +396,8 @@ internal object IslandMusicWaveColorHooker {
         var applied = 0
         synchronized(trackedHolders) {
             trackedHolders.forEach { (holder, tracked) ->
-                val colors = tracked.palette?.toList()?.let { colorsFromPalette(it, useGradient) }
+                val colors = islandPalettes.get(tracked.dataRef.get()?.let(::islandKey))?.cover
+                    ?.toList()?.let { colorsFromPalette(it, useGradient) }
                 tracked.overrideColors = if (colors != null && isAllowedTarget(holder, tracked)) {
                     applied++
                     arrayOf(colors.top, colors.bottom)
@@ -415,7 +412,8 @@ internal object IslandMusicWaveColorHooker {
     /** Shared by the original Lottie and the spectrum renderer; always scoped to one holder. */
     fun colorsForHolder(holder: Any): Array<Int>? = synchronized(trackedHolders) {
         val tracked = trackedHolders[holder] ?: return@synchronized null
-        tracked.overrideColors?.takeIf { isAllowedTarget(holder, tracked) } ?: tracked.nativeColors
+        tracked.overrideColors?.takeIf { isAllowedTarget(holder, tracked) }
+            ?: islandPalettes.get(tracked.dataRef.get()?.let(::islandKey))?.native
     }
 
     private fun trackHolder(holder: Any, data: Any, lottieView: View?) {
@@ -436,29 +434,31 @@ internal object IslandMusicWaveColorHooker {
                 dataRef = WeakReference(data),
                 lottieViewRef = lottieView?.let(::WeakReference),
                 holderRootRef = holderRoot?.let(::WeakReference),
-                bitmapRef = previous?.bitmapRef?.takeIf { sameIsland },
-                palette = previous?.palette?.takeIf { sameIsland },
-                nativeColors = previous?.nativeColors?.takeIf { sameIsland },
                 overrideColors = previous?.overrideColors?.takeIf { sameIsland },
             )
+            islandPalettes.retain(trackedHolders.values.mapNotNull { it.dataRef.get()?.let(::islandKey) }.toSet())
         }
     }
 
-    private fun rememberArtworkPalette(
-        holder: Any, palette: IntArray?, bitmap: Bitmap?, nativeColors: Array<Int>?,
-    ) {
+    private fun islandKey(data: Any): String? =
+        data.javaClass.getMethod("getKey").invoke(data) as? String
+
+    private fun rememberArtworkPalette(holder: Any, palette: IntArray?, nativeColors: Array<Int>?) {
         synchronized(trackedHolders) {
-            trackedHolders[holder]?.let { tracked ->
-                tracked.palette = palette?.copyOf()
-                tracked.bitmapRef = bitmap?.let(::WeakReference)
-                tracked.nativeColors = nativeColors?.copyOf() ?: tracked.nativeColors
-            }
+            val data = trackedHolders[holder]?.dataRef?.get() ?: return
+            val key = islandKey(data) ?: return
+            islandPalettes.remember(key, palette, nativeColors)
+            HookLogger.dState(
+                stateId = "$TAG.palette", tag = TAG,
+                state = "$key/${nativeColors?.contentToString()}/${palette?.contentHashCode()}",
+            ) { "媒体岛律动取色更新: key=$key, native=${nativeColors?.contentToString()}, cover=${palette != null}" }
         }
     }
 
     private fun untrackHolder(holder: Any) {
         synchronized(trackedHolders) {
             trackedHolders.remove(holder)
+            islandPalettes.retain(trackedHolders.values.mapNotNull { it.dataRef.get()?.let(::islandKey) }.toSet())
         }
     }
 
@@ -536,13 +536,14 @@ internal object IslandMusicWaveColorHooker {
                 }.getOrNull()
                 runOnMain {
                     runCatching {
-                        if (generation != requestGeneration || dataField?.get(holder) !== data ||
+                        val currentData = dataField?.get(holder) ?: return@runCatching
+                        if (generation != requestGeneration || islandKey(currentData) != islandKey(data) ||
                             (cachedBitmapField != null && cachedBitmapField.get(holder) !== bitmap)
                         ) {
                             return@runCatching
                         }
                         val target = IslandModificationTargetPolicy.resolve(
-                            data = data,
+                            data = currentData,
                             hostRoot = IslandProbeUtils.getHolderRootView(holder)
                         )
                         if (!target.isMediaTarget) {
@@ -552,8 +553,8 @@ internal object IslandMusicWaveColorHooker {
                             return@runCatching
                         }
                         val lottieView = lottieViewField.get(holder) as? View
-                        trackHolder(holder, data, lottieView)
-                        rememberArtworkPalette(holder, artworkPalette?.second, bitmap, nativeColors)
+                        trackHolder(holder, currentData, lottieView)
+                        rememberArtworkPalette(holder, artworkPalette?.second, nativeColors)
                         refresh()
                         IslandMusicWaveSpectrumHooker.refresh()
                     }.onFailure { HookLogger.e(TAG, "应用音频律动封面色失败", it) }
@@ -600,7 +601,7 @@ internal object IslandMusicWaveColorHooker {
                 ?: return chain.proceed()
             val current = runCatching { tracked.dataRef.get() === dataField?.get(holder) }.getOrDefault(false)
             if (!current) return chain.proceed()
-            return colorsForHolder(holder) ?: DEFAULT_NATIVE_COLORS
+            return colorsForHolder(holder) ?: chain.proceed()
         }
     }
 
@@ -666,9 +667,6 @@ internal object IslandMusicWaveColorHooker {
         val dataRef: WeakReference<Any>,
         val lottieViewRef: WeakReference<View>?,
         val holderRootRef: WeakReference<android.view.ViewGroup>?,
-        var bitmapRef: WeakReference<Bitmap>? = null,
-        var palette: IntArray? = null,
-        var nativeColors: Array<Int>? = null,
         var overrideColors: Array<Int>? = null,
     )
 

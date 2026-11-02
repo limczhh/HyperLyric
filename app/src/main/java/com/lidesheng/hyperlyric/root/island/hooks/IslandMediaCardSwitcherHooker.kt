@@ -1,12 +1,10 @@
 package com.lidesheng.hyperlyric.root.island.hooks
 
-import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaSessionCoordinator
-import com.lidesheng.hyperlyric.root.mediacard.notification.switcher.NotificationMediaPageIndicator
+import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaMiniBarIndicator
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -17,13 +15,11 @@ import java.util.WeakHashMap
 internal object IslandMediaCardSwitcherHooker {
     private const val TAG = "IslandMediaCardSwitcher"
     private val watchedWindows = WeakHashMap<View, Boolean>()
-    private val indicators = WeakHashMap<View, NotificationMediaPageIndicator>()
 
     fun prepareForHotReload() {
         watchedWindows.keys.toList().forEach { IslandMediaSessionCoordinator.setRefresh(it, null) }
         watchedWindows.clear()
-        indicators.values.toList().forEach(NotificationMediaPageIndicator::detach)
-        indicators.clear()
+        IslandMediaMiniBarIndicator.clear()
     }
 
     fun hook(module: XposedModule, loader: ClassLoader) {
@@ -65,51 +61,86 @@ internal object IslandMediaCardSwitcherHooker {
                     }
                 })
             }
-            val events = loader.loadClass("miui.systemui.dynamicisland.event.DynamicIslandEventCoordinator")
-            events.declaredMethods.first {
-                it.name == "dispatchEvent" && it.parameterCount == 2
+            val base = loader.loadClass(
+                "miui.systemui.dynamicisland.window.content.DynamicIslandBaseContentView"
+            )
+            base.declaredMethods.first {
+                it.name == "updateMiniBar" && it.parameterCount == 1
             }.let { method ->
+                module.managedHook(method, "island.media_switcher.mini_bar", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val result = chain.proceed()
+                        val owner = chain.thisObject ?: return result
+                        val real = chain.args.firstOrNull() ?: return result
+                        IslandMediaMiniBarIndicator.nativeVisibilityUpdated(owner)
+                        val events = call(real, "getDynamicIslandEventCoordinator") ?: return result
+                        val window = call(events, "getWindowView") as? View ?: return result
+                        IslandMediaSessionCoordinator.connect(window, IslandProbeUtils.getCurrentIslandData(real))
+                        refresh(window)
+                        return result
+                    }
+                })
+            }
+            val controller = loader.loadClass(
+                "miui.systemui.dynamicisland.window.DynamicIslandWindowViewController"
+            )
+            controller.declaredMethods.filter {
+                it.name in setOf("addDynamicIslandView", "updateDynamicIslandView") &&
+                    it.parameterCount == 2 && it.parameterTypes[0].name.endsWith(".DynamicIslandData")
+            }.forEach { method ->
+                module.managedHook(method, "island.media_switcher.prepare.${method.name}", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val window = chain.thisObject?.let { call(it, "getView") } as? View
+                            ?: return chain.proceed()
+                        val data = chain.args.firstOrNull() ?: return chain.proceed()
+                        val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
+                        val args = chain.args.toTypedArray()
+                        args[1] = bridge.apply(arrayOf("prepareUpdate", window, data, args[1])) ?: args[1]
+                        return chain.proceed(args)
+                    }
+                })
+            }
+
+            // These event bodies are deliberately hooked instead of tiny setters/dispatch wrappers
+            // that R8 can inline into the native click/update callers.
+            val events = loader.loadClass("miui.systemui.dynamicisland.event.DynamicIslandEventCoordinator")
+            events.declaredMethods.first { it.name == "handleEvent" && it.parameterCount == 2 }.let { method ->
+                module.managedHook(method, "island.media_switcher.event_complete", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val result = chain.proceed()
+                        val window = chain.thisObject?.let { call(it, "getWindowView") } as? View
+                        val data = IslandProbeUtils.getCurrentIslandData(chain.args.getOrNull(1))
+                        window?.let { IslandMediaSessionCoordinator.connect(it, data) }
+                        refreshForWindow(window)
+                        return result
+                    }
+                })
+            }
+            val updates = loader.loadClass("miui.systemui.dynamicisland.event.UpdateEventCoordinator")
+            updates.declaredMethods.first { it.name == "handleAppEvent" && it.parameterCount == 3 }.let { method ->
                 module.managedHook(method, "island.media_switcher.activity_order", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         if (chain.args.firstOrNull()?.javaClass?.simpleName != "UpdateDynamicIsland") {
                             return chain.proceed()
                         }
+                        val owner = chain.thisObject ?: return chain.proceed()
+                        val events = call(owner, "getDynamicIslandEventCoordinator") ?: return chain.proceed()
+                        val window = call(events, "getWindowView") as? View ?: return chain.proceed()
                         val content = chain.args.getOrNull(1) ?: return chain.proceed()
-                        val data = IslandProbeUtils.getCurrentIslandData(content)
-                        val extras = data?.let { call(it, "getExtras") } as? Bundle
-                        if (extras?.getBoolean(IslandMediaSessionCoordinator.ACTIVITY_ORDER_EXTRA) == true) {
-                            extras.remove(IslandMediaSessionCoordinator.ACTIVITY_ORDER_EXTRA)
-                            val state = call(content, "getState")
-                            if (state != null) {
-                                val now = System.currentTimeMillis()
-                                // Use native update-order handling on both plugin generations.
-                                // Tablets compare postTime; phones compare time, with native
-                                // notification priorities still taking precedence on both.
-                                mapOf("setTime" to now, "setPostTime" to now, "setUpdateOrder" to true)
-                                    .forEach { (name, value) ->
-                                        state.javaClass.methods.first {
-                                            it.name == name && it.parameterCount == 1
-                                        }.invoke(state, value)
-                                    }
+                        val data = IslandProbeUtils.getCurrentIslandData(content) ?: return chain.proceed()
+                        val key = key(data) ?: return chain.proceed()
+                        val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
+                        val time = bridge.apply(arrayOf("consumePromotion", key)) as? Long ?: return chain.proceed()
+                        val state = call(content, "getState") ?: return chain.proceed()
+                        mapOf("setTime" to time, "setPostTime" to time, "setUpdateOrder" to true)
+                            .forEach { (name, value) ->
+                                state.javaClass.methods.first { it.name == name && it.parameterCount == 1 }
+                                    .invoke(state, value)
                             }
-                        }
-                        return chain.proceed()
-                    }
-                })
-            }
-
-            // Expansion can finish after the add/update coroutine has returned. Watch the native
-            // state owner instead of depending on the next touch or media update to mount dots.
-            val expandedHandler = loader.loadClass(
-                "miui.systemui.dynamicisland.event.handler.ExpandedStateHandler"
-            )
-            expandedHandler.declaredMethods.first {
-                it.name == "setCurrent" && it.parameterCount == 1
-            }.let { method ->
-                module.managedHook(method, "island.media_switcher.expanded_state", object : Hooker {
-                    override fun intercept(chain: Chain): Any? {
                         val result = chain.proceed()
-                        watchedWindows.keys.toList().forEach(::refreshForWindow)
+                        val big = call(window, "getCurrentBigIslandState")
+                        val winner = IslandProbeUtils.getCurrentIslandData(big)?.let(::key)
+                        HookLogger.d(TAG, "原生媒体岛排序完成: target=$key, first=$winner")
                         return result
                     }
                 })
@@ -151,22 +182,7 @@ internal object IslandMediaCardSwitcherHooker {
         val bridge = IslandMediaSessionCoordinator.connect(window, data)
         bridge?.apply(arrayOf("expanded", data?.let(::key)))
         val page = data?.let(::key)?.let { bridge?.apply(arrayOf("pages", it)) } as? IntArray
-        val parent = expanded?.let { call(it, "getExpandedView") } as? ViewGroup
-        if (page == null || page[0] <= 1 || parent == null) {
-            indicators.remove(window)?.detach()
-            return
-        }
-        val player = call(data, "getView") as? View ?: return
-        val indicator = indicators.getOrPut(window) {
-            // The plugin loader cannot resolve SystemUI's PageIndicator. Use the media player,
-            // which is inflated by SystemUI and retains that component's class loader.
-            NotificationMediaPageIndicator(player.javaClass.classLoader, player.context)
-        }
-        indicator.attachTo(parent)
-        indicator.update(page[0], page[1], enabled = true)
-        HookLogger.dState(
-            stateId = "$TAG.indicator", tag = TAG, state = "${page[0]}/${page[1]}",
-        ) { "单岛指示器更新: pages=${page[0]}, selected=${page[1]}" }
+        IslandMediaMiniBarIndicator.update(window, expanded, page)
     }
 
     private fun key(data: Any): String? = call(data, "getKey") as? String
