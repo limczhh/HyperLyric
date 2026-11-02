@@ -17,13 +17,49 @@ internal object IslandMediaCardSwitcherHooker {
     private val watchedWindows = WeakHashMap<View, Boolean>()
 
     fun prepareForHotReload() {
-        watchedWindows.keys.toList().forEach { IslandMediaSessionCoordinator.setRefresh(it, null) }
+        watchedWindows.keys.toList().forEach {
+            IslandMediaSessionCoordinator.connect(it)?.apply(arrayOf("resetPresentation"))
+            IslandMediaSessionCoordinator.setRefresh(it, null)
+        }
         watchedWindows.clear()
         IslandMediaMiniBarIndicator.clear()
     }
 
     fun hook(module: XposedModule, loader: ClassLoader) {
         runCatching {
+            val controller = loader.loadClass(
+                "miui.systemui.dynamicisland.window.DynamicIslandWindowViewController"
+            )
+            val publicationNames = setOf("addDynamicIslandView", "updateDynamicIslandView")
+            val publications = controller.declaredMethods.filter {
+                it.name in publicationNames && it.parameterCount == 2 &&
+                    it.parameterTypes[0].name.endsWith(".DynamicIslandData")
+            }
+            check(publications.map { it.name }.toSet() == publicationNames) {
+                "Native island publication interfaces unavailable"
+            }
+            publications.forEach { method ->
+                module.managedHook(method, "island.media_switcher.preview.${method.name}", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val window = chain.thisObject?.let { call(it, "getView") } as? View
+                            ?: return chain.proceed()
+                        val data = chain.args.firstOrNull() ?: return chain.proceed()
+                        val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
+                        // Preview controllers bind independent native views. Their generated
+                        // payload is consumed directly, never published as an actual island.
+                        if (bridge.apply(arrayOf("preview", data)) == true) return null
+                        val multi = bridge.apply(arrayOf("single")) != true
+                        val previous = if (multi) window.javaClass.getMethod(
+                            "getViewFromList", String::class.java
+                        ).invoke(window, key(data)) else null
+                        val wasUpdate = call(previous, "getState") != null
+                        val result = chain.proceed()
+                        if (multi) bridge.apply(arrayOf("published", data, wasUpdate))
+                        return result
+                    }
+                })
+            }
+
             val type = loader.loadClass("miui.systemui.dynamicisland.window.DynamicIslandWindowView")
             val pending = type.declaredMethods.first {
                 it.name == "hasPendingMedia" && it.parameterCount == 1
@@ -56,30 +92,6 @@ internal object IslandMediaCardSwitcherHooker {
                             it.javaClass.name.endsWith(".DynamicIslandData")
                         }
                         window?.let { IslandMediaSessionCoordinator.connect(it, data) }
-                        if (method.name == "handleContentViewUpdateOperate") {
-                            val content = chain.args.firstOrNull()
-                            val currentData = IslandProbeUtils.getCurrentIslandData(content)
-                            val bridge = window?.let { IslandMediaSessionCoordinator.connect(it, currentData) }
-                            if (bridge?.apply(arrayOf("single")) == true &&
-                                call(content, "getState")?.javaClass?.simpleName == "Expanded"
-                            ) {
-                                // Expanded -> Expanded does not run the native state-change capability
-                                // refresh. Both real and fake payloads have been bound at this point.
-                                val events = call(content, "getDynamicIslandEventCoordinator")
-                                events?.javaClass?.methods?.first {
-                                    it.name == "updateMiniBar" && it.parameterCount == 1
-                                }?.invoke(events, content)
-                                val pkg = IslandProbeUtils.extractMediaIslandInfo(currentData)?.packageName
-                                val realCanSlide = call(content, "getMiniBarVisible")
-                                val fakeCanSlide = call(call(content, "getFakeView"), "getMiniBarVisible")
-                                HookLogger.dState(
-                                    stateId = "$TAG.mini_window", tag = TAG,
-                                    state = "$pkg/$realCanSlide/$fakeCanSlide",
-                                ) {
-                                    "单岛下拉能力已刷新: pkg=$pkg, real=$realCanSlide, fake=$fakeCanSlide"
-                                }
-                            }
-                        }
                         refreshForWindow(window)
                         return result
                     }
@@ -98,7 +110,7 @@ internal object IslandMediaCardSwitcherHooker {
                         val events = call(real, "getDynamicIslandEventCoordinator") ?: return result
                         val window = call(events, "getWindowView") as? View ?: return result
                         IslandMediaSessionCoordinator.connect(window, IslandProbeUtils.getCurrentIslandData(real))
-                        refresh(window)
+                        refreshForWindow(window)
                         return result
                     }
                 })
@@ -114,31 +126,11 @@ internal object IslandMediaCardSwitcherHooker {
                         val events = call(real, "getDynamicIslandEventCoordinator")
                         val window = events?.let { call(it, "getWindowView") } as? View
                         val bridge = window?.let { IslandMediaSessionCoordinator.connect(it, data) }
-                        val key = data?.let(::key)
                         val state = call(real, "getState")?.javaClass?.simpleName
-                        if (key != null && state != null) {
-                            bridge?.apply(arrayOf("presentation", key, state))
+                        if (real != null && state != null) {
+                            bridge?.apply(arrayOf("presentation", real, state))
                         }
                         return chain.proceed()
-                    }
-                })
-            }
-            val controller = loader.loadClass(
-                "miui.systemui.dynamicisland.window.DynamicIslandWindowViewController"
-            )
-            controller.declaredMethods.filter {
-                it.name in setOf("addDynamicIslandView", "updateDynamicIslandView") &&
-                    it.parameterCount == 2 && it.parameterTypes[0].name.endsWith(".DynamicIslandData")
-            }.forEach { method ->
-                module.managedHook(method, "island.media_switcher.prepare.${method.name}", object : Hooker {
-                    override fun intercept(chain: Chain): Any? {
-                        val window = chain.thisObject?.let { call(it, "getView") } as? View
-                            ?: return chain.proceed()
-                        val data = chain.args.firstOrNull() ?: return chain.proceed()
-                        val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
-                        val args = chain.args.toTypedArray()
-                        args[1] = bridge.apply(arrayOf("prepareUpdate", window, data, args[1])) ?: args[1]
-                        return chain.proceed(args)
                     }
                 })
             }
@@ -203,25 +195,28 @@ internal object IslandMediaCardSwitcherHooker {
 
     fun switchToAdjacent(windowView: Any, currentData: Any, dx: Float): Boolean {
         val key = key(currentData) ?: return false
-        val controller = call(windowView, "getWindowViewController") ?: return false
         val bridge = (windowView as? View)?.let(IslandMediaSessionCoordinator::connect) ?: return false
-        return bridge.apply(arrayOf("switch", controller, key, dx)) == true
+        return bridge.apply(arrayOf("switch", key, dx)) == true
     }
 
     fun refreshForWindow(windowView: Any?) {
         val view = windowView as? View ?: return
         IslandMediaSessionCoordinator.connect(view) ?: return
         // Native add/update uses coroutines. Refresh after the content is attached and expanded.
-        watchedWindows[view] = true
-        val refresh = Runnable { refresh(view) }
-        IslandMediaSessionCoordinator.setRefresh(view, refresh)
-        view.post(refresh)
+        if (watchedWindows.put(view, true) == null) {
+            IslandMediaSessionCoordinator.setRefresh(view, Runnable { refresh(view) })
+        }
+        IslandMediaSessionCoordinator.requestRefresh(view)
     }
 
     private fun refresh(window: View) {
-        val expanded = call(window, "getCurrentExpandedState")
+        val expanded = call(window, "getCurrentExpandedState")?.takeIf {
+            call(it, "getState")?.javaClass?.simpleName == "Expanded"
+        }
+        val nativeData = IslandProbeUtils.getCurrentIslandData(expanded)
+        val bridge = IslandMediaSessionCoordinator.connect(window, nativeData)
+        if (expanded != null) bridge?.apply(arrayOf("render", expanded))
         val data = IslandProbeUtils.getCurrentIslandData(expanded)
-        val bridge = IslandMediaSessionCoordinator.connect(window, data)
         bridge?.apply(arrayOf("expanded", data?.let(::key)))
         val page = data?.let(::key)?.let { bridge?.apply(arrayOf("pages", it)) } as? IntArray
         IslandMediaMiniBarIndicator.update(window, expanded, page)
