@@ -83,6 +83,9 @@ fun VerbatimLyricPage() {
     var wordMotionLatinWave by remember {
         mutableFloatStateOf(wordMotionSettings.latinWaveFactor)
     }
+    var wordHighlightSungOpacity by remember {
+        mutableFloatStateOf(wordHighlightSettings.sungOpacity)
+    }
     var wordHighlightUnsungOpacity by remember {
         mutableFloatStateOf(wordHighlightSettings.unsungOpacity)
     }
@@ -91,6 +94,7 @@ fun VerbatimLyricPage() {
     var showWordMotionCjkWaveDialog by remember { mutableStateOf(false) }
     var showWordMotionLatinLiftDialog by remember { mutableStateOf(false) }
     var showWordMotionLatinWaveDialog by remember { mutableStateOf(false) }
+    var showWordHighlightSungOpacityDialog by remember { mutableStateOf(false) }
     var showWordHighlightUnsungOpacityDialog by remember { mutableStateOf(false) }
 
     fun updateSyllableSettings(
@@ -168,6 +172,20 @@ fun VerbatimLyricPage() {
         }
     )
     FloatInputDialog(
+        show = showWordHighlightSungOpacityDialog,
+        title = stringResource(id = R.string.title_word_highlight_sung_opacity),
+        label = stringResource(id = R.string.label_word_highlight_sung_opacity_range),
+        initialValue = wordHighlightSungOpacity,
+        min = RootConstants.MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+        max = RootConstants.MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+        onDismiss = { showWordHighlightSungOpacityDialog = false },
+        onConfirm = { value ->
+            val normalized = WordHighlightPreferencePolicy.normalizeSungOpacity(value)
+            wordHighlightSungOpacity = normalized
+            saveConfig(RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY, normalized)
+        }
+    )
+    FloatInputDialog(
         show = showWordHighlightUnsungOpacityDialog,
         title = stringResource(id = R.string.title_word_highlight_unsung_opacity),
         label = stringResource(id = R.string.label_word_highlight_unsung_opacity_range),
@@ -203,6 +221,10 @@ fun VerbatimLyricPage() {
             onGradientStyleChange = {
                 gradientStyle = it
                 saveConfig(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, it)
+            },
+            wordHighlightSungOpacity = wordHighlightSungOpacity,
+            onWordHighlightSungOpacityClick = {
+                showWordHighlightSungOpacityDialog = true
             },
             wordHighlightUnsungOpacity = wordHighlightUnsungOpacity,
             onWordHighlightUnsungOpacityClick = {

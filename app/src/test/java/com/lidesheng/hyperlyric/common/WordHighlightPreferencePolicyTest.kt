@@ -24,31 +24,49 @@ class WordHighlightPreferencePolicyTest {
     }
 
     @Test
-    fun missingPreferenceFallsBackToDefault() {
+    fun missingPreferencesFallBackToDefaults() {
+        val state = WordHighlightPreferencePolicy.read(prefs)
+
         assertEquals(
             RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
-            WordHighlightPreferencePolicy.read(prefs).unsungOpacity,
+            state.unsungOpacity,
+            0f
+        )
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            state.sungOpacity,
             0f
         )
     }
 
     @Test
-    fun validStoredValueIsReadDirectly() {
-        commitOpacity(0.35f)
+    fun sungAndUnsungPreferencesAreReadIndependently() {
+        commitUnsungOpacity(0.8f)
+        commitSungOpacity(0.2f)
+
+        val state = WordHighlightPreferencePolicy.read(prefs)
+
+        assertEquals(0.8f, state.unsungOpacity, 0f)
+        assertEquals(0.2f, state.sungOpacity, 0f)
+    }
+
+    @Test
+    fun unsungValidStoredValueIsReadDirectly() {
+        commitUnsungOpacity(0.35f)
 
         assertEquals(0.35f, WordHighlightPreferencePolicy.read(prefs).unsungOpacity, 0f)
     }
 
     @Test
-    fun boundaryValuesAreAccepted() {
-        commitOpacity(RootConstants.MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY)
+    fun unsungBoundaryValuesAreAccepted() {
+        commitUnsungOpacity(RootConstants.MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY)
         assertEquals(
             RootConstants.MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
             WordHighlightPreferencePolicy.read(prefs).unsungOpacity,
             0f
         )
 
-        commitOpacity(RootConstants.MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY)
+        commitUnsungOpacity(RootConstants.MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY)
         assertEquals(
             RootConstants.MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
             WordHighlightPreferencePolicy.read(prefs).unsungOpacity,
@@ -57,10 +75,10 @@ class WordHighlightPreferencePolicyTest {
     }
 
     @Test
-    fun outOfRangeOrNonFiniteStoredValuesFallBackToDefaultOnRead() {
+    fun unsungOutOfRangeOrNonFiniteStoredValuesFallBackToDefaultOnRead() {
         listOf(1.7f, -0.2f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)
             .forEach { illegal ->
-                commitOpacity(illegal)
+                commitUnsungOpacity(illegal)
                 assertEquals(
                     RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
                     WordHighlightPreferencePolicy.read(prefs).unsungOpacity,
@@ -70,8 +88,8 @@ class WordHighlightPreferencePolicyTest {
     }
 
     @Test
-    fun illegalStoredValueIsSanitizedOnStartup() {
-        commitOpacity(1.7f)
+    fun unsungIllegalStoredValueIsSanitizedOnStartup() {
+        commitUnsungOpacity(1.7f)
 
         FloatPreferencePolicy.normalizeInPlace(prefs)
 
@@ -116,7 +134,7 @@ class WordHighlightPreferencePolicyTest {
     }
 
     @Test
-    fun floatPreferencePolicyNormalizesIllegalValuesToDefault() {
+    fun floatPreferencePolicyNormalizesIllegalUnsungValuesToDefault() {
         val key = RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY
 
         assertEquals(
@@ -147,7 +165,7 @@ class WordHighlightPreferencePolicyTest {
     }
 
     @Test
-    fun floatPreferencePolicyAcceptsInRangeValues() {
+    fun floatPreferencePolicyAcceptsInRangeUnsungValues() {
         val key = RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY
 
         assertEquals(0.35f, requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, 0.35f)), 0f)
@@ -159,9 +177,170 @@ class WordHighlightPreferencePolicyTest {
         assertNull(FloatPreferencePolicy.normalizeStoredFloat("key_unknown_float", 0.35f))
     }
 
-    private fun commitOpacity(value: Float) {
+    @Test
+    fun sungValidStoredValueIsReadDirectly() {
+        commitSungOpacity(0.35f)
+
+        assertEquals(0.35f, WordHighlightPreferencePolicy.read(prefs).sungOpacity, 0f)
+    }
+
+    @Test
+    fun sungBoundaryValuesAreAccepted() {
+        commitSungOpacity(RootConstants.MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY)
+        assertEquals(
+            RootConstants.MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            WordHighlightPreferencePolicy.read(prefs).sungOpacity,
+            0f
+        )
+
+        commitSungOpacity(RootConstants.MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY)
+        assertEquals(
+            RootConstants.MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            WordHighlightPreferencePolicy.read(prefs).sungOpacity,
+            0f
+        )
+    }
+
+    @Test
+    fun sungOutOfRangeOrNonFiniteStoredValuesFallBackToDefaultOnRead() {
+        listOf(1.7f, -0.2f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)
+            .forEach { illegal ->
+                commitSungOpacity(illegal)
+                assertEquals(
+                    RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+                    WordHighlightPreferencePolicy.read(prefs).sungOpacity,
+                    0f
+                )
+            }
+    }
+
+    @Test
+    fun sungIllegalStoredValueIsSanitizedOnStartup() {
+        commitSungOpacity(-0.2f)
+
+        FloatPreferencePolicy.normalizeInPlace(prefs)
+
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            prefs.getFloat(
+                RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+                RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY
+            ),
+            0f
+        )
+    }
+
+    @Test
+    fun normalizeSungOpacityClampsFiniteValues() {
+        assertEquals(
+            RootConstants.MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            WordHighlightPreferencePolicy.normalizeSungOpacity(-0.2f),
+            0f
+        )
+        assertEquals(
+            RootConstants.MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            WordHighlightPreferencePolicy.normalizeSungOpacity(1.7f),
+            0f
+        )
+        assertEquals(0.35f, WordHighlightPreferencePolicy.normalizeSungOpacity(0.35f), 0f)
+    }
+
+    @Test
+    fun normalizeSungOpacityFallsBackForNonFiniteValues() {
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            WordHighlightPreferencePolicy.normalizeSungOpacity(Float.NaN),
+            0f
+        )
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            WordHighlightPreferencePolicy.normalizeSungOpacity(Float.POSITIVE_INFINITY),
+            0f
+        )
+        assertEquals(0.2f, WordHighlightPreferencePolicy.normalizeSungOpacity(Float.NaN, 0.2f), 0f)
+    }
+
+    @Test
+    fun floatPreferencePolicyNormalizesIllegalSungValuesToDefault() {
+        val key = RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY
+
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, 1.7f)),
+            0f
+        )
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, -0.2f)),
+            0f
+        )
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, Float.NaN)),
+            0f
+        )
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, "非法值")),
+            0f
+        )
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, null)),
+            0f
+        )
+    }
+
+    @Test
+    fun floatPreferencePolicyAcceptsInRangeSungValues() {
+        val key = RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY
+
+        assertEquals(0.35f, requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, 0.35f)), 0f)
+        assertEquals(
+            0.35f,
+            requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, "0.35")),
+            0f
+        )
+        assertEquals(1f, requireNotNull(FloatPreferencePolicy.normalizeStoredFloat(key, 1f)), 0f)
+    }
+
+    @Test
+    fun stateKeepsUnsungAsFirstPositionalParameter() {
+        val state = WordHighlightPreferenceState(0.42f)
+
+        assertEquals(0.42f, state.unsungOpacity, 0f)
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            state.sungOpacity,
+            0f
+        )
+    }
+
+    @Test
+    fun stateWithoutSungArgumentFallsBackToDefaultSung() {
+        val state = WordHighlightPreferenceState(
+            unsungOpacity = 0.42f
+        )
+
+        assertEquals(0.42f, state.unsungOpacity, 0f)
+        assertEquals(
+            RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            state.sungOpacity,
+            0f
+        )
+    }
+
+    private fun commitUnsungOpacity(value: Float) {
+        commitFloat(RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY, value)
+    }
+
+    private fun commitSungOpacity(value: Float) {
+        commitFloat(RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY, value)
+    }
+
+    private fun commitFloat(key: String, value: Float) {
         prefs.edit()
-            .putFloat(RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY, value)
+            .putFloat(key, value)
             .commit()
     }
 }

@@ -40,6 +40,20 @@ class UnsungOpacityTest {
     }
 
     @Test
+    fun sungOpacityOneKeepsOriginalHighlightColor() {
+        // 已演唱不透明度 = 1：烘出的高亮色与原始颜色完全一致，默认外观不变。
+        assertEquals(0xFFFFFFFF.toInt(), UnsungOpacity.tint(0xFFFFFFFF.toInt(), 1f))
+        assertEquals(0xFF00FF00.toInt(), UnsungOpacity.tint(0xFF00FF00.toInt(), 1f))
+    }
+
+    @Test
+    fun sungOpacityZeroMakesHighlightFullyTransparent() {
+        // 已演唱不透明度 = 0：高亮色 RGB 保留但 alpha 为 0（绘制结果全透明）。
+        assertEquals(0x00FFFFFF, UnsungOpacity.tint(0xFFFFFFFF.toInt(), 0f))
+        assertEquals(0x0000FF00, UnsungOpacity.tint(0xFF00FF00.toInt(), 0f))
+    }
+
+    @Test
     fun tintMapsWholeArrayWithoutMutatingSource() {
         val source = intArrayOf(0xFFFFFFFF.toInt(), 0xFF00FF00.toInt())
         assertArrayEquals(

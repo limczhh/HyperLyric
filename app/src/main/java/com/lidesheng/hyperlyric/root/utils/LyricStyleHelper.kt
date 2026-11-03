@@ -281,13 +281,20 @@ object LyricStyleHelper {
                     RootConstants.DEFAULT_HOOK_WORD_MOTION_LATIN_WAVE
                 ),
             ),
-            // 未演唱歌词的不透明度：先按偏好归一化，再交给 View 层渲染。
+            // 歌词不透明度（未演唱/已演唱）：先按偏好归一化，再交给 View 层渲染。
             wordHighlight = WordHighlight(
                 unsungOpacity = WordHighlightPreferencePolicy.normalizeUnsungOpacity(
                     getFloatCompat(
                         prefs,
                         RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
                         RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY
+                    )
+                ),
+                sungOpacity = WordHighlightPreferencePolicy.normalizeSungOpacity(
+                    getFloatCompat(
+                        prefs,
+                        RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+                        RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY
                     )
                 )
             ),

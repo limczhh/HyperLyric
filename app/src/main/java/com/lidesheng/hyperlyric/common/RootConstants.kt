@@ -313,6 +313,8 @@ object RootConstants {
     // ================= WORD HIGHLIGHT KEYS =================
     const val KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY =
         "key_hook_word_highlight_unsung_opacity"
+    const val KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY =
+        "key_hook_word_highlight_sung_opacity"
 
     // ================= DEFAULTS =================
     const val MIN_HOOK_WORD_MOTION_LIFT = 0f
@@ -775,4 +777,8 @@ object RootConstants {
     const val MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY = 0f
     const val MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY = 1f
     const val DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY = 0.50f
+    /** 已演唱歌词的不透明度：0 为完全透明，1 为完全不透明。 */
+    const val MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY = 0f
+    const val MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY = 1f
+    const val DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY = 1f
 }

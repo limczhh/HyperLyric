@@ -94,10 +94,15 @@ data class WordMotion(
 data class WordHighlight(
     /** 未演唱部分的绝对不透明度：0f 完全透明，1f 与已演唱颜色一致。 */
     val unsungOpacity: Float = DEFAULT_UNSUNG_OPACITY,
+    /** 已演唱（高亮）部分的绝对不透明度：0f 完全透明，1f 保持高亮色原样。 */
+    val sungOpacity: Float = DEFAULT_SUNG_OPACITY,
 ) {
     companion object {
         /** 与 RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY 保持一致。 */
         const val DEFAULT_UNSUNG_OPACITY = 0.5f
+
+        /** 与 RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY 保持一致。 */
+        const val DEFAULT_SUNG_OPACITY = 1f
     }
 }
 

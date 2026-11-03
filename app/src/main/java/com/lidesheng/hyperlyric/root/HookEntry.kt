@@ -143,6 +143,7 @@ class HookEntry : XposedModule() {
             RootConstants.KEY_HOOK_WORD_MOTION_LATIN_LIFT,
             RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE,
             RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+            RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
         )
     }
 

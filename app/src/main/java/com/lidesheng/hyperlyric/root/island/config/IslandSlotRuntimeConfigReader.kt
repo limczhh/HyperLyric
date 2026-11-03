@@ -316,6 +316,11 @@ internal object IslandSlotRuntimeConfigReader {
                 prefs,
                 RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
                 RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY
+            ),
+            wordHighlightSungOpacity = getFloatCompat(
+                prefs,
+                RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+                RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY
             )
         )
         if (!HookLogger.isDebugEnabled) return config
@@ -347,7 +352,8 @@ internal object IslandSlotRuntimeConfigReader {
             "color=${config.textColorStyle}",
             "font=${config.customFontPath.isNotBlank()}/${config.narrowLatinFont}",
             "wordMotion=${config.wordMotionEnabled}",
-            "wordHighlight=${config.wordHighlightUnsungOpacity}"
+            "wordHighlight=${config.wordHighlightUnsungOpacity}/" +
+                    "${config.wordHighlightSungOpacity}"
         ).joinToString(",")
         HookLogger.dState(
             stateId = "IslandSlotRuntimeConfig",

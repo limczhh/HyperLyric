@@ -183,6 +183,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             if (field == value) return
             field = value
             syncRenderer.unsungOpacity = value.unsungOpacity
+            syncRenderer.sungOpacity = value.sungOpacity
             invalidate()
         }
 
