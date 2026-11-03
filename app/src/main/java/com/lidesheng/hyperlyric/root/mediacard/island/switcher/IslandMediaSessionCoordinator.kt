@@ -22,22 +22,22 @@ import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.WeakHashMap
+import java.util.Collections
 import java.util.function.Function
 
-/** Owns the media source and native card lifetimes in SystemUI, independently of the plugin. */
+/** Tracks sessions; single-island browsing owns binders, multi-island mode owns controllers. */
 internal object IslandMediaSessionCoordinator {
     private const val TAG = "IslandMediaCardSwitcher"
     private const val PREFIX = "com.android.systemui.statusbar.notification.mediaisland."
     private val main = Handler(Looper.getMainLooper())
     private val constructingCard = ThreadLocal<Boolean>()
-    private val ownedControllers = WeakHashMap<Any, Boolean>()
+    private val ownedControllers = Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
     private val binderTemplates = WeakHashMap<Any, Pair<Constructor<*>, List<Any?>>>()
     private var runtime: Runtime? = null
     // Boot-class interfaces and native View tags keep the persistent media runtime reachable
     // when lyric/plugin hooks are replaced by a new module class loader during hot reload.
     private const val BRIDGE_TAG = 0x7e484c01
     private const val REFRESH_TAG = 0x7e484c02
-    private const val PREVIEW_TAG = 0x7e484c03
     private const val RETIRED_WINDOW_TAG = 0x7e484c04
     private val windows = WeakHashMap<View, Boolean>()
     private val bridge = Function<Array<Any?>, Any?> { args ->
@@ -46,7 +46,6 @@ internal object IslandMediaSessionCoordinator {
             "single" -> runtime?.let { !it.failed && !it.multi } == true
             "pages" -> pageState(args[1] as String)?.let { intArrayOf(it.first, it.second) }
             "switch" -> switchRelative(args[1] as String, args[2] as Int)
-            "preview" -> (readPlayer(args[1]!!)?.getTag(PREVIEW_TAG) == true)
             "render" -> { runtime?.let { state -> state.guard { state.renderSingle(args[1]!!) } }; null }
             "rank" -> runtime?.nativeRank(args[1] as String)
             "consumeOrder" -> runtime?.takeNativeOrder(args[1] as String)
@@ -136,39 +135,24 @@ internal object IslandMediaSessionCoordinator {
                     override fun intercept(chain: Chain): Any? {
                         val instance = chain.thisObject ?: return chain.proceed()
                         val state = runtime
-                        if (ownedControllers.containsKey(instance) ||
+                        if (instance in ownedControllers ||
                             state?.multi == false && state.original === chain.thisObject
                         ) {
                             chain.args.take(2).forEach { holder ->
                                 (holder?.let { read(it, "player") } as? View)?.let { player ->
                                     player.setTag(BRIDGE_TAG, bridge)
-                                    if (ownedControllers[chain.thisObject] == true) player.setTag(PREVIEW_TAG, true)
                                 }
                             }
                         }
-                        val rebuilding = ownedControllers.containsKey(instance) && read(instance, "currentKey") == null
+                        val rebuilding = instance in ownedControllers && read(instance, "currentKey") == null
                         if (rebuilding) {
                             // Native reinflation clears currentKey and rejects paused sessions on
-                            // its add path. Owned islands and single-card previews use the native update path.
+                            // its add path. Owned multi-island cards use the native update path.
                             field(instance, "currentKey").set(instance, chain.args[2]?.let { read(it, "notificationKey") })
                         }
                         val result = chain.proceed()
                         if (rebuilding) state?.guard { state.onNativeRebuilt(instance) }
-                        if (ownedControllers[chain.thisObject] == true) notifyPagesChanged()
                         return result
-                    }
-                })
-            }
-            controller.declaredMethods.filter {
-                it.name.startsWith("removeDynamicIslandView") && it.parameterCount == 2 &&
-                    it.parameterTypes[0] == String::class.java
-            }.forEach { method ->
-                module.managedHook(method, "media.island_switcher.suppress_preview_remove", object : Hooker {
-                    override fun intercept(chain: Chain): Any? {
-                        // A browsing controller owns views only, never a native island.
-                        if (ownedControllers[chain.thisObject] != true) return chain.proceed()
-                        field(requireNotNull(chain.thisObject), "currentKey").set(chain.thisObject, null)
-                        return null
                     }
                 })
             }
@@ -271,7 +255,8 @@ internal object IslandMediaSessionCoordinator {
         private var listener: Any? = null
         var failed = false
             private set
-        private val singlePresenter = IslandMediaSinglePresenter()
+        private val singlePresenter = IslandMediaSinglePresenter { action -> guard(action) }
+        private var singleCard: IslandMediaBrowsingCard? = null
         private val dirtyKeys = linkedSetOf<String>()
         private var seeded = false
         private var syncScheduled = false
@@ -364,7 +349,7 @@ internal object IslandMediaSessionCoordinator {
             // without calling back into its destroyed event/animation coordinator.
             singlePresenter.forgetAll()
             singleSelection.setExpanded(false)
-            if (!multi) cards.remove("single")?.close()
+            releaseSingleCard()
             windows.keys.toList().filterNot(::acceptsWindow).forEach { window ->
                 setRefresh(window, null)
                 window.setTag(BRIDGE_TAG, null)
@@ -437,10 +422,7 @@ internal object IslandMediaSessionCoordinator {
             // Release removed sessions immediately; queued content updates must not keep an
             // obsolete controller eligible for reinflation before the next reconciliation.
             if (multi) cards.remove(key)?.close()
-            else if (cards["single"]?.key == key) {
-                singlePresenter.restoreAll()
-                cards.remove("single")?.close()
-            }
+            else if (singleCard?.key == key) releaseSingleCard()
         }
 
         fun nativeRank(key: String): Long? = if (multi && !failed) nativeOrderRanks[key] else null
@@ -459,6 +441,10 @@ internal object IslandMediaSessionCoordinator {
                 cards[key]?.takeIf { it.data() === data }?.publishedContent = content
             } else if (read(original, "dynamicIslandData") === data) {
                 nativePublishedContent = content
+                singleCard?.let { card ->
+                    val player = read(original, "miuiPlayerHolder")?.let { read(it, "player") }
+                    if (player !== card.templatePlayer) requestSync(card.key)
+                }
             }
         }
 
@@ -470,7 +456,7 @@ internal object IslandMediaSessionCoordinator {
             if (multi) {
                 cards.values.forEach { it.publishedContent = null }
                 orderDirty = true
-            } else cards.remove("single")?.close()
+            } else releaseSingleCard()
             requestSync()
         }
 
@@ -519,11 +505,6 @@ internal object IslandMediaSessionCoordinator {
             return all.filter { it.first in kept }
         }
 
-        private fun expandSingle() {
-            if (singleSelection.isExpanded) return
-            singleSelection.setExpanded(true)
-        }
-
         fun renderSingle(real: Any) {
             if (multi) return
             val current = method(real, "getCurrentIslandData", 0).invoke(real)
@@ -533,17 +514,16 @@ internal object IslandMediaSessionCoordinator {
                 return
             }
             if (method(real, "getState", 0).invoke(real)?.javaClass?.simpleName == "Expanded") {
-                expandSingle()
+                singleSelection.setExpanded(true)
             }
-            val preview = cards["single"]?.data()
+            val preview = singleCard?.content
             singlePresenter.render(real, preview)
         }
 
         fun resetSingle() {
             if (multi) return
             singleSelection.setExpanded(false)
-            singlePresenter.restoreAll()
-            cards.remove("single")?.close()
+            releaseSingleCard()
         }
 
         fun onPresentationChanged(real: Any, state: String) {
@@ -562,9 +542,9 @@ internal object IslandMediaSessionCoordinator {
             }
             if (key != nativeKey() && !singlePresenter.owns(real)) return
             if (state == "Expanded") {
-                expandSingle()
+                singleSelection.setExpanded(true)
             } else if (collapsed) {
-                // Restore content before native collapse animation, without publishing an island event.
+                // Restore identity now; the presenter releases Views after the native transition.
                 guard { resetSingle() }
             }
             // App/MiniWindow transitions keep the browsed intent until native launch completes.
@@ -577,11 +557,12 @@ internal object IslandMediaSessionCoordinator {
             // Opening uses the already-bound native card. Inflate/bind a browsing card only
             // after a swipe, then retain it when swiping back for symmetric cover animations.
             if (!singleSelection.isBrowsing || selected == null || nativeOnly) {
-                singlePresenter.restoreAll()
-                cards.remove("single")?.close()
+                releaseSingleCard()
             } else {
                 val data = pages.first { it.first == selected }.second
-                val card = cards.getOrPut("single") { createCard() }
+                val holder = required(original, "miuiPlayerHolder")
+                if (singleCard?.templatePlayer !== required(holder, "player")) releaseSingleCard()
+                val card = singleCard ?: createBrowsingCard().also { singleCard = it }
                 if (card.key != selected || selected in changed) card.bind(selected, data)
             }
             HookLogger.dState(
@@ -643,6 +624,7 @@ internal object IslandMediaSessionCoordinator {
                 dirtyKeys.clear()
                 listener?.let { runCatching { method(manager, "removeListener", 1).invoke(manager, it) } }
                 runCatching { singlePresenter.restoreAll() }
+                runCatching { releaseSingleCard() }
                 cards.values.toList().forEach { runCatching { it.close() } }
                 cards.clear()
                 observers.values.forEach { it.second.clear() }
@@ -655,6 +637,54 @@ internal object IslandMediaSessionCoordinator {
                 }
                 HookLogger.w(TAG, "超级岛媒体卡片更新失败，恢复原生展示", error)
             }.isSuccess
+        }
+
+        private fun releaseSingleCard() {
+            val card = singleCard ?: return
+            singleCard = null
+            singlePresenter.release(card.content)
+        }
+
+        private fun createBrowsingCard(): IslandMediaBrowsingCard {
+            constructingCard.set(true)
+            var native: NotificationMediaNativeFactory.Controller? = null
+            try {
+                native = factory.createIslandBinder(binderTemplate.first, binderTemplate.second)
+                val context = required(original, "context") as Context
+                val config = read(original, "notificationConfigManager")
+                fun holder(field: String, layout: String): Any {
+                    val template = required(original, field)
+                    val id = context.resources.getIdentifier(layout, "layout", context.packageName)
+                    check(id != 0) { "Native media island layout unavailable: $layout" }
+                    return factory.createIslandHolder(template, context, id, config)
+                }
+                val real = holder("miuiPlayerHolder", "miui_media_session_island")
+                val dummy = holder("miuiDummyPlayerHolder", "miui_media_session_island_dummy")
+                val player = required(real, "player") as View
+                val fake = required(dummy, "player") as View
+                val layout = required(original, "normalLayoutIsland")
+                val apply = layout.javaClass.methods.first {
+                    it.name == "applyTo" && it.parameterCount == 1 && it.parameterTypes[0].isInstance(player)
+                }
+                listOf(player, fake).forEach {
+                    apply.invoke(layout, it)
+                    it.setTag(BRIDGE_TAG, bridge)
+                }
+                method(native.instance, "attach", 2).invoke(native.instance, real, dummy)
+                val templatePlayer = required(required(original, "miuiPlayerHolder"), "player") as View
+                HookLogger.d(TAG, "单岛浏览绑定器已创建，保留原生媒体岛控制器")
+                return IslandMediaBrowsingCard(native, templatePlayer, player, fake)
+            } catch (error: Throwable) {
+                native?.let {
+                    if (read(it.instance, "holder") != null) {
+                        runCatching { method(it.instance, "detach", 0).invoke(it.instance) }
+                    }
+                    it.close()
+                }
+                throw error
+            } finally {
+                constructingCard.remove()
+            }
         }
 
         private fun createCard(): Card {
@@ -687,7 +717,7 @@ internal object IslandMediaSessionCoordinator {
                 val controller = constructor.newInstance(*args.toTypedArray())
                 val callback = (topListeners - before).single()
                 topListeners.remove(callback)
-                ownedControllers[controller] = !multi
+                ownedControllers.add(controller)
                 method(controller, "resetPlayerHolder", 0).invoke(controller)
                 listOf("miuiPlayerHolder", "miuiDummyPlayerHolder").forEach { name ->
                     val holder = required(controller, name)
@@ -719,8 +749,7 @@ internal object IslandMediaSessionCoordinator {
             native.prepareBind(data)
             val previous = key
             if (previous != nextKey) {
-                // Multi-island controllers keep native keys. Browsing controllers publish nothing.
-                if (ownedControllers[controller] != true) previous?.let { old ->
+                previous?.let { old ->
                     method(controller, "removeDynamicIslandView", 2).invoke(controller, old, true)
                 }
                 field(controller, "currentKey").set(controller, nextKey)
@@ -760,9 +789,7 @@ internal object IslandMediaSessionCoordinator {
                 registrations.asReversed().forEach { unregister ->
                     runCatching(unregister).onFailure { HookLogger.w(TAG, "注销媒体卡片回调失败", it) }
                 }
-                // Keep the weak preview marker until collection, so already-posted native
-                // callbacks cannot publish an island after this browsing card is released.
-                if (ownedControllers[controller] != true) ownedControllers.remove(controller)
+                ownedControllers.remove(controller)
                 native.close()
             }
         }
@@ -776,8 +803,6 @@ internal object IslandMediaSessionCoordinator {
         override fun sortKey(sortKey: Any) = read(sortKey, "key") as? String
         override fun sortData(sortKey: Any) = read(sortKey, "data")
     }
-
-    private fun readPlayer(data: Any): View? = method(data, "getView", 0).invoke(data) as? View
 
     private fun readPluginContent(plugin: Any): Any? = plugin.javaClass.methods.first {
         it.name.startsWith("getContent") && it.parameterCount == 0

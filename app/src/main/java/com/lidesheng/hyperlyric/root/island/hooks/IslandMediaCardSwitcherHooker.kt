@@ -30,15 +30,12 @@ internal object IslandMediaCardSwitcherHooker {
                 "Native island publication interfaces unavailable"
             }
             publications.forEach { method ->
-                module.managedHook(method, "media.island_switcher.plugin.preview.${method.name}", object : Hooker {
+                module.managedHook(method, "media.island_switcher.plugin.publication.${method.name}", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
                         val window = chain.thisObject?.let { call(it, "getView") } as? View
                             ?: return chain.proceed()
                         val data = chain.args.firstOrNull() ?: return chain.proceed()
                         val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
-                        // Preview controllers bind independent native views. Their generated
-                        // payload is consumed directly, never published as an actual island.
-                        if (bridge.apply(arrayOf("preview", data)) == true) return null
                         val result = chain.proceed()
                         bridge.apply(arrayOf("published", data))
                         return result

@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.mediacard.island.switcher
 
+import android.app.Activity
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -9,6 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -24,12 +26,23 @@ class IslandMediaSinglePresenterTest {
         var extras = Bundle()
     }
 
-    class Content(var currentIslandData: Data?, val fakeView: Content? = null) {
+    class Expanded
+    class BigIsland
+    class Content(var currentIslandData: Data?, val fakeView: Content? = null) :
+        FrameLayout(RuntimeEnvironment.getApplication()) {
+        var state: Any = Expanded()
+        var animationRunning = false
+        fun isAnimating() = animationRunning
         var reparentCount = 0
         var miniBarVisible = true
         val dynamicIslandEventCoordinator = Events()
         val expandedView = FrameLayout(RuntimeEnvironment.getApplication())
         val fakeExpandedView = FrameLayout(RuntimeEnvironment.getApplication())
+        init {
+            addView(expandedView)
+            addView(fakeExpandedView)
+            fakeView?.let(::addView)
+        }
         fun updateExpandedView(data: Data?, reuse: Boolean, continuation: Any?) {
             reparentCount++
             val parent = if (fakeView == null) fakeExpandedView else expandedView
@@ -63,13 +76,14 @@ class IslandMediaSinglePresenterTest {
         extras.putString("miui.pending.intent", "launch:$key")
     }
     private fun content(data: Data) = Content(data, Content(data))
+    private fun Data.expanded() = IslandMediaExpandedContent(view!!, fakeView!!, extras)
 
     @Test fun browsingPreservesNativeIdentityAndCompactContentWhileSwitchingBothExpandedViews() {
         val native = data("A")
         val preview = data("B")
         val real = content(native)
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, preview)
+        presenter.render(real, preview.expanded())
         val shown = real.currentIslandData!!
         assertNotSame(native, shown)
         assertNotSame(preview, shown)
@@ -96,7 +110,7 @@ class IslandMediaSinglePresenterTest {
         val first = data("B").apply { extras.putBoolean("playing", true) }
         val real = content(native)
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, first)
+        presenter.render(real, first.expanded())
         repeat(100) { index ->
             val update = data("B").apply {
                 view = first.view
@@ -104,7 +118,7 @@ class IslandMediaSinglePresenterTest {
                 extras.putBoolean("playing", true)
                 extras.putString("song", "song:$index")
             }
-            presenter.render(real, update)
+            presenter.render(real, update.expanded())
         }
         assertEquals(1, real.reparentCount)
         assertEquals(1, real.fakeView!!.reparentCount)
@@ -121,11 +135,11 @@ class IslandMediaSinglePresenterTest {
         val real = content(original)
         val preview = data("B")
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, preview)
+        presenter.render(real, preview.expanded())
         val latestNative = data("A").apply { tickerData = "new song" }
         real.currentIslandData = latestNative
         real.fakeView!!.currentIslandData = latestNative
-        presenter.render(real, preview)
+        presenter.render(real, preview.expanded())
         assertEquals("new song", real.currentIslandData!!.tickerData)
         presenter.restoreAll()
         assertSame(latestNative, real.currentIslandData)
@@ -137,7 +151,7 @@ class IslandMediaSinglePresenterTest {
         val real = content(original)
         val preview = data("B")
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, preview)
+        presenter.render(real, preview.expanded())
         // Native media updates can retain children and update the real/fake payloads separately.
         val latestNative = data("A").apply {
             view = original.view
@@ -145,7 +159,7 @@ class IslandMediaSinglePresenterTest {
             tickerData = "new song"
         }
         real.currentIslandData = latestNative
-        presenter.render(real, preview)
+        presenter.render(real, preview.expanded())
         assertEquals(1, real.reparentCount)
         assertEquals(1, real.fakeView!!.reparentCount)
         assertSame(preview.view, real.expandedView.getChildAt(0))
@@ -158,7 +172,7 @@ class IslandMediaSinglePresenterTest {
     @Test fun nativeRecreationIsNeverOverwrittenByRestoringAnOldBrowsingCard() {
         val real = content(data("A"))
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, data("B"))
+        presenter.render(real, data("B").expanded())
         val recreated = data("C")
         real.currentIslandData = recreated
         real.fakeView!!.currentIslandData = recreated
@@ -172,15 +186,67 @@ class IslandMediaSinglePresenterTest {
         val real = content(data("A"))
         val preview = data("B")
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, preview)
+        presenter.render(real, preview.expanded())
         val next = data("B").apply {
             view = preview.view
             fakeView = preview.fakeView
             extras.putString("miui.pending.intent", "new activity")
         }
-        presenter.render(real, next)
+        presenter.render(real, next.expanded())
         assertEquals(2, real.dynamicIslandEventCoordinator.capabilityUpdates)
         assertEquals(1, real.reparentCount)
         assertEquals(1, real.fakeView!!.reparentCount)
+    }
+
+    @Test fun collapseRestoresIdentityBeforeAnimationButReleasesViewsOnlyAfterItEnds() {
+        val native = data("A")
+        val real = content(native)
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        activity.setContentView(real)
+        var releases = 0
+        val selected = data("B")
+        val preview = IslandMediaExpandedContent(selected.view!!, selected.fakeView!!, selected.extras) { releases++ }
+        val presenter = IslandMediaSinglePresenter()
+        presenter.render(real, preview)
+        real.state = BigIsland()
+        // onStateChange runs before the animation starts.
+        presenter.release(preview)
+        assertSame(native, real.currentIslandData)
+        assertSame(selected.view, real.expandedView.getChildAt(0))
+        assertEquals(0, releases)
+        real.animationRunning = true
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(selected.view, real.expandedView.getChildAt(0))
+        assertEquals(0, releases)
+        real.animationRunning = false
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(native.view, real.expandedView.getChildAt(0))
+        assertEquals(1, releases)
+        assertFalse(presenter.owns(real))
+    }
+
+    @Test fun aNewExpansionCancelsTheOldBrowsingContentWithoutChangingViewsDuringItsAnimation() {
+        val native = data("A")
+        val real = content(native)
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        activity.setContentView(real)
+        var releases = 0
+        val selected = data("B")
+        val preview = IslandMediaExpandedContent(selected.view!!, selected.fakeView!!, selected.extras) { releases++ }
+        val presenter = IslandMediaSinglePresenter()
+        presenter.render(real, preview)
+        real.state = BigIsland()
+        presenter.release(preview)
+        real.animationRunning = true
+        real.state = Expanded()
+        presenter.render(real, null)
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(selected.view, real.expandedView.getChildAt(0))
+        assertSame(native, real.currentIslandData)
+        real.animationRunning = false
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(native.view, real.expandedView.getChildAt(0))
+        assertSame(native, real.currentIslandData)
+        assertEquals(1, releases)
     }
 }

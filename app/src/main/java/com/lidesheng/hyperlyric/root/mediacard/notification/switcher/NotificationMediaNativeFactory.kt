@@ -3,6 +3,7 @@ package com.lidesheng.hyperlyric.root.mediacard.notification.switcher
 import android.content.Context
 import android.media.session.MediaController
 import android.media.session.MediaSession
+import android.view.LayoutInflater
 import android.view.View
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Constructor
@@ -79,6 +80,37 @@ internal class NotificationMediaNativeFactory(
         val factory = holderFactory ?: resolveHolderFactory(templateHolder.javaClass, player)
             .also { holderFactory = it }
         return factory(player, templateHolder, templatePlayer)
+    }
+
+    fun createIslandHolder(template: Any, context: Context, layoutId: Int, config: Any?): Any {
+        val inflater = LayoutInflater.from(context)
+        val companion = try {
+            template.javaClass.classLoader!!.loadClass("${template.javaClass.name}\$Companion")
+        } catch (_: ClassNotFoundException) {
+            null
+        }
+        val create = companion?.declaredMethods?.firstOrNull {
+            it.name == "create" && it.returnType == template.javaClass &&
+                it.parameterTypes.firstOrNull() == LayoutInflater::class.java
+        }?.apply { isAccessible = true }
+        if (create == null) {
+            // Older SystemUI exposes the View constructor; new versions inline it into create().
+            val constructor = template.javaClass.getDeclaredConstructor(View::class.java).apply {
+                isAccessible = true
+            }
+            return constructor.newInstance(inflater.inflate(layoutId, null, false))
+        }
+        val receiver = if (Modifier.isStatic(create.modifiers)) null
+            else template.javaClass.getDeclaredField("Companion").get(null)
+        val args = create.parameterTypes.map { type ->
+            when {
+                type == LayoutInflater::class.java -> inflater
+                type == Int::class.javaPrimitiveType -> layoutId
+                config != null && type.isInstance(config) -> config
+                else -> error("Unknown island holder dependency: ${type.name}")
+            }
+        }
+        return create.invoke(receiver, *args.toTypedArray())!!
     }
 
     private fun resolveHolderFactory(clazz: Class<*>, player: View): (View, Any, View) -> Any {
