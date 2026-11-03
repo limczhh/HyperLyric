@@ -28,10 +28,16 @@ class IslandMediaSinglePresenterTest {
 
     class Expanded
     class BigIsland
+    class MiniWindowExpanded
+    class Signal(var value: Boolean = false)
     class Content(var currentIslandData: Data?, val fakeView: Content? = null) :
         FrameLayout(RuntimeEnvironment.getApplication()) {
         var state: Any = Expanded()
         var animationRunning = false
+        val islandAppAnimRunning = Signal()
+        val islandFreeformAnimRunning = Signal()
+        val trackingToOpenMW = Signal()
+        var needResetState = false
         fun isAnimating() = animationRunning
         var reparentCount = 0
         var miniBarVisible = true
@@ -248,5 +254,62 @@ class IslandMediaSinglePresenterTest {
         assertSame(native.view, real.expandedView.getChildAt(0))
         assertSame(native, real.currentIslandData)
         assertEquals(1, releases)
+    }
+
+    @Test fun nativeMinibarDragAndReboundKeepTheCurrentCardUntilBothFinish() {
+        val real = content(data("A"))
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        activity.setContentView(real)
+        val presenter = IslandMediaSinglePresenter()
+        val current = data("B").expanded()
+        val next = data("C").expanded()
+        presenter.render(real, current)
+        val beforeDrag = real.currentIslandData
+        real.fakeView!!.trackingToOpenMW.value = true
+        assertFalse(real.isAnimating())
+        assertTrue(presenter.isBusy(real))
+        presenter.render(real, next)
+        var resumed = 0
+        presenter.whenIdle(real) { resumed++ }
+        real.fakeView.trackingToOpenMW.value = false
+        real.fakeView.needResetState = true
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(beforeDrag, real.currentIslandData)
+        assertSame(current.view, real.expandedView.getChildAt(0))
+        assertEquals(0, resumed)
+        real.fakeView.needResetState = false
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(next.view, real.expandedView.getChildAt(0))
+        assertEquals(1, resumed)
+    }
+
+    @Test fun collapseDuringFreeformDoesNotChangeTheTargetBeforeItsCompletionCallback() {
+        val native = data("A")
+        val real = content(native)
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        activity.setContentView(real)
+        var released = 0
+        val selected = data("B")
+        val preview = IslandMediaExpandedContent(selected.view!!, selected.fakeView!!, selected.extras) { released++ }
+        val presenter = IslandMediaSinglePresenter()
+        presenter.render(real, preview)
+        val launchTarget = real.currentIslandData
+        real.islandFreeformAnimRunning.value = true
+        real.state = MiniWindowExpanded()
+        presenter.release(preview)
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(launchTarget, real.currentIslandData)
+        assertSame(launchTarget, real.fakeView!!.currentIslandData)
+        assertSame(selected.view, real.expandedView.getChildAt(0))
+        assertEquals(0, released)
+        real.islandFreeformAnimRunning.value = false
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(launchTarget, real.currentIslandData)
+        assertEquals(0, released)
+        real.state = BigIsland()
+        real.viewTreeObserver.dispatchOnPreDraw()
+        assertSame(native, real.currentIslandData)
+        assertSame(native.view, real.expandedView.getChildAt(0))
+        assertEquals(1, released)
     }
 }

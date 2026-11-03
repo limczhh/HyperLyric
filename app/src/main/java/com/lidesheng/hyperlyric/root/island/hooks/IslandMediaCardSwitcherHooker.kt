@@ -36,6 +36,12 @@ internal object IslandMediaCardSwitcherHooker {
                             ?: return chain.proceed()
                         val data = chain.args.firstOrNull() ?: return chain.proceed()
                         val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
+                        if (method.name == "updateDynamicIslandView") {
+                            val owner = chain.thisObject
+                            val args = chain.args.toTypedArray()
+                            val publish = Runnable { method.invoke(owner, *args) }
+                            if (bridge.apply(arrayOf("holdNativeUpdate", data, publish)) == true) return null
+                        }
                         val result = chain.proceed()
                         bridge.apply(arrayOf("published", data))
                         return result
@@ -200,6 +206,7 @@ internal object IslandMediaCardSwitcherHooker {
     fun hasAdjacent(window: Any, data: Any, dx: Float): Boolean {
         val view = window as? View ?: return false
         val bridge = IslandMediaSessionCoordinator.connect(view, data) ?: return false
+        if (bridge.apply(arrayOf("canBrowse")) != true) return false
         val page = key(data)?.let { bridge.apply(arrayOf("pages", it)) } as? IntArray ?: return false
         return page[1] + pageStep(view, dx) in 0 until page[0]
     }

@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewTreeObserver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Method
+import java.lang.reflect.Field
 import java.util.IdentityHashMap
 
 /** Swaps expanded content only. No add/update/remove call reaches the island state machine. */
@@ -24,13 +25,51 @@ internal class IslandMediaSinglePresenter(
         val observer: ViewTreeObserver,
         val listener: ViewTreeObserver.OnPreDrawListener,
         var preview: IslandMediaExpandedContent?,
+        var onIdle: (() -> Unit)? = null,
     )
 
     private val presentations = IdentityHashMap<Any, Presentation>()
     private val pending = IdentityHashMap<Any, Pending>()
     private val methods = HashMap<Pair<Class<*>, String>, Method>()
+    private val reboundFields = HashMap<Class<*>, Field>()
 
     fun owns(real: Any): Boolean = presentations.containsKey(real) || pending.containsKey(real)
+
+    fun isBusy(real: Any): Boolean {
+        val phase = nativeInteraction(real) ?: if (method(real, "isAnimating", 0).invoke(real) == true) {
+            "island_animation"
+        } else null
+        if (real in pending) HookLogger.dState(
+            stateId = "IslandMediaCardSwitcher.native_phase", tag = "IslandMediaCardSwitcher", state = phase ?: "idle",
+        ) { "单岛原生交互状态: phase=${phase ?: "idle"}" }
+        return phase != null
+    }
+
+    private fun nativeInteraction(real: Any): String? {
+        fun signal(target: Any, name: String): Boolean =
+            get(target, name)?.let { get(it, "Value") == true } == true
+        if (signal(real, "IslandAppAnimRunning")) return "app_animation"
+        if (signal(real, "IslandFreeformAnimRunning")) return "freeform_animation"
+        // The return-to-island lookup still uses this target after the launch animation ends.
+        // Keep it until the app/freeform state itself exits, including its return transition.
+        when (get(real, "State")?.javaClass?.simpleName) {
+            "AppExpanded", "SubAppExpanded" -> return "app_window"
+            "MiniWindowExpanded", "SubMiniWindowExpanded" -> return "freeform_window"
+        }
+        val fake = get(real, "FakeView") ?: return null
+        // Both supplied plugin generations clear tracking at UP, then retain needResetState
+        // until the FakeView rebound completes/cancels. The ordinary island animator is idle here.
+        if (signal(fake, "TrackingToOpenMW")) return "minibar_tracking"
+        val rebounding = reboundFields.getOrPut(fake.javaClass) {
+            fake.javaClass.getDeclaredField("needResetState").apply { isAccessible = true }
+        }.getBoolean(fake)
+        return if (rebounding) "minibar_rebound" else null
+    }
+
+    fun whenIdle(real: Any, action: () -> Unit) {
+        if (real !in pending) defer(real, presentations[real]?.preview)
+        pending.getValue(real).onIdle = action
+    }
 
     fun render(real: Any, preview: IslandMediaExpandedContent?) {
         if (preview == null) {
@@ -38,13 +77,14 @@ internal class IslandMediaSinglePresenter(
             return
         }
         if (get(real, "State")?.javaClass?.simpleName != "Expanded") return
-        if (method(real, "isAnimating", 0).invoke(real) == true) {
+        if (isBusy(real)) {
             defer(real, preview)
             return
         }
         val queued = cancelPending(real)
         renderNow(real, preview)
-        queued?.let(::closeIfUnused)
+        queued?.preview?.let(::closeIfUnused)
+        queued?.onIdle?.invoke()
     }
 
     private fun renderNow(real: Any, preview: IslandMediaExpandedContent) {
@@ -86,13 +126,20 @@ internal class IslandMediaSinglePresenter(
 
     fun restore(real: Any) {
         val state = presentations[real]
+        if (state == null && real !in pending) return
+        if ((real as View).isAttachedToWindow && nativeInteraction(real) != null) {
+            // Native launch/rebound callbacks must observe one unchanged target until completion.
+            defer(real, null)
+            return
+        }
         state?.let { restoreMetadata(real, it) }
         // Restore native identity before collapse; retain its current children until the
         // transition finishes. Reparenting/detaching inside onStateChange disrupts that animation.
-        if (!(real as View).isAttachedToWindow) {
+        if (!real.isAttachedToWindow) {
             val queued = cancelPending(real)
             finishRestore(real)
-            queued?.let(::closeIfUnused)
+            queued?.preview?.let(::closeIfUnused)
+            queued?.onIdle?.invoke()
         } else if (state != null || pending.containsKey(real)) defer(real, null)
     }
 
@@ -113,6 +160,7 @@ internal class IslandMediaSinglePresenter(
     }
 
     private fun finishRestore(real: Any) {
+        presentations[real]?.let { restoreMetadata(real, it) }
         val state = presentations.remove(real) ?: return
         try {
             val current = get(real, "CurrentIslandData")
@@ -144,7 +192,7 @@ internal class IslandMediaSinglePresenter(
             val queued = cancelPending(real)
             presentations[real]?.let { restoreMetadata(real, it) }
             finishRestore(real)
-            queued?.let(::closeIfUnused)
+            queued?.preview?.let(::closeIfUnused)
         }
     }
 
@@ -163,10 +211,10 @@ internal class IslandMediaSinglePresenter(
         }
     }
 
-    private fun cancelPending(real: Any): IslandMediaExpandedContent? {
+    private fun cancelPending(real: Any): Pending? {
         val task = pending.remove(real) ?: return null
         if (task.observer.isAlive) task.observer.removeOnPreDrawListener(task.listener)
-        return task.preview
+        return task
     }
 
     private fun defer(real: Any, preview: IslandMediaExpandedContent?) {
@@ -180,14 +228,16 @@ internal class IslandMediaSinglePresenter(
         val observer = view.viewTreeObserver
         val listener = ViewTreeObserver.OnPreDrawListener {
             runGuarded {
-                if (!view.isAttachedToWindow || method(real, "isAnimating", 0).invoke(real) != true) {
-                    val next = cancelPending(real)
+                if (!view.isAttachedToWindow || !isBusy(real)) {
+                    val task = cancelPending(real)
+                    val next = task?.preview
                     if (next != null && view.isAttachedToWindow &&
                         get(real, "State")?.javaClass?.simpleName == "Expanded"
                     ) {
                         renderNow(real, next)
                     } else finishRestore(real)
                     next?.let(::closeIfUnused)
+                    task?.onIdle?.invoke()
                 }
             }
             true

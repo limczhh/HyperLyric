@@ -44,6 +44,8 @@ internal object IslandMediaSessionCoordinator {
         when (args[0]) {
             "ready" -> isRunning()
             "single" -> runtime?.let { !it.failed && !it.multi } == true
+            "canBrowse" -> runtime?.canBrowse() == true
+            "holdNativeUpdate" -> runtime?.holdNativeUpdate(args[1]!!, args[2] as Runnable) == true
             "pages" -> pageState(args[1] as String)?.let { intArrayOf(it.first, it.second) }
             "switch" -> switchRelative(args[1] as String, args[2] as Int)
             "render" -> { runtime?.let { state -> state.guard { state.renderSingle(args[1]!!) } }; null }
@@ -203,7 +205,7 @@ internal object IslandMediaSessionCoordinator {
 
     private fun switchRelative(currentKey: String, step: Int): Boolean {
         val state = runtime ?: return false
-        if (state.multi || state.failed) return false
+        if (!state.canBrowse()) return false
         val pages = state.pages()
         if (state.nativeKey() != currentKey) return false
         val selectedKey = state.singleSelection.selectedKey(pages.map { it.first })
@@ -257,6 +259,9 @@ internal object IslandMediaSessionCoordinator {
             private set
         private val singlePresenter = IslandMediaSinglePresenter { action -> guard(action) }
         private var singleCard: IslandMediaBrowsingCard? = null
+        private var singleHost: Any? = null
+        private class NativeUpdate(val key: String, val host: Any, val publish: Runnable)
+        private var pendingNativeUpdate: NativeUpdate? = null
         private val dirtyKeys = linkedSetOf<String>()
         private var seeded = false
         private var syncScheduled = false
@@ -267,6 +272,7 @@ internal object IslandMediaSessionCoordinator {
             dirtyKeys.clear()
             guard {
                 if (pluginContent == null) onPluginChanged(plugin)
+                flushNativeUpdate()
                 sync(changed)
             }
         }
@@ -349,6 +355,8 @@ internal object IslandMediaSessionCoordinator {
             // without calling back into its destroyed event/animation coordinator.
             singlePresenter.forgetAll()
             singleSelection.setExpanded(false)
+            singleHost = null
+            pendingNativeUpdate = null
             releaseSingleCard()
             windows.keys.toList().filterNot(::acceptsWindow).forEach { window ->
                 setRefresh(window, null)
@@ -453,6 +461,8 @@ internal object IslandMediaSessionCoordinator {
             nativePublishedContent = null
             singlePresenter.forgetAll()
             singleSelection.setExpanded(false)
+            singleHost = null
+            pendingNativeUpdate = null
             if (multi) {
                 cards.values.forEach { it.publishedContent = null }
                 orderDirty = true
@@ -514,6 +524,8 @@ internal object IslandMediaSessionCoordinator {
                 return
             }
             if (method(real, "getState", 0).invoke(real)?.javaClass?.simpleName == "Expanded") {
+                if (singleHost !== real) requestSync()
+                singleHost = real
                 singleSelection.setExpanded(true)
             }
             val preview = singleCard?.content
@@ -523,7 +535,43 @@ internal object IslandMediaSessionCoordinator {
         fun resetSingle() {
             if (multi) return
             singleSelection.setExpanded(false)
+            // A collapse can occur before a native freeform callback completes. Keep its host
+            // available so metadata publications remain deferred until that callback finishes.
             releaseSingleCard()
+        }
+
+        fun canBrowse(): Boolean {
+            if (multi || failed) return false
+            val real = singleHost ?: return false
+            var ready = false
+            guard {
+                ready = method(real, "getState", 0).invoke(real)?.javaClass?.simpleName == "Expanded" &&
+                    !singlePresenter.isBusy(real)
+            }
+            return ready
+        }
+
+        fun holdNativeUpdate(data: Any, publish: Runnable): Boolean {
+            if (multi || failed || read(original, "dynamicIslandData") !== data) return false
+            val real = singleHost ?: return false
+            if (!singlePresenter.owns(real) || !singlePresenter.isBusy(real)) return false
+            val key = method(data, "getKey", 0).invoke(data) as? String ?: return false
+            val current = method(real, "getCurrentIslandData", 0).invoke(real) ?: return false
+            if (method(current, "getKey", 0).invoke(current) != key) return false
+            if (pendingNativeUpdate == null) HookLogger.d(TAG, "暂存原生媒体更新，等待交互结束: key=$key")
+            pendingNativeUpdate = NativeUpdate(key, real, publish)
+            singlePresenter.whenIdle(real) { requestSync() }
+            return true
+        }
+
+        private fun flushNativeUpdate() {
+            val update = pendingNativeUpdate ?: return
+            if ((update.host as View).isAttachedToWindow && singlePresenter.isBusy(update.host)) return
+            pendingNativeUpdate = null
+            // A genuinely different native owner takes precedence over an old deferred update.
+            if (update.key != nativeKey()) return
+            update.publish.run()
+            HookLogger.d(TAG, "交互结束，已同步最新原生媒体数据: key=${update.key}")
         }
 
         fun onPresentationChanged(real: Any, state: String) {
@@ -542,7 +590,9 @@ internal object IslandMediaSessionCoordinator {
             }
             if (key != nativeKey() && !singlePresenter.owns(real)) return
             if (state == "Expanded") {
+                singleHost = real
                 singleSelection.setExpanded(true)
+                requestSync()
             } else if (collapsed) {
                 // Restore identity now; the presenter releases Views after the native transition.
                 guard { resetSingle() }
@@ -559,6 +609,16 @@ internal object IslandMediaSessionCoordinator {
             if (!singleSelection.isBrowsing || selected == null || nativeOnly) {
                 releaseSingleCard()
             } else {
+                val real = singleHost
+                if (real == null || method(real, "getState", 0).invoke(real)?.javaClass?.simpleName != "Expanded") {
+                    dirtyKeys.addAll(changed)
+                    return
+                }
+                if (singlePresenter.isBusy(real)) {
+                    dirtyKeys.addAll(changed)
+                    singlePresenter.whenIdle(real) { requestSync() }
+                    return
+                }
                 val data = pages.first { it.first == selected }.second
                 val holder = required(original, "miuiPlayerHolder")
                 if (singleCard?.templatePlayer !== required(holder, "player")) releaseSingleCard()
@@ -622,6 +682,7 @@ internal object IslandMediaSessionCoordinator {
                 main.removeCallbacks(syncTask)
                 syncScheduled = false
                 dirtyKeys.clear()
+                pendingNativeUpdate = null
                 listener?.let { runCatching { method(manager, "removeListener", 1).invoke(manager, it) } }
                 runCatching { singlePresenter.restoreAll() }
                 runCatching { releaseSingleCard() }
