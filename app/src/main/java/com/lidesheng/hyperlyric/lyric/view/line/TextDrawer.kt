@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2026 Proify, Tomakino
  * Licensed under the Apache License, Version 2.0
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -203,9 +203,9 @@ internal class TextDrawer {
                 return@withSave
             }
 
-            // 未演唱部分按 unsungOpacity 的绝对值绘制：透明度已烘进 effectiveBgColors，
-            // 纯色走 paint.color、彩虹走 shader 都带同一 alpha，且与上浮姿态用同一支画笔一次画完。
-            bgPaint.color = effectiveBgColors[0]
+            // 未演唱部分按 unsungOpacity 的绝对值绘制：透明度已烘进 effectiveBgColors。
+            // 单色由画笔颜色承载 alpha；彩虹渐变由 shader 颜色承载 alpha，此时画笔 alpha 必须保持
+            // 255，否则绘制时画笔 alpha 会与 shader 输出 alpha 再相乘一次（0.5 会变成 0.25）。
             if (isRainbowBg) {
                 bgPaint.shader = getOrCreateRainbowShader(
                     gradientStartX,
@@ -213,8 +213,10 @@ internal class TextDrawer {
                     effectiveBgColors,
                     bgRainbowCache
                 )
+                bgPaint.alpha = 255
             } else {
                 bgPaint.shader = null
+                bgPaint.color = effectiveBgColors[0]
             }
 
             if (charMotionEnabled) {
