@@ -6,6 +6,7 @@ internal class IslandMediaSingleSelection {
     private var browsedKey: String? = null
 
     val isExpanded: Boolean get() = expanded
+    val isBrowsing: Boolean get() = browsedKey != null
 
     fun replaceKey(oldKey: String, key: String) {
         if (browsedKey == oldKey) browsedKey = key

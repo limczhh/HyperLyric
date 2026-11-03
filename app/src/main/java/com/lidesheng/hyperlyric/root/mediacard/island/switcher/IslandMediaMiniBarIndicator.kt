@@ -20,8 +20,10 @@ internal object IslandMediaMiniBarIndicator {
     private val bars = WeakHashMap<View, WeakReference<BarState>>()
 
     fun update(window: View, content: Any?, pages: IntArray?) {
+        // A single session needs no indicator; keep its native bar and capability unchanged.
+        val indicatorPages = pages?.takeIf { it[0] > 1 }
         val active = LinkedHashMap<View, Any>()
-        if (content != null && pages != null) {
+        if (content != null && indicatorPages != null) {
             (call(content, "getMiniBar") as? View)?.let { active[it] = content }
             call(content, "getFakeView")?.let { fake ->
                 (call(fake, "getMiniBar") as? View)?.let { active[it] = fake }
@@ -34,7 +36,7 @@ internal object IslandMediaMiniBarIndicator {
                 bars.remove(bar)
             }
         }
-        if (pages == null || content == null) return
+        if (indicatorPages == null || content == null) return
         active.forEach { (bar, owner) ->
             val parent = bar.parent as? FrameLayout ?: return@forEach
             var state = bars[bar]?.get()
@@ -44,14 +46,14 @@ internal object IslandMediaMiniBarIndicator {
                 state = BarState(window, bar, parent, background, owner, content)
                 bars[bar] = WeakReference(state)
             }
-            state.pageCount = pages[0]
-            state.selectedIndex = pages[1]
+            state.pageCount = indicatorPages[0]
+            state.selectedIndex = indicatorPages[1]
             state.updateActionColor()
             state.onPreDraw()
         }
         HookLogger.dState(
-            stateId = "$TAG.pages", tag = TAG, state = "${pages[0]}/${pages[1]}/${active.size}",
-        ) { "媒体岛分段指示更新: pages=${pages[0]}, selected=${pages[1]}, bars=${active.size}" }
+            stateId = "$TAG.pages", tag = TAG, state = "${indicatorPages[0]}/${indicatorPages[1]}/${active.size}",
+        ) { "媒体岛分段指示更新: pages=${indicatorPages[0]}, selected=${indicatorPages[1]}, bars=${active.size}" }
     }
 
     fun clear() {

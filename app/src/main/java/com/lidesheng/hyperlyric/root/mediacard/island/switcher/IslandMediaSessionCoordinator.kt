@@ -522,7 +522,6 @@ internal object IslandMediaSessionCoordinator {
         private fun expandSingle() {
             if (singleSelection.isExpanded) return
             singleSelection.setExpanded(true)
-            requestSync()
         }
 
         fun renderSingle(real: Any) {
@@ -575,7 +574,9 @@ internal object IslandMediaSessionCoordinator {
             val pages = pages()
             val selected = singleSelection.selectedKey(pages.map { it.first })
             val nativeOnly = pages.size == 1 && selected == nativeKey()
-            if (!singleSelection.isExpanded || selected == null || nativeOnly) {
+            // Opening uses the already-bound native card. Inflate/bind a browsing card only
+            // after a swipe, then retain it when swiping back for symmetric cover animations.
+            if (!singleSelection.isBrowsing || selected == null || nativeOnly) {
                 singlePresenter.restoreAll()
                 cards.remove("single")?.close()
             } else {
