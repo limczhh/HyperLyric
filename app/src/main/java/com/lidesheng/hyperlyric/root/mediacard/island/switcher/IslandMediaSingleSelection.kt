@@ -5,6 +5,12 @@ internal class IslandMediaSingleSelection {
     private var expanded = false
     private var browsedKey: String? = null
 
+    val isExpanded: Boolean get() = expanded
+
+    fun replaceKey(oldKey: String, key: String) {
+        if (browsedKey == oldKey) browsedKey = key
+    }
+
     fun setExpanded(value: Boolean) {
         expanded = value
         if (!value) browsedKey = null

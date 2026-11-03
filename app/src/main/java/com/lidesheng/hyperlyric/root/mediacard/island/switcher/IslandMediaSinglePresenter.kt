@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.root.mediacard.island.switcher
 
 import android.os.Bundle
+import android.view.View
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import java.lang.reflect.Method
 import java.util.IdentityHashMap
@@ -28,11 +29,16 @@ internal class IslandMediaSinglePresenter {
         val current = get(real, "CurrentIslandData") ?: return
         val fake = get(real, "FakeView")
         val previous = presentations[real]
-        if (previous?.displayed === current && previous.preview === preview && previous.fake === fake) return
+        if (previous?.displayed === current && previous.preview === preview && previous.fake === fake &&
+            isPresented(real, get(preview, "View") as? View, "View") &&
+            (fake == null || get(fake, "CurrentIslandData") === previous.displayed &&
+                isPresented(fake, get(preview, "FakeView") as? View, "FakeView"))
+        ) return
         val sameHost = previous?.displayed === current && previous.fake === fake
         if (previous != null && !sameHost) restore(real)
         val native = if (sameHost) previous.native else get(real, "CurrentIslandData") ?: return
-        val fakeNative = if (sameHost) previous.fakeNative else fake?.let { get(it, "CurrentIslandData") }
+        val fakeCurrent = fake?.let { get(it, "CurrentIslandData") }
+        val fakeNative = if (sameHost && fakeCurrent === previous.displayed) previous.fakeNative else fakeCurrent
         val displayed = native.javaClass.getDeclaredConstructor().newInstance()
         listOf("Key", "Priority", "Properties", "TickerData").forEach { name ->
             set(displayed, name, get(native, name))
@@ -69,16 +75,30 @@ internal class IslandMediaSinglePresenter {
 
     fun restoreAll() = presentations.keys.toList().forEach(::restore)
 
+    fun forgetAll() = presentations.clear()
+
     private fun bind(content: Any, data: Any?, viewName: String) {
         val before = get(content, "CurrentIslandData")
         val previousView = before?.let { get(it, viewName) }
+        val targetView = data?.let { get(it, viewName) } as? View
         set(content, "CurrentIslandData", data)
-        // Metadata and progress updates reuse the binder's existing views. Reparent only
-        // when actually changing cards, rather than removing/adding children every callback.
-        if (previousView === data?.let { get(it, viewName) }) return
+        // Native media updates may replace CurrentIslandData while deliberately keeping the
+        // expanded child. Inspect the actual parent instead of treating that payload as the View tree.
+        if (isPresented(content, targetView, viewName) || targetView == null && previousView == null) return
         // Both supplied plugin generations keep this suspend ABI, but the actual real/fake
         // updateExpandedView bodies are synchronous and never access their continuation.
         method(content, "updateExpandedView", 3).invoke(content, data, false, null)
+    }
+
+    private fun isPresented(content: Any, view: View?, viewName: String): Boolean {
+        view ?: return false
+        val expanded = get(content, if (viewName == "View") "ExpandedView" else "FakeExpandedView") ?: return false
+        var parent = view.parent
+        while (parent != null) {
+            if (parent === expanded) return true
+            parent = parent.parent
+        }
+        return false
     }
 
     @Suppress("DEPRECATION")

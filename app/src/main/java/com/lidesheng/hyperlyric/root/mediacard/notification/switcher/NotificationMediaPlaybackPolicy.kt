@@ -31,7 +31,6 @@ internal class NotificationMediaPlaybackPolicy(
     private val directPlaybackKeys = HashSet<String>()
     private var nextActivitySequence = 0L
     private var nextInsertionSequence = 0L
-    private var lastNativeBindKey: String? = null
 
     fun initialize() {
         HookLogger.d(TAG, "媒体会话活跃度排序初始化")
@@ -45,7 +44,6 @@ internal class NotificationMediaPlaybackPolicy(
         directPlaybackKeys.clear()
         nextActivitySequence = 0L
         nextInsertionSequence = 0L
-        lastNativeBindKey = initialEntries.firstOrNull()?.first
 
         // Before the first callback, native order is the only available
         // chronology. Give the first native item the highest initial rank;
@@ -89,7 +87,7 @@ internal class NotificationMediaPlaybackPolicy(
             playbackSignalByKey.remove(key)
             directPlaybackKeys.remove(key)
         }
-        if (accessor.isPlaying(data) == true && (!wasPlaying || tokenChanged)) {
+        if (key !in directPlaybackKeys && accessor.isPlaying(data) == true && (!wasPlaying || tokenChanged)) {
             markActive(key)
         }
         if (key !in directPlaybackKeys) {
@@ -119,27 +117,18 @@ internal class NotificationMediaPlaybackPolicy(
     }
 
     /**
-     * Native binding is an ordering signal when the bound top session changes.
-     * Repeated binds for the same key are content refreshes and must not make
-     * metadata updates continually reshuffle the carousel.
+     * Native binding refreshes the payload. A different visible card is not a
+     * playback transition: metadata updates and manual browsing must not reorder sessions.
      */
     fun onNativeBind(data: Any?, synthetic: Boolean = false) {
         if (data == null) return
 
         val key = accessor.notificationKey(data) ?: return
-        if (!synthetic) {
-            val previousKey = lastNativeBindKey
-            lastNativeBindKey = key
-            if (key != previousKey && key in dataByKey && isPlaying(data)) {
-                markActive(key)
-            }
-        }
-
         if (key in dataByKey && accessor.isActive(data)) {
             val previous = dataByKey[key]
             val wasPlaying = previous?.let { accessor.isPlaying(it) == true } == true
             dataByKey[key] = data
-            if (isPlaying(data) && !wasPlaying) markActive(key)
+            if (!synthetic && key !in directPlaybackKeys && isPlaying(data) && !wasPlaying) markActive(key)
             if (key !in directPlaybackKeys) {
                 accessor.isPlaying(data)?.let { playbackSignalByKey[key] = it }
             }
@@ -181,7 +170,6 @@ internal class NotificationMediaPlaybackPolicy(
         insertionSequenceByKey.clear()
         playbackSignalByKey.clear()
         directPlaybackKeys.clear()
-        lastNativeBindKey = null
     }
 
     private fun isPlaying(key: String): Boolean {
@@ -208,6 +196,5 @@ internal class NotificationMediaPlaybackPolicy(
         insertionSequenceByKey.remove(key)
         playbackSignalByKey.remove(key)
         directPlaybackKeys.remove(key)
-        if (lastNativeBindKey == key) lastNativeBindKey = null
     }
 }

@@ -39,19 +39,24 @@ internal object IslandMediaCardSwitcherHooker {
                         // Preview controllers bind independent native views. Their generated
                         // payload is consumed directly, never published as an actual island.
                         if (bridge.apply(arrayOf("preview", data)) == true) return null
-                        val multi = bridge.apply(arrayOf("single")) != true
-                        val previous = if (multi) window.javaClass.getMethod(
-                            "getViewFromList", String::class.java
-                        ).invoke(window, key(data)) else null
-                        val wasUpdate = call(previous, "getState") != null
                         val result = chain.proceed()
-                        if (multi) bridge.apply(arrayOf("published", data, wasUpdate))
+                        bridge.apply(arrayOf("published", data))
                         return result
                     }
                 })
             }
 
             val type = loader.loadClass("miui.systemui.dynamicisland.window.DynamicIslandWindowView")
+            val findContent = type.getMethod("getViewFromList", String::class.java)
+            type.declaredMethods.first { it.name == "destroy" && it.parameterCount == 0 }.let { method ->
+                module.managedHook(method, "media.island_switcher.plugin.window_destroy", object : Hooker {
+                    override fun intercept(chain: Chain): Any? {
+                        val result = chain.proceed()
+                        (chain.thisObject as? View)?.let(IslandMediaSessionCoordinator::onWindowDestroyed)
+                        return result
+                    }
+                })
+            }
             val pending = type.declaredMethods.first {
                 it.name == "hasPendingMedia" && it.parameterCount == 1
             }
@@ -135,12 +140,19 @@ internal object IslandMediaCardSwitcherHooker {
                         val result = chain.proceed()
                         val window = chain.thisObject?.let { call(it, "getWindowView") } as? View
                         val data = IslandProbeUtils.getCurrentIslandData(chain.args.getOrNull(1))
-                        window?.let { IslandMediaSessionCoordinator.connect(it, data) }
+                        val bridge = window?.let { IslandMediaSessionCoordinator.connect(it, data) }
+                        if (chain.args.firstOrNull()?.javaClass?.simpleName == "AddDynamicIsland" && data != null) {
+                            bridge?.apply(arrayOf("added", data))
+                        }
                         refreshForWindow(window)
                         return result
                     }
                 })
             }
+            val stateMethods = loader.loadClass("miui.systemui.dynamicisland.event.DynamicIslandState").methods
+            val setTime = stateMethods.first { it.name == "setTime" && it.parameterCount == 1 }
+            val setPostTime = stateMethods.first { it.name == "setPostTime" && it.parameterCount == 1 }
+            val setUpdateOrder = stateMethods.first { it.name == "setUpdateOrder" && it.parameterCount == 1 }
             val updates = loader.loadClass("miui.systemui.dynamicisland.event.UpdateEventCoordinator")
             updates.declaredMethods.first { it.name == "handleAppEvent" && it.parameterCount == 3 }.let { method ->
                 module.managedHook(method, "media.island_switcher.plugin.activity_order", object : Hooker {
@@ -155,17 +167,28 @@ internal object IslandMediaCardSwitcherHooker {
                         val data = IslandProbeUtils.getCurrentIslandData(content) ?: return chain.proceed()
                         val key = key(data) ?: return chain.proceed()
                         val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
-                        val time = bridge.apply(arrayOf("consumePromotion", key)) as? Long ?: return chain.proceed()
+                        val rank = bridge.apply(arrayOf("rank", key)) as? Long ?: return chain.proceed()
                         val state = call(content, "getState") ?: return chain.proceed()
-                        mapOf("setTime" to time, "setPostTime" to time, "setUpdateOrder" to true)
-                            .forEach { (name, value) ->
-                                state.javaClass.methods.first { it.name == name && it.parameterCount == 1 }
-                                    .invoke(state, value)
-                            }
+                        // Native template/metadata updates can rewrite these timestamps even
+                        // without a playback transition. Keep the current rank without forcing a reorder.
+                        setTime.invoke(state, rank)
+                        setPostTime.invoke(state, rank)
+                        val ranks = bridge.apply(arrayOf("consumeOrder", key)) as? Map<*, *>
+                        var applied = 1
+                        ranks?.forEach { (mediaKey, time) ->
+                            if (mediaKey == key) return@forEach
+                            val card = findContent.invoke(window, mediaKey) ?: return@forEach
+                            val other = call(card, "getState") ?: return@forEach
+                            setTime.invoke(other, time)
+                            setPostTime.invoke(other, time)
+                            applied++
+                        }
+                        if (ranks != null) setUpdateOrder.invoke(state, true)
                         val result = chain.proceed()
-                        val big = call(window, "getCurrentBigIslandState")
-                        val winner = IslandProbeUtils.getCurrentIslandData(big)?.let(::key)
-                        HookLogger.d(TAG, "原生媒体岛排序完成: target=$key, first=$winner")
+                        if (ranks != null) {
+                            val winner = IslandProbeUtils.getCurrentIslandData(call(window, "getCurrentBigIslandState"))?.let(::key)
+                            HookLogger.d(TAG, "原生媒体岛排序完成: order=${ranks.keys}, applied=$applied/${ranks.size}, first=$winner")
+                        }
                         return result
                     }
                 })
@@ -181,14 +204,18 @@ internal object IslandMediaCardSwitcherHooker {
         val view = window as? View ?: return false
         val bridge = IslandMediaSessionCoordinator.connect(view, data) ?: return false
         val page = key(data)?.let { bridge.apply(arrayOf("pages", it)) } as? IntArray ?: return false
-        return if (dx < 0f) page[1] + 1 < page[0] else page[1] > 0
+        return page[1] + pageStep(view, dx) in 0 until page[0]
     }
 
     fun switchToAdjacent(windowView: Any, currentData: Any, dx: Float): Boolean {
         val key = key(currentData) ?: return false
-        val bridge = (windowView as? View)?.let(IslandMediaSessionCoordinator::connect) ?: return false
-        return bridge.apply(arrayOf("switch", key, dx)) == true
+        val window = windowView as? View ?: return false
+        val bridge = IslandMediaSessionCoordinator.connect(window) ?: return false
+        return bridge.apply(arrayOf("switch", key, pageStep(window, dx))) == true
     }
+
+    private fun pageStep(window: View, dx: Float): Int =
+        (if (dx < 0f) 1 else -1) * (if (window.layoutDirection == View.LAYOUT_DIRECTION_RTL) -1 else 1)
 
     fun refreshForWindow(windowView: Any?) {
         val view = windowView as? View ?: return

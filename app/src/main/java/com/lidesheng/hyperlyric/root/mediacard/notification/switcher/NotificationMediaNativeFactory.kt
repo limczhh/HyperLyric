@@ -163,12 +163,18 @@ internal class NotificationMediaNativeFactory(
             }
             val templateButtons = required(templateController, "miuiMediaActionButtonUtils")
             val buttons = createActionButtons(scope?.value)
+            val templateAlbum = required(templateController, "miuiMediaAlbumAnimationUtils")
+            // Dagger creates one animation utility per binder. Its FlipAnimation and
+            // hasFlipListenerCallback are mutable and must not leak across sessions.
+            val album = matchingConstructor(templateAlbum.javaClass, emptyList())?.newInstance()
+                ?: fromNativeFactory(templateAlbum)
             val values = arguments.map { value ->
                 when {
                     value === templateViewModel -> viewModel
                     templateOwner != null && value === templateOwner -> requireNotNull(owner)
                     templateScope != null && value === templateScope -> requireNotNull(scope).value
                     value === templateButtons -> buttons
+                    value === templateAlbum -> album
                     else -> value
                 }
             }
