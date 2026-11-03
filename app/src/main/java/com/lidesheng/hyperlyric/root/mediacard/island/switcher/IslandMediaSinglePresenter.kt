@@ -34,11 +34,14 @@ internal class IslandMediaSinglePresenter {
             (fake == null || get(fake, "CurrentIslandData") === previous.displayed &&
                 isPresented(fake, get(preview, "FakeView") as? View, "FakeView"))
         ) return
-        val sameHost = previous?.displayed === current && previous.fake === fake
-        if (previous != null && !sameHost) restore(real)
-        val native = if (sameHost) previous.native else get(real, "CurrentIslandData") ?: return
+        // Native media updates can replace only the payload, retaining the browsing Views.
+        // Save the newer native payload without restoring/reinserting the other expanded child.
+        if (previous != null && previous.fake !== fake) restoreFake(previous)
+        val native = if (previous != null && current === previous.displayed) previous.native else current
         val fakeCurrent = fake?.let { get(it, "CurrentIslandData") }
-        val fakeNative = if (sameHost && fakeCurrent === previous.displayed) previous.fakeNative else fakeCurrent
+        val fakeNative = if (previous != null && previous.fake === fake && fakeCurrent === previous.displayed) {
+            previous.fakeNative
+        } else fakeCurrent
         val displayed = native.javaClass.getDeclaredConstructor().newInstance()
         listOf("Key", "Priority", "Properties", "TickerData").forEach { name ->
             set(displayed, name, get(native, name))
@@ -64,13 +67,15 @@ internal class IslandMediaSinglePresenter {
             bind(real, state.native, "View")
             restored = true
         }
-        state.fake?.let { fake ->
-            if (get(fake, "CurrentIslandData") === state.displayed) {
-                bind(fake, state.fakeNative, "FakeView")
-                restored = true
-            }
-        }
+        if (restoreFake(state)) restored = true
         if (restored) refreshMiniWindowCapability(real)
+    }
+
+    private fun restoreFake(state: Presentation): Boolean {
+        val fake = state.fake ?: return false
+        if (get(fake, "CurrentIslandData") !== state.displayed) return false
+        bind(fake, state.fakeNative, "FakeView")
+        return true
     }
 
     fun restoreAll() = presentations.keys.toList().forEach(::restore)

@@ -2,6 +2,8 @@ package com.lidesheng.hyperlyric.root.mediacard.island.switcher
 
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,7 +28,16 @@ class IslandMediaSinglePresenterTest {
         var reparentCount = 0
         var miniBarVisible = true
         val dynamicIslandEventCoordinator = Events()
-        fun updateExpandedView(data: Data?, reuse: Boolean, continuation: Any?) { reparentCount++ }
+        val expandedView = FrameLayout(RuntimeEnvironment.getApplication())
+        val fakeExpandedView = FrameLayout(RuntimeEnvironment.getApplication())
+        fun updateExpandedView(data: Data?, reuse: Boolean, continuation: Any?) {
+            reparentCount++
+            val parent = if (fakeView == null) fakeExpandedView else expandedView
+            val view = if (fakeView == null) data?.fakeView else data?.view
+            view?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            parent.removeAllViews()
+            view?.let(parent::addView)
+        }
     }
 
     class Events {
@@ -119,6 +130,29 @@ class IslandMediaSinglePresenterTest {
         presenter.restoreAll()
         assertSame(latestNative, real.currentIslandData)
         assertSame(latestNative, real.fakeView.currentIslandData)
+    }
+
+    @Test fun aNativePayloadUpdateDoesNotReinsertTheUnchangedFakeCard() {
+        val original = data("A")
+        val real = content(original)
+        val preview = data("B")
+        val presenter = IslandMediaSinglePresenter()
+        presenter.render(real, preview)
+        // Native media updates can retain children and update the real/fake payloads separately.
+        val latestNative = data("A").apply {
+            view = original.view
+            fakeView = original.fakeView
+            tickerData = "new song"
+        }
+        real.currentIslandData = latestNative
+        presenter.render(real, preview)
+        assertEquals(1, real.reparentCount)
+        assertEquals(1, real.fakeView!!.reparentCount)
+        assertSame(preview.view, real.expandedView.getChildAt(0))
+        assertSame(preview.fakeView, real.fakeView.fakeExpandedView.getChildAt(0))
+        presenter.restoreAll()
+        assertSame(latestNative, real.currentIslandData)
+        assertSame(original, real.fakeView.currentIslandData)
     }
 
     @Test fun nativeRecreationIsNeverOverwrittenByRestoringAnOldBrowsingCard() {
