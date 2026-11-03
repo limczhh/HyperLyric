@@ -135,7 +135,7 @@ internal object IslandMediaMiniBarIndicator {
         fun updateActionColor() {
             val player = call(call(real, "getCurrentIslandData"), "getView") as? View
             val id = player?.resources?.getIdentifier("action2", "id", "com.android.systemui") ?: 0
-            action = player?.findViewById(id)
+            action = (call(real, "getExpandedView") as? View)?.findViewById(id)
         }
 
         fun dispose(bar: View) {

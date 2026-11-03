@@ -14,8 +14,7 @@ internal class IslandMediaBrowsingCard(
     player: View,
     dummy: View,
 ) {
-    var key: String? = null
-        private set
+    val key: String? get() = content.key
     val content = IslandMediaExpandedContent(player, dummy, Bundle()) {
         try {
             method("detach", 0).invoke(native.instance)
@@ -33,7 +32,7 @@ internal class IslandMediaBrowsingCard(
     fun bind(key: String, data: Any) {
         native.prepareBind(data)
         bind.invoke(native.instance, data)
-        this.key = key
+        content.key = key
         // These are the launch fields populated by Xiaomi's media island controller.
         // Keep compact template/identity data owned by the original island.
         val pkg = packageNameField.get(data) as String
@@ -67,6 +66,7 @@ internal class IslandMediaExpandedContent(
     var extras: Bundle,
     private val dispose: () -> Unit = {},
 ) {
+    var key: String? = null
     private var closed = false
     var retired = false
         private set

@@ -13,12 +13,9 @@ internal class IslandMediaSinglePresenter(
     private val runGuarded: (() -> Unit) -> Unit = { it() },
 ) {
     private data class Presentation(
-        val native: Any,
         val fake: Any?,
-        val fakeNative: Any?,
         val preview: IslandMediaExpandedContent,
         val extras: Bundle,
-        val displayed: Any,
     )
 
     private class Pending(
@@ -34,6 +31,9 @@ internal class IslandMediaSinglePresenter(
     private val reboundFields = HashMap<Class<*>, Field>()
 
     fun owns(real: Any): Boolean = presentations.containsKey(real) || pending.containsKey(real)
+
+    fun displayedContent(real: Any): IslandMediaExpandedContent? =
+        presentations[real]?.preview?.takeIf { isPresented(real, it.view, "View") }
 
     fun isBusy(real: Any): Boolean {
         val phase = nativeInteraction(real) ?: if (method(real, "isAnimating", 0).invoke(real) == true) {
@@ -91,36 +91,21 @@ internal class IslandMediaSinglePresenter(
         val current = get(real, "CurrentIslandData") ?: return
         val fake = get(real, "FakeView")
         val previous = presentations[real]
-        if (previous?.displayed === current && previous.preview === preview &&
+        if (previous?.preview === preview &&
             previous.extras === preview.extras && previous.fake === fake &&
             isPresented(real, preview.view, "View") &&
-            (fake == null || get(fake, "CurrentIslandData") === previous.displayed &&
-                isPresented(fake, preview.fakeView, "FakeView"))
+            (fake == null || isPresented(fake, preview.fakeView, "FakeView"))
         ) return
-        // Native media updates can replace only the payload, retaining the browsing Views.
-        // Save the newer native payload without restoring/reinserting the other expanded child.
+        // Native data remains canonical. This argument supplies only the two visual children.
         if (previous != null && previous.fake !== fake) restoreFake(previous)
-        val native = if (previous != null && current === previous.displayed) previous.native else current
-        val fakeCurrent = fake?.let { get(it, "CurrentIslandData") }
-        val fakeNative = if (previous != null && previous.fake === fake && fakeCurrent === previous.displayed) {
-            previous.fakeNative
-        } else fakeCurrent
-        val displayed = native.javaClass.getDeclaredConstructor().newInstance()
-        listOf("Key", "Priority", "Properties", "TickerData").forEach { name ->
-            set(displayed, name, get(native, name))
-        }
-        val extras = Bundle(get(native, "Extras") as? Bundle ?: Bundle()).apply {
-            putAll(preview.extras)
-            putString("miui.key", get(native, "Key") as? String)
-        }
-        set(displayed, "Extras", extras)
-        set(displayed, "View", preview.view)
-        set(displayed, "FakeView", preview.fakeView)
-        val state = Presentation(native, fake, fakeNative, preview, preview.extras, displayed)
+        val views = current.javaClass.getDeclaredConstructor().newInstance()
+        set(views, "View", preview.view)
+        set(views, "FakeView", preview.fakeView)
+        val state = Presentation(fake, preview, preview.extras)
         presentations[real] = state
-        bind(real, displayed, "View")
-        fake?.let { bind(it, displayed, "FakeView") }
-        if (miniWindowTargetChanged(current, displayed)) refreshMiniWindowCapability(real)
+        bind(real, views, "View")
+        fake?.let { bind(it, views, "FakeView") }
+        refreshMiniWindowCapability(real)
         previous?.preview?.takeIf { it !== preview }?.let(::closeIfUnused)
     }
 
@@ -132,9 +117,7 @@ internal class IslandMediaSinglePresenter(
             defer(real, null)
             return
         }
-        state?.let { restoreMetadata(real, it) }
-        // Restore native identity before collapse; retain its current children until the
-        // transition finishes. Reparenting/detaching inside onStateChange disrupts that animation.
+        // Retain the visual children until the native transition finishes.
         if (!real.isAttachedToWindow) {
             val queued = cancelPending(real)
             finishRestore(real)
@@ -143,29 +126,12 @@ internal class IslandMediaSinglePresenter(
         } else if (state != null || pending.containsKey(real)) defer(real, null)
     }
 
-    private fun restoreMetadata(real: Any, state: Presentation) {
-        var restored = false
-        // A native update may have replaced our projection already. Keep that newer payload.
-        if (get(real, "CurrentIslandData") === state.displayed) {
-            set(real, "CurrentIslandData", state.native)
-            restored = true
-        }
-        state.fake?.let { fake ->
-            if (get(fake, "CurrentIslandData") === state.displayed) {
-                set(fake, "CurrentIslandData", state.fakeNative)
-                restored = true
-            }
-        }
-        if (restored) refreshMiniWindowCapability(real)
-    }
-
     private fun finishRestore(real: Any) {
-        presentations[real]?.let { restoreMetadata(real, it) }
         val state = presentations.remove(real) ?: return
         try {
-            val current = get(real, "CurrentIslandData")
-            bind(real, if (current === state.displayed) state.native else current, "View", restoring = true)
+            bind(real, get(real, "CurrentIslandData"), "View", restoring = true)
             restoreFake(state)
+            refreshMiniWindowCapability(real)
         } finally {
             closeIfUnused(state.preview)
         }
@@ -173,8 +139,7 @@ internal class IslandMediaSinglePresenter(
 
     private fun restoreFake(state: Presentation) {
         val fake = state.fake ?: return
-        val current = get(fake, "CurrentIslandData")
-        bind(fake, if (current === state.displayed) state.fakeNative else current, "FakeView", restoring = true)
+        bind(fake, get(fake, "CurrentIslandData"), "FakeView", restoring = true)
     }
 
     fun release(preview: IslandMediaExpandedContent) {
@@ -190,7 +155,6 @@ internal class IslandMediaSinglePresenter(
     fun restoreAll() {
         (presentations.keys + pending.keys).toSet().forEach { real ->
             val queued = cancelPending(real)
-            presentations[real]?.let { restoreMetadata(real, it) }
             finishRestore(real)
             queued?.preview?.let(::closeIfUnused)
         }
@@ -249,15 +213,10 @@ internal class IslandMediaSinglePresenter(
     }
 
     private fun bind(content: Any, data: Any?, viewName: String, restoring: Boolean = false) {
-        val before = get(content, "CurrentIslandData")
-        val previousView = before?.let { get(it, viewName) }
         val targetView = data?.let { get(it, viewName) } as? View
-        set(content, "CurrentIslandData", data)
-        // Native media updates may replace CurrentIslandData while deliberately keeping the
-        // expanded child. Inspect the actual parent instead of treating that payload as the View tree.
-        if (isPresented(content, targetView, viewName) || targetView == null && previousView == null) return
+        if (targetView == null || isPresented(content, targetView, viewName)) return
         // A recreated native host may already own this player. An old host must not steal it back.
-        if (restoring && targetView?.parent != null) return
+        if (restoring && targetView.parent != null) return
         // Both supplied plugin generations keep this suspend ABI, but the actual real/fake
         // updateExpandedView bodies are synchronous and never access their continuation.
         method(content, "updateExpandedView", 3).invoke(content, data, false, null)
@@ -272,15 +231,6 @@ internal class IslandMediaSinglePresenter(
             parent = parent.parent
         }
         return false
-    }
-
-    @Suppress("DEPRECATION")
-    private fun miniWindowTargetChanged(before: Any, after: Any): Boolean {
-        val old = get(before, "Extras") as? Bundle
-        val new = get(after, "Extras") as? Bundle
-        return listOf("miui.pkg.name", "miui.user.id", "miui.pending.intent", "miui.sbn").any {
-            old?.get(it) != new?.get(it)
-        }
     }
 
     private fun refreshMiniWindowCapability(real: Any) {

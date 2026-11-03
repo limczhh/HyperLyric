@@ -106,6 +106,15 @@ internal object SodaIslandMiniWindowCompatHooker {
         loggedStages.clear()
     }
 
+    fun resolveFreeformIntent(context: Context, extras: Bundle): PendingIntent? {
+        val mutation = createSodaActivityIntentMutation(context, listOf(extras), "ordinary_freeform")
+        return try {
+            readPendingIntent(extras)
+        } finally {
+            mutation?.restore()
+        }
+    }
+
     private class SodaSlideEligibilityHooker : Hooker {
         override fun intercept(chain: Chain): Any? {
             val view = chain.args.firstOrNull() ?: return chain.proceed()

@@ -12,6 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
+import java.util.function.Supplier
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
@@ -91,19 +92,19 @@ class IslandMediaSinglePresenterTest {
         val presenter = IslandMediaSinglePresenter()
         presenter.render(real, preview.expanded())
         val shown = real.currentIslandData!!
-        assertNotSame(native, shown)
+        assertSame(native, shown)
         assertNotSame(preview, shown)
         assertEquals("A", shown.key)
         assertEquals("compact:A", shown.tickerData)
         assertEquals("A", shown.extras.getString("miui.key"))
-        assertEquals("B", shown.extras.getString("miui.pkg.name"))
-        assertSame(preview.view, shown.view)
-        assertSame(preview.fakeView, shown.fakeView)
-        assertSame(shown, real.fakeView!!.currentIslandData)
+        assertEquals("A", shown.extras.getString("miui.pkg.name"))
+        assertSame(native.view, shown.view)
+        assertSame(native.fakeView, shown.fakeView)
+        assertSame(preview.view, real.expandedView.getChildAt(0))
+        assertSame(preview.fakeView, real.fakeView!!.fakeExpandedView.getChildAt(0))
+        assertSame(shown, real.fakeView.currentIslandData)
         assertEquals("A", native.extras.getString("miui.pkg.name"))
         assertEquals("B", preview.extras.getString("miui.key"))
-        assertFalse(real.miniBarVisible)
-        assertFalse(real.fakeView.miniBarVisible)
         presenter.restoreAll()
         assertSame(native, real.currentIslandData)
         assertSame(native, real.fakeView.currentIslandData)
@@ -116,15 +117,11 @@ class IslandMediaSinglePresenterTest {
         val first = data("B").apply { extras.putBoolean("playing", true) }
         val real = content(native)
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, first.expanded())
-        repeat(100) { index ->
-            val update = data("B").apply {
-                view = first.view
-                fakeView = first.fakeView
-                extras.putBoolean("playing", true)
-                extras.putString("song", "song:$index")
-            }
-            presenter.render(real, update.expanded())
+        val browsing = first.expanded()
+        presenter.render(real, browsing)
+        repeat(3) { index ->
+            first.view!!.tag = "song:$index"
+            presenter.render(real, browsing)
         }
         assertEquals(1, real.reparentCount)
         assertEquals(1, real.fakeView!!.reparentCount)
@@ -156,8 +153,9 @@ class IslandMediaSinglePresenterTest {
         val original = data("A")
         val real = content(original)
         val preview = data("B")
+        val browsing = preview.expanded()
         val presenter = IslandMediaSinglePresenter()
-        presenter.render(real, preview.expanded())
+        presenter.render(real, browsing)
         // Native media updates can retain children and update the real/fake payloads separately.
         val latestNative = data("A").apply {
             view = original.view
@@ -165,7 +163,8 @@ class IslandMediaSinglePresenterTest {
             tickerData = "new song"
         }
         real.currentIslandData = latestNative
-        presenter.render(real, preview.expanded())
+        assertSame(browsing, presenter.displayedContent(real))
+        presenter.render(real, browsing)
         assertEquals(1, real.reparentCount)
         assertEquals(1, real.fakeView!!.reparentCount)
         assertSame(preview.view, real.expandedView.getChildAt(0))
@@ -261,8 +260,8 @@ class IslandMediaSinglePresenterTest {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         activity.setContentView(real)
         val presenter = IslandMediaSinglePresenter()
-        val current = data("B").expanded()
-        val next = data("C").expanded()
+        val current = data("A").expanded()
+        val next = data("B").expanded()
         presenter.render(real, current)
         val beforeDrag = real.currentIslandData
         real.fakeView!!.trackingToOpenMW.value = true
@@ -283,13 +282,13 @@ class IslandMediaSinglePresenterTest {
         assertEquals(1, resumed)
     }
 
-    @Test fun collapseDuringFreeformDoesNotChangeTheTargetBeforeItsCompletionCallback() {
+    @Test fun nativeOwnerFreeformKeepsItsViewsUntilCompletion() {
         val native = data("A")
         val real = content(native)
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         activity.setContentView(real)
         var released = 0
-        val selected = data("B")
+        val selected = data("A")
         val preview = IslandMediaExpandedContent(selected.view!!, selected.fakeView!!, selected.extras) { released++ }
         val presenter = IslandMediaSinglePresenter()
         presenter.render(real, preview)
@@ -311,5 +310,31 @@ class IslandMediaSinglePresenterTest {
         assertSame(native, real.currentIslandData)
         assertSame(native.view, real.expandedView.getChildAt(0))
         assertEquals(1, released)
+    }
+
+    @Test fun browsedEligibilityIsScopedToTheQueryAndRestoresCanonicalDataEvenOnFailure() {
+        val native = data("A")
+        val real = content(native)
+        val extras = Bundle().apply { putString("miui.pkg.name", "B") }
+        val context = RuntimeEnvironment.getApplication()
+        IslandMediaMiniWindowHooker.withEligibility(context, real, extras, Supplier<Any?> {
+            assertEquals("B", real.currentIslandData!!.extras.getString("miui.pkg.name"))
+            assertSame(native.view, real.currentIslandData!!.view)
+            assertSame(native, real.fakeView!!.currentIslandData)
+            real.dynamicIslandEventCoordinator.updateMiniBar(real)
+            null
+        })
+        assertSame(native, real.currentIslandData)
+        assertFalse(real.miniBarVisible)
+        assertEquals(1, real.dynamicIslandEventCoordinator.capabilityUpdates)
+        assertEquals("A", native.extras.getString("miui.pkg.name"))
+        try {
+            IslandMediaMiniWindowHooker.withEligibility(context, real, extras, Supplier<Any?> {
+                error("Native policy failure")
+            })
+            fail("Expected policy failure")
+        } catch (_: IllegalStateException) {
+            assertSame(native, real.currentIslandData)
+        }
     }
 }

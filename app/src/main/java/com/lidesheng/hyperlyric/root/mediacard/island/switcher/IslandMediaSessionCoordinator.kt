@@ -5,6 +5,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.os.Handler
 import android.os.Looper
+import android.os.Bundle
 import android.view.View
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.managedHook
@@ -24,6 +25,7 @@ import java.lang.reflect.Proxy
 import java.util.WeakHashMap
 import java.util.Collections
 import java.util.function.Function
+import java.util.function.Supplier
 
 /** Tracks sessions; single-island browsing owns binders, multi-island mode owns controllers. */
 internal object IslandMediaSessionCoordinator {
@@ -45,7 +47,13 @@ internal object IslandMediaSessionCoordinator {
             "ready" -> isRunning()
             "single" -> runtime?.let { !it.failed && !it.multi } == true
             "canBrowse" -> runtime?.canBrowse() == true
-            "holdNativeUpdate" -> runtime?.holdNativeUpdate(args[1]!!, args[2] as Runnable) == true
+            "ordinaryWindowTarget" -> runtime?.ordinaryWindowTarget(args[1]!!)
+            "withWindowEligibility" -> {
+                val action = args[2] as Supplier<*>
+                val state = runtime
+                if (state == null) action.get() else state.withWindowEligibility(args[1]!!, action)
+            }
+            "openOrdinaryWindow" -> runtime?.openOrdinaryWindow(args[1] as Bundle, args[2] as Boolean, args[3] as Runnable) == true
             "pages" -> pageState(args[1] as String)?.let { intArrayOf(it.first, it.second) }
             "switch" -> switchRelative(args[1] as String, args[2] as Int)
             "render" -> { runtime?.let { state -> state.guard { state.renderSingle(args[1]!!) } }; null }
@@ -260,8 +268,6 @@ internal object IslandMediaSessionCoordinator {
         private val singlePresenter = IslandMediaSinglePresenter { action -> guard(action) }
         private var singleCard: IslandMediaBrowsingCard? = null
         private var singleHost: Any? = null
-        private class NativeUpdate(val key: String, val host: Any, val publish: Runnable)
-        private var pendingNativeUpdate: NativeUpdate? = null
         private val dirtyKeys = linkedSetOf<String>()
         private var seeded = false
         private var syncScheduled = false
@@ -272,7 +278,6 @@ internal object IslandMediaSessionCoordinator {
             dirtyKeys.clear()
             guard {
                 if (pluginContent == null) onPluginChanged(plugin)
-                flushNativeUpdate()
                 sync(changed)
             }
         }
@@ -356,7 +361,6 @@ internal object IslandMediaSessionCoordinator {
             singlePresenter.forgetAll()
             singleSelection.setExpanded(false)
             singleHost = null
-            pendingNativeUpdate = null
             releaseSingleCard()
             windows.keys.toList().filterNot(::acceptsWindow).forEach { window ->
                 setRefresh(window, null)
@@ -462,7 +466,6 @@ internal object IslandMediaSessionCoordinator {
             singlePresenter.forgetAll()
             singleSelection.setExpanded(false)
             singleHost = null
-            pendingNativeUpdate = null
             if (multi) {
                 cards.values.forEach { it.publishedContent = null }
                 orderDirty = true
@@ -535,8 +538,7 @@ internal object IslandMediaSessionCoordinator {
         fun resetSingle() {
             if (multi) return
             singleSelection.setExpanded(false)
-            // A collapse can occur before a native freeform callback completes. Keep its host
-            // available so metadata publications remain deferred until that callback finishes.
+            singleHost = null
             releaseSingleCard()
         }
 
@@ -551,27 +553,32 @@ internal object IslandMediaSessionCoordinator {
             return ready
         }
 
-        fun holdNativeUpdate(data: Any, publish: Runnable): Boolean {
-            if (multi || failed || read(original, "dynamicIslandData") !== data) return false
-            val real = singleHost ?: return false
-            if (!singlePresenter.owns(real) || !singlePresenter.isBusy(real)) return false
-            val key = method(data, "getKey", 0).invoke(data) as? String ?: return false
-            val current = method(real, "getCurrentIslandData", 0).invoke(real) ?: return false
-            if (method(current, "getKey", 0).invoke(current) != key) return false
-            if (pendingNativeUpdate == null) HookLogger.d(TAG, "暂存原生媒体更新，等待交互结束: key=$key")
-            pendingNativeUpdate = NativeUpdate(key, real, publish)
-            singlePresenter.whenIdle(real) { requestSync() }
-            return true
+        fun ordinaryWindowTarget(real: Any): Bundle? {
+            if (multi || failed) return null
+            var extras: Bundle? = null
+            guard {
+                val content = singlePresenter.displayedContent(real)
+                if (content?.key != null && content.key != nativeKey() &&
+                    method(real, "getState", 0).invoke(real)?.javaClass?.simpleName == "Expanded"
+                ) extras = Bundle(content.extras)
+            }
+            return extras
         }
 
-        private fun flushNativeUpdate() {
-            val update = pendingNativeUpdate ?: return
-            if ((update.host as View).isAttachedToWindow && singlePresenter.isBusy(update.host)) return
-            pendingNativeUpdate = null
-            // A genuinely different native owner takes precedence over an old deferred update.
-            if (update.key != nativeKey()) return
-            update.publish.run()
-            HookLogger.d(TAG, "交互结束，已同步最新原生媒体数据: key=${update.key}")
+        fun openOrdinaryWindow(extras: Bundle, freeform: Boolean, collapse: Runnable): Boolean {
+            if (multi || failed) return false
+            val context = required(original, "context") as Context
+            return IslandMediaMiniWindowHooker.launch(context, extras, freeform) {
+                check(guard { resetSingle() }) { "Native media island restoration failed" }
+                collapse.run()
+            }
+        }
+
+        fun withWindowEligibility(real: Any, action: Supplier<*>): Any? {
+            val extras = ordinaryWindowTarget(real) ?: return action.get()
+            return IslandMediaMiniWindowHooker.withEligibility(
+                required(original, "context") as Context, real, extras, action,
+            )
         }
 
         fun onPresentationChanged(real: Any, state: String) {
@@ -682,7 +689,6 @@ internal object IslandMediaSessionCoordinator {
                 main.removeCallbacks(syncTask)
                 syncScheduled = false
                 dirtyKeys.clear()
-                pendingNativeUpdate = null
                 listener?.let { runCatching { method(manager, "removeListener", 1).invoke(manager, it) } }
                 runCatching { singlePresenter.restoreAll() }
                 runCatching { releaseSingleCard() }

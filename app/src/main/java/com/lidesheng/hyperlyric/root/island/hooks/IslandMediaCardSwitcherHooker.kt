@@ -5,11 +5,13 @@ import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaSessionCoordinator
 import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaMiniBarIndicator
+import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaMiniWindowHooker
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
 import java.util.WeakHashMap
+import java.util.function.Supplier
 
 /** Plugin-side presentation only; SystemUI owns sessions and independent native card binders. */
 internal object IslandMediaCardSwitcherHooker {
@@ -18,6 +20,7 @@ internal object IslandMediaCardSwitcherHooker {
 
     fun hook(module: XposedModule, loader: ClassLoader) {
         runCatching {
+            IslandMediaMiniWindowHooker.hook(module, loader)
             val controller = loader.loadClass(
                 "miui.systemui.dynamicisland.window.DynamicIslandWindowViewController"
             )
@@ -36,12 +39,6 @@ internal object IslandMediaCardSwitcherHooker {
                             ?: return chain.proceed()
                         val data = chain.args.firstOrNull() ?: return chain.proceed()
                         val bridge = IslandMediaSessionCoordinator.connect(window, data) ?: return chain.proceed()
-                        if (method.name == "updateDynamicIslandView") {
-                            val owner = chain.thisObject
-                            val args = chain.args.toTypedArray()
-                            val publish = Runnable { method.invoke(owner, *args) }
-                            if (bridge.apply(arrayOf("holdNativeUpdate", data, publish)) == true) return null
-                        }
                         val result = chain.proceed()
                         bridge.apply(arrayOf("published", data))
                         return result
@@ -104,11 +101,13 @@ internal object IslandMediaCardSwitcherHooker {
             }.let { method ->
                 module.managedHook(method, "media.island_switcher.plugin.mini_bar", object : Hooker {
                     override fun intercept(chain: Chain): Any? {
-                        val result = chain.proceed()
-                        val real = chain.args.firstOrNull() ?: return result
-                        val events = call(real, "getDynamicIslandEventCoordinator") ?: return result
-                        val window = call(events, "getWindowView") as? View ?: return result
-                        IslandMediaSessionCoordinator.connect(window, IslandProbeUtils.getCurrentIslandData(real))
+                        val real = chain.args.firstOrNull() ?: return chain.proceed()
+                        val events = call(real, "getDynamicIslandEventCoordinator") ?: return chain.proceed()
+                        val window = call(events, "getWindowView") as? View ?: return chain.proceed()
+                        val bridge = IslandMediaSessionCoordinator.connect(window, IslandProbeUtils.getCurrentIslandData(real))
+                        val result = if (chain.thisObject === real && bridge != null) {
+                            bridge.apply(arrayOf("withWindowEligibility", real, Supplier { chain.proceed() }))
+                        } else chain.proceed()
                         refreshForWindow(window)
                         return result
                     }
