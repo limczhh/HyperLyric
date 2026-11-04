@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2026 Proify, Tomakino
  * Licensed under the Apache License, Version 2.0
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -16,6 +16,7 @@ import android.graphics.Shader
 import android.text.TextPaint
 import androidx.core.graphics.withSave
 import com.lidesheng.hyperlyric.lyric.view.METADATA_PLACEHOLDER_WORD_MOTION
+import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
 import com.lidesheng.hyperlyric.lyric.view.line.model.WordModel
 import kotlin.math.abs
@@ -26,6 +27,12 @@ internal class TextDrawer {
     private val revealDrawer = WordRevealDrawer()
     private var bgColors = intArrayOf(Color.GRAY)
     private var hlColors = intArrayOf(Color.WHITE)
+
+    /** 按 [unsungOpacity] 烘好 alpha 的背景色；只在颜色或不透明度变化时重建，绘制期直接复用。 */
+    private var effectiveBgColors = UnsungOpacity.tint(bgColors, WordHighlight.DEFAULT_UNSUNG_OPACITY)
+
+    /** 按 [sungOpacity] 烘好 alpha 的高亮色；只在颜色或不透明度变化时重建，绘制期直接复用。 */
+    private var effectiveHlColors = UnsungOpacity.tint(hlColors, WordHighlight.DEFAULT_SUNG_OPACITY)
 
     private val cjkMotionSpec = MotionSpec(
         animateByChar = true,
@@ -70,6 +77,42 @@ internal class TextDrawer {
     val isRainbowBg get() = bgColors.size > 1
     val isRainbowHl get() = hlColors.size > 1
 
+    /**
+     * 未演唱（背景色）部分的绝对不透明度：0f 完全透明，1f 与已演唱颜色一致。
+     *
+     * 变化时重建烘好 alpha 的背景色并清空 shader 缓存，绘制期不再做任何换算。
+     */
+    var unsungOpacity: Float = WordHighlight.DEFAULT_UNSUNG_OPACITY
+        set(value) {
+            val normalized = if (value.isFinite()) {
+                value.coerceIn(0f, 1f)
+            } else {
+                WordHighlight.DEFAULT_UNSUNG_OPACITY
+            }
+            if (field == normalized) return
+            field = normalized
+            rebuildBackgroundColors()
+            clearShaderCache()
+        }
+
+    /**
+     * 已演唱（高亮色）部分的绝对不透明度：0f 完全透明，1f 保持高亮色原样。
+     *
+     * 变化时重建烘好 alpha 的高亮色并清空 shader 缓存，绘制期不再做任何换算。
+     */
+    var sungOpacity: Float = WordHighlight.DEFAULT_SUNG_OPACITY
+        set(value) {
+            val normalized = if (value.isFinite()) {
+                value.coerceIn(0f, 1f)
+            } else {
+                WordHighlight.DEFAULT_SUNG_OPACITY
+            }
+            if (field == normalized) return
+            field = normalized
+            rebuildHighlightColors()
+            clearShaderCache()
+        }
+
     private val fontMetrics = Paint.FontMetrics()
     private var baselineOffset = 0f
 
@@ -85,6 +128,18 @@ internal class TextDrawer {
     fun setColors(background: IntArray, highlight: IntArray) {
         if (background.isNotEmpty()) bgColors = background
         if (highlight.isNotEmpty()) hlColors = highlight
+        rebuildBackgroundColors()
+        rebuildHighlightColors()
+    }
+
+    /** 把 [unsungOpacity] 烘进背景色；只在配置变化时调用，结果供每帧绘制直接复用。 */
+    private fun rebuildBackgroundColors() {
+        effectiveBgColors = UnsungOpacity.tint(bgColors, unsungOpacity)
+    }
+
+    /** 把 [sungOpacity] 烘进高亮色；只在配置变化时调用，结果供每帧绘制直接复用。 */
+    private fun rebuildHighlightColors() {
+        effectiveHlColors = UnsungOpacity.tint(hlColors, sungOpacity)
     }
 
     fun updateMetrics(paint: TextPaint) {
@@ -162,6 +217,9 @@ internal class TextDrawer {
             }
 
             if (revealWords) {
+                // 高亮绘制会把不透明度写进画笔颜色/alpha，而逐字浮现复用同一支画笔；
+                // 进入浮现分支前复位到原始高亮色，避免上一帧的透明画笔状态泄漏到浮现动画。
+                hlPaint.color = hlColors[0]
                 hlPaint.shader = if (isRainbowHl) {
                     getOrCreateRainbowShader(gradientStartX, gradientEndX, hlColors, hlRainbowCache)
                 } else {
@@ -175,15 +233,20 @@ internal class TextDrawer {
                 return@withSave
             }
 
+            // 未演唱部分按 unsungOpacity 的绝对值绘制：透明度已烘进 effectiveBgColors。
+            // 单色由画笔颜色承载 alpha；彩虹渐变由 shader 颜色承载 alpha，此时画笔 alpha 必须保持
+            // 255，否则绘制时画笔 alpha 会与 shader 输出 alpha 再相乘一次（0.5 会变成 0.25）。
             if (isRainbowBg) {
                 bgPaint.shader = getOrCreateRainbowShader(
                     gradientStartX,
                     gradientEndX,
-                    bgColors,
+                    effectiveBgColors,
                     bgRainbowCache
                 )
+                bgPaint.alpha = 255
             } else {
                 bgPaint.shader = null
+                bgPaint.color = effectiveBgColors[0]
             }
 
             if (charMotionEnabled) {
@@ -228,16 +291,19 @@ internal class TextDrawer {
                     }
                     canvas.clipRect(0f, 0f, highlightClipEnd, clipBottom)
 
+                    // 已演唱部分按 sungOpacity 的绝对值绘制：透明度已烘进 effectiveHlColors。
+                    // 与未演唱侧同一规则——用 shader 时 alpha 由 shader 颜色承载、画笔 alpha
+                    // 保持 255；纯色时 alpha 写进画笔颜色，避免绘制时再相乘一次。
                     if (hasFeather) {
                         val baseShader = if (isRainbowHl) {
                             getOrCreateRainbowShader(
                                 gradientStartX,
                                 gradientEndX,
-                                hlColors,
+                                effectiveHlColors,
                                 hlRainbowCache
                             )
                         } else {
-                            getOrCreateSolidHighlightShader(model.width, hlPaint.color)
+                            getOrCreateSolidHighlightShader(model.width, effectiveHlColors[0])
                         }
                         val maskShader = getOrCreateAlphaMaskShader(
                             highlightWidth,
@@ -245,18 +311,19 @@ internal class TextDrawer {
                         )
                         hlPaint.shader =
                             ComposeShader(baseShader, maskShader, PorterDuff.Mode.DST_IN)
+                        hlPaint.alpha = 255
+                    } else if (isRainbowHl) {
+                        hlPaint.shader =
+                            getOrCreateRainbowShader(
+                                gradientStartX,
+                                gradientEndX,
+                                effectiveHlColors,
+                                hlRainbowCache
+                            )
+                        hlPaint.alpha = 255
                     } else {
-                        if (isRainbowHl) {
-                            hlPaint.shader =
-                                getOrCreateRainbowShader(
-                                    gradientStartX,
-                                    gradientEndX,
-                                    hlColors,
-                                    hlRainbowCache
-                                )
-                        } else {
-                            hlPaint.shader = null
-                        }
+                        hlPaint.shader = null
+                        hlPaint.color = effectiveHlColors[0]
                     }
                     if (charMotionEnabled) {
                         drawAnimatedUnits(

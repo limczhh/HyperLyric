@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.SyllablePreferencePolicy
+import com.lidesheng.hyperlyric.common.WordHighlightPreferencePolicy
 import com.lidesheng.hyperlyric.common.WordMotionPreferencePolicy
 import com.lidesheng.hyperlyric.ui.component.FloatInputDialog
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
@@ -22,6 +23,7 @@ fun VerbatimLyricPage() {
     val prefs = rememberHookPrefs()
     val saveConfig = rememberHookConfigSaver(prefs)
     val syllableSettings = remember(prefs) { SyllablePreferencePolicy.read(prefs) }
+    val wordHighlightSettings = remember(prefs) { WordHighlightPreferencePolicy.read(prefs) }
     val wordMotionSettings = remember(prefs) { WordMotionPreferencePolicy.read(prefs) }
     var wordEffect by remember {
         mutableIntStateOf(prefs.getInt(
@@ -81,11 +83,19 @@ fun VerbatimLyricPage() {
     var wordMotionLatinWave by remember {
         mutableFloatStateOf(wordMotionSettings.latinWaveFactor)
     }
+    var wordHighlightSungOpacity by remember {
+        mutableFloatStateOf(wordHighlightSettings.sungOpacity)
+    }
+    var wordHighlightUnsungOpacity by remember {
+        mutableFloatStateOf(wordHighlightSettings.unsungOpacity)
+    }
 
     var showWordMotionCjkLiftDialog by remember { mutableStateOf(false) }
     var showWordMotionCjkWaveDialog by remember { mutableStateOf(false) }
     var showWordMotionLatinLiftDialog by remember { mutableStateOf(false) }
     var showWordMotionLatinWaveDialog by remember { mutableStateOf(false) }
+    var showWordHighlightSungOpacityDialog by remember { mutableStateOf(false) }
+    var showWordHighlightUnsungOpacityDialog by remember { mutableStateOf(false) }
 
     fun updateSyllableSettings(
         relativeProgress: Boolean = syllableRelative,
@@ -161,6 +171,34 @@ fun VerbatimLyricPage() {
             saveConfig(RootConstants.KEY_HOOK_WORD_MOTION_LATIN_WAVE, normalized)
         }
     )
+    FloatInputDialog(
+        show = showWordHighlightSungOpacityDialog,
+        title = stringResource(id = R.string.title_word_highlight_sung_opacity),
+        label = stringResource(id = R.string.label_word_highlight_sung_opacity_range),
+        initialValue = wordHighlightSungOpacity,
+        min = RootConstants.MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+        max = RootConstants.MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+        onDismiss = { showWordHighlightSungOpacityDialog = false },
+        onConfirm = { value ->
+            val normalized = WordHighlightPreferencePolicy.normalizeSungOpacity(value)
+            wordHighlightSungOpacity = normalized
+            saveConfig(RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY, normalized)
+        }
+    )
+    FloatInputDialog(
+        show = showWordHighlightUnsungOpacityDialog,
+        title = stringResource(id = R.string.title_word_highlight_unsung_opacity),
+        label = stringResource(id = R.string.label_word_highlight_unsung_opacity_range),
+        initialValue = wordHighlightUnsungOpacity,
+        min = RootConstants.MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+        max = RootConstants.MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+        onDismiss = { showWordHighlightUnsungOpacityDialog = false },
+        onConfirm = { value ->
+            val normalized = WordHighlightPreferencePolicy.normalizeUnsungOpacity(value)
+            wordHighlightUnsungOpacity = normalized
+            saveConfig(RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY, normalized)
+        }
+    )
 
     XposedLyricSettingPage(title = stringResource(id = R.string.title_verbatim_lyric)) {
         verbatimLyricSections(
@@ -183,6 +221,14 @@ fun VerbatimLyricPage() {
             onGradientStyleChange = {
                 gradientStyle = it
                 saveConfig(RootConstants.KEY_HOOK_GRADIENT_PROGRESS, it)
+            },
+            wordHighlightSungOpacity = wordHighlightSungOpacity,
+            onWordHighlightSungOpacityClick = {
+                showWordHighlightSungOpacityDialog = true
+            },
+            wordHighlightUnsungOpacity = wordHighlightUnsungOpacity,
+            onWordHighlightUnsungOpacityClick = {
+                showWordHighlightUnsungOpacityDialog = true
             },
             lineDisplay = lineDisplay,
             onLineDisplayChange = {

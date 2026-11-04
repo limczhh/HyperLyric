@@ -93,6 +93,24 @@ internal class SpaceGateWordSyncRenderer(private val view: SpaceGateLyricLineVie
             }
         }
 
+    /** 未演唱部分的绝对不透明度；代理给 [TextDrawer]，变化时重绘本行。 */
+    var unsungOpacity: Float
+        get() = textDrawer.unsungOpacity
+        set(value) {
+            if (textDrawer.unsungOpacity == value) return
+            textDrawer.unsungOpacity = value
+            view.invalidate()
+        }
+
+    /** 已演唱（高亮）部分的绝对不透明度；代理给 [TextDrawer]，变化时重绘本行。 */
+    var sungOpacity: Float
+        get() = textDrawer.sungOpacity
+        set(value) {
+            if (textDrawer.sungOpacity == value) return
+            textDrawer.sungOpacity = value
+            view.invalidate()
+        }
+
     var playListener: LyricPlayListener? = null
         set(value) {
             field = value

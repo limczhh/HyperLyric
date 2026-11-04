@@ -56,6 +56,8 @@ internal data class IslandSlotRuntimeConfig(
     val wordMotionLatinByCharacter: Boolean,
     val wordMotionLatinLift: Float,
     val wordMotionLatinWave: Float,
+    val wordHighlightUnsungOpacity: Float,
+    val wordHighlightSungOpacity: Float,
     val presentation: LyricPresentationScheduler.Presentation
 ) {
     val isSplitMode: Boolean
@@ -117,7 +119,9 @@ internal data class IslandSlotRuntimeConfig(
         wordMotionCjkWave,
         wordMotionLatinByCharacter,
         wordMotionLatinLift,
-        wordMotionLatinWave
+        wordMotionLatinWave,
+        wordHighlightUnsungOpacity,
+        wordHighlightSungOpacity
     ).joinToString("|")
 
     fun modeForTag(tag: String): Int {

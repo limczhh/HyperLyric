@@ -27,6 +27,10 @@ fun LazyListScope.verbatimLyricSections(
     onWordRevealSpeedRateChange: (Int) -> Unit,
     gradientStyle: Boolean,
     onGradientStyleChange: (Boolean) -> Unit,
+    wordHighlightSungOpacity: Float,
+    onWordHighlightSungOpacityClick: () -> Unit,
+    wordHighlightUnsungOpacity: Float,
+    onWordHighlightUnsungOpacityClick: () -> Unit,
     lineDisplay: Boolean,
     onLineDisplayChange: (Boolean) -> Unit,
     syllableRelative: Boolean,
@@ -107,6 +111,38 @@ fun LazyListScope.verbatimLyricSections(
                         .fillMaxWidth()
                 ) {
                     Column {
+                        ArrowPreference(
+                            title = stringResource(
+                                id = R.string.title_word_highlight_sung_opacity
+                            ),
+                            summary = stringResource(
+                                id = R.string.summary_word_highlight_sung_opacity
+                            ),
+                            onClick = onWordHighlightSungOpacityClick,
+                            endActions = {
+                                Text(
+                                    String.format("%.2f", wordHighlightSungOpacity),
+                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                )
+                            }
+                        )
+                        ArrowPreference(
+                            title = stringResource(
+                                id = R.string.title_word_highlight_unsung_opacity
+                            ),
+                            summary = stringResource(
+                                id = R.string.summary_word_highlight_unsung_opacity
+                            ),
+                            onClick = onWordHighlightUnsungOpacityClick,
+                            endActions = {
+                                Text(
+                                    String.format("%.2f", wordHighlightUnsungOpacity),
+                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                                )
+                            }
+                        )
                         SwitchPreference(
                             title = stringResource(id = R.string.title_gradient_progress),
                             checked = gradientStyle,

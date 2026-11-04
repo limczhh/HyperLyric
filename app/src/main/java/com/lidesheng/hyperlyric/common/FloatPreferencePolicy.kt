@@ -64,6 +64,22 @@ object FloatPreferencePolicy {
             ),
         )
         put(
+            RootConstants.KEY_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+            Rule(
+                RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+                RootConstants.MIN_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+                RootConstants.MAX_HOOK_WORD_HIGHLIGHT_UNSUNG_OPACITY,
+            ),
+        )
+        put(
+            RootConstants.KEY_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            Rule(
+                RootConstants.DEFAULT_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+                RootConstants.MIN_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+                RootConstants.MAX_HOOK_WORD_HIGHLIGHT_SUNG_OPACITY,
+            ),
+        )
+        put(
             RootConstants.KEY_HOOK_AI_TRANS_TEMPERATURE,
             Rule(RootConstants.DEFAULT_HOOK_AI_TRANS_TEMPERATURE, 0f, 2f),
         )
