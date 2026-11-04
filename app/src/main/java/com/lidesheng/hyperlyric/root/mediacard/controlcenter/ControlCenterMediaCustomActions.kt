@@ -1,10 +1,10 @@
 package com.lidesheng.hyperlyric.root.mediacard.controlcenter
 
 import android.graphics.drawable.Drawable
-import android.media.MediaMetadata
-import android.media.session.MediaController
-import android.media.session.MediaSessionManager
-import android.media.session.PlaybackState
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Rect
+import android.graphics.drawable.BitmapDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -18,13 +18,8 @@ internal class ControlCenterMediaCustomActions(
     private val title: TextView,
     private val enabled: Boolean,
     private val requestRefresh: () -> Unit = {},
+    private val source: () -> ControlCenterMediaActions = { ControlCenterMediaActions() },
 ) {
-    private data class ActionSource(
-        val controller: MediaController,
-        val actions: List<PlaybackState.CustomAction>,
-        val isPlaying: Boolean,
-    )
-
     private val nativeButtons = container?.let { viewGroup ->
         (0 until viewGroup.childCount)
             .map { viewGroup.getChildAt(it) }
@@ -42,35 +37,19 @@ internal class ControlCenterMediaCustomActions(
     private var lastChain = emptyList<View>()
     private var nativeGap: Int? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val manager by lazy { title.context.getSystemService(MediaSessionManager::class.java) }
-    private var sessions = emptyList<MediaController>()
     private var observing = false
-    private var sourceDirty = true
-    private var cachedSource: ActionSource? = null
     private var refreshPosted = false
     private val refreshTask = Runnable { refreshPosted = false; requestRefresh() }
-    private val iconKeys = arrayOfNulls<Pair<String, Int>>(2)
-    private val sessionCallback = object : MediaController.Callback() {
-        override fun onPlaybackStateChanged(state: PlaybackState?) = scheduleRefresh()
-        override fun onMetadataChanged(metadata: MediaMetadata?) = scheduleRefresh()
-        override fun onSessionDestroyed() = scheduleRefresh()
-    }
-    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-        observeSessions(controllers.orEmpty())
-        scheduleRefresh()
-    }
+    private val sourceIcons = arrayOfNulls<Drawable>(2)
+    private val sourceChanged: () -> Unit = { scheduleRefresh() }
 
     init {
         if (enabled && container != null) {
             title.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(view: View) { startObserving(); scheduleRefresh() }
                 override fun onViewDetachedFromWindow(view: View) {
-                    sessions.forEach { runCatching { it.unregisterCallback(sessionCallback) } }
-                    sessions = emptyList()
-                    runCatching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
+                    ControlCenterMediaActionSource.removeListener(sourceChanged)
                     observing = false
-                    sourceDirty = true
-                    cachedSource = null
                     handler.removeCallbacks(refreshTask)
                     refreshPosted = false
                 }
@@ -79,7 +58,6 @@ internal class ControlCenterMediaCustomActions(
     }
 
     private fun scheduleRefresh() {
-        sourceDirty = true
         if (refreshPosted || !title.isAttachedToWindow) return
         refreshPosted = true
         handler.post(refreshTask)
@@ -88,15 +66,7 @@ internal class ControlCenterMediaCustomActions(
     private fun startObserving() {
         if (observing) return
         observing = true
-        runCatching { manager?.addOnActiveSessionsChangedListener(sessionsListener, null, handler) }
-        observeSessions(runCatching { manager?.getActiveSessions(null) }.getOrNull().orEmpty())
-    }
-
-    private fun observeSessions(controllers: List<MediaController>) {
-        sessions.forEach { runCatching { it.unregisterCallback(sessionCallback) } }
-        sessions = controllers
-        sessions.forEach { runCatching { it.registerCallback(sessionCallback, handler) } }
-        sourceDirty = true
+        ControlCenterMediaActionSource.addListener(sourceChanged)
     }
 
     /** Called after measuring the original three-button hierarchy, before insertion. */
@@ -138,12 +108,10 @@ internal class ControlCenterMediaCustomActions(
                 customButtons[index] = button
             }
         }
-        val source = resolveSource()
-        val first = source?.actions?.firstOrNull()
-            ?.let { createButton(0, source.controller, it) }
-        val last = source?.actions?.lastOrNull()
-            ?.takeUnless { source.actions.size == 1 }
-            ?.let { createButton(1, source.controller, it) }
+        if (title.isAttachedToWindow) startObserving()
+        val actions = source()
+        val first = actions.left?.let { createButton(0, it) }
+        val last = actions.right?.let { createButton(1, it) }
         updateAvailability(0, first != null)
         updateAvailability(1, last != null)
         connectChain()
@@ -165,7 +133,7 @@ internal class ControlCenterMediaCustomActions(
             button.setOnClickListener(null)
             button.contentDescription = null
             button.tooltipText = null
-            iconKeys[index] = null
+            sourceIcons[index] = null
         }
         button.isEnabled = hasAction
         button.isClickable = hasAction
@@ -183,7 +151,7 @@ internal class ControlCenterMediaCustomActions(
         }
         customButtons.fill(null)
         available.fill(false)
-        iconKeys.fill(null)
+        sourceIcons.fill(null)
         lastChain = emptyList()
         nativeParams.forEach { (button, params) ->
             button.layoutParams = MediaLayoutParams.copy(params)
@@ -193,21 +161,17 @@ internal class ControlCenterMediaCustomActions(
 
     private fun createButton(
         index: Int,
-        controller: MediaController,
-        action: PlaybackState.CustomAction,
+        action: ControlCenterMediaAction,
     ): ImageView? {
         val button = customButtons[index] ?: return null
-        val iconKey = controller.packageName to action.icon
-        if (iconKeys[index] != iconKey || button.drawable == null) {
-            button.setImageDrawable(loadDrawable(controller, action) ?: return null)
-            iconKeys[index] = iconKey
+        if (sourceIcons[index] !== action.icon || button.drawable == null) {
+            button.setImageDrawable(copyDrawable(action.icon) ?: return null)
+            sourceIcons[index] = action.icon
         }
-        button.contentDescription = action.name
-        button.tooltipText = action.name
+        button.contentDescription = action.description
+        button.tooltipText = action.description
         button.setOnClickListener {
-            runCatching {
-                controller.transportControls.sendCustomAction(action.action, action.extras)
-            }
+            runCatching { action.run.run() }
         }
         return button
     }
@@ -274,34 +238,17 @@ internal class ControlCenterMediaCustomActions(
         runCatching { params.javaClass.getField(name).setInt(params, value) }
     }
 
-    private fun resolveSource(): ActionSource? {
-        startObserving()
-        if (!sourceDirty) return cachedSource
-        sourceDirty = false
-        val candidates = sessions.mapNotNull { controller ->
-            val state = controller.playbackState ?: return@mapNotNull null
-            val actions = state.customActions.orEmpty()
-                .filter { it.action.isNotBlank() && it.icon != 0 }
-            actions.takeIf { it.isNotEmpty() }?.let {
-                ActionSource(controller, it, state.state == PlaybackState.STATE_PLAYING)
-            }
+    private fun copyDrawable(icon: Drawable): Drawable? = runCatching {
+        icon.constantState?.newDrawable(title.resources)?.mutate() ?: run {
+            // A notification's drawable must keep its own callback/bounds.
+            val bitmap = Bitmap.createBitmap(icon.intrinsicWidth.coerceAtLeast(1),
+                icon.intrinsicHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+            val bounds = Rect(icon.bounds)
+            try {
+                icon.setBounds(0, 0, bitmap.width, bitmap.height)
+                icon.draw(Canvas(bitmap))
+            } finally { icon.bounds = bounds }
+            BitmapDrawable(title.resources, bitmap)
         }
-        val currentTitle = title.text?.toString()?.trim().orEmpty()
-        return candidates.maxByOrNull { source ->
-            val sessionTitle = source.controller.metadata
-                ?.getString(MediaMetadata.METADATA_KEY_TITLE)
-                ?.trim()
-                .orEmpty()
-            (if (currentTitle.isNotEmpty() && currentTitle == sessionTitle) 4 else 0) +
-                (if (source.isPlaying) 2 else 0)
-        }.also { cachedSource = it }
-    }
-
-    private fun loadDrawable(controller: MediaController, action: PlaybackState.CustomAction): Drawable? {
-        return runCatching {
-            val resources = title.context.packageManager
-                .getResourcesForApplication(controller.packageName)
-            resources.getDrawable(action.icon, title.context.theme)
-        }.getOrNull()
-    }
+    }.getOrNull()
 }

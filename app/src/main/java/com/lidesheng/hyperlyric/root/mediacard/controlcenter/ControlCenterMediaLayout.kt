@@ -62,7 +62,8 @@ internal class ControlCenterMediaLayout private constructor(
         audio as? ViewGroup,
         title,
         options.customActions && options.immersiveCoverLayout,
-        ::refreshCustomActions
+        ::refreshCustomActions,
+        ControlCenterMediaActionSource.forHeader(header, title, artist)
     )
     var isPanelHost = false
     private var panelExpanded = false

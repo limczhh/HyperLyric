@@ -1,8 +1,5 @@
 package com.lidesheng.hyperlyric.root.mediacard.controlcenter
 
-import android.media.session.MediaSession
-import android.media.session.MediaSessionManager
-import android.media.session.PlaybackState
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -12,7 +9,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -45,23 +41,13 @@ class ControlCenterMediaCustomActionsTest {
         layout(row, 160)
         val gap = native[1].left - native[0].right
         assertTrue(gap > 0)
-        val session = MediaSession(context, "actions-layout")
-        try {
-            val controller = session.controller
-            shadowOf(controller).setPackageName(context.packageName)
-            val state = PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 0, 1f)
-            repeat(customCount) { index ->
-                state.addCustomAction(PlaybackState.CustomAction.Builder(
-                    "custom-$index", "Custom $index", android.R.drawable.ic_media_play
-                ).build())
-            }
-            shadowOf(controller).setPlaybackState(state.build())
-            shadowOf(context.getSystemService(MediaSessionManager::class.java)).addController(controller)
-            assertEquals(customCount, controller.playbackState!!.customActions.size)
-            assertEquals(1, context.getSystemService(MediaSessionManager::class.java).getActiveSessions(null).size)
-            assertNotNull(context.packageManager.getResourcesForApplication(controller.packageName)
-                .getDrawable(android.R.drawable.ic_media_play, context.theme))
-            val actions = ControlCenterMediaCustomActions(row, TextView(context), true)
+        val clicked = mutableListOf<Int>()
+        val custom = List(customCount) { index -> ControlCenterMediaAction(
+            context.getDrawable(android.R.drawable.ic_media_play)!!,
+            if (index == 0) "Like" else "Desktop lyrics", Runnable { clicked.add(index) }) }
+        val slots = ControlCenterMediaActions(custom.getOrNull(0), custom.getOrNull(1))
+        run {
+            val actions = ControlCenterMediaCustomActions(row, TextView(context), true, source = { slots })
             actions.captureNativeGeometry()
             assertTrue(actions.refresh())
             layout(row, actions.expandedWidth(row, 160))
@@ -78,6 +64,15 @@ class ControlCenterMediaCustomActionsTest {
                 assertFalse(it.hasOnClickListeners())
             }
             ordered.forEach { assertEquals(44, it.width); assertEquals(44, it.height) }
+            if (customCount > 0) {
+                assertEquals("Like", ordered.first().contentDescription)
+                ordered.first().performClick()
+            }
+            if (customCount > 1) {
+                assertEquals("Desktop lyrics", ordered.last().contentDescription)
+                ordered.last().performClick()
+            }
+            assertEquals((0 until customCount).toList(), clicked)
             val icons = ordered.filter { it !in native }.map { (it as ImageView).drawable }
             repeat(5) { assertFalse(actions.refresh()) }
             ordered.filter { it !in native }.forEachIndexed { index, view ->
@@ -104,8 +99,6 @@ class ControlCenterMediaCustomActionsTest {
             assertEquals(3, row.childCount)
             assertEquals(gap, native[1].left - native[0].right)
             assertEquals(gap, native[2].left - native[1].right)
-        } finally {
-            session.release()
         }
     }
 

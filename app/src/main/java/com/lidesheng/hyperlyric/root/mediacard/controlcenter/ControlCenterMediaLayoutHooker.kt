@@ -58,6 +58,9 @@ internal object ControlCenterMediaLayoutHooker {
         )
         if (!options.immersiveCoverLayout && !options.progressHeadGlow &&
             options.coverFlip == RootConstants.CONTROL_CENTER_MEDIA_COVER_FLIP_DEFAULT) return
+        if (options.immersiveCoverLayout && options.customActions) {
+            ControlCenterMediaActionSource.install(module, loader)
+        }
         hookMiPlayDetailAdapter(module, loader)
         val api = hookDetails(module, loader, options) ?: return
         // A detail host need not load the Control Center delegate or animator.
