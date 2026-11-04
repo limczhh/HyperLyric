@@ -215,6 +215,7 @@
 
     <string name="title_hide_media_time">Hide progress time</string>
     <string name="title_hide_media_custom_actions">Hide custom action buttons</string>
+    <string name="title_show_media_custom_actions">Show custom action buttons</string>
     <string name="title_disable_media_cover_flip">Disable music cover flip animation</string>
     <string name="title_hide_audio_cover_shadow">Hide music cover shadow</string>
     <string name="title_media_progress_style">Progress bar style</string>

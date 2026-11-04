@@ -23,6 +23,8 @@ internal class LandscapeMediaLayout(
     private val volume: View,
     private val devices: View,
     private val divider: View?,
+    private val expandedActionWidth: (View, Int) -> Int = { _, width -> width },
+    private val prepareActions: () -> Unit = {},
 ) {
     private val coverIndex = meta.indexOfChild(artworkParent)
     private val orientation = host.orientation
@@ -50,6 +52,7 @@ internal class LandscapeMediaLayout(
         (devices.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0)
     private var actionWidths = emptyMap<View, Int>()
     private var flowVisibility: List<Int>? = null
+    private var flowActionWidths: List<Int>? = null
     private val devicePadding = intArrayOf(devices.paddingLeft, devices.paddingTop, devices.paddingRight, devices.paddingBottom)
     private var deviceHeight = 0
     var active = false
@@ -76,6 +79,7 @@ internal class LandscapeMediaLayout(
         actionSpacing = NativeMediaActionSpacing.capture(header, nativeWidth,
             listOf(title, artist, noPlayback), listOf(audio, video))
         actionWidths = listOf(audio, video).associateWith { it.measuredWidth }
+        prepareActions()
         val actions = listOf(audio, video).filter { it.visibility != View.GONE }
         if (actions.any { actionWidths.getValue(it) > innerWidth }) {
             return false
@@ -160,7 +164,10 @@ internal class LandscapeMediaLayout(
 
     private fun configureMetadata() {
         val visibility = listOf(artist, title, noPlayback, audio, video, progress).map { it.visibility }
-        if (visibility == flowVisibility) return
+        val widths = listOf(audio, video).map { row ->
+            expandedActionWidth(row, actionWidths[row]?.takeIf { it > 0 } ?: params.getValue(row).width)
+        }
+        if (visibility == flowVisibility && widths == flowActionWidths) return
         val actions = listOf(audio, video).filter { it.visibility != View.GONE }
         // Keep the native TextViews and action rows; only replace constraints.
         constrain(title, -2, params.getValue(title).height,
@@ -172,8 +179,8 @@ internal class LandscapeMediaLayout(
         constrain(noPlayback, -2, params.getValue(noPlayback).height,
             "startToStart" to 0, "endToEnd" to 0, "topToTop" to 0, "constrainedWidth" to true)
         val label = listOf(artist, title, noPlayback).firstOrNull { it.visibility != View.GONE }
-        listOf(audio, video).forEach { row ->
-            constrain(row, actionWidths[row]?.takeIf { it > 0 } ?: params.getValue(row).width,
+        listOf(audio, video).forEachIndexed { index, row ->
+            constrain(row, widths[index],
                 params.getValue(row).height, "startToStart" to 0, "endToEnd" to 0,
                 "topToBottom" to (label?.id ?: 0), "topMargin" to (actionSpacing?.before(row) ?: 0))
         }
@@ -185,6 +192,7 @@ internal class LandscapeMediaLayout(
             (this as ViewGroup.MarginLayoutParams).topMargin = volumeGap
         }
         flowVisibility = visibility
+        flowActionWidths = widths
     }
 
     fun restore() {

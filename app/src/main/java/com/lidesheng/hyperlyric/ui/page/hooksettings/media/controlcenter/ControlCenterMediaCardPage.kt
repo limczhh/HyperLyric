@@ -45,6 +45,22 @@ fun ControlCenterMediaCardPage() {
             )
         )
     }
+    var progressHeadGlow by remember {
+        mutableStateOf(
+            PrefsBridge.getBoolean(
+                RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW,
+                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW
+            )
+        )
+    }
+    var customActions by remember {
+        mutableStateOf(
+            PrefsBridge.getBoolean(
+                RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS,
+                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS
+            )
+        )
+    }
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
@@ -103,6 +119,40 @@ fun ControlCenterMediaCardPage() {
                                 immersiveCoverLayout = enabled
                                 PrefsBridge.putBoolean(
                                     RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER,
+                                    enabled
+                                )
+                            }
+                        )
+                        if (immersiveCoverLayout) {
+                            SwitchPreference(
+                                title = stringResource(id = R.string.title_show_media_custom_actions),
+                                checked = customActions,
+                                onCheckedChange = { enabled ->
+                                    customActions = enabled
+                                    PrefsBridge.putBoolean(
+                                        RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS,
+                                        enabled
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+                item(key = "control_center_progress_head_glow") {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        SwitchPreference(
+                            title = stringResource(id = R.string.title_media_progress_head_glow),
+                            summary = stringResource(id = R.string.summary_media_progress_head_glow),
+                            checked = progressHeadGlow,
+                            onCheckedChange = { enabled ->
+                                progressHeadGlow = enabled
+                                PrefsBridge.putBoolean(
+                                    RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW,
                                     enabled
                                 )
                             }

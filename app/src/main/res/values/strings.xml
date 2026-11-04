@@ -215,6 +215,7 @@
 
     <string name="title_hide_media_time">隐藏进度时间</string>
     <string name="title_hide_media_custom_actions">隐藏自定义动作按钮</string>
+    <string name="title_show_media_custom_actions">显示自定义动作按钮</string>
     <string name="title_disable_media_cover_flip">禁用音乐封面翻转动画</string>
     <string name="title_hide_audio_cover_shadow">隐藏音乐封面阴影</string>
     <string name="title_media_progress_style">进度条样式</string>

@@ -8,6 +8,12 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 
+internal data class ControlCenterMediaLayoutOptions(
+    val immersiveCoverLayout: Boolean = false,
+    val progressHeadGlow: Boolean = false,
+    val customActions: Boolean = false,
+)
+
 /** Changes native component bounds only. Text styling and transition drawing stay native. */
 internal class ControlCenterMediaLayout private constructor(
     val header: LinearLayout,
@@ -22,6 +28,7 @@ internal class ControlCenterMediaLayout private constructor(
     private val progress: View,
     private val volume: View,
     val contentView: ViewGroup? = null,
+    private val options: ControlCenterMediaLayoutOptions = ControlCenterMediaLayoutOptions(),
 ) {
     private val padding = intArrayOf(header.paddingLeft, header.paddingTop, header.paddingRight, header.paddingBottom)
     private var savedParams = listOf(header, meta, coverParent, cover, title, artist, noPlayback,
@@ -46,6 +53,13 @@ internal class ControlCenterMediaLayout private constructor(
     private var landscapeSize: Pair<Int, Int>? = null
     private var failedLandscapeSize: Pair<Int, Int>? = null
     private var nativeUpdateDepth = 0
+    private val progressGlow = ControlCenterMediaProgressGlow(header, progress, options.progressHeadGlow)
+    private val customActions = ControlCenterMediaCustomActions(
+        audio as? ViewGroup,
+        title,
+        options.customActions && options.immersiveCoverLayout,
+        ::refreshCustomActions
+    )
     var isPanelHost = false
     private var panelExpanded = false
     private var panelAnimating = false
@@ -109,18 +123,26 @@ internal class ControlCenterMediaLayout private constructor(
     fun markPanelShown() {
         panelAnimating = false
         panelExpanded = true
+        customActions.setVisible(true)
         applyLandscapeIfReady()
         landscape?.settle()
     }
 
     fun endPanelAnimation() { panelAnimating = false }
 
+    fun setCustomActionsVisible(visible: Boolean) { customActions.setVisible(visible) }
+
     private fun applyLandscapeIfReady(forTransition: Boolean = false) {
         if (header.resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE) return
+        if (!options.immersiveCoverLayout) {
+            if (nativeUpdateDepth == 0 && !isTransitioning) progressGlow.apply()
+            return
+        }
         if (nativeUpdateDepth > 0 || isTransitioning || (!forTransition &&
                 (panelAnimating || (isPanelHost && !panelExpanded)))) {
             return
         }
+        progressGlow.apply()
         val host = contentView as? LinearLayout ?: return
         if ((isPanelHost && host.orientation != LinearLayout.HORIZONTAL) || host.width <= 0 || host.height <= 0) {
             return
@@ -136,20 +158,33 @@ internal class ControlCenterMediaLayout private constructor(
         }
         val dividerId = host.resources.getIdentifier("spilt_screen_divider", "id", "miui.systemui.plugin")
         val next = LandscapeMediaLayout(host, header, meta, coverParent, cover, artist, title,
-            noPlayback, audio, video, progress, volume, list, host.findViewById(dividerId))
+            noPlayback, audio, video, progress, volume, list, host.findViewById(dividerId),
+            customActions::expandedWidth,
+            { customActions.captureNativeGeometry(); customActions.refresh() })
         if (next.apply()) {
             landscape = next
             landscapeSize = size
             isApplied = true
             artworkBlend?.setActive(false)
         } else {
+            customActions.restore()
             failedLandscapeSize = size
         }
     }
 
-    fun ensureApplied() { if (!isApplied) apply() }
+    fun ensureApplied() {
+        if (!options.immersiveCoverLayout) {
+            applyNativeFeatures()
+        } else if (!isApplied) {
+            apply()
+        }
+    }
 
     fun apply() {
+        if (!options.immersiveCoverLayout) {
+            applyNativeFeatures()
+            return
+        }
         if (header.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             applyLandscapeIfReady()
             return
@@ -158,11 +193,13 @@ internal class ControlCenterMediaLayout private constructor(
     }
 
     private fun applyPortrait() {
+        progressGlow.apply()
         if (nativeWidth == 0) {
             val id = header.resources.getIdentifier("miplay_detail_content_width", "dimen", "miui.systemui.plugin")
             val width = if (id != 0) header.resources.getDimensionPixelSize(id) else header.measuredWidth
             if (width > 0) captureNativeGeometry(width)
         }
+        customActions.refresh()
         isApplied = true
         artworkBlend?.setActive(true)
         header.setPadding(0, 0, 0, padding[3])
@@ -201,6 +238,7 @@ internal class ControlCenterMediaLayout private constructor(
 
     private fun captureNativeGeometry(width: Int) {
         actionSpacing = NativeMediaActionSpacing.capture(header, width, metadataLabels, listOf(audio, video))
+        customActions.captureNativeGeometry()
         nativeWidth = width
         nativeAudioWidth = audio.measuredWidth
         nativeProgressHeight = progress.measuredHeight
@@ -210,7 +248,8 @@ internal class ControlCenterMediaLayout private constructor(
     private fun configureControls() {
         listOf(audio to nativeAudioWidth, video to nativeVideoWidth).forEach { (view, measuredWidth) ->
             val native = savedParams.getValue(view)
-            setConstraints(view, measuredWidth.takeIf { it > 0 } ?: native.width, native.height,
+            setConstraints(view, customActions.expandedWidth(view,
+                measuredWidth.takeIf { it > 0 } ?: native.width), native.height,
                 "startToStart" to 0, "endToEnd" to 0, "topToBottom" to coverParent.id,
                 "topMargin" to actionGap(view))
         }
@@ -222,6 +261,19 @@ internal class ControlCenterMediaLayout private constructor(
 
     private fun actionGap(view: View): Int = actionSpacing?.before(view)
         ?: (savedParams.getValue(view) as ViewGroup.MarginLayoutParams).topMargin
+
+    private fun applyNativeFeatures() {
+        progressGlow.apply()
+        refreshCustomActions()
+    }
+
+    private fun refreshCustomActions() {
+        if (!customActions.refresh() || !isApplied || isTransitioning || nativeUpdateDepth > 0) return
+        if (isLandscapeApplied) landscape?.settle()
+        else if (nativeWidth > 0) configureControls()
+    }
+
+    fun refreshMediaFeatures() { applyNativeFeatures() }
 
     fun beginTransition(card: View) {
         if (!isApplied) return
@@ -248,6 +300,7 @@ internal class ControlCenterMediaLayout private constructor(
     fun onArtworkChanged() {
         artworkBlend?.invalidateContent()
         syncArtworkBlend()
+        refreshMediaFeatures()
     }
 
     fun syncArtworkBlend(progress: Float = artworkProgress) {
@@ -284,6 +337,10 @@ internal class ControlCenterMediaLayout private constructor(
     }
 
     fun forceHeaderHeight(width: Int): Int {
+        if (!options.immersiveCoverLayout) {
+            progressGlow.apply()
+            return header.measuredHeight
+        }
         if (isTransitioning) return header.measuredHeight
         if (header.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             if (!isLandscapeApplied) restore()
@@ -338,6 +395,7 @@ internal class ControlCenterMediaLayout private constructor(
     }
 
     fun restore() {
+        customActions.restore()
         if (!isApplied) return
         artworkBlend?.setActive(false)
         finishTransition()
@@ -376,16 +434,22 @@ internal class ControlCenterMediaLayout private constructor(
     companion object {
         fun create(header: LinearLayout): ControlCenterMediaLayout = create(header, contentView = null)
 
-        fun create(header: LinearLayout, contentView: ViewGroup?): ControlCenterMediaLayout {
+        fun create(
+            header: LinearLayout,
+            contentView: ViewGroup?,
+            options: ControlCenterMediaLayoutOptions = ControlCenterMediaLayoutOptions(),
+        ): ControlCenterMediaLayout {
             fun view(name: String): View? {
                 val id = header.resources.getIdentifier(name, "id", "miui.systemui.plugin")
                 return if (id == 0) null else header.findViewById(id)
             }
-            return create(header, ::view, contentView)
+            return create(header, ::view, contentView, options)
         }
 
         internal fun create(header: LinearLayout, view: (String) -> View?,
-            contentView: ViewGroup? = null): ControlCenterMediaLayout {
+            contentView: ViewGroup? = null,
+            options: ControlCenterMediaLayoutOptions = ControlCenterMediaLayoutOptions(),
+        ): ControlCenterMediaLayout {
             fun required(name: String) = requireNotNull(view(name)) { "Missing MiPlay view: $name" }
             val meta = required("meta_data_info") as ViewGroup
             val parent = required("coverParent") as ViewGroup
@@ -399,7 +463,7 @@ internal class ControlCenterMediaLayout private constructor(
             require(parent.parent === meta && cover.parent === parent && meta.parent === header)
             require(listOf(title, artist, noPlayback, audio, video, progress).all { it.parent === meta })
             return ControlCenterMediaLayout(header, meta, parent, cover, title, artist, noPlayback,
-                audio, video, progress, required("volume_bar_container"), contentView)
+                audio, video, progress, required("volume_bar_container"), contentView, options)
         }
     }
 }

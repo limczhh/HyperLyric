@@ -84,6 +84,12 @@ object RootConstants {
     const val KEY_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER =
         "key_hook_control_center_media_square_cover"
     const val DEFAULT_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER = false
+    const val KEY_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW =
+        "key_hook_control_center_media_progress_head_glow"
+    const val DEFAULT_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW = false
+    const val KEY_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS =
+        "key_hook_control_center_media_custom_actions"
+    const val DEFAULT_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS = false
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_ENABLED =
         "key_hook_notification_media_card_switcher_enabled"
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_MODE =

@@ -38,16 +38,33 @@ internal object ControlCenterMediaLayoutHooker {
     private val pendingDetails = Collections.newSetFromMap(WeakHashMap<View, Boolean>())
 
     fun hook(module: XposedModule, loader: ClassLoader, prefs: SharedPreferences) {
-        if (!prefs.getBoolean(RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER,
-                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER)) return
+        val options = ControlCenterMediaLayoutOptions(
+            immersiveCoverLayout = prefs.getBoolean(
+                RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER,
+                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER
+            ),
+            progressHeadGlow = prefs.getBoolean(
+                RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW,
+                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW
+            ),
+            customActions = prefs.getBoolean(
+                RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS,
+                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS
+            )
+        )
+        if (!options.immersiveCoverLayout && !options.progressHeadGlow) return
         hookMiPlayDetailAdapter(module, loader)
-        val api = hookDetails(module, loader) ?: return
+        val api = hookDetails(module, loader, options) ?: return
         // A detail host need not load the Control Center delegate or animator.
         // Install their transitions separately, after the common detail hooks.
         hookPanel(module, loader, api)
     }
 
-    private fun hookDetails(module: XposedModule, loader: ClassLoader): NativeApi? {
+    private fun hookDetails(
+        module: XposedModule,
+        loader: ClassLoader,
+        options: ControlCenterMediaLayoutOptions,
+    ): NativeApi? {
         val content = runCatching {
             loader.loadClass("com.android.systemui.QSControlMiPlayDetailContent")
         }.getOrNull() ?: return null
@@ -60,7 +77,10 @@ internal object ControlCenterMediaLayoutHooker {
             val frame = runCatching {
                 owner.loadClass("miui.systemui.controlcenter.widget.MaxHeightFrameLayout")
             }.getOrNull()
-            val api = NativeApi(content, frame)
+            val api = NativeApi(content, frame, options)
+            if (options.progressHeadGlow) {
+                handles += ControlCenterMediaProgressGlow.installOverflowDrawing(module, owner)
+            }
             fun install(method: Method, name: String, hooker: Hooker) {
                 method.isAccessible = true
                 handles += module.managedHook(method, "media.controlcenter.layout.$name", hooker)
@@ -208,6 +228,7 @@ internal object ControlCenterMediaLayoutHooker {
                             val instance = chain.thisObject ?: return@protect
                             if (panelController.isInstance(instance)) {
                                 delegateBase.get(instance)?.let { delegate ->
+                                    api.setCustomActionsVisible(delegate, method.name == "startShow")
                                     api.setArtworkBackground(delegate, getBlurBg.invoke(instance) as View)
                                     api.prepareTransition(delegate)
                                 }
@@ -457,7 +478,11 @@ internal object ControlCenterMediaLayoutHooker {
         runCatching(block).onFailure { HookLogger.w(TAG, "应用控制中心媒体布局失败", it) }
     }
 
-    private class NativeApi(content: Class<*>, private val frameClass: Class<*>?) {
+    private class NativeApi(
+        content: Class<*>,
+        private val frameClass: Class<*>?,
+        private val options: ControlCenterMediaLayoutOptions,
+    ) {
         private val pluginLoader = content.classLoader
         private val delegate by lazy { requireNotNull(pluginLoader).loadClass(PANEL_PACKAGE + "MediaPanelDelegate") }
         private val detailClass = content
@@ -505,9 +530,13 @@ internal object ControlCenterMediaLayoutHooker {
             }
             val previous = header.layoutState()
             if (previous?.isTransitioning == true) return previous
-            val state = previous ?: ControlCenterMediaLayout.create(header, content as? ViewGroup)
+            val state = previous ?: ControlCenterMediaLayout.create(
+                header,
+                content as? ViewGroup,
+                options
+            )
             if (panelHost) state.isPanelHost = true
-            if (state.panelSizing == null) {
+            if (options.immersiveCoverLayout && state.panelSizing == null) {
                 val frame = generateSequence(content.parent as? View) { it.parent as? View }
                     .firstOrNull { frameClass?.isInstance(it) == true }
                 fun dimension(name: String): Int {
@@ -527,6 +556,7 @@ internal object ControlCenterMediaLayoutHooker {
             content.setTag(R.id.control_center_media_layout_state, state)
             if (artworkDrawHook != null) pluginLoader?.let(state::enableArtworkBlend)
             prepareContent(content)
+            state.refreshMediaFeatures()
             if (previous == null) {
                 header.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
                     if (r - l != or - ol || b - t != ob - ot)
@@ -540,6 +570,9 @@ internal object ControlCenterMediaLayoutHooker {
         fun isApplied(delegate: Any) = state(delegate)?.isApplied == true
         fun isLandscapeApplied(delegate: Any) = state(delegate)?.isLandscapeApplied == true
         fun transitionGeneration(delegate: Any) = state(delegate)?.transitionGeneration ?: -1
+        fun setCustomActionsVisible(delegate: Any, visible: Boolean) {
+            state(delegate)?.setCustomActionsVisible(visible)
+        }
         fun setArtworkBackground(delegate: Any, background: View) { state(delegate)?.setArtworkBackground(background) }
         fun updateArtworkBlend(delegate: Any, progress: Float) { state(delegate)?.syncArtworkBlend(progress) }
         fun resetIfUnlocked(delegate: Any) {
@@ -615,6 +648,10 @@ internal object ControlCenterMediaLayoutHooker {
             if (!detailClass.isInstance(content)) return
             val state = content.layoutState() ?: return
             if (state.isTransitioning) return
+            if (!options.immersiveCoverLayout) {
+                state.refreshMediaFeatures()
+                return
+            }
             val dimensionName = if (content.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
                 "miplay_detail_content_land_width" else "miplay_detail_content_width"
             val id = content.resources.getIdentifier(dimensionName, "dimen", "miui.systemui.plugin")

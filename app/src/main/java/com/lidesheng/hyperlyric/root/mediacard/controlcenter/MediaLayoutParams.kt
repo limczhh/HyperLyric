@@ -5,6 +5,11 @@ import android.view.ViewGroup
 
 /** Preserve native parameter types without depending on the plugin's AndroidX. */
 internal object MediaLayoutParams {
+    /** A different View must never share a copied ConstraintLayout's solver widget. */
+    fun fresh(original: ViewGroup.LayoutParams): ViewGroup.LayoutParams = original.javaClass
+        .getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        .newInstance(original.width, original.height) as ViewGroup.LayoutParams
+
     fun copy(original: ViewGroup.LayoutParams): ViewGroup.LayoutParams {
         val type = original.javaClass
         val constructor = runCatching { type.getConstructor(type) }.getOrNull()
