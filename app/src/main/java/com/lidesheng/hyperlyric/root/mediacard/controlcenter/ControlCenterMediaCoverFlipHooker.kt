@@ -36,6 +36,21 @@ internal object ControlCenterMediaCoverFlipHooker {
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType).apply { isAccessible = true }
             val endScenario = header.getDeclaredMethod("endSwitchMusicScenario").apply { isAccessible = true }
             val nextMedia = header.getDeclaredField("nextMedia").apply { isAccessible = true }
+            val refreshers = WeakHashMap<View, ControlCenterMediaCoverFlipRefresh>()
+            val coverParent = header.getDeclaredField("coverParent").apply { isAccessible = true }
+            val useCoverAnim = header.getDeclaredField("useCoverAnim").apply { isAccessible = true }
+            val flipType = header.getDeclaredField("flipAnimation").type
+            val isFlipping = flipType.getDeclaredMethod("isInFlipAnimation", View::class.java)
+                .apply { isAccessible = true }
+            fun refresher(view: View) = refreshers.getOrPut(view) {
+                ControlCenterMediaCoverFlipRefresh(view,
+                    isFlipping = { isFlipping.invoke(null, it) as Boolean },
+                    canApply = { useCoverAnim.getBoolean(it) },
+                    apply = { owner, bitmap ->
+                        endScenario.invoke(owner)
+                        setCover.invoke(owner, bitmap, true, false)
+                    })
+            }
             hook(header.getDeclaredMethod("performFlip", Bitmap::class.java), "perform", object : Hooker {
                 override fun intercept(chain: Chain): Any? {
                     val view = chain.thisObject as? View ?: return chain.proceed()
@@ -49,7 +64,15 @@ internal object ControlCenterMediaCoverFlipHooker {
                     }
                     (view.getTag(R.id.control_center_media_layout_state) as? ControlCenterMediaLayout)
                         ?.prepareCoverFlip()
-                    return chain.proceed()
+                    if (mode != RootConstants.CONTROL_CENTER_MEDIA_COVER_FLIP_ENABLED) return chain.proceed()
+                    val refresh = refresher(view)
+                    refresh.begin(coverParent.get(view) as View, chain.args[0] as? Bitmap)
+                    return try {
+                        chain.proceed().also { refresh.afterStart() }
+                    } catch (error: Throwable) {
+                        refresh.stop()
+                        throw error
+                    }
                 }
             })
             if (mode == RootConstants.CONTROL_CENTER_MEDIA_COVER_FLIP_ENABLED) {
@@ -72,6 +95,7 @@ internal object ControlCenterMediaCoverFlipHooker {
                     override fun intercept(chain: Chain): Any? {
                         val view = chain.thisObject as? View ?: return chain.proceed()
                         val metadata = chain.args[0] ?: return chain.proceed()
+                        refresher(view).update(artwork.invoke(metadata) as? Bitmap)
                         val previous = active.get()
                         active.set(Update(view, metadata))
                         return try {
