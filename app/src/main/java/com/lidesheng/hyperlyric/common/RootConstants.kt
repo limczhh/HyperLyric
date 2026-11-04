@@ -90,6 +90,11 @@ object RootConstants {
     const val KEY_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS =
         "key_hook_control_center_media_custom_actions"
     const val DEFAULT_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS = false
+    const val KEY_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP = "key_hook_control_center_media_cover_flip"
+    const val CONTROL_CENTER_MEDIA_COVER_FLIP_DEFAULT = 0
+    const val CONTROL_CENTER_MEDIA_COVER_FLIP_DISABLED = 1
+    const val CONTROL_CENTER_MEDIA_COVER_FLIP_ENABLED = 2
+    const val DEFAULT_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP = CONTROL_CENTER_MEDIA_COVER_FLIP_DEFAULT
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_ENABLED =
         "key_hook_notification_media_card_switcher_enabled"
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_MODE =

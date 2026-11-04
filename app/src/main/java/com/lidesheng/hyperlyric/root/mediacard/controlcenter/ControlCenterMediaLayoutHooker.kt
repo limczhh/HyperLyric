@@ -50,9 +50,14 @@ internal object ControlCenterMediaLayoutHooker {
             customActions = prefs.getBoolean(
                 RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS,
                 RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS
-            )
+            ),
+            coverFlip = prefs.getInt(
+                RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP,
+                RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP
+            ).coerceIn(0, 2)
         )
-        if (!options.immersiveCoverLayout && !options.progressHeadGlow) return
+        if (!options.immersiveCoverLayout && !options.progressHeadGlow &&
+            options.coverFlip == RootConstants.CONTROL_CENTER_MEDIA_COVER_FLIP_DEFAULT) return
         hookMiPlayDetailAdapter(module, loader)
         val api = hookDetails(module, loader, options) ?: return
         // A detail host need not load the Control Center delegate or animator.
@@ -78,6 +83,7 @@ internal object ControlCenterMediaLayoutHooker {
                 owner.loadClass("miui.systemui.controlcenter.widget.MaxHeightFrameLayout")
             }.getOrNull()
             val api = NativeApi(content, frame, options)
+            handles += ControlCenterMediaCoverFlipHooker.install(module, owner, header, options)
             if (options.progressHeadGlow) {
                 handles += ControlCenterMediaProgressGlow.installOverflowDrawing(module, owner)
             }
@@ -466,11 +472,12 @@ internal object ControlCenterMediaLayoutHooker {
             View::class.java, Long::class.javaPrimitiveType).apply { isAccessible = true }
         artworkDrawHook = module.managedHook(method, "media.controlcenter.artwork_blend", object : Hooker {
             override fun intercept(chain: Chain): Any? {
-                val child = chain.args[1] as? ImageView ?: return chain.proceed()
+                val child = chain.args[1] as? View ?: return chain.proceed()
+                if (child !is ImageView && child !is ViewGroup) return chain.proceed()
                 val state = child.layoutState() ?: return chain.proceed()
                 if (chain.thisObject !== child.parent) return chain.proceed()
                 val canvas = chain.args[0] as? Canvas ?: return chain.proceed()
-                return state.drawArtwork(canvas) { chain.proceed() }
+                return state.drawArtwork(child, canvas) { chain.proceed() }
             }
         })
     }

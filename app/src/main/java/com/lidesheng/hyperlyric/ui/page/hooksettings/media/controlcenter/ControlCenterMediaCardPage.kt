@@ -32,6 +32,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -60,6 +61,12 @@ fun ControlCenterMediaCardPage() {
                 RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_CUSTOM_ACTIONS
             )
         )
+    }
+    var coverFlip by remember {
+        mutableStateOf(PrefsBridge.getInt(
+            RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP,
+            RootConstants.DEFAULT_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP
+        ).coerceIn(0, 2))
     }
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
@@ -105,6 +112,40 @@ fun ControlCenterMediaCardPage() {
                 ),
                 contentPadding = contentPadding
             ) {
+                item(key = "control_center_media_effects") {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        OverlayDropdownPreference(
+                            title = stringResource(R.string.title_media_cover_flip_animation),
+                            items = listOf(
+                                stringResource(R.string.monet_default),
+                                stringResource(R.string.option_island_media_ambient_flow_disabled),
+                                stringResource(R.string.title_enable)
+                            ),
+                            selectedIndex = coverFlip,
+                            onSelectedIndexChange = { mode ->
+                                coverFlip = mode
+                                PrefsBridge.putInt(RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_COVER_FLIP, mode)
+                            }
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.title_media_progress_head_glow),
+                            summary = stringResource(id = R.string.summary_media_progress_head_glow),
+                            checked = progressHeadGlow,
+                            onCheckedChange = { enabled ->
+                                progressHeadGlow = enabled
+                                PrefsBridge.putBoolean(
+                                    RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW,
+                                    enabled
+                                )
+                            }
+                        )
+                    }
+                }
                 item(key = "control_center_immersive_cover_layout") {
                     Card(
                         modifier = Modifier
@@ -136,27 +177,6 @@ fun ControlCenterMediaCardPage() {
                                 }
                             )
                         }
-                    }
-                }
-                item(key = "control_center_progress_head_glow") {
-                    Card(
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .fillMaxWidth()
-                    ) {
-                        SwitchPreference(
-                            title = stringResource(id = R.string.title_media_progress_head_glow),
-                            summary = stringResource(id = R.string.summary_media_progress_head_glow),
-                            checked = progressHeadGlow,
-                            onCheckedChange = { enabled ->
-                                progressHeadGlow = enabled
-                                PrefsBridge.putBoolean(
-                                    RootConstants.KEY_HOOK_CONTROL_CENTER_MEDIA_PROGRESS_HEAD_GLOW,
-                                    enabled
-                                )
-                            }
-                        )
                     }
                 }
             }

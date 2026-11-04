@@ -144,6 +144,7 @@
   <string name="title_hide_media_custom_actions">إخفاء أزرار الإجراءات المخصصة</string>
   <string name="title_show_media_custom_actions">إظهار أزرار الإجراءات المخصصة</string>
   <string name="title_disable_media_cover_flip">تعطيل حركة قلب غلاف الصوت</string>
+  <string name="title_media_cover_flip_animation">حركة قلب غلاف الموسيقى</string>
   <string name="title_hide_audio_cover_shadow">إخفاء ظل غلاف الصوت</string>
   <string name="title_media_progress_style">نمط شريط التقدّم</string>
   <string name="option_media_progress_style_default">افتراضي</string>

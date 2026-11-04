@@ -7,11 +7,13 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.lidesheng.hyperlyric.common.RootConstants
 
 internal data class ControlCenterMediaLayoutOptions(
     val immersiveCoverLayout: Boolean = false,
     val progressHeadGlow: Boolean = false,
     val customActions: Boolean = false,
+    val coverFlip: Int = RootConstants.CONTROL_CENTER_MEDIA_COVER_FLIP_DEFAULT,
 )
 
 /** Changes native component bounds only. Text styling and transition drawing stay native. */
@@ -54,6 +56,8 @@ internal class ControlCenterMediaLayout private constructor(
     private var failedLandscapeSize: Pair<Int, Int>? = null
     private var nativeUpdateDepth = 0
     private val progressGlow = ControlCenterMediaProgressGlow(header, progress, options.progressHeadGlow)
+    private val coverFlipGeometry = ControlCenterMediaCoverFlipGeometry(coverParent,
+        savedParams.getValue(coverParent).width)
     private val customActions = ControlCenterMediaCustomActions(
         audio as? ViewGroup,
         title,
@@ -75,6 +79,7 @@ internal class ControlCenterMediaLayout private constructor(
     }
 
     init {
+        coverParent.setTag(com.lidesheng.hyperlyric.R.id.control_center_media_layout_state, this)
         contentView?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             if (header.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 applyLandscapeIfReady()
@@ -321,7 +326,15 @@ internal class ControlCenterMediaLayout private constructor(
         artworkBlend?.sync(labels.minOf { it.top } - origin, cover.height, artworkProgress)
     }
 
-    fun drawArtwork(canvas: Canvas, original: () -> Any?): Any? {
+    fun prepareCoverFlip() {
+        if (isApplied && options.immersiveCoverLayout && !isTransitioning) coverFlipGeometry.prepare()
+    }
+
+    fun drawArtwork(child: View, canvas: Canvas, original: () -> Any?): Any? {
+        if (child === coverParent) {
+            return if (isApplied && !isTransitioning) coverFlipGeometry.draw(canvas, original) else original()
+        }
+        if (child !== cover) return original()
         val blend = artworkBlend ?: return original()
         return blend.draw(canvas, original)
     }
@@ -396,6 +409,7 @@ internal class ControlCenterMediaLayout private constructor(
 
     fun restore() {
         customActions.restore()
+        coverFlipGeometry.restore()
         if (!isApplied) return
         artworkBlend?.setActive(false)
         finishTransition()
