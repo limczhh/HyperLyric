@@ -81,6 +81,9 @@ object RootConstants {
     const val KEY_HOOK_ISLAND_MODIFICATION_SCOPE = "key_hook_island_modification_scope"
     const val KEY_HOOK_NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE =
         "key_hook_notification_media_ambient_flow_mode"
+    const val KEY_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER =
+        "key_hook_control_center_media_square_cover"
+    const val DEFAULT_HOOK_CONTROL_CENTER_MEDIA_SQUARE_COVER = false
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_ENABLED =
         "key_hook_notification_media_card_switcher_enabled"
     const val KEY_HOOK_NOTIFICATION_MEDIA_CARD_SWITCHER_MODE =

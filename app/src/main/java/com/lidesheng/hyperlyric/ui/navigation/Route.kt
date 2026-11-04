@@ -91,6 +91,9 @@ sealed interface Route : NavKey {
     data object MediaCardSettings : Route
 
     @Serializable
+    data object ControlCenterMediaCardSettings : Route
+
+    @Serializable
     data object NotificationMediaCardSettings : Route
 
     @Serializable

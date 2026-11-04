@@ -26,6 +26,7 @@ import com.lidesheng.hyperlyric.root.island.renderer.SystemUiLyricRenderer
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardConfigurationRefreshHooker
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardElementBehaviorHooker
 import com.lidesheng.hyperlyric.root.mediacard.MediaCardRuntimeConfig
+import com.lidesheng.hyperlyric.root.mediacard.controlcenter.ControlCenterMediaLayoutHooker
 import com.lidesheng.hyperlyric.root.mediacard.island.switcher.IslandMediaSessionCoordinator
 import com.lidesheng.hyperlyric.root.mediacard.island.IslandExpandedMediaAmbientFlowHooker
 import com.lidesheng.hyperlyric.root.mediacard.island.layout.IslandExpandedMediaLayoutHooker
@@ -419,6 +420,7 @@ class HookEntry : XposedModule() {
 
     /** Cold-start installer: the media-card surface is intentionally added only here. */
     private fun installSystemUiHooks(classLoader: ClassLoader) {
+        ControlCenterMediaLayoutHooker.hook(this, classLoader, prefs)
         installSuperIslandStatusBarHooks(classLoader)
         installMediaCardHooks(classLoader)
         installSuperIslandLifecycleHooks(classLoader, hotReload = false)
@@ -1084,6 +1086,7 @@ class HookEntry : XposedModule() {
             val result = chain.proceed()
             val cl = chain.thisObject as? ClassLoader ?: return result
             try {
+                ControlCenterMediaLayoutHooker.hook(this@HookEntry, cl, prefs)
                 SystemUIHookRegistry.hook(this@HookEntry, cl)
             } catch (e: Exception) {
                 if (e is ClassNotFoundException || e is NoSuchMethodException) {

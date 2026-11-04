@@ -195,6 +195,10 @@ fun MediaCardSettingsPage() {
                                 onClick = { navigator.navigate(Route.SuperIslandMediaCardSettings) }
                             )
                             ArrowPreference(
+                                title = stringResource(id = R.string.title_control_center),
+                                onClick = { navigator.navigate(Route.ControlCenterMediaCardSettings) }
+                            )
+                            ArrowPreference(
                                 title = stringResource(id = R.string.title_always_on_display),
                                 onClick = { navigator.navigate(Route.AlwaysOnDisplaySettings) }
                             )

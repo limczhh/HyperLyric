@@ -161,6 +161,8 @@
     <string name="title_custom_config">自定义配置</string>
     <string name="title_super_island">超级岛</string>
     <string name="title_media_cards">媒体卡片</string>
+    <string name="title_control_center">控制中心</string>
+    <string name="title_immersive_cover_layout">沉浸封面布局</string>
     <string name="title_notification_center">通知中心</string>
     <string name="title_always_on_display">息屏显示</string>
     <string name="title_disable_media_card_collapsing">禁用媒体卡片折叠</string>

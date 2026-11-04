@@ -93,6 +93,8 @@
   <string name="title_custom_config">إعدادات مخصصة</string>
   <string name="title_super_island">HyperIsland</string>
   <string name="title_media_cards">بطاقات الوسائط</string>
+  <string name="title_control_center">مركز التحكم</string>
+  <string name="title_immersive_cover_layout">تخطيط الغلاف الغامر</string>
   <string name="title_notification_center">مركز الإشعارات</string>
   <string name="title_always_on_display">العرض الدائم</string>
   <string name="title_disable_media_card_collapsing">تعطيل طي بطاقات الوسائط</string>

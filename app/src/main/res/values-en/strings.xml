@@ -161,6 +161,8 @@
     <string name="title_custom_config">Custom Configuration</string>
     <string name="title_super_island">HyperIsland</string>
     <string name="title_media_cards">Media cards</string>
+    <string name="title_control_center">Control Center</string>
+    <string name="title_immersive_cover_layout">Immersive cover layout</string>
     <string name="title_notification_center">Notification Center</string>
     <string name="title_always_on_display">Always On Display</string>
     <string name="title_disable_media_card_collapsing">Disable media card collapsing</string>

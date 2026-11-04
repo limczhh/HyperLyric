@@ -25,6 +25,7 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.scroll.LyricScrollPa
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.verbatim.VerbatimLyricPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.MediaCardSettingsPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.aod.AlwaysOnDisplayPage
+import com.lidesheng.hyperlyric.ui.page.hooksettings.media.controlcenter.ControlCenterMediaCardPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.island.IslandExpandedMediaCardPage
 import com.lidesheng.hyperlyric.ui.page.hooksettings.media.notification.NotificationCenterMediaCardPage
 import com.lidesheng.hyperlyric.ui.page.lyricenhancement.LyricEnhancementPage
@@ -79,6 +80,7 @@ fun AppNavigation(startRoute: Route) {
             entry<Route.SuperIslandSettings> { SuperIslandSettingsPage() }
             entry<Route.SuperIslandContentLayout> { ContentLayoutPage() }
             entry<Route.MediaCardSettings> { MediaCardSettingsPage() }
+            entry<Route.ControlCenterMediaCardSettings> { ControlCenterMediaCardPage() }
             entry<Route.NotificationMediaCardSettings> { NotificationCenterMediaCardPage() }
             entry<Route.SuperIslandMediaCardSettings> { IslandExpandedMediaCardPage() }
             entry<Route.AlwaysOnDisplaySettings> { AlwaysOnDisplayPage() }
