@@ -31,6 +31,11 @@ import java.util.function.Supplier
 internal object IslandMediaSessionCoordinator {
     private const val TAG = "IslandMediaCardSwitcher"
     private const val PREFIX = "com.android.systemui.statusbar.notification.mediaisland."
+    // OS3's plugin keeps the island view in DynamicIslandWindowViewController.islandData.
+    // Its update entry point only updates an existing view; an unknown key must go through
+    // addDynamicIslandView first.
+    private const val OS3_PLUGIN_CONTENT =
+        "miui.systemui.dynamicisland.window.DynamicIslandWindowViewController"
     private const val CONFIGURATION_IMPL =
         "com.android.systemui.statusbar.phone.ConfigurationControllerImpl"
     private val main = Handler(Looper.getMainLooper())
@@ -182,9 +187,12 @@ internal object IslandMediaSessionCoordinator {
                             }
                         }
                         val rebuilding = instance in ownedControllers && read(instance, "currentKey") == null
-                        if (rebuilding) {
+                        val seedCurrentKey = rebuilding && (state?.shouldSeedCurrentKey() ?: true)
+                        if (seedCurrentKey) {
                             // Native reinflation clears currentKey and rejects paused sessions on
-                            // its add path. Owned multi-island cards use the native update path.
+                            // its add path. Older plugins use the native update path for the
+                            // replacement card. OS3 must keep currentKey null here: its native
+                            // addDynamicIslandView checks that state before calling plugin Add.
                             field(instance, "currentKey").set(instance, chain.args[2]?.let { read(it, "notificationKey") })
                         }
                         val result = chain.proceed()
@@ -377,6 +385,11 @@ internal object IslandMediaSessionCoordinator {
             if (window.getTag(RETIRED_WINDOW_TAG) == true) return false
             val content = readPluginContent(plugin) ?: return false
             return content.javaClass.classLoader === window.javaClass.classLoader
+        }
+
+        fun shouldSeedCurrentKey(): Boolean {
+            val content = pluginContent ?: runCatching { readPluginContent(plugin) }.getOrNull()
+            return content?.javaClass?.name != OS3_PLUGIN_CONTENT
         }
 
         fun onPluginChanged(owner: Any) {
@@ -861,8 +874,10 @@ internal object IslandMediaSessionCoordinator {
                 previous?.let { old ->
                     method(controller, "removeDynamicIslandView", 2).invoke(controller, old, true)
                 }
-                field(controller, "currentKey").set(controller, nextKey)
             }
+            // Let the native controller decide between Add and Update. OS3's add path uses
+            // currentKey == null to create a new plugin island; pre-seeding it makes OS3 call
+            // updateDynamicIslandView for a key that has not been added yet.
             key = nextKey
             method(callback, "onMediaDataChanged", 1).invoke(callback, data)
         }
@@ -886,7 +901,7 @@ internal object IslandMediaSessionCoordinator {
             } finally {
                 // A failure during the first attach can precede topMediaData assignment, in
                 // which case the native null callback has nothing to detach yet.
-                (read(controller, "currentKey") as? String)?.let { remainingKey ->
+                ((read(controller, "currentKey") as? String) ?: key)?.let { remainingKey ->
                     runCatching {
                         method(controller, "removeDynamicIslandView", 2).invoke(controller, remainingKey, true)
                     }.onFailure { HookLogger.w(TAG, "清理未完成绑定的媒体岛失败", it) }
