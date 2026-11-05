@@ -19,13 +19,8 @@ import android.view.ViewGroup
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.createBitmap
 import com.lidesheng.hyperlyric.common.color.ColorExtractor
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sin
 
 internal enum class MediaFlowTone { LIGHT, DARK }
 
@@ -186,231 +181,367 @@ internal object MediaSoftPaletteExtractor {
     private val DEFAULT_DOMINANCE = listOf(0.46f, 0.24f, 0.18f, 0.12f)
 }
 
-internal object MediaSoftArtworkFactory {
-    const val TEXTURE_SIZE = 72
-
-    private val anchorX = floatArrayOf(0.12f, 0.88f, 0.20f, 0.82f)
-    private val anchorY = floatArrayOf(0.14f, 0.22f, 0.86f, 0.78f)
-
-    fun createTexture(palette: MediaSoftPalette): Bitmap {
-        val colors = palette.asList().map(::toOklab)
-        val dominance = palette.dominance
-        val pixels = IntArray(TEXTURE_SIZE * TEXTURE_SIZE)
-        val denominator = (TEXTURE_SIZE - 1).toFloat()
-        for (y in 0 until TEXTURE_SIZE) {
-            val normalizedY = y / denominator
-            for (x in 0 until TEXTURE_SIZE) {
-                val normalizedX = x / denominator
-                val warpedX = normalizedX + sin(normalizedY * PI * 2.0).toFloat() * 0.075f +
-                        sin((normalizedX + normalizedY) * PI).toFloat() * 0.035f
-                val warpedY = normalizedY + cos(normalizedX * PI * 2.0).toFloat() * 0.065f -
-                        sin((normalizedX - normalizedY) * PI).toFloat() * 0.030f
-                var totalWeight = 0f
-                var lightness = 0f
-                var greenRed = 0f
-                var blueYellow = 0f
-                colors.indices.forEach { index ->
-                    val dx = warpedX - anchorX[index]
-                    val dy = warpedY - anchorY[index]
-                    val areaWeight = dominance[index]
-                    val weight =
-                        exp((-(dx * dx + dy * dy) * 5.2f).toDouble()).toFloat() *
-                                (0.55f + areaWeight * 2.6f) +
-                                0.006f + areaWeight * 0.11f
-                    totalWeight += weight
-                    lightness += colors[index].l * weight
-                    greenRed += colors[index].a * weight
-                    blueYellow += colors[index].b * weight
-                }
-                pixels[y * TEXTURE_SIZE + x] = fromOklab(
-                    Oklab(lightness / totalWeight, greenRed / totalWeight, blueYellow / totalWeight)
-                )
-            }
-        }
-        return Bitmap.createBitmap(
-            pixels,
-            TEXTURE_SIZE,
-            TEXTURE_SIZE,
-            Bitmap.Config.ARGB_8888
-        )
-    }
-
-    fun renderStatic(
-        palette: MediaSoftPalette,
-        tone: MediaFlowTone,
-        width: Int,
-        height: Int
-    ): Bitmap {
-        val texture = createTexture(palette)
-        val flow = createBitmap(width, height)
-        val canvas = Canvas(flow)
-        drawLayer(canvas, texture, width, height, angle = 0f, zoom = 1.34f, alpha = 255)
-        drawLayer(
-            canvas,
-            texture,
-            width,
-            height,
-            angle = 97f,
-            zoom = 1.48f,
-            offsetX = -0.08f,
-            offsetY = -0.06f,
-            alpha = 82
-        )
-        drawLayer(
-            canvas,
-            texture,
-            width,
-            height,
-            angle = 218f,
-            zoom = 1.58f,
-            offsetX = 0.07f,
-            offsetY = 0.08f,
-            alpha = 62
-        )
-
-        val appearance = appearance(tone)
-        val result = createBitmap(width, height)
-        val saturationMatrix = ColorMatrix().apply { setSaturation(appearance.saturation) }
-        Canvas(result).apply {
-            drawBitmap(flow, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                isFilterBitmap = true
-                colorFilter = ColorMatrixColorFilter(saturationMatrix)
-            })
-            drawColor(appearance.surface.withAlpha((appearance.surfaceBlend * 255f).toInt()))
-        }
-        texture.recycle()
-        flow.recycle()
-        return result
-    }
-
-    fun appearance(tone: MediaFlowTone): MediaFlowAppearance = when (tone) {
-        MediaFlowTone.DARK -> MediaFlowAppearance(
-            surface = 0xff121316.toInt(),
-            surfaceBlend = 0.39f,
-            saturation = 1.18f
-        )
-
-        MediaFlowTone.LIGHT -> MediaFlowAppearance(
-            surface = 0xfff3f3f5.toInt(),
-            surfaceBlend = 0.65f,
-            saturation = 1.30f
-        )
-    }
-
-    private fun drawLayer(
-        canvas: Canvas,
-        texture: Bitmap,
-        width: Int,
-        height: Int,
-        angle: Float,
-        zoom: Float,
-        offsetX: Float = 0f,
-        offsetY: Float = 0f,
-        alpha: Int
-    ) {
-        val shader = BitmapShader(texture, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
-            filterMode = BitmapShader.FILTER_MODE_LINEAR
-        }
-        val scale = max(width, height) / TEXTURE_SIZE.toFloat() * zoom
-        val matrix = Matrix().apply {
-            setTranslate(-TEXTURE_SIZE / 2f, -TEXTURE_SIZE / 2f)
-            postRotate(angle)
-            postScale(scale, scale)
-            postTranslate(width / 2f + width * offsetX, height / 2f + height * offsetY)
-        }
-        shader.setLocalMatrix(matrix)
-        canvas.drawRect(
-            0f,
-            0f,
-            width.toFloat(),
-            height.toFloat(),
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.shader = shader
-                this.alpha = alpha
-            })
-    }
-
-    private data class Oklab(val l: Float, val a: Float, val b: Float)
-
-    private fun toOklab(color: Int): Oklab {
-        val r = srgbToLinear(Color.red(color) / 255f)
-        val g = srgbToLinear(Color.green(color) / 255f)
-        val b = srgbToLinear(Color.blue(color) / 255f)
-        val l = cubeRoot(0.41222147f * r + 0.53633255f * g + 0.05144599f * b)
-        val m = cubeRoot(0.2119035f * r + 0.6806995f * g + 0.107397f * b)
-        val s = cubeRoot(0.08830246f * r + 0.28171884f * g + 0.6299787f * b)
-        return Oklab(
-            0.21045426f * l + 0.7936178f * m - 0.00407205f * s,
-            1.9779985f * l - 2.4285922f * m + 0.4505937f * s,
-            0.02590404f * l + 0.78277177f * m - 0.80867577f * s
-        )
-    }
-
-    private fun fromOklab(color: Oklab): Int {
-        val l = color.l + 0.39633778f * color.a + 0.21580376f * color.b
-        val m = color.l - 0.10556135f * color.a - 0.06385417f * color.b
-        val s = color.l - 0.08948418f * color.a - 1.2914855f * color.b
-        val l3 = l * l * l
-        val m3 = m * m * m
-        val s3 = s * s * s
-        val r = linearToSrgb(4.0767417f * l3 - 3.3077116f * m3 + 0.23096994f * s3)
-        val g = linearToSrgb(-1.268438f * l3 + 2.6097574f * m3 - 0.3413194f * s3)
-        val b = linearToSrgb(-0.00419609f * l3 - 0.7034186f * m3 + 1.7076147f * s3)
-        return Color.rgb((r * 255f).toInt(), (g * 255f).toInt(), (b * 255f).toInt())
-    }
-
-    private fun srgbToLinear(value: Float): Float = if (value <= 0.04045f) {
-        value / 12.92f
-    } else {
-        ((value + 0.055f) / 1.055f).toDouble().pow(2.4).toFloat()
-    }
-
-    private fun linearToSrgb(value: Float): Float {
-        val clamped = value.coerceIn(0f, 1f)
-        return if (clamped <= 0.0031308f) {
-            clamped * 12.92f
-        } else {
-            (1.055 * clamped.toDouble().pow(1.0 / 2.4) - 0.055).toFloat()
-        }.coerceIn(0f, 1f)
-    }
-
-    private fun cubeRoot(value: Float): Float = Math.cbrt(value.toDouble()).toFloat()
-
-    private fun Int.withAlpha(alpha: Int): Int =
-        this and 0x00ffffff or (alpha.coerceIn(0, 255) shl 24)
-}
-
 internal data class MediaFlowAppearance(
     val surface: Int,
     val surfaceBlend: Float,
     val saturation: Float
 )
 
-internal class MediaFlowArtwork private constructor(
-    private val pixels: IntArray,
-    private val signature: Int
-) {
-    fun createBitmap(): Bitmap = Bitmap.createBitmap(
-        pixels,
-        TEXTURE_SIZE,
-        TEXTURE_SIZE,
-        Bitmap.Config.ARGB_8888
+internal object MediaSoftArtworkFactory {
+    fun appearance(tone: MediaFlowTone): MediaFlowAppearance = when (tone) {
+        MediaFlowTone.DARK -> MediaFlowAppearance(
+            surface = 0xff121316.toInt(),
+            surfaceBlend = 0.39f,
+            saturation = 2.5f
+        )
+        MediaFlowTone.LIGHT -> MediaFlowAppearance(
+            surface = 0xfff3f3f5.toInt(),
+            surfaceBlend = 0.65f,
+            saturation = 2.5f
+        )
+    }
+
+    /** 浅色模式叠加色 (1:1 Salt Music AbstractC0479mu.f12380) */
+    val LIGHT_ADDITIONAL_COLORS = intArrayOf(
+        0x95ffffff.toInt(),
+        0x2affffff
     )
 
+    /** 深色模式叠加色 (1:1 Salt Music AbstractC0479mu.f12381) */
+    val DARK_ADDITIONAL_COLORS = intArrayOf(
+        0x52000000,
+        0x1a000000
+    )
+
+    /**
+     * 静态渲染（供通知中心/超级岛卡片的"柔光封面背景"离线生成 Bitmap）
+     * 针对后台工作线程的纯软件 Canvas 优化，严格兼容 BaseCanvas，绝不调用不受支持的 RuntimeShader
+     */
+    fun renderStatic(
+        source: Bitmap,
+        tone: MediaFlowTone,
+        width: Int,
+        height: Int,
+        densityDpi: Int = 440
+    ): Bitmap {
+        if (width <= 0 || height <= 0 || source.isRecycled) return createBitmap(1, 1)
+        val scaleFactor = if (densityDpi >= 420) 32f else 20f
+        val smallW = width / scaleFactor
+        val smallH = height / scaleFactor
+        val bufW = Math.floor(smallW + 58.0).toInt().coerceAtLeast(1)
+        val bufH = Math.floor(smallH + 58.0).toInt().coerceAtLeast(1)
+
+        val buffer = Bitmap.createBitmap(bufW, bufH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(buffer)
+        val avgColor = calculateAverageColor(source)
+        buffer.eraseColor(avgColor)
+
+        val fM6509 = Math.floor(max(bufW.toFloat(), bufH.toFloat()) * 1.3).toFloat()
+        val coverScale = fM6509 / source.height.toFloat().coerceAtLeast(1f)
+        val f5 = (-(fM6509 - bufW)) / 2.0f
+        val f7 = (-(fM6509 - bufH)) / 2.0f
+        val f8 = fM6509 / 2.0f
+
+        val saturationPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(2.5f) })
+        }
+        val matrix = Matrix()
+
+        // 横屏长轴自适应 90 度三层微型平铺
+        // Layer 0: 居中 (+90°)
+        matrix.reset()
+        matrix.setScale(coverScale, coverScale)
+        matrix.postRotate(90f, f8, f8)
+        matrix.postTranslate(f5, f7)
+        canvas.drawBitmap(source, matrix, saturationPaint)
+
+        // Layer 1: 左偏 (-0.7*W, -0.95*H)
+        matrix.reset()
+        matrix.setScale(coverScale, coverScale)
+        matrix.postRotate(90f, f8, f8)
+        matrix.postTranslate(f5, f7)
+        matrix.postTranslate(bufW * (-0.7f), bufH * (-0.95f))
+        canvas.drawBitmap(source, matrix, saturationPaint)
+
+        // Layer 2: 右偏 (+0.7*W, -0.5*H) + 围绕中心自转
+        matrix.reset()
+        matrix.setScale(coverScale, coverScale)
+        matrix.postRotate(90f, f8, f8)
+        matrix.postTranslate(f5, f7)
+        matrix.postTranslate(bufW * 0.7f, bufH * (-0.5f))
+        matrix.postRotate(90f, bufW / 2.0f, bufH / 2.0f)
+        canvas.drawBitmap(source, matrix, saturationPaint)
+
+        // 双层深浅遮罩覆盖 (1:1 Salt Music)
+        val colors = if (tone == MediaFlowTone.LIGHT) LIGHT_ADDITIONAL_COLORS else DARK_ADDITIONAL_COLORS
+        val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        for (color in colors) {
+            overlayPaint.color = color
+            canvas.drawPaint(overlayPaint)
+        }
+
+        // 半径 25 的微型平滑高斯晕染
+        blurBitmap(buffer, radius = 25)
+
+        // 放大至最终目标宽高（使用纯软件 Canvas 完美支持的 BitmapShader 线性过滤）
+        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val resultCanvas = Canvas(result)
+
+        val shaderMatrix = Matrix().apply {
+            setScale(scaleFactor, scaleFactor)
+            preTranslate((-(bufW - smallW)) / 2.0f, (-(bufH - smallH)) / 2.0f)
+        }
+        val shader = BitmapShader(buffer, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+            setLocalMatrix(shaderMatrix)
+            filterMode = BitmapShader.FILTER_MODE_LINEAR
+        }
+        val drawPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            this.shader = shader
+        }
+        resultCanvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), drawPaint)
+
+        buffer.recycle()
+        return result
+    }
+
+    fun calculateAverageColor(bitmap: Bitmap): Int {
+        if (bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) return Color.BLACK
+        var jRed = 0L
+        var jGreen = 0L
+        var jBlue = 0L
+        var count = 0
+        val bw = bitmap.width
+        val bh = bitmap.height
+        for (row in 0 until 5) {
+            val y = (((row + 0.5f) * bh) / 5f).toInt().coerceIn(0, bh - 1)
+            for (col in 0 until 5) {
+                val x = (((col + 0.5f) * bw) / 5f).toInt().coerceIn(0, bw - 1)
+                val pixel = bitmap.getPixel(x, y)
+                val alpha = Color.alpha(pixel)
+                jRed += (Color.red(pixel) * alpha) / 255
+                jGreen += (Color.green(pixel) * alpha) / 255
+                jBlue += (Color.blue(pixel) * alpha) / 255
+                count++
+            }
+        }
+        return if (count > 0) {
+            Color.rgb((jRed / count).toInt(), (jGreen / count).toInt(), (jBlue / count).toInt())
+        } else {
+            Color.BLACK
+        }
+    }
+
+    fun blurBitmap(bitmap: Bitmap, radius: Int) {
+        if (radius <= 0 || bitmap.isRecycled) return
+        val w = bitmap.width
+        val h = bitmap.height
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        val boxRadius = (radius * 0.577f).toInt().coerceAtLeast(1)
+        val temp = IntArray(w * h)
+        boxBlurPass(pixels, temp, w, h, boxRadius)
+        boxBlurPass(pixels, temp, w, h, boxRadius)
+        boxBlurPass(pixels, temp, w, h, boxRadius)
+
+        bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
+    }
+
+    private fun boxBlurPass(src: IntArray, temp: IntArray, w: Int, h: Int, r: Int) {
+        val window = r * 2 + 1
+        val invWindow = 1.0f / window
+
+        for (y in 0 until h) {
+            val rowOffset = y * w
+            var a = 0L
+            var rSum = 0L
+            var gSum = 0L
+            var bSum = 0L
+
+            for (i in -r..r) {
+                val p = src[rowOffset + i.coerceIn(0, w - 1)]
+                a += Color.alpha(p)
+                rSum += Color.red(p)
+                gSum += Color.green(p)
+                bSum += Color.blue(p)
+            }
+
+            for (x in 0 until w) {
+                temp[rowOffset + x] = Color.argb(
+                    (a * invWindow).toInt(),
+                    (rSum * invWindow).toInt(),
+                    (gSum * invWindow).toInt(),
+                    (bSum * invWindow).toInt()
+                )
+                val outP = src[rowOffset + (x - r).coerceIn(0, w - 1)]
+                val inP = src[rowOffset + (x + r + 1).coerceIn(0, w - 1)]
+                a += Color.alpha(inP) - Color.alpha(outP)
+                rSum += Color.red(inP) - Color.red(outP)
+                gSum += Color.green(inP) - Color.green(outP)
+                bSum += Color.blue(inP) - Color.blue(outP)
+            }
+        }
+
+        for (x in 0 until w) {
+            var a = 0L
+            var rSum = 0L
+            var gSum = 0L
+            var bSum = 0L
+
+            for (i in -r..r) {
+                val p = temp[i.coerceIn(0, h - 1) * w + x]
+                a += Color.alpha(p)
+                rSum += Color.red(p)
+                gSum += Color.green(p)
+                bSum += Color.blue(p)
+            }
+
+            for (y in 0 until h) {
+                val colOffset = y * w + x
+                src[colOffset] = Color.argb(
+                    (a * invWindow).toInt(),
+                    (rSum * invWindow).toInt(),
+                    (gSum * invWindow).toInt(),
+                    (bSum * invWindow).toInt()
+                )
+                val outP = temp[(y - r).coerceIn(0, h - 1) * w + x]
+                val inP = temp[(y + r + 1).coerceIn(0, h - 1) * w + x]
+                a += Color.alpha(inP) - Color.alpha(outP)
+                rSum += Color.red(inP) - Color.red(outP)
+                gSum += Color.green(inP) - Color.green(outP)
+                bSum += Color.blue(inP) - Color.blue(outP)
+            }
+        }
+    }
+
+    /** 兼容旧代码签名的重载 */
+    fun renderStatic(
+        palette: MediaSoftPalette,
+        tone: MediaFlowTone,
+        width: Int,
+        height: Int,
+        densityDpi: Int = 440
+    ): Bitmap {
+        val fallback = createFallbackBitmap(palette)
+        val result = renderStatic(fallback, tone, width, height, densityDpi)
+        fallback.recycle()
+        return result
+    }
+
+    private fun createFallbackBitmap(palette: MediaSoftPalette): Bitmap {
+        val colors = palette.asList()
+        val bmp = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        colors.forEachIndexed { i, color ->
+            paint.color = color
+            val x = (i % 2) * 16f
+            val y = (i / 2) * 16f
+            canvas.drawRect(x, y, x + 16f, y + 16f, paint)
+        }
+        return bmp
+    }
+
+    /**
+     * 极纯净、完全去除噪点与畸变条纹的 GPU AGSL 流水线
+     * 1:1 对齐 Salt Music 三层时间轴 (100s, 70s, 40s) 与饱和度 2.5、深浅双层遮罩
+     */
+    const val FLOW_SHADER = """
+        uniform shader uArtworkFrom;
+        uniform shader uArtworkTo;
+        uniform float2 uResolution;
+        uniform float uTextureSize;
+        uniform float uTime;
+        uniform float uTransition;
+        uniform float uTone; // 0.0 = LIGHT, 1.0 = DARK
+
+        float2 rotatePoint(float2 p, float angle) {
+            float s = sin(angle);
+            float c = cos(angle);
+            return float2(p.x * c - p.y * s, p.x * s + p.y * c);
+        }
+
+        float3 sampleArtwork(float2 pScreen, float angle, float zoom, float2 offset) {
+            float2 p = pScreen - offset;
+            p = rotatePoint(p, -angle);
+            p = p / zoom;
+            float2 uv = p + 0.5;
+            float2 pt = clamp(uv, float2(0.002), float2(0.998)) * (uTextureSize - 1.0);
+            float3 fromCol = uArtworkFrom.eval(pt).rgb;
+            float3 toCol = uArtworkTo.eval(pt).rgb;
+            return mix(fromCol, toCol, uTransition);
+        }
+
+        half4 main(float2 fragCoord) {
+            float2 uv = fragCoord / uResolution;
+            float aspect = uResolution.x / max(uResolution.y, 1.0);
+            float2 p = uv - 0.5;
+            p.y = p.y / aspect;
+
+            float TWO_PI = 6.2831853;
+            float baseAngle = 1.5707963; // 横屏长轴旋转 90 度映射
+
+            // Layer 0: 周期 100s 顺时针，居中放大 1.3
+            float a0 = (uTime / 100.0) * TWO_PI + baseAngle;
+            float3 layer0 = sampleArtwork(p, a0, 1.30, float2(0.0, 0.0));
+
+            // Layer 1: 周期 70s 逆时针，横向左偏 (-0.35)
+            float a1 = -(uTime / 70.0) * TWO_PI + baseAngle;
+            float3 layer1 = sampleArtwork(p, a1, 1.35, float2(-0.35, -0.15 / aspect));
+
+            // Layer 2: 周期 40s 逆时针，横向右偏 (+0.35)，叠加自转
+            float a2 = -(uTime / 40.0) * TWO_PI + baseAngle;
+            float3 layer2 = sampleArtwork(p, a2 * 1.5, 1.40, float2(0.35, 0.15 / aspect));
+
+            // 三层自然交融混合
+            float3 color = mix(layer0, layer1, 0.50);
+            color = mix(color, layer2, 0.40);
+
+            // 1:1 饱和度增强 2.5 倍 (Salt Music ColorMatrix 标准)
+            float lum = dot(color, float3(0.2126, 0.7152, 0.0722));
+            color = mix(float3(lum), color, 2.5);
+
+            // 1:1 Salt Music 浅色/深色纯净遮罩 (浅色白 0.652, 深色黑 0.391)
+            if (uTone < 0.5) {
+                color = mix(color, float3(1.0), 0.652);
+            } else {
+                color = mix(color, float3(0.0), 0.391);
+            }
+
+            return half4(clamp(color, 0.0, 1.0), 1.0);
+        }
+    """
+}
+
+/**
+ * 预晕染光晕模型：在切歌后台做一次高质量高斯平滑，供 GPU 纯硬件并行采样
+ */
+internal class MediaFlowArtwork private constructor(
+    private val textureBitmap: Bitmap,
+    private val signature: Int
+) {
+    fun createBitmap(): Bitmap = textureBitmap
+
+    fun recycle() {
+        if (!textureBitmap.isRecycled) {
+            textureBitmap.recycle()
+        }
+    }
+
     override fun equals(other: Any?): Boolean =
-        other is MediaFlowArtwork &&
-                signature == other.signature &&
-                pixels.contentEquals(other.pixels)
+        other is MediaFlowArtwork && signature == other.signature
 
     override fun hashCode(): Int = signature
 
     companion object {
-        const val TEXTURE_SIZE = 96
+        const val TEXTURE_SIZE = 128
+        private const val BLUR_RADIUS = 20
 
         fun prepare(bitmap: Bitmap): MediaFlowArtwork? {
             if (bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) return null
+
             val side = min(bitmap.width, bitmap.height)
-            val source = Rect(
+            val sourceRect = Rect(
                 (bitmap.width - side) / 2,
                 (bitmap.height - side) / 2,
                 (bitmap.width + side) / 2,
@@ -420,59 +551,60 @@ internal class MediaFlowArtwork private constructor(
             return try {
                 Canvas(texture).drawBitmap(
                     bitmap,
-                    source,
+                    sourceRect,
                     Rect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE),
                     Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
                 )
                 val pixels = IntArray(TEXTURE_SIZE * TEXTURE_SIZE)
-                texture.getPixels(
-                    pixels,
-                    0,
-                    TEXTURE_SIZE,
-                    0,
-                    0,
-                    TEXTURE_SIZE,
-                    TEXTURE_SIZE
-                )
-                val blurred = boxBlur(pixels, TEXTURE_SIZE, TEXTURE_SIZE, BLUR_RADIUS)
-                MediaFlowArtwork(blurred, blurred.contentHashCode())
+                texture.getPixels(pixels, 0, TEXTURE_SIZE, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE)
+
+                // 3-pass 高质量平滑高斯晕染
+                val blurred = fastBlur3Pass(pixels, TEXTURE_SIZE, TEXTURE_SIZE, BLUR_RADIUS)
+                val blurredBmp = Bitmap.createBitmap(blurred, TEXTURE_SIZE, TEXTURE_SIZE, Bitmap.Config.ARGB_8888)
+                MediaFlowArtwork(blurredBmp, blurred.contentHashCode())
             } finally {
                 texture.recycle()
             }
         }
 
-        private fun boxBlur(
-            source: IntArray,
-            width: Int,
-            height: Int,
-            radius: Int
-        ): IntArray {
-            if (radius <= 0) return source
+        private fun fastBlur3Pass(src: IntArray, w: Int, h: Int, radius: Int): IntArray {
+            if (radius <= 0) return src
+            val boxR = (radius * 0.577f).toInt().coerceAtLeast(1)
+            var current = src
+            repeat(3) {
+                current = singleBoxBlur(current, w, h, boxR)
+            }
+            return current
+        }
+
+        private fun singleBoxBlur(source: IntArray, width: Int, height: Int, radius: Int): IntArray {
             val horizontal = IntArray(source.size)
             val result = IntArray(source.size)
             val window = radius * 2 + 1
+            val invWindow = 1.0f / window
 
             for (y in 0 until height) {
                 var alpha = 0L
                 var red = 0L
                 var green = 0L
                 var blue = 0L
+                val rowOffset = y * width
                 for (offset in -radius..radius) {
-                    val color = source[y * width + offset.coerceIn(0, width - 1)]
+                    val color = source[rowOffset + offset.coerceIn(0, width - 1)]
                     alpha += Color.alpha(color)
                     red += Color.red(color)
                     green += Color.green(color)
                     blue += Color.blue(color)
                 }
                 for (x in 0 until width) {
-                    horizontal[y * width + x] = Color.argb(
-                        (alpha / window).toInt(),
-                        (red / window).toInt(),
-                        (green / window).toInt(),
-                        (blue / window).toInt()
+                    horizontal[rowOffset + x] = Color.argb(
+                        (alpha * invWindow).toInt(),
+                        (red * invWindow).toInt(),
+                        (green * invWindow).toInt(),
+                        (blue * invWindow).toInt()
                     )
-                    val removed = source[y * width + (x - radius).coerceIn(0, width - 1)]
-                    val added = source[y * width + (x + radius + 1).coerceIn(0, width - 1)]
+                    val removed = source[rowOffset + (x - radius).coerceIn(0, width - 1)]
+                    val added = source[rowOffset + (x + radius + 1).coerceIn(0, width - 1)]
                     alpha += Color.alpha(added) - Color.alpha(removed)
                     red += Color.red(added) - Color.red(removed)
                     green += Color.green(added) - Color.green(removed)
@@ -494,10 +626,10 @@ internal class MediaFlowArtwork private constructor(
                 }
                 for (y in 0 until height) {
                     result[y * width + x] = Color.argb(
-                        (alpha / window).toInt(),
-                        (red / window).toInt(),
-                        (green / window).toInt(),
-                        (blue / window).toInt()
+                        (alpha * invWindow).toInt(),
+                        (red * invWindow).toInt(),
+                        (green * invWindow).toInt(),
+                        (blue * invWindow).toInt()
                     )
                     val removed = horizontal[(y - radius).coerceIn(0, height - 1) * width + x]
                     val added = horizontal[(y + radius + 1).coerceIn(0, height - 1) * width + x]
@@ -509,8 +641,6 @@ internal class MediaFlowArtwork private constructor(
             }
             return result
         }
-
-        private const val BLUR_RADIUS = 5
     }
 }
 
@@ -536,16 +666,22 @@ internal class MediaFlowTimeline {
     }
 }
 
+/**
+ * 纯 GPU 硬件管线动态流光背景 View：CPU 占用为 0%，硬件插值满帧如丝般顺滑
+ */
 internal class MediaFlowBackgroundView(
     context: Context,
     private val timeline: MediaFlowTimeline = MediaFlowTimeline()
 ) : View(context), Choreographer.FrameCallback {
-    private val runtimeShader = RuntimeShader(FLOW_SHADER)
+
+    private val runtimeShader = RuntimeShader(MediaSoftArtworkFactory.FLOW_SHADER)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = runtimeShader }
+
     private var targetArtwork = DEFAULT_ARTWORK
     private var fromTexture = createTexture(DEFAULT_ARTWORK)
     private var targetTexture = fromTexture
     private var transitionStartedAt: Float? = null
+
     private var animationTime = 0f
     private var frameScheduled = false
     private var playing = false
@@ -567,7 +703,9 @@ internal class MediaFlowBackgroundView(
         playing: Boolean
     ) {
         animationTime = timeline.currentTimeSeconds()
-        if (artwork != null && artwork != targetArtwork) updateArtwork(artwork)
+        if (artwork != null && artwork != targetArtwork) {
+            updateArtwork(artwork)
+        }
         this.tone = tone
         if (this.playing != playing) {
             this.playing = playing
@@ -633,37 +771,25 @@ internal class MediaFlowBackgroundView(
             animationTime = timeline.currentTimeSeconds()
             invalidate()
         }
-        Choreographer.getInstance().postFrameCallbackDelayed(
-            this,
-            if (visible) FRAME_INTERVAL_MS else HIDDEN_PROBE_INTERVAL_MS
-        )
+        Choreographer.getInstance().postFrameCallback(this)
         frameScheduled = true
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
+
         val viewport = transitionViewport
         val shaderWidth = viewport?.width()?.coerceAtLeast(1) ?: width
         val shaderHeight = viewport?.height()?.coerceAtLeast(1) ?: height
-        val appearance = MediaSoftArtworkFactory.appearance(tone)
-        runtimeShader.setFloatUniform(
-            "uResolution",
-            shaderWidth.toFloat(),
-            shaderHeight.toFloat()
-        )
+
+        // 仅向 GPU 发送几个基础浮点参数，CPU 计算耗时为 0
+        runtimeShader.setFloatUniform("uResolution", shaderWidth.toFloat(), shaderHeight.toFloat())
         runtimeShader.setFloatUniform("uTextureSize", MediaFlowArtwork.TEXTURE_SIZE.toFloat())
         runtimeShader.setFloatUniform("uTime", animationTime)
         runtimeShader.setFloatUniform("uTransition", transitionFraction())
-        runtimeShader.setFloatUniform("uSurfaceBlend", appearance.surfaceBlend)
-        runtimeShader.setFloatUniform("uSaturation", FLOW_SATURATION)
-        runtimeShader.setFloatUniform(
-            "uSurface",
-            Color.red(appearance.surface) / 255f,
-            Color.green(appearance.surface) / 255f,
-            Color.blue(appearance.surface) / 255f,
-            1f
-        )
+        runtimeShader.setFloatUniform("uTone", if (tone == MediaFlowTone.LIGHT) 0f else 1f)
+
         if (viewport == null) {
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         } else {
@@ -734,75 +860,14 @@ internal class MediaFlowBackgroundView(
     }
 
     companion object {
-        private const val FRAME_INTERVAL_MS = 42L
-        private const val HIDDEN_PROBE_INTERVAL_MS = 250L
-        private const val ARTWORK_TRANSITION_SECONDS = 0.85f
-        private const val FLOW_SATURATION = 2.5f
+        private const val ARTWORK_TRANSITION_SECONDS = 0.5f
         private val DEFAULT_ARTWORK = createDefaultArtwork()
 
         private fun createDefaultArtwork(): MediaFlowArtwork {
-            val bitmap = MediaSoftArtworkFactory.createTexture(
-                MediaSoftPaletteExtractor.fromColors(emptyList())
-            )
-            return try {
-                requireNotNull(MediaFlowArtwork.prepare(bitmap))
-            } finally {
-                bitmap.recycle()
-            }
+            val bmp = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+            Canvas(bmp).drawColor(0xff2d3142.toInt())
+            return requireNotNull(MediaFlowArtwork.prepare(bmp))
         }
-
-        private const val FLOW_SHADER = """
-            uniform shader uArtworkFrom;
-            uniform shader uArtworkTo;
-            uniform float2 uResolution;
-            uniform float uTextureSize;
-            uniform float uTime;
-            uniform float uTransition;
-            uniform float uSurfaceBlend;
-            uniform float uSaturation;
-            uniform float4 uSurface;
-
-            float hash(float2 point) {
-                return fract(sin(dot(point, float2(127.1, 311.7))) * 43758.5453);
-            }
-
-            float2 rotatePoint(float2 point, float angle) {
-                float sine = sin(angle);
-                float cosine = cos(angle);
-                return float2(point.x * cosine - point.y * sine, point.x * sine + point.y * cosine);
-            }
-
-            float3 sampleArtwork(float2 uv) {
-                float2 point = clamp(uv, float2(0.002), float2(0.998)) * (uTextureSize - 1.0);
-                return mix(float3(uArtworkFrom.eval(point).rgb), float3(uArtworkTo.eval(point).rgb), uTransition);
-            }
-
-            float2 layerUv(float2 uv, float angle, float zoom, float2 offset) {
-                return rotatePoint(uv - 0.5, angle) / zoom + 0.5 + offset;
-            }
-
-            half4 main(float2 fragCoord) {
-                float2 uv = fragCoord / uResolution;
-                float aspect = uResolution.x / max(uResolution.y, 1.0);
-                float2 coverUv = uv;
-                if (aspect > 1.0) coverUv.y = (coverUv.y - 0.5) / aspect + 0.5;
-                else coverUv.x = (coverUv.x - 0.5) * aspect + 0.5;
-
-                float fullTurn = 6.2831853;
-                float3 layer0 = sampleArtwork(layerUv(coverUv, uTime * fullTurn / 100.0, 1.34, float2(0.0)));
-                float3 layer1 = sampleArtwork(layerUv(coverUv, -uTime * fullTurn / 70.0 + 1.7, 1.48, float2(-0.08, -0.06)));
-                float3 layer2 = sampleArtwork(layerUv(coverUv, -uTime * fullTurn / 40.0 + 3.8, 1.58, float2(0.07, 0.08)));
-                float blend1 = 0.24 + 0.13 * (0.5 + 0.5 * sin(dot(uv, float2(2.1, 1.3)) * 3.14159 + uTime * 0.035));
-                float blend2 = 0.16 + 0.11 * (0.5 + 0.5 * cos(dot(uv, float2(-1.2, 2.4)) * 3.14159 - uTime * 0.029));
-                float3 color = mix(mix(layer0, layer1, blend1), layer2, blend2);
-                float luminance = dot(color, float3(0.2126, 0.7152, 0.0722));
-                color = mix(float3(luminance), color, uSaturation);
-                color = mix(color, uSurface.rgb, uSurfaceBlend);
-                color += sin(dot(uv, float2(1.5, 2.0)) * 3.14159 + uTime * 0.041) * 0.006;
-                color += (hash(fragCoord) - 0.5) * 0.005;
-                return half4(clamp(color, 0.0, 1.0), 1.0);
-            }
-        """
     }
 }
 

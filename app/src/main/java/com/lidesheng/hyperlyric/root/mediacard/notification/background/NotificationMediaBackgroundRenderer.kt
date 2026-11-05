@@ -177,7 +177,7 @@ internal class NotificationMediaBackgroundRenderer(
             2 -> renderBlurredCover(source, baseColors, blurAmount, width, height)
             3 -> renderRadialGradient(source, baseColors, width, height)
             4 -> renderLinearGradient(source, baseColors, width, height)
-            5 -> renderSoftCover(profile.rawColors, softCoverTone, width, height)
+            5 -> renderSoftCover(source, profile.rawColors, softCoverTone, width, height, context.resources.configuration.densityDpi)
             else -> null
         }
         source.recycle()
@@ -206,9 +206,7 @@ internal class NotificationMediaBackgroundRenderer(
                     )
                 }
 
-                5 -> MediaCardForegroundColorSource.Soft(
-                    colors = MediaSoftPaletteExtractor.fromColors(profile.rawColors).asList()
-                )
+                5 -> null
 
                 else -> null
             }
@@ -444,16 +442,32 @@ internal class NotificationMediaBackgroundRenderer(
     }
 
     private fun renderSoftCover(
+        source: Bitmap?,
         rawColors: List<Int>,
         softCoverTone: Int,
         width: Int,
-        height: Int
-    ): Bitmap = MediaSoftArtworkFactory.renderStatic(
-        palette = MediaSoftPaletteExtractor.fromColors(rawColors),
-        tone = softCoverTone.toFlowTone(),
-        width = width,
-        height = height
-    )
+        height: Int,
+        densityDpi: Int = 440
+    ): Bitmap {
+        val tone = softCoverTone.toFlowTone()
+        return if (source != null && !source.isRecycled) {
+            MediaSoftArtworkFactory.renderStatic(
+                source = source,
+                tone = tone,
+                width = width,
+                height = height,
+                densityDpi = densityDpi
+            )
+        } else {
+            MediaSoftArtworkFactory.renderStatic(
+                palette = MediaSoftPaletteExtractor.fromColors(rawColors),
+                tone = tone,
+                width = width,
+                height = height,
+                densityDpi = densityDpi
+            )
+        }
+    }
 
     private fun Canvas.drawCircleGradient(
         start: Int,
