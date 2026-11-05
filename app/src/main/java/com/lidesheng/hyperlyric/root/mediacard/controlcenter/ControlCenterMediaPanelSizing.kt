@@ -44,6 +44,7 @@ internal class ControlCenterMediaPanelSizing(
         private set
     var active = false
         private set
+    private var preparingMeasure = false
 
     @Suppress("UNUSED_PARAMETER")
     fun prepare(widthHint: Int, heightSpec: Int = 0, windowLimit: Int = windowLimit()): Boolean {
@@ -93,7 +94,7 @@ internal class ControlCenterMediaPanelSizing(
     fun prepareForMeasure(view: View, widthSpec: Int) {
         // A wrap-content frame receives AT_MOST(screenWidth), not the card width.
         // Only its content's resolved width can determine the full-bleed header.
-        if (view !== content) return
+        if (view !== content || preparingMeasure) return
         val mode = View.MeasureSpec.getMode(widthSpec)
         val available = View.MeasureSpec.getSize(widthSpec)
         val params = layout.header.layoutParams as? ViewGroup.MarginLayoutParams
@@ -104,7 +105,14 @@ internal class ControlCenterMediaPanelSizing(
             content.layoutParams.width > 0 -> content.layoutParams.width - insets
             else -> width
         }
-        if (measuredWidth > 0) prepare(measuredWidth)
+        if (measuredWidth > 0) {
+            preparingMeasure = true
+            try {
+                prepare(measuredWidth)
+            } finally {
+                preparingMeasure = false
+            }
+        }
     }
 
     private fun applyHeights() {

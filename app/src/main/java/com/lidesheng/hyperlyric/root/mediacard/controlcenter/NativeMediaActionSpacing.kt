@@ -21,6 +21,7 @@ internal class NativeMediaActionSpacing private constructor(
     companion object {
         /** Call only with the ORIGINAL native hierarchy and LayoutParams restored. */
         fun capture(header: LinearLayout, width: Int, labels: List<View>, rows: List<View>): NativeMediaActionSpacing {
+            MediaLayoutParams.validateTree(header)
             val hidden = (labels + rows).filter { it.visibility == View.GONE }
             try {
                 // Resolve both audio/video and label metrics even before a media

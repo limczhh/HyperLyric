@@ -34,7 +34,12 @@ internal object ControlCenterMediaCoverFlipHooker {
         try {
             val setCover = header.getDeclaredMethod("setCover", Bitmap::class.java,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType).apply { isAccessible = true }
-            val endScenario = header.getDeclaredMethod("endSwitchMusicScenario").apply { isAccessible = true }
+            // OS4 added scenario tracking; OS3's midpoint only updates the cover.
+            val endScenario = try {
+                header.getDeclaredMethod("endSwitchMusicScenario").apply { isAccessible = true }
+            } catch (_: NoSuchMethodException) {
+                null
+            }
             val nextMedia = header.getDeclaredField("nextMedia").apply { isAccessible = true }
             val refreshers = WeakHashMap<View, ControlCenterMediaCoverFlipRefresh>()
             val coverParent = header.getDeclaredField("coverParent").apply { isAccessible = true }
@@ -47,7 +52,7 @@ internal object ControlCenterMediaCoverFlipHooker {
                     isFlipping = { isFlipping.invoke(null, it) as Boolean },
                     canApply = { useCoverAnim.getBoolean(it) },
                     apply = { owner, bitmap ->
-                        endScenario.invoke(owner)
+                        endScenario?.invoke(owner)
                         setCover.invoke(owner, bitmap, true, false)
                     })
             }
@@ -57,7 +62,7 @@ internal object ControlCenterMediaCoverFlipHooker {
                     if (mode == RootConstants.CONTROL_CENTER_MEDIA_COVER_FLIP_DISABLED) {
                         // Match the native midpoint callback so artwork and scenario
                         // bookkeeping still complete without starting an animation.
-                        endScenario.invoke(view)
+                        endScenario?.invoke(view)
                         setCover.invoke(view, chain.args[0], true, false)
                         nextMedia.setBoolean(view, true)
                         return null

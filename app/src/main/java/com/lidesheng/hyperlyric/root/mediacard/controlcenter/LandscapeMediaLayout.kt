@@ -199,7 +199,7 @@ internal class LandscapeMediaLayout(
         if (!active) return
         listOf(progress, volume, devices, video).forEach { it.scaleX = 1f; it.scaleY = 1f }
         (artworkParent.parent as? ViewGroup)?.removeView(artworkParent)
-        params.forEach { (view, original) -> view.layoutParams = copy(original) }
+        params.forEach { (view, original) -> MediaLayoutParams.assign(view, copy(original)) }
         meta.addView(artworkParent, coverIndex)
         dividerVisibility?.let { divider?.visibility = it }
         artwork.scaleType = coverScale

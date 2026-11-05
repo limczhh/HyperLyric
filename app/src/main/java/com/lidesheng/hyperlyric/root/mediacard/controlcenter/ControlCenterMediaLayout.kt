@@ -34,7 +34,7 @@ internal class ControlCenterMediaLayout private constructor(
 ) {
     private val padding = intArrayOf(header.paddingLeft, header.paddingTop, header.paddingRight, header.paddingBottom)
     private var savedParams = listOf(header, meta, coverParent, cover, title, artist, noPlayback,
-        audio, video, progress, volume).associateWith { it.layoutParams }
+        audio, video, progress, volume).associateWith { MediaLayoutParams.copy(it.layoutParams) }
     private var titleArtistGap = margin(artist).topMargin
     private var progressGap = margin(progress).topMargin
     private var actionSpacing: NativeMediaActionSpacing? = null
@@ -100,7 +100,7 @@ internal class ControlCenterMediaLayout private constructor(
     fun endNativeUpdate(): Boolean {
         nativeUpdateDepth--
         if (nativeUpdateDepth != 0) return false
-        savedParams = savedParams.keys.associateWith { it.layoutParams }
+        savedParams = savedParams.keys.associateWith { MediaLayoutParams.copy(it.layoutParams) }
         padding[0] = header.paddingLeft; padding[1] = header.paddingTop
         padding[2] = header.paddingRight; padding[3] = header.paddingBottom
         titleArtistGap = margin(artist).topMargin
@@ -351,6 +351,7 @@ internal class ControlCenterMediaLayout private constructor(
     }
 
     fun forceHeaderHeight(width: Int): Int {
+        MediaLayoutParams.validateTree(header)
         if (!options.immersiveCoverLayout) {
             progressGlow.apply()
             return header.measuredHeight
@@ -421,7 +422,7 @@ internal class ControlCenterMediaLayout private constructor(
             isApplied = false
             return
         }
-        savedParams.forEach { (view, params) -> view.layoutParams = params }
+        savedParams.forEach { (view, params) -> MediaLayoutParams.assign(view, MediaLayoutParams.copy(params)) }
         header.setPadding(padding[0], padding[1], padding[2], padding[3])
         isApplied = false
     }

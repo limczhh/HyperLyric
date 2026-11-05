@@ -100,6 +100,10 @@ internal object ControlCenterMediaLayoutHooker {
                     override fun intercept(chain: Chain): Any? {
                         val view = chain.thisObject as? View ?: return chain.proceed()
                         val state = view.layoutState() ?: return chain.proceed()
+                        // A stale snapshot may have survived native reparenting.
+                        // Repair it before either our sizing or native measurement,
+                        // including while the native transition owns the bounds.
+                        protect { MediaLayoutParams.validateTree(state.header) }
                         // Native animation exclusively controls all intermediate bounds.
                         if (state.isTransitioning) return chain.proceed()
                         val sizing = state.panelSizing ?: return chain.proceed()
