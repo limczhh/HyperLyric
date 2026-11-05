@@ -10,6 +10,19 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "7.11-1944",
+                title = "优化了一些体验",
+                summary = "- 新增超级岛媒体卡片切换功能\n" +
+                        "- 新增逐字歌词高亮透明度设置\n" +
+                        "- 新增控制中心媒体卡片沉浸封面布局\n" +
+                        "- 新增控制中心媒体卡片进度条光辉和自定义动作按钮功能\n" +
+                        "- 新增控制中心媒体卡片音乐封面翻转动画功能\n" +
+                        "- 修复超级岛长按拖拽分享在 os 4 上失效的问题\n" +
+                        "- 修复媒体卡片波浪进度条在 os 4 上失效的问题\n" +
+                        "- 模拟逐字歌词接入逐字歌词动效\n" +
+                        "- 优化柔光封面和封面流光的显示效果"
+            ),
+            ChangelogItem(
                 version = "7.10-1943",
                 title = "修复了一些问题",
                 summary = "- 新增超级岛音乐律动实时频谱功能\n" +
