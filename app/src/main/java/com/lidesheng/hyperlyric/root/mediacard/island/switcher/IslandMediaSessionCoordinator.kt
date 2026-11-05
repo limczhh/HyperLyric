@@ -31,8 +31,11 @@ import java.util.function.Supplier
 internal object IslandMediaSessionCoordinator {
     private const val TAG = "IslandMediaCardSwitcher"
     private const val PREFIX = "com.android.systemui.statusbar.notification.mediaisland."
+    private const val CONFIGURATION_IMPL =
+        "com.android.systemui.statusbar.phone.ConfigurationControllerImpl"
     private val main = Handler(Looper.getMainLooper())
     private val constructingCard = ThreadLocal<Boolean>()
+    private val callbackRegistrations = ThreadLocal<MutableList<() -> Unit>?>()
     private val ownedControllers = Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
     private val binderTemplates = WeakHashMap<Any, Pair<Constructor<*>, List<Any?>>>()
     private var runtime: Runtime? = null
@@ -113,6 +116,30 @@ internal object IslandMediaSessionCoordinator {
             val controller = loader.loadClass(PREFIX + "MiuiIslandMediaControllerImpl")
             val binder = loader.loadClass(PREFIX + "MiuiIslandMediaViewBinderImpl")
             val plugin = loader.loadClass("com.android.systemui.statusbar.notification.DynamicIslandPluginController")
+            // OS3's MiuiIslandMediaControllerImpl accepts ConfigurationController as an
+            // interface but immediately casts it back to ConfigurationControllerImpl. A
+            // proxy therefore crashes its constructor before the second island is created.
+            // Keep the real implementation and record only the callbacks registered while
+            // our replacement controller is being constructed, so they can still be removed.
+            runCatching {
+                loader.loadClass(CONFIGURATION_IMPL)
+                    .declaredMethods
+                    .filter { it.name == "addCallback" && it.parameterCount == 1 }
+                    .forEach { callbackHookMethod ->
+                        module.managedHook(callbackHookMethod, "media.island_switcher.configuration_callback", object : Hooker {
+                            override fun intercept(chain: Chain): Any? {
+                                val result = chain.proceed()
+                                val registrations = callbackRegistrations.get() ?: return result
+                                val callback = chain.args.firstOrNull() ?: return result
+                                val owner = chain.thisObject ?: return result
+                                registrations += {
+                                    method(owner, "removeCallback", 1).invoke(owner, callback)
+                                }
+                                return result
+                            }
+                        })
+                    }
+            }.onFailure { HookLogger.d(TAG, "ConfigurationController 回调清理 hook 不可用", it) }
             plugin.declaredMethods.filter {
                 it.name in setOf("onPluginLoaded", "onPluginUnloaded") && !it.isBridge
             }.forEach { method ->
@@ -767,21 +794,36 @@ internal object IslandMediaSessionCoordinator {
                 constructor.parameterTypes.forEachIndexed { index, type ->
                     when {
                         type.isInstance(binder) -> args[index] = native.instance
-                        type.isInterface && type.simpleName in setOf("ConfigurationController", "StatusBarStateController") -> {
+                        type.isInterface && type.simpleName in
+                            setOf("ConfigurationController", "StatusBarStateController") -> {
                             val delegate = requireNotNull(args[index])
-                            args[index] = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, m, values ->
-                                val result = m.invoke(delegate, *(values ?: emptyArray()))
-                                if (m.name == "addCallback" && values?.size == 1) {
-                                    val callback = values[0]
-                                    registrations += { method(delegate, "removeCallback", 1).invoke(delegate, callback) }
+                            // OS3's implementation casts ConfigurationController back to this
+                            // concrete class. Other implementations can retain the proxy used
+                            // for callback ownership without risking that cast.
+                            val keepConcrete = type.simpleName == "ConfigurationController" &&
+                                delegate.javaClass.name == CONFIGURATION_IMPL
+                            if (!keepConcrete) {
+                                args[index] = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, m, values ->
+                                    val result = m.invoke(delegate, *(values ?: emptyArray()))
+                                    if (m.name == "addCallback" && values?.size == 1) {
+                                        val callback = values[0]
+                                        registrations += { method(delegate, "removeCallback", 1).invoke(delegate, callback) }
+                                    }
+                                    result
                                 }
-                                result
                             }
                         }
                     }
                 }
                 constructor.isAccessible = true
-                val controller = constructor.newInstance(*args.toTypedArray())
+                callbackRegistrations.set(registrations)
+                val controller = try {
+                    // Keep the concrete ConfigurationController implementation on OS3; its
+                    // MiuiIslandMediaControllerImpl constructor casts this argument directly.
+                    constructor.newInstance(*args.toTypedArray())
+                } finally {
+                    callbackRegistrations.remove()
+                }
                 val callback = (topListeners - before).single()
                 topListeners.remove(callback)
                 ownedControllers.add(controller)
