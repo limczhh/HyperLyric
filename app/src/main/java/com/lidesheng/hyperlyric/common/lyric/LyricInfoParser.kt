@@ -8,8 +8,8 @@ import java.util.regex.Pattern
 
 object LyricInfoParser {
 
-    private val LRC_TIME_RE = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]")
-    private val ELRC_WORD_TIME_RE = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>")
+    private val LRC_TIME_RE = Pattern.compile("\\[(\\d{2}):(\\d{2})[.:](\\d{2,3})]")
+    private val ELRC_WORD_TIME_RE = Pattern.compile("<(\\d{2}):(\\d{2})[.:](\\d{2,3})>")
     private val TRANSLATION_KEYS = listOf(
         "translation",
         "translationLyric",
@@ -162,22 +162,20 @@ object LyricInfoParser {
 
     /**
      * 提取行首时间戳（毫秒），用于翻译匹配。
-     * 取 [mm:ss.ms] 行首标签，不取词级标签。
+     * 取 [mm:ss.ms] 或 [mm:ss:ms] 行首标签，不取词级标签。
      */
     private fun extractTimeMs(raw: String): Long {
         val m = LRC_TIME_RE.matcher(raw)
         if (!m.find()) return -1
-        return m.group(1)!!.toLong() * 60000 +
-                m.group(2)!!.toLong() * 1000 +
-                (if (m.group(3)!!.length == 2) m.group(3)!!.toLong() * 10 else m.group(3)!!.toLong())
+        return toTimeMs(m.group(1)!!, m.group(2)!!, m.group(3)!!)
     }
 
     /**
      * 解析 ELRC 单行：[mm:ss.ms] <mm:ss.ms>word <mm:ss.ms>word...
      */
     private fun parseElrcLine(raw: String): RichLyricLine? {
-        val lineRe = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]\\s*(.*)")
-        val wordRe = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>([^<]*)")
+        val lineRe = Pattern.compile("\\[(\\d{2}):(\\d{2})[.:](\\d{2,3})]\\s*(.*)")
+        val wordRe = Pattern.compile("<(\\d{2}):(\\d{2})[.:](\\d{2,3})>([^<]*)")
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
 
@@ -190,9 +188,7 @@ object LyricInfoParser {
         val wm = wordRe.matcher(wordPart)
         val words = mutableListOf<LyricWord>()
         while (wm.find()) {
-            val wordBegin = wm.group(1)!!.toLong() * 60000 +
-                    wm.group(2)!!.toLong() * 1000 +
-                    (if (wm.group(3)!!.length == 2) wm.group(3)!!.toLong() * 10 else wm.group(3)!!.toLong())
+            val wordBegin = toTimeMs(wm.group(1)!!, wm.group(2)!!, wm.group(3)!!)
             val wordText = wm.group(4) ?: ""
             if (wordText.isBlank()) continue
             words.add(LyricWord(begin = wordBegin, end = wordBegin + 500, duration = 500, text = wordText))
@@ -226,14 +222,13 @@ object LyricInfoParser {
     }
 
     /**
-     * 解析 LRC 单行：[mm:ss.xx]文本
+     * 解析 LRC 单行：[mm:ss.xx]文本 或 [mm:ss:xx]文本
      */
     private fun parseLrcLine(raw: String): RichLyricLine? {
-        val re = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
+        val re = Pattern.compile("\\[(\\d{2}):(\\d{2})[.:](\\d{2,3})](.*)")
         val m = re.matcher(raw.trim())
         if (!m.matches()) return null
-        val ms = m.group(1)!!.toLong() * 60000 + m.group(2)!!.toLong() * 1000 +
-                (if (m.group(3)!!.length == 2) m.group(3)!!.toLong() * 10 else m.group(3)!!.toLong())
+        val ms = toTimeMs(m.group(1)!!, m.group(2)!!, m.group(3)!!)
         val text = m.group(4)!!.trim()
         if (text.isBlank()) return null
         return RichLyricLine(begin = ms, text = text)

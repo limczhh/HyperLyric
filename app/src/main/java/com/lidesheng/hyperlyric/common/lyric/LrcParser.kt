@@ -5,7 +5,7 @@ import com.lidesheng.hyperlyric.lyric.LrcLine
 object LrcParser {
     fun parse(lrcText: String): List<LrcLine> {
         val lines = mutableListOf<LrcLine>()
-        val timeRegex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})]")
+        val timeRegex = Regex("\\[(\\d{2}):(\\d{2})[.:](\\d{2,3})]")
         lrcText.lines().forEach { line ->
             val trimmedLine = line.trim()
             if (trimmedLine.isEmpty()) return@forEach
