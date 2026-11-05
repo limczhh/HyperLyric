@@ -14,6 +14,7 @@ import io.github.libxposed.api.XposedInterface.HookHandle
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
 import java.lang.reflect.Field
+import java.lang.reflect.Modifier
 import java.util.WeakHashMap
 
 /** Replaces MiPlaySeekBar with its default HyperProgressSeekBar mode. */
@@ -204,6 +205,45 @@ internal class ControlCenterMediaProgressGlow(
         fun installOverflowDrawing(module: XposedModule, loader: ClassLoader): HookHandle {
             val type = loader.loadClass("miuix.miuixbasewidget.widget.HyperProgressSeekBar")
             val draw = type.getDeclaredMethod("drawHighEndMode", Canvas::class.java).apply { isAccessible = true }
+            // OS3 changed drawHighEndMode from public to private. Its onDraw implementation
+            // then invokes the private method directly, which is not a reliable Xposed entry
+            // point on ART. Reproduce the two shader-backed modes from onDraw in that case:
+            // middle mode draws the normal track first, then the enlarged shader rectangle;
+            // high-end mode only draws the enlarged shader rectangle.
+            if (Modifier.isPrivate(draw.modifiers)) {
+                val onDraw = runCatching {
+                    type.getDeclaredMethod("onDraw", Canvas::class.java).apply { isAccessible = true }
+                }.getOrNull()
+                val primary = runCatching {
+                    type.getDeclaredMethod("drawPrimaryMode", Canvas::class.java).apply { isAccessible = true }
+                }.getOrNull()
+                val deviceLevel = runCatching {
+                    type.getDeclaredField("mDeviceLevel").apply { isAccessible = true }
+                }.getOrNull()
+                if (onDraw != null && primary != null && deviceLevel != null) {
+                    return module.managedHook(onDraw, "media.controlcenter.progress_glow.ondraw", object : Hooker {
+                        override fun intercept(chain: Chain): Any? {
+                            val view = chain.thisObject as? SeekBar ?: return chain.proceed()
+                            val drawing = drawings[view] ?: return chain.proceed()
+                            val canvas = chain.args.firstOrNull() as? Canvas ?: return chain.proceed()
+                            val level = runCatching { deviceLevel.getInt(view) }.getOrNull()
+                                ?: return chain.proceed()
+                            return when (level) {
+                                2 -> {
+                                    drawing.draw(view, canvas)
+                                    null
+                                }
+                                1 -> {
+                                    primary.invoke(view, canvas)
+                                    drawing.draw(view, canvas)
+                                    null
+                                }
+                                else -> chain.proceed()
+                            }
+                        }
+                    })
+                }
+            }
             return module.managedHook(draw, "media.controlcenter.progress_glow", object : Hooker {
                 override fun intercept(chain: Chain): Any? {
                     val view = chain.thisObject as? SeekBar ?: return chain.proceed()
