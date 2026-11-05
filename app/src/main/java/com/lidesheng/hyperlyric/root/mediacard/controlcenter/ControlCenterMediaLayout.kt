@@ -4,11 +4,11 @@ import android.content.res.Configuration
 import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.lidesheng.hyperlyric.common.RootConstants
-import java.lang.reflect.Method
 
 internal data class ControlCenterMediaLayoutOptions(
     val immersiveCoverLayout: Boolean = false,
@@ -47,12 +47,12 @@ internal class ControlCenterMediaLayout private constructor(
     private var nativeAudioWidth = 0
     private var nativeVideoWidth = 0
     private var nativeProgressHeight = 0
-    // QSControlMiPlayDetailHeader owns the outline providers for both cover and
-    // coverParent. MediaPanelAnimator reads this value as its expanded endpoint,
-    // then interpolates it from the compact card radius on every frame.
-    private val getCoverRadius = headerMethod("getCoverRadius", 0)
-    private val setCoverRadius = headerMethod("setCoverRadius", 1)
-    private val nativeCoverRadius = readCoverRadius()
+    private val coverShape = ControlCenterMediaCoverShape(header, contentView, coverParent, cover)
+    private var shapeObserver: ViewTreeObserver? = null
+    private val shapePreDraw = ViewTreeObserver.OnPreDrawListener {
+        syncCoverShape()
+        true
+    }
     var isApplied = false
         private set
     var isTransitioning = false
@@ -88,6 +88,13 @@ internal class ControlCenterMediaLayout private constructor(
 
     init {
         coverParent.setTag(com.lidesheng.hyperlyric.R.id.control_center_media_layout_state, this)
+        header.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(view: View) { observeCoverShape() }
+            override fun onViewDetachedFromWindow(view: View) {
+                shapeObserver?.takeIf { it.isAlive }?.removeOnPreDrawListener(shapePreDraw)
+                shapeObserver = null
+            }
+        })
         contentView?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             if (header.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 applyLandscapeIfReady()
@@ -122,10 +129,7 @@ internal class ControlCenterMediaLayout private constructor(
     fun preparePanelTransition() {
         transitionGeneration++
         applyLandscapeIfReady(forTransition = true)
-        // prepareShowPanel() restores the stock radius immediately before the
-        // panel animator captures its target. Re-apply the immersive endpoint
-        // at this handoff so MediaPanelAnimator interpolates to zero.
-        applyExpandedCoverRadius()
+        if (isApplied && !isLandscapeApplied) coverShape.prepareTransition()
         panelAnimating = true
         panelExpanded = false
     }
@@ -140,7 +144,6 @@ internal class ControlCenterMediaLayout private constructor(
     fun markPanelShown() {
         panelAnimating = false
         panelExpanded = true
-        applyExpandedCoverRadius()
         customActions.setVisible(true)
         applyLandscapeIfReady()
         landscape?.settle()
@@ -219,10 +222,8 @@ internal class ControlCenterMediaLayout private constructor(
         }
         customActions.refresh()
         isApplied = true
-        // This is also the target used by the native Panel animator. Set it
-        // before calculateViewValues() so the native transition interpolates
-        // compactRadius -> 0 rather than jumping at the handoff.
-        applyExpandedCoverRadius()
+        syncCoverShape()
+        observeCoverShape()
         artworkBlend?.setActive(true)
         header.setPadding(0, 0, 0, padding[3])
         setSize(header, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -301,6 +302,7 @@ internal class ControlCenterMediaLayout private constructor(
         if (!isApplied) return
         if (transitionClip == null) transitionClip = ControlCenterMediaTransitionClip(card)
         isTransitioning = true
+        syncCoverShape()
         clipTransition()
     }
 
@@ -349,13 +351,6 @@ internal class ControlCenterMediaLayout private constructor(
 
     fun drawArtwork(child: View, canvas: Canvas, original: () -> Any?): Any? {
         if (child === coverParent) {
-            if (isApplied && !isTransitioning && shouldKeepExpandedCoverRadius()) {
-                // MiPlay's prepareShowPanel()/material refresh can restore the
-                // stock radius after applyPortrait(). Re-assert the static
-                // endpoint immediately before drawing, while leaving Panel's
-                // in-flight native radius interpolation untouched.
-                applyExpandedCoverRadius()
-            }
             return if (isApplied && !isTransitioning) coverFlipGeometry.draw(canvas, original) else original()
         }
         if (child !== cover) return original()
@@ -435,7 +430,7 @@ internal class ControlCenterMediaLayout private constructor(
     fun restore() {
         customActions.restore()
         coverFlipGeometry.restore()
-        restoreNativeCoverRadius()
+        coverShape.restore()
         if (!isApplied) return
         artworkBlend?.setActive(false)
         finishTransition()
@@ -454,41 +449,18 @@ internal class ControlCenterMediaLayout private constructor(
     private fun margin(view: View) = view.layoutParams as ViewGroup.MarginLayoutParams
     private fun exact(size: Int) = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
 
-    private fun headerMethod(name: String, parameterCount: Int): Method? {
-        var type: Class<*>? = header.javaClass
-        while (type != null) {
-            type.declaredMethods.firstOrNull {
-                it.name == name && it.parameterCount == parameterCount
-            }?.let { return it.apply { isAccessible = true } }
-            type = type.superclass
-        }
-        return null
-    }
-
-    private fun readCoverRadius(): Float? = runCatching {
-        (getCoverRadius?.invoke(header) as? Number)?.toFloat()
-    }.getOrNull() ?: runCatching {
-        val id = header.resources.getIdentifier(
-            "miplay_detail_header_cover_radius", "dimen", "miui.systemui.plugin")
-        id.takeIf { it != 0 }?.let(header.resources::getDimension)
-    }.getOrNull()
-
-    private fun setCoverRadius(radius: Float) {
-        runCatching { setCoverRadius?.invoke(header, radius) }
-    }
-
-    private fun applyExpandedCoverRadius() {
-        if (options.immersiveCoverLayout &&
-            header.resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE) {
-            setCoverRadius(0f)
+    private fun syncCoverShape() {
+        if (isApplied && !isLandscapeApplied) {
+            coverShape.apply(outerHostClips = !isPanelHost, transitioning = isTransitioning)
         }
     }
 
-    private fun shouldKeepExpandedCoverRadius(): Boolean =
-        !isPanelHost || panelExpanded
-
-    private fun restoreNativeCoverRadius() {
-        nativeCoverRadius?.let(::setCoverRadius)
+    private fun observeCoverShape() {
+        if (!header.isAttachedToWindow) return
+        val observer = header.viewTreeObserver
+        if (shapeObserver === observer) return
+        shapeObserver?.takeIf { it.isAlive }?.removeOnPreDrawListener(shapePreDraw)
+        shapeObserver = observer.takeIf { it.isAlive }?.also { it.addOnPreDrawListener(shapePreDraw) }
     }
 
     private fun setSize(view: View, width: Int, height: Int) {
