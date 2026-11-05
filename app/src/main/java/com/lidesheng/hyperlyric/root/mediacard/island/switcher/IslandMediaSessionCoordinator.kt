@@ -139,7 +139,7 @@ internal object IslandMediaSessionCoordinator {
                             }
                         })
                     }
-            }.onFailure { HookLogger.d(TAG, "ConfigurationController 回调清理 hook 不可用", it) }
+            }.onFailure { HookLogger.w(TAG, "ConfigurationController 回调清理 hook 不可用", it) }
             plugin.declaredMethods.filter {
                 it.name in setOf("onPluginLoaded", "onPluginUnloaded") && !it.isBridge
             }.forEach { method ->
