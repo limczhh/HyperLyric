@@ -697,10 +697,11 @@
     <string name="no_lyric_data">No lyric data</string>
 
     <string name="title_lyric_enhancement">Lyric Enhancement</string>
-    <string name="title_openai_translation">OpenAI Translation</string>
+    <string name="title_openai_translation">AI Translation</string>
     <string name="title_amll_ttml">AMLL TTML Lyrics</string>
     <string name="summary_amll_ttml">Fetch high-quality word-level lyrics (background vocals/translation/roma) from the AMLL TTML database; falls back to the current lyric source on miss</string>
     <string name="summary_lyric_enhancement_unavailable">This lyric enhancement is currently unavailable</string>
+    <string name="title_ai_settings">AI Settings</string>
     <string name="title_lyric_enhancement_basic_settings">Basic Settings</string>
     <string name="title_lyric_enhancement_advanced_settings">Advanced Settings</string>
     <string name="title_lyric_enhancement_cache">Cache</string>
@@ -737,13 +738,14 @@
     <string name="title_ai_translation_force_override">Force AI Translation</string>
     <string name="title_ai_translation_target_language">Target Language</string>
     <string name="title_ai_translation_api_key">API Key</string>
+    <string name="title_ai_translation_provider">API Protocol</string>
     <string name="title_ai_translation_model">Model Name</string>
     <string name="toast_ai_translation_models_api_key_required">Enter an API key first</string>
-    <string name="toast_ai_translation_models_base_url_required">Enter an API base URL first</string>
+    <string name="toast_ai_translation_models_base_url_required">Please enter the BASE_URL first</string>
     <string name="toast_ai_translation_models_fetch_failed">Failed to load models. Check the URL, key, and network.</string>
     <string name="toast_ai_translation_models_fetch_http_failed">Failed to load models (HTTP %1$d)</string>
     <string name="toast_ai_translation_models_empty">The service returned no available models</string>
-    <string name="title_ai_translation_base_url">API Base URL</string>
+    <string name="title_ai_translation_base_url">BASE_URL</string>
     <string name="title_ai_translation_prompt">Custom Prompt</string>
     <string name="title_ai_translation_temperature">temperature</string>
     <string name="title_ai_translation_top_p">top_p</string>

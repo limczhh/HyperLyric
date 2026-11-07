@@ -35,10 +35,12 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val AI_KEY_ENABLED = RootConstants.KEY_HOOK_AI_TRANS_ENABLE
+private const val AI_KEY_PROVIDER = RootConstants.KEY_HOOK_AI_TRANS_PROVIDER
 private const val AI_KEY_SKIP_LANGUAGES = RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES
 private const val AI_KEY_SKIP_LANGUAGES_ENABLED =
     RootConstants.KEY_HOOK_AI_TRANS_SKIP_LANGUAGES_ENABLED
@@ -129,6 +131,14 @@ private fun OpenAiTranslationSettingsPage() {
 
     var enabled by remember(prefs) {
         mutableStateOf(prefs.getBoolean(AI_KEY_ENABLED, false))
+    }
+    var provider by remember(prefs) {
+        mutableStateOf(
+            prefs.getString(
+                AI_KEY_PROVIDER,
+                RootConstants.DEFAULT_HOOK_AI_TRANS_PROVIDER
+            ) ?: RootConstants.DEFAULT_HOOK_AI_TRANS_PROVIDER
+        )
     }
     var skipLanguages by remember(prefs) {
         mutableStateOf(
@@ -237,6 +247,7 @@ private fun OpenAiTranslationSettingsPage() {
     )
     AiTranslationModelDialog(
         show = showModelDialog,
+        provider = provider,
         currentModel = model,
         baseUrl = baseUrl,
         apiKey = apiKey,
@@ -314,7 +325,7 @@ private fun OpenAiTranslationSettingsPage() {
     )
 
     XposedLyricSettingPage(title = stringResource(R.string.title_openai_translation)) {
-        item(key = "openai_enable") {
+        item(key = "ai_enable") {
             Card(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
@@ -331,10 +342,7 @@ private fun OpenAiTranslationSettingsPage() {
                 )
             }
         }
-        item(key = "openai_basic_title") {
-            SmallTitle(text = stringResource(R.string.title_lyric_enhancement_basic_settings))
-        }
-        item(key = "openai_basic_settings") {
+        item(key = "ai_targets_and_filters") {
             Card(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
@@ -342,6 +350,22 @@ private fun OpenAiTranslationSettingsPage() {
                     .fillMaxWidth()
             ) {
                 Column {
+                    ArrowPreference(
+                        title = stringResource(R.string.title_ai_translation_target_language),
+                        endActions = {
+                            Text(
+                                text = targetLanguage,
+                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                color = if (enabled) {
+                                    MiuixTheme.colorScheme.onSurfaceVariantActions
+                                } else {
+                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
+                                }
+                            )
+                        },
+                        enabled = enabled,
+                        onClick = { showTargetLanguageDialog = true }
+                    )
                     ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_skip_languages),
                         summary = skipLanguagesSummary,
@@ -375,21 +399,40 @@ private fun OpenAiTranslationSettingsPage() {
                             saveConfig(AI_KEY_FORCE_OVERRIDE, it)
                         }
                     )
+                }
+            }
+        }
+        item(key = "ai_settings_title") {
+            SmallTitle(text = stringResource(R.string.title_ai_settings))
+        }
+        item(key = "ai_api_settings") {
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp)
+                    .fillMaxWidth()
+            ) {
+                Column {
+                    val providerOptions = listOf("OpenAI", "Anthropic")
+                    val providerValues = listOf(
+                        RootConstants.AI_TRANS_PROVIDER_OPENAI,
+                        RootConstants.AI_TRANS_PROVIDER_ANTHROPIC
+                    )
+                    val selectedProviderIndex = if (provider.equals(RootConstants.AI_TRANS_PROVIDER_ANTHROPIC, ignoreCase = true)) 1 else 0
+                    OverlayDropdownPreference(
+                        title = stringResource(R.string.title_ai_translation_provider),
+                        items = providerOptions,
+                        selectedIndex = selectedProviderIndex,
+                        onSelectedIndexChange = { index ->
+                            val newProvider = providerValues.getOrElse(index) { RootConstants.AI_TRANS_PROVIDER_OPENAI }
+                            provider = newProvider
+                            saveConfig(AI_KEY_PROVIDER, newProvider)
+                        }
+                    )
                     ArrowPreference(
-                        title = stringResource(R.string.title_ai_translation_target_language),
-                        endActions = {
-                            Text(
-                                text = targetLanguage,
-                                fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = if (enabled) {
-                                    MiuixTheme.colorScheme.onSurfaceVariantActions
-                                } else {
-                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                                }
-                            )
-                        },
-                        enabled = enabled,
-                        onClick = { showTargetLanguageDialog = true }
+                        title = stringResource(R.string.title_ai_translation_base_url),
+                        summary = baseUrl,
+                        onClick = { showBaseUrlDialog = true }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_api_key),
@@ -398,14 +441,9 @@ private fun OpenAiTranslationSettingsPage() {
                                 text = apiKey.takeIf { it.isNotEmpty() }?.let { "***************" }
                                     ?: stringResource(R.string.summary_ai_translation_not_configured),
                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = if (enabled) {
-                                    MiuixTheme.colorScheme.onSurfaceVariantActions
-                                } else {
-                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                                }
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        enabled = enabled,
                         onClick = { showApiKeyDialog = true }
                     )
                     ArrowPreference(
@@ -414,36 +452,15 @@ private fun OpenAiTranslationSettingsPage() {
                             Text(
                                 text = model,
                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = if (enabled) {
-                                    MiuixTheme.colorScheme.onSurfaceVariantActions
-                                } else {
-                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                                }
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        enabled = enabled,
                         onClick = { showModelDialog = true }
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.title_ai_translation_base_url),
-                        summary = baseUrl,
-                        enabled = enabled,
-                        onClick = { showBaseUrlDialog = true }
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.title_ai_translation_prompt),
-                        summary = previewSettingValue(prompt, 2),
-                        enabled = enabled,
-                        holdDownState = showPromptDialog,
-                        onClick = { showPromptDialog = true }
                     )
                 }
             }
         }
-        item(key = "openai_advanced_title") {
-            SmallTitle(text = stringResource(R.string.title_lyric_enhancement_advanced_settings))
-        }
-        item(key = "openai_advanced_settings") {
+        item(key = "ai_prompt_and_params") {
             Card(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
@@ -452,19 +469,20 @@ private fun OpenAiTranslationSettingsPage() {
             ) {
                 Column {
                     ArrowPreference(
+                        title = stringResource(R.string.title_ai_translation_prompt),
+                        summary = previewSettingValue(prompt, 2),
+                        holdDownState = showPromptDialog,
+                        onClick = { showPromptDialog = true }
+                    )
+                    ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_temperature),
                         endActions = {
                             Text(
                                 text = temperature.toString(),
                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = if (enabled) {
-                                    MiuixTheme.colorScheme.onSurfaceVariantActions
-                                } else {
-                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                                }
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        enabled = enabled,
                         holdDownState = showTemperatureDialog,
                         onClick = { showTemperatureDialog = true }
                     )
@@ -474,14 +492,9 @@ private fun OpenAiTranslationSettingsPage() {
                             Text(
                                 text = topP.toString(),
                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = if (enabled) {
-                                    MiuixTheme.colorScheme.onSurfaceVariantActions
-                                } else {
-                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                                }
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        enabled = enabled,
                         holdDownState = showTopPDialog,
                         onClick = { showTopPDialog = true }
                     )
@@ -491,24 +504,19 @@ private fun OpenAiTranslationSettingsPage() {
                             Text(
                                 text = maxTokens.toString(),
                                 fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                color = if (enabled) {
-                                    MiuixTheme.colorScheme.onSurfaceVariantActions
-                                } else {
-                                    MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                                }
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        enabled = enabled,
                         holdDownState = showMaxTokensDialog,
                         onClick = { showMaxTokensDialog = true }
                     )
                 }
             }
         }
-        item(key = "openai_cache_title") {
+        item(key = "ai_cache_title") {
             SmallTitle(text = stringResource(R.string.title_lyric_enhancement_cache))
         }
-        item(key = "openai_cache") {
+        item(key = "ai_cache") {
             Card(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)

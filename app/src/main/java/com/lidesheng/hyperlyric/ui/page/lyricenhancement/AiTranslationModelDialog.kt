@@ -37,6 +37,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.ui.component.rememberDialogInputFocusModifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -58,6 +59,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun AiTranslationModelDialog(
     show: Boolean,
+    provider: String = RootConstants.AI_TRANS_PROVIDER_OPENAI,
     currentModel: String,
     baseUrl: String,
     apiKey: String,
@@ -135,6 +137,7 @@ internal fun AiTranslationModelDialog(
                 coroutineScope.launch {
                     try {
                         val fetchedModels = OpenAiModelDiscovery.fetch(
+                            provider = provider,
                             baseUrl = baseUrl,
                             apiKey = apiKey
                         )

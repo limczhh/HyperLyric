@@ -706,10 +706,11 @@
     <string name="no_lyric_data">歌词源无数据</string>
 
     <string name="title_lyric_enhancement">歌词增强</string>
-    <string name="title_openai_translation">OpenAI 翻译</string>
+    <string name="title_openai_translation">AI 翻译</string>
     <string name="title_amll_ttml">AMLL TTML 逐字歌词</string>
     <string name="summary_amll_ttml">从 AMLL TTML DataBase 获取高质量逐字歌词（背景人声/翻译/罗马音），未命中时保持当前歌词源</string>
     <string name="summary_lyric_enhancement_unavailable">此歌词增强功能当前不可用</string>
+    <string name="title_ai_settings">AI 设置</string>
     <string name="title_lyric_enhancement_basic_settings">基础设置</string>
     <string name="title_lyric_enhancement_advanced_settings">高级设置</string>
     <string name="title_lyric_enhancement_cache">缓存</string>
@@ -746,13 +747,14 @@
     <string name="title_ai_translation_force_override">强制 AI 翻译</string>
     <string name="title_ai_translation_target_language">目标语言</string>
     <string name="title_ai_translation_api_key">API Key</string>
+    <string name="title_ai_translation_provider">API 协议</string>
     <string name="title_ai_translation_model">模型名称</string>
     <string name="toast_ai_translation_models_api_key_required">请先填写 API Key</string>
-    <string name="toast_ai_translation_models_base_url_required">请先填写 OpenAI API 地址</string>
+    <string name="toast_ai_translation_models_base_url_required">请先填写 BASE_URL 请求地址</string>
     <string name="toast_ai_translation_models_fetch_failed">获取模型失败，请检查地址、密钥和网络</string>
     <string name="toast_ai_translation_models_fetch_http_failed">获取模型失败（HTTP %1$d）</string>
     <string name="toast_ai_translation_models_empty">服务未返回可用模型</string>
-    <string name="title_ai_translation_base_url">OpenAI API 地址</string>
+    <string name="title_ai_translation_base_url">BASE_URL 请求地址</string>
     <string name="title_ai_translation_prompt">自定义提示词</string>
     <string name="title_ai_translation_temperature">temperature</string>
     <string name="title_ai_translation_top_p">top_p</string>

@@ -752,7 +752,9 @@ object RootConstants {
     val DEFAULT_HOOK_AI_TRANS_SKIP_LANGUAGES: Set<String> = emptySet()
     const val DEFAULT_HOOK_AI_TRANS_SKIP_EXISTING_TRANSLATION = false
     const val DEFAULT_HOOK_AI_TRANS_FORCE_OVERRIDE = false
-    const val DEFAULT_HOOK_AI_TRANS_PROVIDER = "OPENAI"
+    const val AI_TRANS_PROVIDER_OPENAI = "OPENAI"
+    const val AI_TRANS_PROVIDER_ANTHROPIC = "ANTHROPIC"
+    const val DEFAULT_HOOK_AI_TRANS_PROVIDER = AI_TRANS_PROVIDER_OPENAI
     const val DEFAULT_HOOK_AI_TRANS_MODEL = "mimo-v2.5"
     const val DEFAULT_HOOK_AI_TRANS_BASE_URL = "https://api.xiaomimimo.com/v1/"
     const val DEFAULT_HOOK_AI_TRANS_TARGET_LANG = "中文"

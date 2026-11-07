@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.translation
 
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
+import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 
@@ -15,10 +16,18 @@ internal class AiTranslationEngine(
     }
 
     private val cache = translationCache ?: TranslationCache(cacheStore)
-    private val client = OpenAiTranslationClient()
+    private val openAiClient = OpenAiTranslationClient()
+    private val anthropicClient = AnthropicTranslationClient()
+    private val defaultRequester: (AiTranslationConfig, Song, List<String>) -> List<TranslationItem>? = { config, song, texts ->
+        if (config.provider.equals(RootConstants.AI_TRANS_PROVIDER_ANTHROPIC, ignoreCase = true)) {
+            anthropicClient.request(config, song, texts)
+        } else {
+            openAiClient.request(config, song, texts)
+        }
+    }
     private val networkRequest:
         (AiTranslationConfig, Song, List<String>) -> List<TranslationItem>? =
-        networkRequester ?: client::request
+        networkRequester ?: defaultRequester
     private val scheduler = TranslationScheduler()
 
     fun translate(
