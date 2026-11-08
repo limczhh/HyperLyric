@@ -22,6 +22,8 @@ fun LazyListScope.lyricDisplaySections(
     onTextSizeClick: () -> Unit,
     textSizeRatio: Float,
     onTextSizeRatioClick: () -> Unit,
+    multiLineScale: Float,
+    onMultiLineScaleClick: () -> Unit,
     fadingEdge: Int,
     onFadingEdgeClick: () -> Unit,
     textColorStyle: Int,
@@ -91,6 +93,17 @@ fun LazyListScope.lyricDisplaySections(
                         )
                     },
                     onClick = onTextSizeRatioClick
+                )
+                ArrowPreference(
+                    title = stringResource(id = R.string.title_multi_line_scale),
+                    endActions = {
+                        Text(
+                            String.format("%.2f", multiLineScale),
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                        )
+                    },
+                    onClick = onMultiLineScaleClick
                 )
                 ArrowPreference(
                     title = stringResource(id = R.string.title_fading_edge),

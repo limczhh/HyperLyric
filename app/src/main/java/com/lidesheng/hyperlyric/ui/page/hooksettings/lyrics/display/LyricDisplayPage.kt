@@ -13,6 +13,7 @@ import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.getFloatCompat
+import com.lidesheng.hyperlyric.ui.component.FloatInputDialog
 import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.component.TextInputDialog
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
@@ -51,6 +52,15 @@ internal fun LyricDisplaySettings(
                 prefs,
                 RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
                 RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO
+            )
+        )
+    }
+    var multiLineScale by remember {
+        mutableFloatStateOf(
+            getFloatCompat(
+                prefs,
+                RootConstants.KEY_HOOK_MULTI_LINE_SCALE,
+                RootConstants.DEFAULT_HOOK_MULTI_LINE_SCALE
             )
         )
     }
@@ -101,6 +111,7 @@ internal fun LyricDisplaySettings(
     }
     var showTextSizeDialog by remember { mutableStateOf(false) }
     var showTextSizeRatioDialog by remember { mutableStateOf(false) }
+    var showMultiLineScaleDialog by remember { mutableStateOf(false) }
     var showFadingEdgeDialog by remember { mutableStateOf(false) }
     var showFontPathDialog by remember { mutableStateOf(false) }
     var showFontWeightDialog by remember { mutableStateOf(false) }
@@ -129,6 +140,19 @@ internal fun LyricDisplaySettings(
         onConfirm = { value ->
             textSizeRatio = value.toFloat() / 100f
             saveConfig(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, textSizeRatio)
+        }
+    )
+    FloatInputDialog(
+        show = showMultiLineScaleDialog,
+        title = stringResource(id = R.string.title_multi_line_scale),
+        label = stringResource(id = R.string.label_multi_line_scale_range),
+        initialValue = multiLineScale,
+        min = RootConstants.MIN_HOOK_MULTI_LINE_SCALE,
+        max = RootConstants.MAX_HOOK_MULTI_LINE_SCALE,
+        onDismiss = { showMultiLineScaleDialog = false },
+        onConfirm = { value ->
+            multiLineScale = value
+            saveConfig(RootConstants.KEY_HOOK_MULTI_LINE_SCALE, multiLineScale)
         }
     )
     NumberInputDialog(
@@ -175,6 +199,8 @@ internal fun LyricDisplaySettings(
             onTextSizeClick = { showTextSizeDialog = true },
             textSizeRatio = textSizeRatio,
             onTextSizeRatioClick = { showTextSizeRatioDialog = true },
+            multiLineScale = multiLineScale,
+            onMultiLineScaleClick = { showMultiLineScaleDialog = true },
             fadingEdge = fadingEdge,
             onFadingEdgeClick = { showFadingEdgeDialog = true },
             textColorStyle = textColorStyle,

@@ -157,6 +157,12 @@ internal object IslandSlotRuntimeConfigReader {
                 RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
                 RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO
             ),
+            multiLineScale = getFloatCompat(
+                prefs,
+                RootConstants.KEY_HOOK_MULTI_LINE_SCALE,
+                RootConstants.DEFAULT_HOOK_MULTI_LINE_SCALE
+            
+            ),
             fontWeight = prefs.getInt(
                 RootConstants.KEY_HOOK_FONT_WEIGHT,
                 RootConstants.DEFAULT_HOOK_FONT_WEIGHT

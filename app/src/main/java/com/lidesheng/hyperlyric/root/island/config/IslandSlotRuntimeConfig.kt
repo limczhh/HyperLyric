@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.island.config
 
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
+import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplaySettings
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.sizing.IslandSlotGeometryConfig
@@ -16,6 +17,7 @@ internal data class IslandSlotRuntimeConfig(
     val pauseBehavior: Int,
     val textSizeSp: Int,
     val textSizeRatio: Float,
+    val multiLineScale: Float = RootConstants.DEFAULT_HOOK_MULTI_LINE_SCALE,
     val fontWeight: Int,
     val fontItalic: Boolean,
     val fadingEdgeLength: Int,
@@ -76,6 +78,7 @@ internal data class IslandSlotRuntimeConfig(
         activeMode,
         textSizeSp,
         textSizeRatio,
+        multiLineScale,
         fontWeight,
         fontItalic,
         fadingEdgeLength,

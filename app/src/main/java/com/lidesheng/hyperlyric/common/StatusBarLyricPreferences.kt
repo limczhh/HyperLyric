@@ -11,6 +11,7 @@ object StatusBarLyricPreferences {
     private val independentLyricKeys = setOf(
         RootConstants.KEY_HOOK_TEXT_SIZE,
         RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
+        RootConstants.KEY_HOOK_MULTI_LINE_SCALE,
         RootConstants.KEY_HOOK_FONT_WEIGHT,
         RootConstants.KEY_HOOK_FONT_ITALIC,
         RootConstants.KEY_HOOK_FADING_EDGE_LENGTH,

@@ -23,6 +23,14 @@ object FloatPreferencePolicy {
         put(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, textSizeRatio)
         put(StatusBarLyricPreferences.scopedKey(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO), textSizeRatio)
 
+        val multiLineScale = Rule(
+            RootConstants.DEFAULT_HOOK_MULTI_LINE_SCALE,
+            RootConstants.MIN_HOOK_MULTI_LINE_SCALE,
+            RootConstants.MAX_HOOK_MULTI_LINE_SCALE
+        )
+        put(RootConstants.KEY_HOOK_MULTI_LINE_SCALE, multiLineScale)
+        put(StatusBarLyricPreferences.scopedKey(RootConstants.KEY_HOOK_MULTI_LINE_SCALE), multiLineScale)
+
         val padding = Rule(
             RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_PADDING_DP,
             RootConstants.MIN_HOOK_STATUS_BAR_LYRIC_PADDING_DP,

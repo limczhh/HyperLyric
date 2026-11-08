@@ -230,6 +230,7 @@ object RootConstants {
     // ================= STYLE & TYPOGRAPHY KEYS =================
     const val KEY_HOOK_TEXT_SIZE = "key_hook_text_size"
     const val KEY_HOOK_TEXT_SIZE_RATIO = "key_hook_text_size_ratio"
+    const val KEY_HOOK_MULTI_LINE_SCALE = "key_hook_multi_line_scale"
     const val KEY_HOOK_FONT_WEIGHT = "key_hook_font_weight"
     const val KEY_HOOK_FONT_ITALIC = "key_hook_font_italic"
     const val KEY_HOOK_FADING_EDGE_LENGTH = "key_hook_fading_edge_length"
@@ -614,6 +615,9 @@ object RootConstants {
 
     const val DEFAULT_HOOK_TEXT_SIZE = 12
     const val DEFAULT_HOOK_TEXT_SIZE_RATIO = 0.7f
+    const val DEFAULT_HOOK_MULTI_LINE_SCALE = 1.0f
+    const val MIN_HOOK_MULTI_LINE_SCALE = 0.30f
+    const val MAX_HOOK_MULTI_LINE_SCALE = 1.20f
     const val DEFAULT_HOOK_FONT_WEIGHT = 600
     const val DEFAULT_HOOK_FONT_ITALIC = false
     const val DEFAULT_HOOK_NARROW_LATIN_FONT = false

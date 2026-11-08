@@ -49,6 +49,9 @@ class SpaceGateRichLyricLineView(
     var renderScale = 1.0f
         private set
 
+    var multiLineScale = 1.0f
+        private set
+
     private val assembler = LyricLineAssembler(
         displayTranslation = displayTranslation,
         displayRoma = displayRoma,
@@ -293,6 +296,8 @@ class SpaceGateRichLyricLineView(
         )
         enableRelativeProgress = style.primary.relativeProgress
         enableRelativeProgressHighlight = style.primary.relativeHighlight
+        multiLineScale = style.scaleMultiLine
+        updateScaleForCurrentMode()
 
         setTransitionConfig(style.transitionConfig)
 
@@ -368,8 +373,14 @@ class SpaceGateRichLyricLineView(
     fun setRenderScale(scale: Float) {
         if (renderScale != scale) {
             renderScale = scale
+            requestLayout()
             invalidate()
         }
+    }
+
+    private fun updateScaleForCurrentMode(isMultiLine: Boolean = alwaysShowSecondary || secondary.visibleIfChanged) {
+        val targetScale = if (isMultiLine) multiLineScale else 1.0f
+        setRenderScale(targetScale)
     }
 
     /**
@@ -461,7 +472,8 @@ class SpaceGateRichLyricLineView(
             if (onMainLineWillApply != null) {
                 pendingMainLineWillApply = null
                 val generation = lineGeneration
-                val candidateWidth = maxOf(mainContentWidth, secondaryContentWidth)
+                val candidateScale = if (secResult.alwaysShow) multiLineScale else 1.0f
+                val candidateWidth = maxOf(mainContentWidth, secondaryContentWidth) * candidateScale
                 val shouldDefer = onMainLineWillApply.invoke(candidateWidth)
                 if (generation != lineGeneration) return
                 if (shouldDefer) {
@@ -524,6 +536,7 @@ class SpaceGateRichLyricLineView(
         // Translation and preview render data can replace metadata; use the source row's marker.
         secondary.rightIfPossible = rightAlignment(rawSecondaryLine?.metadata ?: line?.metadata)
         secondary.visibleIfChanged = secResult.alwaysShow
+        updateScaleForCurrentMode(secResult.alwaysShow)
         secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.hasSourceWordTiming = secResult.hasSourceWordTiming
         secondary.hasSimulatedWordTiming = secResult.hasSimulatedWordTiming

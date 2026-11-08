@@ -40,6 +40,9 @@ class RichLyricLineView(
     var renderScale = 1.0f
         private set
 
+    var multiLineScale = 1.0f
+        private set
+
     private val assembler = LyricLineAssembler(
         displayTranslation = displayTranslation,
         displayRoma = displayRoma,
@@ -269,6 +272,8 @@ class RichLyricLineView(
         )
         enableRelativeProgress = style.primary.relativeProgress
         enableRelativeProgressHighlight = style.primary.relativeHighlight
+        multiLineScale = style.scaleMultiLine
+        updateScaleForCurrentMode()
 
         setTransitionConfig(style.transitionConfig)
 
@@ -335,8 +340,14 @@ class RichLyricLineView(
     fun setRenderScale(scale: Float) {
         if (renderScale != scale) {
             renderScale = scale
+            requestLayout()
             invalidate()
         }
+    }
+
+    private fun updateScaleForCurrentMode(isMultiLine: Boolean = alwaysShowSecondary || secondary.visibleIfChanged) {
+        val targetScale = if (isMultiLine) multiLineScale else 1.0f
+        setRenderScale(targetScale)
     }
 
     /**
@@ -425,10 +436,11 @@ class RichLyricLineView(
             if (onMainLineWillApply != null) {
                 pendingMainLineWillApply = null
                 val generation = lineGeneration
+                val candidateScale = if (secResult.alwaysShow) multiLineScale else 1.0f
                 val candidateWidth = maxOf(
                     main.measureLineWidth(mainResult.line),
                     secondary.measureLineWidth(secResult.line)
-                )
+                ) * candidateScale
                 val shouldDefer = onMainLineWillApply.invoke(candidateWidth)
                 if (generation != lineGeneration) return
                 if (shouldDefer) {
@@ -488,6 +500,7 @@ class RichLyricLineView(
         alwaysShowSecondary = secResult.alwaysShow
         secondaryIsNextLinePreview = secResult.isNextLinePreview
         secondary.visibleIfChanged = secResult.alwaysShow
+        updateScaleForCurrentMode(secResult.alwaysShow)
         secondary.isStaticPreview = secResult.isNextLinePreview
         secondary.hasSourceWordTiming = secResult.hasSourceWordTiming
         secondary.hasSimulatedWordTiming = secResult.hasSimulatedWordTiming

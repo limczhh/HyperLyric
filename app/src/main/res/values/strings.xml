@@ -381,8 +381,10 @@
     <string name="label_marquee_delay_range">ms 范围：0 ~ 10000</string>
     <string name="title_marquee_loop">循环间隔</string>
     <string name="label_marquee_loop_range">ms 范围：0 ~ 10000</string>
-    <string name="title_text_size_ratio">多行模式下文字大小比例</string>
+    <string name="title_text_size_ratio">副行文字大小比例</string>
     <string name="label_text_size_ratio_range">范围：10 ~ 100</string>
+    <string name="title_multi_line_scale">多行文字整体大小比例</string>
+    <string name="label_multi_line_scale_range">范围：0.30 ~ 1.20</string>
     <string name="title_italic">斜体</string>
     <string name="title_narrow_latin_font">英数窄字体</string>
     <string name="title_gradient_progress">羽化高亮进度</string>

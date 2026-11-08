@@ -48,6 +48,11 @@ object LyricStyleHelper {
             RootConstants.KEY_HOOK_TEXT_SIZE_RATIO,
             RootConstants.DEFAULT_HOOK_TEXT_SIZE_RATIO
         )
+        val multiLineScale = getFloatCompat(
+            prefs,
+            RootConstants.KEY_HOOK_MULTI_LINE_SCALE,
+            RootConstants.DEFAULT_HOOK_MULTI_LINE_SCALE
+        )
         val primarySizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_SP,
             fontSize.toFloat(),
@@ -246,6 +251,7 @@ object LyricStyleHelper {
                     RootConstants.DEFAULT_HOOK_WORD_REVEAL_SPEED_RATE
                 )
             ),
+            scaleMultiLine = multiLineScale,
             lineDisplay = syllableSettings.lineDisplay,
             fadingEdge = prefs.getInt(
                 RootConstants.KEY_HOOK_FADING_EDGE_LENGTH,
