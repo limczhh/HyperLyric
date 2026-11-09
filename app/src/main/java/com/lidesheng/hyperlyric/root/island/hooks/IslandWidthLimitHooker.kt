@@ -3,8 +3,11 @@ package com.lidesheng.hyperlyric.root.island.hooks
 import android.content.Context
 import android.content.res.Resources
 import android.view.View
+import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
+import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
+import com.lidesheng.hyperlyric.root.island.policy.IslandModificationTargetPolicy
 import com.lidesheng.hyperlyric.root.managedHook
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -38,7 +41,6 @@ internal object IslandWidthLimitHooker {
         "miui.systemui.dynamicisland.window.content.helpers.DynamicIslandContentViewPhoneHelper"
     private const val DYNAMIC_ISLAND_UTILS_CLASS =
         "miui.systemui.dynamicisland.DynamicIslandUtils"
-    private const val COMMON_UTILS_CLASS = "miui.systemui.util.CommonUtils"
     private const val FOLD_UTILS_CLASS = "miui.systemui.util.FoldUtils"
     private const val FOLD_LAYOUT_LARGE_METHOD = "isFoldScreenLayoutLarge"
     private const val SCREEN_WIDTH_METHOD = "getScreenWidth"
@@ -110,8 +112,7 @@ internal object IslandWidthLimitHooker {
                     capability = "island.width.${method.name}",
                     hooker = NativeScreenWidthHook(
                         widthProvider = widthProvider,
-                        variantDetector = variantDetector,
-                        allowUnscopedPhoneFallback = calculateBigIslandWidth == null
+                        variantDetector = variantDetector
                     ),
                 )
                 installed++
@@ -213,6 +214,19 @@ internal object IslandWidthLimitHooker {
     }
 
     /**
+     * Removing Xiaomi's width limit is a visual modification of an injected lyric island, not a
+     * device-wide setting. Missing host, island-data, ownership, or injection evidence must keep
+     * the native behavior instead of guessing from the phone form factor or package name alone.
+     */
+    internal fun isInjectedLyricWidthTarget(view: View?): Boolean {
+        val root = view as? ViewGroup ?: return false
+        val data = IslandProbeUtils.getCurrentIslandDataForHost(root) ?: return false
+        return runCatching {
+            IslandModificationTargetPolicy.resolve(data, root).isInjectedLyricTarget
+        }.getOrDefault(false)
+    }
+
+    /**
      * Returns the largest display-width candidate instead of WindowConfiguration.maxBounds. The
      * latter is the width of the current window/container on this SystemUI build (916px), while
      * the phone's actual root/display width is 1440px.
@@ -277,8 +291,6 @@ internal object IslandWidthLimitHooker {
     private class HostVariantDetector(classLoader: ClassLoader) {
         private val foldLayoutLargeMethod: Method?
         private val foldUtilsOwner: Any?
-        private val tabletMethod: Method?
-        private val tabletUtilsOwner: Any?
         private val helperMethods = Collections.synchronizedMap(
             WeakHashMap<Class<*>, Method?>()
         )
@@ -293,15 +305,6 @@ internal object IslandWidthLimitHooker {
                                 it.returnType == Boolean::class.java)
             }?.apply { isAccessible = true }
             foldUtilsOwner = singletonOwner(foldUtilsClass, foldLayoutLargeMethod)
-
-            val commonUtilsClass = classLoader.loadClassOrNull(COMMON_UTILS_CLASS)
-            tabletMethod = commonUtilsClass?.methods?.firstOrNull {
-                it.name == "getIS_TABLET" &&
-                        it.parameterTypes.isEmpty() &&
-                        (it.returnType == Boolean::class.javaPrimitiveType ||
-                                it.returnType == Boolean::class.java)
-            }?.apply { isAccessible = true }
-            tabletUtilsOwner = singletonOwner(commonUtilsClass, tabletMethod)
         }
 
         fun isPhoneContentView(view: View): Boolean {
@@ -330,13 +333,6 @@ internal object IslandWidthLimitHooker {
                 method?.invoke(params) as? Boolean
             }.getOrNull()
             return fromParams ?: fallbackView?.let(::isLargeFold)
-        }
-
-        fun isTablet(context: Context): Boolean {
-            val reflected: Boolean? = runCatching {
-                tabletMethod?.invoke(tabletUtilsOwner) as? Boolean
-            }.getOrNull()
-            return reflected ?: (context.resources.configuration.smallestScreenWidthDp >= 600)
         }
 
         private fun helperOf(view: View): Any? {
@@ -394,22 +390,20 @@ internal object IslandWidthLimitHooker {
 
     private class NativeScreenWidthHook(
         private val widthProvider: DisplayWidthProvider,
-        private val variantDetector: HostVariantDetector,
-        private val allowUnscopedPhoneFallback: Boolean
+        private val variantDetector: HostVariantDetector
     ) : Hooker {
         override fun intercept(chain: Chain): Any? {
             if (!isEnabled()) return chain.proceed()
             val context = chain.args.getOrNull(0) as? Context ?: return chain.proceed()
-            val activeView = activePhoneCalculation.get()
-            val shouldOverride = if (activeView != null) {
-                variantDetector.isPhoneContentView(activeView) &&
-                        variantDetector.isLargeFold(activeView) != true
-            } else {
-                allowUnscopedPhoneFallback && !variantDetector.isTablet(context)
+            val activeView = activePhoneCalculation.get() ?: return chain.proceed()
+            if (!variantDetector.isPhoneContentView(activeView) ||
+                variantDetector.isLargeFold(activeView) == true ||
+                !isInjectedLyricWidthTarget(activeView)
+            ) {
+                return chain.proceed()
             }
-            if (!shouldOverride) return chain.proceed()
 
-            val width = widthProvider.width(context, activeView?.width ?: 0)
+            val width = widthProvider.width(context, activeView.width)
                 ?.takeIf { it > 0f }
                 ?: return chain.proceed()
             HookLogger.dState(
@@ -432,7 +426,10 @@ internal object IslandWidthLimitHooker {
             val view = chain.thisObject as? View ?: return chain.proceed()
             val isPhone = activePhoneCalculation.get() === view ||
                     variantDetector.isPhoneContentView(view)
-            if (!isPhone || variantDetector.isLargeFold(view) == true) {
+            if (!isPhone ||
+                variantDetector.isLargeFold(view) == true ||
+                !isInjectedLyricWidthTarget(view)
+            ) {
                 return chain.proceed()
             }
             val width = widthProvider.width(view.context, view.width)
@@ -462,7 +459,10 @@ internal object IslandWidthLimitHooker {
             if (!isEnabled()) return chain.proceed()
             val params = chain.args.getOrNull(0) ?: return chain.proceed()
             val helper = chain.thisObject ?: return chain.proceed()
-            if (variantDetector.isLargeFold(params, activePhoneCalculation.get()) == true) {
+            val activeView = activePhoneCalculation.get() ?: return chain.proceed()
+            if (variantDetector.isLargeFold(params, activeView) == true ||
+                !isInjectedLyricWidthTarget(activeView)
+            ) {
                 return chain.proceed()
             }
 
