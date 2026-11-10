@@ -227,6 +227,27 @@ internal object IslandWidthLimitHooker {
     }
 
     /**
+     * Recalculates the native width when the first registration/indexing pass makes an
+     * already-injected host eligible for the width override.
+     *
+     * Newer SystemUI versions create the first big island asynchronously: adapter callbacks can
+     * inject and pre-measure the lyric slots while the native update still commits the native
+     * maximum, and the Real host is registered only after that update completes. Reconciling the
+     * prepared slots then reports no structural change, so no relayout is requested and the
+     * stale native maximum would survive until another system or settings update. A host that
+     * was already eligible follows the normal native update path and needs no extra calculation.
+     */
+    internal fun refreshIfNewlyEligible(
+        contentView: ViewGroup,
+        wasEligible: Boolean,
+        enabled: Boolean = isEnabled()
+    ): Boolean {
+        if (wasEligible || !enabled) return false
+        if (!isInjectedLyricWidthTarget(contentView)) return false
+        return refresh(contentView)
+    }
+
+    /**
      * Returns the largest display-width candidate instead of WindowConfiguration.maxBounds. The
      * latter is the width of the current window/container on this SystemUI build (916px), while
      * the phone's actual root/display width is 1440px.
