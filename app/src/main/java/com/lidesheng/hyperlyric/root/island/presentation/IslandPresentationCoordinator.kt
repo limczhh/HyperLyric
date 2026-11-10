@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.effects.album.IslandAlbumCoverStyleHooker
 import com.lidesheng.hyperlyric.root.island.effects.IslandMusicWaveEffects
+import com.lidesheng.hyperlyric.root.island.hooks.IslandWidthLimitHooker
 import com.lidesheng.hyperlyric.root.island.host.IslandHostFacade
 import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.host.IslandViewRegistry
@@ -118,11 +119,18 @@ internal object IslandPresentationCoordinator {
             IslandViewRegistry.registerReal(root, owner.packageName)
             observeHostAttachment(root)
         }
+        val wasWidthTarget = IslandWidthLimitHooker.isInjectedLyricWidthTarget(root)
         val result = reconcileRealRoot(
             root = root,
             owner = owner,
             reason = IslandReconcileReason.SYSTEM_UPDATE_COMPLETE
         )
+        if (result.isTarget) {
+            // The first asynchronous build can measure the native maximum before this host is
+            // registered. Registration may not change the prepared slot structure, so give the
+            // now-eligible host an explicit native width recalculation.
+            IslandWidthLimitHooker.refreshIfNewlyEligible(root, wasWidthTarget)
+        }
         refreshAlbumCoverAfterInjection(result)
         return result
     }
