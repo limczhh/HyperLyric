@@ -11,6 +11,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.config.IslandSlotRuntimeConfig
+import com.lidesheng.hyperlyric.root.island.host.IslandProbeUtils
 import com.lidesheng.hyperlyric.root.island.view.IslandLyricViewController
 import com.lidesheng.hyperlyric.root.media.CurrentMediaInfoResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -117,6 +118,7 @@ internal object SlotContentCoordinator {
                 config = config,
                 mode = resolvedMode,
                 force = force,
+                lineSelection = resolveMetadataLineSelection(view, config, resolvedMode),
                 mediaInfo = mediaInfo,
                 playbackPosition = playbackClock.positionMs,
                 playbackDuration = playbackDuration
@@ -140,6 +142,32 @@ internal object SlotContentCoordinator {
 
     fun updatePlaybackProgress(view: View, position: Long): Boolean {
         return IslandMetadataContentAssembler.updatePlaybackProgress(view, position)
+    }
+
+    private fun resolveMetadataLineSelection(
+        view: View,
+        config: IslandSlotRuntimeConfig,
+        resolvedMode: Int
+    ): IslandMetadataContentAssembler.MetadataLineSelection {
+        if (resolvedMode != RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO) {
+            return IslandMetadataContentAssembler.MetadataLineSelection.BOTH
+        }
+        if (config.resolveContentMode(config.leftMode) !=
+            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO ||
+            config.resolveContentMode(config.rightMode) !=
+            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO
+        ) {
+            return IslandMetadataContentAssembler.MetadataLineSelection.BOTH
+        }
+        return when (view.tag?.toString()) {
+            IslandProbeUtils.LEFT_TEST_VIEW_TAG ->
+                IslandMetadataContentAssembler.MetadataLineSelection.FIRST
+
+            IslandProbeUtils.RIGHT_TEST_VIEW_TAG ->
+                IslandMetadataContentAssembler.MetadataLineSelection.SECOND
+
+            else -> IslandMetadataContentAssembler.MetadataLineSelection.BOTH
+        }
     }
 
     private fun currentMediaInfo(context: Context): MediaMetadataHelper.MediaInfo {

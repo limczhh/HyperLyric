@@ -16,6 +16,12 @@ import kotlin.math.roundToInt
 
 internal object IslandMetadataContentAssembler {
 
+    internal enum class MetadataLineSelection {
+        BOTH,
+        FIRST,
+        SECOND
+    }
+
     private val dynamicFields = setOf(
         MusicInfoLayoutPolicy.FIELD_ELAPSED,
         MusicInfoLayoutPolicy.FIELD_REMAINING,
@@ -39,6 +45,7 @@ internal object IslandMetadataContentAssembler {
 
     private data class MetadataState(
         val mode: Int,
+        val lineSelection: MetadataLineSelection,
         val firstLineFields: List<String>,
         val secondLineFields: List<String>,
         val dynamicFieldOrder: List<String>,
@@ -108,6 +115,7 @@ internal object IslandMetadataContentAssembler {
         config: IslandSlotRuntimeConfig,
         mode: Int,
         force: Boolean,
+        lineSelection: MetadataLineSelection = MetadataLineSelection.BOTH,
         mediaInfo: MediaMetadataHelper.MediaInfo,
         playbackPosition: Long = LyriconDataBridge.currentPlaybackClock().positionMs,
         playbackDuration: Long = mediaInfo.duration
@@ -163,6 +171,7 @@ internal object IslandMetadataContentAssembler {
         )
         val state = MetadataState(
             mode = mode,
+            lineSelection = lineSelection,
             firstLineFields = firstLineFields,
             secondLineFields = secondLineFields,
             dynamicFieldOrder = dynamicFieldOrder,
@@ -183,7 +192,8 @@ internal object IslandMetadataContentAssembler {
                 firstLineFields = firstLineFields,
                 secondLineFields = secondLineFields,
                 fieldValues = fieldValues,
-                separator = separator
+                separator = separator,
+                lineSelection = lineSelection
             )
         } else {
             null
@@ -311,7 +321,8 @@ internal object IslandMetadataContentAssembler {
                 firstLineFields = state.firstLineFields,
                 secondLineFields = state.secondLineFields,
                 fieldValues = state.fieldValues,
-                separator = state.separator
+                separator = state.separator,
+                lineSelection = state.lineSelection
             ),
             preserveMarquee = true
         )
@@ -323,6 +334,7 @@ internal object IslandMetadataContentAssembler {
         return listOf(
             "metadata",
             state.mode,
+            state.lineSelection,
             state.fieldValues[MusicInfoLayoutPolicy.FIELD_TITLE].orEmpty(),
             state.fieldValues[MusicInfoLayoutPolicy.FIELD_ARTIST].orEmpty(),
             state.fieldValues[MusicInfoLayoutPolicy.FIELD_ALBUM].orEmpty(),
@@ -401,34 +413,51 @@ internal object IslandMetadataContentAssembler {
         firstLineFields: List<String>,
         secondLineFields: List<String>,
         fieldValues: Map<String, String>,
-        separator: String
+        separator: String,
+        lineSelection: MetadataLineSelection
     ): MetadataLineContent? {
         val separatorValue = MusicInfoLayoutPolicy.separatorValue(separator)
         val firstLine = joinFields(firstLineFields, fieldValues, separatorValue)
         val secondLine = joinFields(secondLineFields, fieldValues, separatorValue)
 
-        return when {
-            firstLine.isNotBlank() -> RichLyricLine(
-                text = firstLine,
-                words = emptyList(),
-            ).let { primary ->
+        return when (lineSelection) {
+            MetadataLineSelection.FIRST -> firstLine.takeIf { it.isNotBlank() }?.let {
                 MetadataLineContent(
-                    primary = primary,
-                    secondary = secondLine.takeIf { it.isNotBlank() }?.let { secondary ->
-                        RichLyricLine(text = secondary, words = emptyList())
-                    }
+                    primary = RichLyricLine(text = it, words = emptyList()),
+                    secondary = null
                 )
             }
 
-            secondLine.isNotBlank() -> MetadataLineContent(
-                primary = RichLyricLine(
-                    text = secondLine,
-                    words = emptyList()
-                ),
-                secondary = null
-            )
+            MetadataLineSelection.SECOND -> secondLine.takeIf { it.isNotBlank() }?.let {
+                MetadataLineContent(
+                    primary = RichLyricLine(text = it, words = emptyList()),
+                    secondary = null
+                )
+            }
 
-            else -> null
+            MetadataLineSelection.BOTH -> when {
+                firstLine.isNotBlank() -> RichLyricLine(
+                    text = firstLine,
+                    words = emptyList(),
+                ).let { primary ->
+                    MetadataLineContent(
+                        primary = primary,
+                        secondary = secondLine.takeIf { it.isNotBlank() }?.let { secondary ->
+                            RichLyricLine(text = secondary, words = emptyList())
+                        }
+                    )
+                }
+
+                secondLine.isNotBlank() -> MetadataLineContent(
+                    primary = RichLyricLine(
+                        text = secondLine,
+                        words = emptyList()
+                    ),
+                    secondary = null
+                )
+
+                else -> null
+            }
         }
     }
 
