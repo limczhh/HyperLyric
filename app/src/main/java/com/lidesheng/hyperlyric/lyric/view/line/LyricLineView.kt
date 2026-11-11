@@ -24,6 +24,7 @@ import com.lidesheng.hyperlyric.lyric.view.UpdatableColor
 import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.WordMotion
 import com.lidesheng.hyperlyric.lyric.view.dp
+import com.lidesheng.hyperlyric.lyric.view.isAmllCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.isCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
 import com.lidesheng.hyperlyric.lyric.view.line.model.createModel
@@ -45,7 +46,11 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private var _model: LyricModel = emptyLyricModel()
 
     val lineWidth: Float
-        get() = if (_model.isCountdownLine()) countdownRenderer.contentWidth() else _model.width
+        get() = when {
+            _model.isAmllCountdownLine() -> amllCountdownRenderer.contentWidth()
+            _model.isCountdownLine() -> countdownRenderer.contentWidth()
+            else -> _model.width
+        }
 
     // ---- Metadata marquee overrides (called from HyperLyric) ----
     fun setMarqueeSpeed(speed: Float) {
@@ -95,6 +100,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             scrollRenderer.centerIfPossible = value
             lineTimelineRenderer.centerIfPossible = value
             countdownRenderer.centerIfPossible = value
+            amllCountdownRenderer.centerIfPossible = value
         }
 
     var hasSourceWordTiming: Boolean
@@ -122,6 +128,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             scrollRenderer.rightIfPossible = value
             lineTimelineRenderer.rightIfPossible = value
             countdownRenderer.rightIfPossible = value
+            amllCountdownRenderer.rightIfPossible = value
         }
 
     var playListener: LyricPlayListener? = null
@@ -192,6 +199,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     private val syncRenderer = WordSyncRenderer(this)
     private val lineTimelineRenderer = LineTimelineRenderer()
     private val countdownRenderer = CountdownDotsRenderer()
+    private val amllCountdownRenderer = AmllCountdownDotsRenderer()
     private val animator = Animator()
 
     private var activeRenderer: LineRenderer = scrollRenderer
@@ -260,6 +268,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         textPaint.textSize = size
         syncRenderer.setTextSize(size)
         countdownRenderer.setTextSize(size)
+        amllCountdownRenderer.setTextSize(size)
         refreshSizes()
         syncRenderer.updateLayout(_model, lineState, measuredWidth, measuredHeight)
         lineTimelineRenderer.updateLayout(_model, lineState, measuredWidth, measuredHeight)
@@ -275,6 +284,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
 
         _model = line?.normalize()?.createModel() ?: emptyLyricModel()
         activeRenderer = when {
+            _model.isAmllCountdownLine() -> amllCountdownRenderer
             _model.isCountdownLine() -> countdownRenderer
             useLineTimeline && _model.isPlainText -> lineTimelineRenderer
             _model.isPlainText -> scrollRenderer
@@ -344,6 +354,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     fun measureLineWidth(rawLine: LyricLine?): Float {
         val line = if (rawLine?.text.isNullOrBlank() && !rawLine.isCountdownLine()) null else rawLine
         val model = line?.normalize()?.createModel() ?: emptyLyricModel()
+        if (model.isAmllCountdownLine()) return amllCountdownRenderer.contentWidth()
         if (model.isCountdownLine()) return countdownRenderer.contentWidth()
         model.updateSizes(textPaint)
         return model.width
@@ -401,7 +412,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             if (playbackActive) startScrolling()
         } else {
             activeRenderer.seek(_model, lineState, posMs, measuredWidth, measuredHeight)
-            if (activeRenderer === countdownRenderer || activeRenderer === lineTimelineRenderer) {
+            if (activeRenderer.isCountdownDotsRenderer || activeRenderer === lineTimelineRenderer) {
                 invalidate()
             }
             if (playbackActive) {
@@ -427,7 +438,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                     measuredHeight,
                     playbackSpeed
                 )
-                if (activeRenderer === countdownRenderer || activeRenderer === lineTimelineRenderer) {
+                if (activeRenderer.isCountdownDotsRenderer || activeRenderer === lineTimelineRenderer) {
                     invalidate()
                 }
                 if (activeRenderer.isPlaying && !activeRenderer.isFinished) {
@@ -459,8 +470,8 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                 renderer.freeze(_model, lineState, measuredWidth)
                 if (isShown) invalidate()
             }
-            (activeRenderer as? CountdownDotsRenderer)?.let { renderer ->
-                renderer.freeze()
+            if (activeRenderer.isCountdownDotsRenderer) {
+                activeRenderer.freezeCountdownDots()
                 if (isShown) invalidate()
             }
             return
@@ -514,6 +525,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         syncRenderer.reset(lineState)
         lineTimelineRenderer.reset(lineState)
         countdownRenderer.reset(lineState)
+        amllCountdownRenderer.reset(lineState)
         _model = emptyLyricModel()
         activeRenderer = scrollRenderer
         refreshSizes()
@@ -691,6 +703,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         updatePlainTextColors()
         syncRenderer.setColors(backgroundColors, highlightColors)
         countdownRenderer.setColors(backgroundColors, highlightColors)
+        amllCountdownRenderer.setColors(backgroundColors, highlightColors)
         invalidate()
     }
 
