@@ -378,16 +378,7 @@ internal class StatusBarLyricGestureController(
     }
 
     private fun performOpenMiPlay() {
-        val intent = Intent(MIPLAY_DETAIL_ACTION)
-            .setPackage(MIPLAY_PACKAGE)
-            .putExtra(MIPLAY_REF_EXTRA, MIPLAY_REF_UNKNOWN)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching {
-            touchView.context.startActivity(intent)
-            HookLogger.d(TAG, "已提交MiPlay设备切换界面启动请求")
-        }.onFailure { error ->
-            HookLogger.w(TAG, "启动MiPlay设备切换界面失败", error)
-        }
+        StatusBarLyricMiPlayLauncher.open()
     }
 
     private fun performOpenMediaAppInFreeform() {
@@ -607,11 +598,6 @@ internal class StatusBarLyricGestureController(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP_FREEFORM,
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_HIDE_LYRIC,
         )
-
-        const val MIPLAY_PACKAGE = "miui.systemui.plugin"
-        const val MIPLAY_DETAIL_ACTION = "miui.intent.action.ACTIVITY_MIPLAY_DETAIL"
-        const val MIPLAY_REF_EXTRA = "ref"
-        const val MIPLAY_REF_UNKNOWN = "unknown"
 
         val SWIPE_ACTIONS = setOf(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE,

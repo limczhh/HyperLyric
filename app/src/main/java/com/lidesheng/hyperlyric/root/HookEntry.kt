@@ -40,6 +40,7 @@ import com.lidesheng.hyperlyric.root.source.LyriconSource
 import com.lidesheng.hyperlyric.root.source.RootLyricSink
 import com.lidesheng.hyperlyric.root.source.SuperLyricSource
 import com.lidesheng.hyperlyric.root.statusbar.StatusBarLyricHooker
+import com.lidesheng.hyperlyric.root.statusbar.StatusBarLyricMiPlayLauncher
 import com.lidesheng.hyperlyric.root.statusbar.StatusBarLyricRenderer
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import io.github.libxposed.api.XposedInterface.Chain
@@ -441,6 +442,7 @@ class HookEntry : XposedModule() {
         }
         StatusBarTextColorHooker.hook(this, classLoader)
         StatusBarLyricHooker.hook(this, classLoader)
+        StatusBarLyricMiPlayLauncher.hook(this, classLoader)
     }
 
     private fun installMediaCardHooks(classLoader: ClassLoader) {
