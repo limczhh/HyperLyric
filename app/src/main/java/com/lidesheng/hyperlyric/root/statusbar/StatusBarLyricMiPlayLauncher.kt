@@ -10,16 +10,18 @@ import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
 import java.util.WeakHashMap
 
-/** Reuses the notification media card's native MiPlay device-button click path. */
+/** Reuses the native MiPlay device-button click path, preferring the Super Island source. */
 internal object StatusBarLyricMiPlayLauncher {
     private const val TAG = "StatusBarLyricMiPlayLauncher"
     private const val TRANSFER_MANAGER_CLASS =
         "com.android.systemui.statusbar.notification.mediacontrol.MiuiMediaTransferManagerImpl"
     private const val CAPABILITY = "status_bar.lyric.miplay_transfer_manager"
     private const val DEVICE_BUTTON_RESOURCE = "media_seamless_image"
+    private const val SUPER_ISLAND_ROOT_CLASS = "PlayerIslandConstraintLayout"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val managers = WeakHashMap<ClassLoader, Any>()
+    // true means that the button belongs to the Super Island media view.
     private val deviceButtons = WeakHashMap<View, Boolean>()
 
     fun hook(module: XposedModule, classLoader: ClassLoader) {
@@ -99,10 +101,7 @@ internal object StatusBarLyricMiPlayLauncher {
     private fun findDeviceButton(): View? {
         synchronized(deviceButtons) {
             val candidates = deviceButtons.keys.toList()
-            return candidates.firstOrNull {
-                it.isAttachedToWindow && it.visibility == View.VISIBLE
-            } ?: candidates.firstOrNull { it.isAttachedToWindow }
-                ?: candidates.firstOrNull()
+            return chooseDeviceButton(candidates)
         }
     }
 
@@ -110,10 +109,24 @@ internal object StatusBarLyricMiPlayLauncher {
         val views = findField(manager.javaClass, "mViews")?.let { field ->
             runCatching { field.get(manager) as? Iterable<*> }.getOrNull()
         } ?: return null
-        val candidates = views.filterIsInstance<View>().toList()
-        return candidates.firstOrNull { it.isAttachedToWindow && it.visibility == View.VISIBLE }
-            ?: candidates.firstOrNull { it.isAttachedToWindow }
-            ?: candidates.firstOrNull()
+        return chooseDeviceButton(views.filterIsInstance<View>().toList())
+    }
+
+    private fun chooseDeviceButton(candidates: List<View>): View? {
+        fun List<View>.firstActive(): View? = firstOrNull {
+            it.isAttachedToWindow && it.visibility == View.VISIBLE
+        }
+
+        fun List<View>.firstAttached(): View? = firstOrNull { it.isAttachedToWindow }
+
+        val island = candidates.filter(::isSuperIslandButton)
+        val notification = candidates.filterNot(::isSuperIslandButton)
+        return island.firstActive()
+            ?: notification.firstActive()
+            ?: island.firstAttached()
+            ?: notification.firstAttached()
+            ?: island.firstOrNull()
+            ?: notification.firstOrNull()
     }
 
     private fun findField(type: Class<*>, name: String): java.lang.reflect.Field? {
@@ -135,6 +148,14 @@ internal object StatusBarLyricMiPlayLauncher {
         }.getOrDefault(false)
     }
 
+    private fun isSuperIslandButton(view: View): Boolean =
+        generateSequence(view) { it.parent as? View }.any { candidate ->
+            val name = candidate.javaClass.name
+            name == SUPER_ISLAND_ROOT_CLASS ||
+                name.endsWith(".$SUPER_ISLAND_ROOT_CLASS") ||
+                name.contains(".notification.mediaisland.")
+        }
+
     private class DeviceButtonListenerHook : Hooker {
         override fun intercept(chain: Chain): Any? {
             val view = chain.thisObject as? View
@@ -145,7 +166,7 @@ internal object StatusBarLyricMiPlayLauncher {
                     if (chain.args.firstOrNull() == null) {
                         deviceButtons.remove(view)
                     } else {
-                        deviceButtons[view] = true
+                        deviceButtons[view] = isSuperIslandButton(view)
                     }
                 }
             }
