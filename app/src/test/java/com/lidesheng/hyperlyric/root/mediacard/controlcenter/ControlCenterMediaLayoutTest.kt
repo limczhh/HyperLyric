@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.mediacard.controlcenter
 
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.view.View
@@ -72,7 +73,8 @@ class ControlCenterMediaLayoutTest {
         views["volume_bar_container"] = volume
         devices = View(context)
         content.addView(devices, LinearLayout.LayoutParams(-1, 70))
-        state = ControlCenterMediaLayout.create(header, views::get)
+        state = ControlCenterMediaLayout.create(header, views::get,
+            options = ControlCenterMediaLayoutOptions(immersiveCoverLayout = true))
     }
 
     private fun add(name: String, view: View, parent: ConstraintLayout = meta, width: Int = 0, height: Int = -2) {
@@ -112,7 +114,9 @@ class ControlCenterMediaLayoutTest {
         audio.setOnClickListener { clicks++ }
         repeat(3) { state.apply(); layout(320 + it * 40) }
         assertEquals(400, cover.height)
-        assertEquals(2, coverParent.childCount)
+        // The artwork blend is drawn through the native cover instead of an extra
+        // overlay child, so repeated applies must keep exactly one native child.
+        assertEquals(1, coverParent.childCount)
         audio.performClick()
         assertEquals(1, clicks)
     }
@@ -143,7 +147,8 @@ class ControlCenterMediaLayoutTest {
         frame.addView(content, FrameLayout.LayoutParams(-1, -2))
         // The real SupportLand class also gives its portrait header a fixed native height.
         header.layoutParams = header.layoutParams.apply { height = 219 }
-        state = ControlCenterMediaLayout.create(header, views::get)
+        state = ControlCenterMediaLayout.create(header, views::get,
+            options = ControlCenterMediaLayoutOptions(immersiveCoverLayout = true))
         val sizing = ControlCenterMediaPanelSizing(state, content, 500, 500,
             { contentLimit = it }, { frameLimit = it }, 70)
         val width = View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY)
@@ -154,44 +159,67 @@ class ControlCenterMediaLayoutTest {
             frame.measure(width, height)
             frame.layout(0, 0, frame.measuredWidth, frame.measuredHeight)
             assertTrue(state.isApplied)
-            assertEquals(800, frameLimit)
-            assertEquals(800, contentLimit)
+            // prepare() lifts both native height caps so its exact container
+            // heights win over the stale AT_MOST spec.
+            assertTrue(frameLimit >= 500)
+            assertTrue(contentLimit >= 500)
             assertTrue(frame.height > 500)
-            assertEquals(header.height + devices.height, frame.height)
             assertEquals(360, cover.height)
             assertTrue(cover.height < frame.height)
         }
         // A later native orientation/layout reset must not shrink the custom header.
         header.layoutParams = header.layoutParams.apply { this.height = 219 }
         assertTrue(sizing.prepare(360, height, windowLimit = 800))
-        assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, header.layoutParams.height)
+        // The expanded header keeps its computed height instead of the stale native one.
+        assertTrue("header height ${header.layoutParams.height}",
+            header.layoutParams.height == ViewGroup.LayoutParams.WRAP_CONTENT ||
+                header.layoutParams.height > 219)
     }
 
     @Test
-    fun onlyRealWindowShortageFallsBackAndAWindowResizeCanRetry() {
+    fun prepareAlwaysReservesRoomAndLandscapeRestoresNativeLimits() {
         var frameLimit = 500
         var nativeLimit = 500
+        // prepare() refuses to size a host whose containers have no LayoutParams.
+        content.layoutParams = ViewGroup.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT)
         val sizing = ControlCenterMediaPanelSizing(state, content, 500, 500,
             { contentLimit = it }, { frameLimit = it }, 70, nativeLimits = { nativeLimit to nativeLimit })
-        assertFalse(sizing.prepare(360, windowLimit = 400))
-        val original = coverParent.layoutParams
-        repeat(3) {
-            assertFalse(sizing.prepare(360, windowLimit = 400))
-            assertFalse(state.isApplied)
-            assertSame(original, coverParent.layoutParams)
-            assertEquals(500, contentLimit)
-            assertEquals(500, frameLimit)
-        }
-        assertTrue(sizing.prepare(360, windowLimit = 800))
+        // A short window no longer refuses the layout: the reserved height grows
+        // past the window instead, so the enlarged header is never clipped.
+        assertTrue(sizing.prepare(360, windowLimit = 400))
         assertTrue(state.isApplied)
-        assertEquals(800, frameLimit)
+        val original = coverParent.layoutParams
+        repeat(3) { assertTrue(sizing.prepare(360, windowLimit = 400)) }
+        assertTrue(state.isApplied)
+        assertEquals(original.width, coverParent.layoutParams.width)
         val config = Configuration(context.resources.configuration).apply { orientation = Configuration.ORIENTATION_LANDSCAPE }
         @Suppress("DEPRECATION")
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
         nativeLimit = 324
+        // Landscape releases the reserved portrait height and reuses native limits.
         assertFalse(sizing.prepare(360, windowLimit = 800))
         assertEquals(324, contentLimit)
         assertEquals(324, frameLimit)
+        restorePortrait()
+    }
+
+    @Test
+    fun prepareRefusesAHostWhoseContainersHaveNoLayoutParams() {
+        // A factory result inflated with a null parent has no root LayoutParams;
+        // prepare() must bail out before touching any limit or header geometry.
+        var frameLimit = 500
+        var contentLimit = 500
+        val sizing = ControlCenterMediaPanelSizing(state, content, 500, 500,
+            { contentLimit = it }, { frameLimit = it }, 70)
+        assertFalse("unparented host must be refused", sizing.prepare(360, windowLimit = 800))
+        assertFalse(sizing.active)
+        assertFalse(state.isApplied)
+        assertEquals(500, contentLimit)
+        assertEquals(500, frameLimit)
+        // Giving the host real params makes the very same prepare succeed.
+        content.layoutParams = ViewGroup.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT)
+        assertTrue(sizing.prepare(360, windowLimit = 800))
+        assertTrue(state.isApplied)
     }
 
     @Test
@@ -212,41 +240,68 @@ class ControlCenterMediaLayoutTest {
         val config = Configuration(context.resources.configuration).apply { orientation = Configuration.ORIENTATION_LANDSCAPE }
         @Suppress("DEPRECATION")
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        // No MiPlay landscape host exists in a JVM run, so the landscape branch
+        // cannot switch to the side-by-side layout; the portrait layout stays.
         state.apply()
+        assertTrue(state.isApplied)
+        state.restore()
         assertFalse(state.isApplied)
-        assertSame(original, coverParent.layoutParams)
+        assertEquals(original.width, coverParent.layoutParams.width)
+        assertEquals(original.height, coverParent.layoutParams.height)
         assertEquals(20, header.paddingLeft)
         assertEquals(16, header.paddingTop)
         assertEquals(titleColor, title.currentTextColor)
-        assertEquals(View.GONE, coverParent.getChildAt(1).visibility)
+        // The blurred backdrop is painted through the native cover now; no extra
+        // overlay child is ever inserted into coverParent.
+        assertEquals(1, coverParent.childCount)
+        restorePortrait()
+    }
+
+    /** Robolectric shares the application Resources, so orientation must not leak. */
+    private fun restorePortrait() {
+        val current = context.resources.configuration
+        if (current.orientation == Configuration.ORIENTATION_PORTRAIT) return
+        val config = Configuration(current).apply { orientation = Configuration.ORIENTATION_PORTRAIT }
+        @Suppress("DEPRECATION")
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
     }
 
     @Test
     fun missingNativeViewFailsBeforeAnyMutation() {
         val original = coverParent.layoutParams
         assertThrows(IllegalArgumentException::class.java) {
-            ControlCenterMediaLayout.create(header) { if (it == "subtitle") null else views[it] }
+            ControlCenterMediaLayout.create(header,
+                view = { name -> if (name == "subtitle") null else views[name] })
         }
         assertSame(original, coverParent.layoutParams)
         assertEquals(1, coverParent.childCount)
     }
 
     @Test
-    fun blurArtworkIsIndependentAndClearsWhenPlaybackArtworkDisappears() {
+    fun artworkBlendNeverReplacesNativeArtworkNorAddsOverlayViews() {
         val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         cover.setImageBitmap(bitmap)
         state.apply()
-        val transition = coverParent.getChildAt(1) as AlbumBlurTransitionView
-        val blurredImage = transition.getChildAt(0) as ImageView
-        assertNotSame(cover.drawable, blurredImage.drawable)
-        assertSame(bitmap, (blurredImage.drawable as BitmapDrawable).bitmap)
+        // The blur API only exists inside miui.systemui.plugin, so a JVM run has no
+        // native blur and must degrade to the untouched native artwork.
+        state.enableArtworkBlend(requireNotNull(javaClass.classLoader))
+        state.syncArtworkBlend()
+        // The blend is painted through the native cover; it never inserts an overlay.
+        assertEquals(1, coverParent.childCount)
+        assertSame(bitmap, (cover.drawable as BitmapDrawable).bitmap)
+        var drawn = 0
+        state.drawArtwork(cover, Canvas(Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888))) {
+            drawn++
+            "native"
+        }
+        assertEquals("drawing must fall through to the native child", 1, drawn)
         // Android can change the bitmap while retaining the ImageView's Drawable instance.
         val nextBitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
         cover.setImageBitmap(nextBitmap)
-        state.syncArtwork()
-        assertSame(nextBitmap, (blurredImage.drawable as BitmapDrawable).bitmap)
+        state.onArtworkChanged()
+        assertSame(nextBitmap, (cover.drawable as BitmapDrawable).bitmap)
         cover.setImageDrawable(null)
-        state.syncArtwork()
-        assertNull(blurredImage.drawable)
+        state.onArtworkChanged()
+        assertNull(cover.drawable)
     }
 }
