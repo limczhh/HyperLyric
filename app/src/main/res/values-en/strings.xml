@@ -152,6 +152,7 @@
     <string name="option_status_bar_lyric_gesture_toggle_playback">Play/Pause</string>
     <string name="option_status_bar_lyric_gesture_temporary_clock">Show clock temporarily</string>
     <string name="option_status_bar_lyric_gesture_open_media_app_freeform">Open media app in a Freeform window</string>
+    <string name="option_status_bar_lyric_gesture_open_miplay">Open Mi Play interface</string>
     <string name="option_status_bar_lyric_gesture_temporary_hide_lyric">Hide lyrics temporarily</string>
     <string name="option_status_bar_lyric_gesture_previous_track">Previous track</string>
     <string name="option_status_bar_lyric_gesture_next_track">Next track</string>

@@ -152,6 +152,7 @@
     <string name="option_status_bar_lyric_gesture_toggle_playback">暂停/播放</string>
     <string name="option_status_bar_lyric_gesture_temporary_clock">临时显示时钟</string>
     <string name="option_status_bar_lyric_gesture_open_media_app_freeform">小窗打开媒体应用</string>
+    <string name="option_status_bar_lyric_gesture_open_miplay">打开小米妙播界面</string>
     <string name="option_status_bar_lyric_gesture_temporary_hide_lyric">临时隐藏歌词</string>
     <string name="option_status_bar_lyric_gesture_previous_track">上一首</string>
     <string name="option_status_bar_lyric_gesture_next_track">下一首</string>

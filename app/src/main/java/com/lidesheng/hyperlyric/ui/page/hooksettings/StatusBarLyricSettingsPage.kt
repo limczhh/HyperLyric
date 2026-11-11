@@ -229,6 +229,7 @@ fun StatusBarLyricSettingsPage() {
         RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TOGGLE_PLAYBACK,
         RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_CLOCK,
         RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP,
+        RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MIPLAY,
         RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP_FREEFORM,
         RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_HIDE_LYRIC,
     )
@@ -237,6 +238,7 @@ fun StatusBarLyricSettingsPage() {
         stringResource(R.string.option_status_bar_lyric_gesture_toggle_playback),
         stringResource(R.string.option_status_bar_lyric_gesture_temporary_clock),
         stringResource(R.string.option_click_open_media),
+        stringResource(R.string.option_status_bar_lyric_gesture_open_miplay),
         stringResource(R.string.option_status_bar_lyric_gesture_open_media_app_freeform),
         stringResource(R.string.option_status_bar_lyric_gesture_temporary_hide_lyric),
     )
