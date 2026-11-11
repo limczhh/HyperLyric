@@ -11,6 +11,7 @@ import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import com.lidesheng.hyperlyric.common.LyricTypePreference
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.root.HookEntry
@@ -18,11 +19,13 @@ import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.hooks.IslandPlaybackControllerResolver
 import com.lidesheng.hyperlyric.root.utils.HookLogger
 import com.lidesheng.hyperlyric.root.presentation.LyricPresentationScheduler
+import java.lang.reflect.Method
 
 /** Handles gestures that start inside the status-bar lyric view or Clock. */
 internal class StatusBarLyricGestureController(
     private val touchView: View,
     private val allowHorizontalSwipe: Boolean = true,
+    private val nativeTouchHost: View? = null,
 ) : View.OnTouchListener {
     private val gestureDetector = GestureDetector(
         touchView.context,
@@ -58,25 +61,43 @@ internal class StatusBarLyricGestureController(
     private var downY = 0f
     private var ignoreCurrentSequence = false
     private var longPressRecognized = false
+    private var nativeHandoff = false
+    private var downEvent: MotionEvent? = null
+    private var nativeTouchHandlerResolved = false
+    private var nativeTouchHandler: NativeTouchHandler? = null
+    private var nativeTouchFailureLogged = false
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
+        var handedOffAtThisEvent = false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val snapshot = readGestureSnapshot() ?: run {
                     gestureSnapshot = null
                     return false
                 }
+                downEvent?.recycle()
+                downEvent = MotionEvent.obtain(event)
                 gestureSnapshot = snapshot
                 downX = event.x
                 downY = event.y
                 ignoreCurrentSequence = false
                 longPressRecognized = false
+                nativeHandoff = false
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> ignoreCurrentSequence = true
 
+            MotionEvent.ACTION_MOVE -> {
+                if (!ignoreCurrentSequence && !longPressRecognized &&
+                    !nativeHandoff && shouldHandOffToNative(event)
+                ) {
+                    nativeHandoff = handOffToNative(event)
+                    handedOffAtThisEvent = nativeHandoff
+                }
+            }
+
             MotionEvent.ACTION_UP -> {
-                if (!ignoreCurrentSequence && !longPressRecognized) {
+                if (!nativeHandoff && !ignoreCurrentSequence && !longPressRecognized) {
                     dispatchHorizontalSwipe(event)
                 }
             }
@@ -84,21 +105,131 @@ internal class StatusBarLyricGestureController(
             MotionEvent.ACTION_CANCEL -> ignoreCurrentSequence = true
         }
 
+        if (nativeHandoff) {
+            if (!handedOffAtThisEvent && event.actionMasked != MotionEvent.ACTION_DOWN) {
+                dispatchToNative(event)
+            }
+            if (event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_CANCEL
+            ) {
+                resetSequence()
+            }
+            return true
+        }
+
         val handledByDetector = gestureDetector.onTouchEvent(event)
         val handled = gestureSnapshot != null || handledByDetector
         if (event.actionMasked == MotionEvent.ACTION_UP ||
             event.actionMasked == MotionEvent.ACTION_CANCEL
         ) {
-            gestureSnapshot = null
-            ignoreCurrentSequence = false
-            longPressRecognized = false
+            resetSequence()
         }
         return handled
     }
 
     fun release() {
+        if (nativeHandoff) {
+            downEvent?.let { down ->
+                val cancel = MotionEvent.obtain(down)
+                cancel.action = MotionEvent.ACTION_CANCEL
+                dispatchToNative(cancel)
+                cancel.recycle()
+            }
+        }
+        downEvent?.recycle()
+        downEvent = null
         gestureSnapshot = null
         ignoreCurrentSequence = true
+        nativeHandoff = false
+    }
+
+    private fun shouldHandOffToNative(event: MotionEvent): Boolean {
+        val touchSlop = ViewConfiguration.get(touchView.context).scaledTouchSlop
+        val deltaX = event.x - downX
+        val deltaY = event.y - downY
+        return kotlin.math.abs(deltaY) > touchSlop &&
+                kotlin.math.abs(deltaY) > kotlin.math.abs(deltaX) * VERTICAL_DOMINANCE_RATIO
+    }
+
+    private fun handOffToNative(event: MotionEvent): Boolean {
+        nativeTouchHost ?: return false
+        val down = downEvent ?: return false
+        // PhoneStatusBarView deliberately keeps onInterceptTouchEvent false. Once this child
+        // accepted ACTION_DOWN, the parent cannot reclaim the stream, so replay the buffered
+        // beginning directly into the native status-bar handler.
+        cancelGestureDetector(event)
+        touchView.parent?.requestDisallowInterceptTouchEvent(false)
+        dispatchToNative(down)
+        dispatchToNative(event)
+        HookLogger.d(TAG, "状态栏歌词纵向手势已交给原生处理")
+        return true
+    }
+
+    private fun cancelGestureDetector(event: MotionEvent) {
+        val cancel = MotionEvent.obtain(event)
+        cancel.action = MotionEvent.ACTION_CANCEL
+        gestureDetector.onTouchEvent(cancel)
+        cancel.recycle()
+    }
+
+    private fun dispatchToNative(event: MotionEvent) {
+        val host = nativeTouchHost ?: return
+        val forwarded = MotionEvent.obtain(event)
+        try {
+            val touchLocation = IntArray(2)
+            val hostLocation = IntArray(2)
+            touchView.getLocationOnScreen(touchLocation)
+            host.getLocationOnScreen(hostLocation)
+            forwarded.offsetLocation(
+                (touchLocation[0] - hostLocation[0]).toFloat(),
+                (touchLocation[1] - hostLocation[1]).toFloat(),
+            )
+            val handler = resolveNativeTouchHandler(host)
+            if (handler != null) {
+                runCatching {
+                    handler.method.invoke(handler.instance, forwarded)
+                }.onFailure { error ->
+                    if (!nativeTouchFailureLogged) {
+                        nativeTouchFailureLogged = true
+                        HookLogger.w(TAG, "转交原生状态栏触摸事件失败", error)
+                    }
+                }
+            } else {
+                runCatching { host.onTouchEvent(forwarded) }
+            }
+        } finally {
+            forwarded.recycle()
+        }
+    }
+
+    private fun resolveNativeTouchHandler(host: View): NativeTouchHandler? {
+        if (nativeTouchHandlerResolved) return nativeTouchHandler
+        nativeTouchHandlerResolved = true
+        var type: Class<*>? = host.javaClass
+        val field = generateSequence {
+            val current = type ?: return@generateSequence null
+            type = current.superclass
+            runCatching { current.getDeclaredField("mTouchEventHandler") }.getOrNull()
+        }.firstOrNull() ?: return null
+        val instance = runCatching {
+            field.isAccessible = true
+            field.get(host)
+        }.getOrNull() ?: return null
+        val method = runCatching {
+            instance.javaClass.getMethod("onTouchEvent", MotionEvent::class.java).apply {
+                isAccessible = true
+            }
+        }.getOrNull() ?: return null
+        return NativeTouchHandler(instance, method).also { nativeTouchHandler = it }
+    }
+
+    private fun resetSequence() {
+        gestureSnapshot = null
+        ignoreCurrentSequence = false
+        longPressRecognized = false
+        nativeHandoff = false
+        downEvent?.recycle()
+        downEvent = null
     }
 
     private fun dispatchHorizontalSwipe(event: MotionEvent): Boolean {
@@ -442,9 +573,15 @@ internal class StatusBarLyricGestureController(
                     swipeRightAction != RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE
     }
 
+    private data class NativeTouchHandler(
+        val instance: Any,
+        val method: Method,
+    )
+
     private companion object {
         const val TAG = "StatusBarLyricGestureController"
         const val HORIZONTAL_DOMINANCE_RATIO = 1.35f
+        const val VERTICAL_DOMINANCE_RATIO = 1.15f
         val TAP_ACTIONS = setOf(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_NONE,
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TOGGLE_PLAYBACK,
@@ -453,6 +590,7 @@ internal class StatusBarLyricGestureController(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_OPEN_MEDIA_APP_FREEFORM,
             RootConstants.STATUS_BAR_LYRIC_GESTURE_ACTION_TEMPORARY_HIDE_LYRIC,
         )
+
         val SWIPE_ACTIONS = setOf(
             RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_NONE,
             RootConstants.STATUS_BAR_LYRIC_GESTURE_SWIPE_PREVIOUS,

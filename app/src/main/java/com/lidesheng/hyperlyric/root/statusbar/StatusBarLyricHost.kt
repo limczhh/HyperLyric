@@ -469,7 +469,10 @@ internal class StatusBarLyricHost(
             lyrics = RichLyricLineView(root.context).apply {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 IslandLyricViewController.configureProjection(this)
-                gestureController = StatusBarLyricGestureController(this)
+                gestureController = StatusBarLyricGestureController(
+                    touchView = this,
+                    nativeTouchHost = root,
+                )
                 setOnTouchListener(gestureController)
             }
             row.addView(icon, LinearLayout.LayoutParams(0, 0))
@@ -663,6 +666,7 @@ internal class StatusBarLyricHost(
         val controller = StatusBarLyricGestureController(
             touchView = clock,
             allowHorizontalSwipe = false,
+            nativeTouchHost = rootReference.get(),
         )
         clockGestureReference = WeakReference(clock)
         clockGestureController = controller
