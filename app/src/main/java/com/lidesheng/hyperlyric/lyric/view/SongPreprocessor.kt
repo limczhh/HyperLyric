@@ -87,10 +87,23 @@ internal class SongPreprocessor(
                 current.end + INTERLUDE_COUNTDOWN_DELAY_MS
             }
             if (begin >= next.begin) continue
-            countdowns.add(TimedLine(countdownPlaceholderLine(begin, next.begin)))
+            countdowns.add(TimedLine(countdownPlaceholderLine(begin, next.begin, countdownDotStyle())))
         }
         return countdowns
     }
+
+    /**
+     * 当前占位符选项对应的圆点样式。
+     *
+     * 第 5 个选项控制**所有**倒计时占位行的样式（前奏行、间奏行、无歌词行），
+     * 因为它们走的是同一条管线；否则会出现「前奏是 AMLL 风格、间奏还是旧风格」的割裂。
+     */
+    private fun countdownDotStyle(): CountdownDotStyle =
+        if (placeholder == TitleSlot.COUNTDOWN_AMLL) {
+            CountdownDotStyle.AMLL
+        } else {
+            CountdownDotStyle.LEGACY
+        }
 
     private fun hasPreciseWordTiming(line: TimedLine): Boolean {
         val words = line.words ?: return false
@@ -118,6 +131,11 @@ internal class SongPreprocessor(
     internal fun noLyricsPlaceholder(song: Song): RichLyricLine? = when (placeholder) {
         TitleSlot.NONE -> null
         TitleSlot.COUNTDOWN -> countdownPlaceholderLine(0L, Long.MAX_VALUE)
+        TitleSlot.COUNTDOWN_AMLL -> countdownPlaceholderLine(
+            0L,
+            Long.MAX_VALUE,
+            CountdownDotStyle.AMLL
+        )
         TitleSlot.NAME_ARTIST,
         TitleSlot.NAME -> songTitle(song)?.let {
             titleLine(Long.MAX_VALUE, Long.MAX_VALUE, it)
@@ -133,6 +151,11 @@ internal class SongPreprocessor(
         return when (placeholder) {
             TitleSlot.NONE -> null
             TitleSlot.COUNTDOWN -> countdownPlaceholderLine(0L, end)
+            TitleSlot.COUNTDOWN_AMLL -> countdownPlaceholderLine(
+                0L,
+                end,
+                CountdownDotStyle.AMLL
+            )
             TitleSlot.NAME_ARTIST,
             TitleSlot.NAME -> songTitle(song)?.let {
                 titleLine(end, end, it)
@@ -169,7 +192,8 @@ internal class SongPreprocessor(
             }
 
             TitleSlot.NAME -> name?.takeIf { it.isNotBlank() }
-            TitleSlot.COUNTDOWN -> null
+            TitleSlot.COUNTDOWN,
+            TitleSlot.COUNTDOWN_AMLL -> null
         }
     }
 }
