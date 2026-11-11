@@ -763,7 +763,8 @@ object LyriconDataBridge {
             RootConstants.PLACEHOLDER_FORMAT_NONE,
             RootConstants.PLACEHOLDER_FORMAT_TITLE_ARTIST,
             RootConstants.PLACEHOLDER_FORMAT_TITLE,
-            RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN -> format
+            RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN,
+            RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN_AMLL -> format
 
             else -> RootConstants.DEFAULT_HOOK_PLACEHOLDER_FORMAT
         }
@@ -774,6 +775,7 @@ object LyriconDataBridge {
             RootConstants.PLACEHOLDER_FORMAT_NONE -> TitleSlot.NONE
             RootConstants.PLACEHOLDER_FORMAT_TITLE -> TitleSlot.NAME
             RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN -> TitleSlot.COUNTDOWN
+            RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN_AMLL -> TitleSlot.COUNTDOWN_AMLL
             else -> TitleSlot.NAME_ARTIST
         }
     }
