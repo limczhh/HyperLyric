@@ -16,23 +16,21 @@ internal object StatusBarLyricMiPlayLauncher {
     private const val TRANSFER_MANAGER_CLASS =
         "com.android.systemui.statusbar.notification.mediacontrol.MiuiMediaTransferManagerImpl"
     private const val CAPABILITY = "status_bar.lyric.miplay_transfer_manager"
+    private const val DEVICE_BUTTON_RESOURCE = "media_seamless_image"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val managers = WeakHashMap<ClassLoader, Any>()
+    private val deviceButtons = WeakHashMap<View, Boolean>()
 
     fun hook(module: XposedModule, classLoader: ClassLoader) {
+        hookDeviceButtonListener(module)
+
         val managerClass = runCatching {
             classLoader.loadClass(TRANSFER_MANAGER_CLASS)
-        }.getOrNull() ?: run {
-            HookLogger.w(TAG, "通知媒体设备按钮 Hook 未安装: reason=manager_class_unavailable")
-            return
-        }
+        }.getOrNull() ?: return
 
         val constructors = managerClass.declaredConstructors
-        if (constructors.isEmpty()) {
-            HookLogger.w(TAG, "通知媒体设备按钮 Hook 未安装: reason=constructor_unavailable")
-            return
-        }
+        if (constructors.isEmpty()) return
 
         runCatching {
             constructors.forEach { constructor ->
@@ -49,14 +47,9 @@ internal object StatusBarLyricMiPlayLauncher {
     }
 
     fun open(): Boolean {
-        val manager = synchronized(managers) {
-            managers.values.firstOrNull()
+        val source = findDeviceButton() ?: synchronized(managers) {
+            managers.values.firstOrNull()?.let(::findManagerDeviceButton)
         } ?: run {
-            HookLogger.w(TAG, "无法打开通知媒体妙播界面: transfer_manager_unavailable")
-            return false
-        }
-
-        val source = findDeviceButton(manager) ?: run {
             HookLogger.w(TAG, "无法打开通知媒体妙播界面: device_button_unavailable")
             return false
         }
@@ -78,13 +71,42 @@ internal object StatusBarLyricMiPlayLauncher {
         return true
     }
 
+    private fun hookDeviceButtonListener(module: XposedModule) {
+        val method = runCatching {
+            View::class.java.getDeclaredMethod(
+                "setOnClickListener",
+                View.OnClickListener::class.java,
+            ).apply { isAccessible = true }
+        }.getOrNull() ?: return
+
+        runCatching {
+            module.managedHook(
+                executable = method,
+                capability = "$CAPABILITY.device_button_listener",
+                hooker = DeviceButtonListenerHook(),
+            )
+        }.onFailure { error ->
+            HookLogger.w(TAG, "通知媒体设备按钮监听 Hook 安装失败", error)
+        }
+    }
+
     private fun register(manager: Any, classLoader: ClassLoader) {
         synchronized(managers) {
             managers[classLoader] = manager
         }
     }
 
-    private fun findDeviceButton(manager: Any): View? {
+    private fun findDeviceButton(): View? {
+        synchronized(deviceButtons) {
+            val candidates = deviceButtons.keys.toList()
+            return candidates.firstOrNull {
+                it.isAttachedToWindow && it.visibility == View.VISIBLE
+            } ?: candidates.firstOrNull { it.isAttachedToWindow }
+                ?: candidates.firstOrNull()
+        }
+    }
+
+    private fun findManagerDeviceButton(manager: Any): View? {
         val views = findField(manager.javaClass, "mViews")?.let { field ->
             runCatching { field.get(manager) as? Iterable<*> }.getOrNull()
         } ?: return null
@@ -97,12 +119,38 @@ internal object StatusBarLyricMiPlayLauncher {
     private fun findField(type: Class<*>, name: String): java.lang.reflect.Field? {
         var current: Class<*>? = type
         while (current != null && current != Any::class.java) {
+            val owner = current
             runCatching {
-                current!!.getDeclaredField(name).apply { isAccessible = true }
+                owner.getDeclaredField(name).apply { isAccessible = true }
             }.getOrNull()?.let { return it }
             current = current.superclass
         }
         return null
+    }
+
+    private fun isDeviceButton(view: View): Boolean {
+        val id = view.id
+        return id != View.NO_ID && runCatching {
+            view.resources.getResourceEntryName(id) == DEVICE_BUTTON_RESOURCE
+        }.getOrDefault(false)
+    }
+
+    private class DeviceButtonListenerHook : Hooker {
+        override fun intercept(chain: Chain): Any? {
+            val view = chain.thisObject as? View
+            val matches = view?.let(::isDeviceButton) == true
+            val result = chain.proceed()
+            if (matches) {
+                synchronized(deviceButtons) {
+                    if (chain.args.firstOrNull() == null) {
+                        deviceButtons.remove(view)
+                    } else {
+                        deviceButtons[view] = true
+                    }
+                }
+            }
+            return result
+        }
     }
 
     private class ManagerConstructorHook(
