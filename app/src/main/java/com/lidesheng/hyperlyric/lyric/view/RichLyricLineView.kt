@@ -317,11 +317,19 @@ class RichLyricLineView(
 
     override fun onMeasure(wSpec: Int, hSpec: Int) {
         if (renderScale != 1.0f && renderScale > 0) {
-            val origW = MeasureSpec.getSize(wSpec)
-            val mode = MeasureSpec.getMode(wSpec)
-            val compW = (origW / renderScale).toInt()
-            super.onMeasure(MeasureSpec.makeMeasureSpec(compW, mode), hSpec)
-            setMeasuredDimension(origW, measuredHeight)
+            // Both rows are laid out before the canvas is scaled. Give them the inverse
+            // height as well as width so the secondary row is not clipped before drawing.
+            val contentWSpec = MeasureSpec.makeMeasureSpec(
+                (MeasureSpec.getSize(wSpec) / renderScale).toInt(), MeasureSpec.getMode(wSpec)
+            )
+            val contentHSpec = MeasureSpec.makeMeasureSpec(
+                (MeasureSpec.getSize(hSpec) / renderScale).toInt(), MeasureSpec.getMode(hSpec)
+            )
+            super.onMeasure(contentWSpec, contentHSpec)
+            setMeasuredDimension(
+                resolveSize(kotlin.math.ceil(measuredWidth * renderScale).toInt(), wSpec),
+                resolveSize(kotlin.math.ceil(measuredHeight * renderScale).toInt(), hSpec)
+            )
         } else {
             super.onMeasure(wSpec, hSpec)
         }

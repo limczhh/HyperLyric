@@ -286,17 +286,7 @@ internal class StatusBarLyricHost(
                 updateVisibility(wrapper, lyrics)
             },
         )
-        if (contentMode != RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
-            val contentWidthPx = metadataContentWidthPx(lyrics)
-            latestContentWidthPx = contentWidthPx
-            val desiredWidth = layoutConfig.desiredWidthPx(
-                contentWidthPx = contentWidthPx,
-                iconWidthPx = iconWidthPx,
-            ).coerceAtMost(effectiveWidthLimitPx)
-            val widthChanged = wrapper.desiredWidthPx != desiredWidth
-            wrapper.desiredWidthPx = desiredWidth
-            if (widthChanged && !widthLimitChanged) wrapper.requestLayout()
-        }
+        if (contentMode != RootConstants.ISLAND_CONTENT_MODE_LYRIC) refreshIslandWidth()
         updateIconTint(lyrics)
         updateVisibility(wrapper, lyrics)
     }
@@ -322,6 +312,7 @@ internal class StatusBarLyricHost(
             coverPaletteBackgroundIsDark = StatusBarTextColorHooker.currentBackgroundIsDark(),
         )
         updateIconTint(lyrics)
+        refreshIslandWidth()
         if (forceStyle) root.requestLayout()
     }
 
@@ -335,7 +326,6 @@ internal class StatusBarLyricHost(
         if (contentMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
             SlotContentCoordinator.updatePlaybackProgress(lyrics, position ?: clock.positionMs)
         ) {
-            latestContentWidthPx = metadataContentWidthPx(lyrics)
             refreshIslandWidth()
         }
         IslandLyricViewController.applyPlaybackSnapshot(
@@ -352,6 +342,9 @@ internal class StatusBarLyricHost(
         val wrapper = container ?: return
         if (wrapper.parent == null) return
         val config = layoutConfig ?: return
+        if (contentMode != RootConstants.ISLAND_CONTENT_MODE_LYRIC) {
+            lyricView?.let { latestContentWidthPx = metadataContentWidthPx(it) }
+        }
         val effectiveWidthLimitPx = effectiveWidthLimitPx(
             wrapper = wrapper,
             configuredLimitPx = config.widthLimitPx,
@@ -362,7 +355,7 @@ internal class StatusBarLyricHost(
 
         val requestedWidth = when {
             isDuetWidthLocked() -> effectiveWidthLimitPx
-            latestContentWidthPx > 0f -> config.desiredWidthPx(
+            latestContentWidthPx > 0f || contentMode != RootConstants.ISLAND_CONTENT_MODE_LYRIC -> config.desiredWidthPx(
                 contentWidthPx = latestContentWidthPx,
                 iconWidthPx = iconWidthPx,
             ).coerceAtMost(effectiveWidthLimitPx)
@@ -396,7 +389,8 @@ internal class StatusBarLyricHost(
         } ?: RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_CONTENT_MODE
 
     private fun metadataContentWidthPx(lyrics: RichLyricLineView): Float =
-        maxOf(lyrics.main.lineWidth, lyrics.secondary.lineWidth).coerceAtLeast(0f)
+        (maxOf(lyrics.main.lineWidth, lyrics.secondary.lineWidth) * lyrics.renderScale)
+            .coerceAtLeast(0f)
 
     fun clearLyrics() {
         val oldView = lyricView

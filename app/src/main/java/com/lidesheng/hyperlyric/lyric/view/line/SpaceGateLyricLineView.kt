@@ -303,6 +303,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         lineTimelineRenderer.updateLayout(
             _model, lineState, getSpaceGateVirtualWidth(), measuredHeight
         )
+        requestLayout()
         invalidate()
     }
 
@@ -426,6 +427,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         }
 
         refreshSizes()
+        requestLayout()
         animator.stop()
         if (!isStaticPreview && playbackActive) animator.startIfNeeded()
         invalidate()

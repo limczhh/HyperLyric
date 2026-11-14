@@ -272,6 +272,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         refreshSizes()
         syncRenderer.updateLayout(_model, lineState, measuredWidth, measuredHeight)
         lineTimelineRenderer.updateLayout(_model, lineState, measuredWidth, measuredHeight)
+        requestLayout()
         invalidate()
     }
 
@@ -392,6 +393,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         }
 
         refreshSizes()
+        requestLayout()
         animator.stop()
         if (!isStaticPreview && playbackActive) animator.startIfNeeded()
         invalidate()
