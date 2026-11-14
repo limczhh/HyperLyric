@@ -87,7 +87,7 @@ internal object IslandLyricContentRefresher {
             }
             return false
         }
-        val contentChanged = SlotContentCoordinator.applySlotContent(
+        return SlotContentCoordinator.applySlotContent(
             view,
             prefs,
             config,
@@ -110,12 +110,5 @@ internal object IslandLyricContentRefresher {
                 IslandDynamicWidthCoordinator.clearPreflight(rootView, viewTag)
             }
         )
-        if (config.resolveContentMode(mode) ==
-            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO &&
-            IslandDynamicWidthCoordinator.cacheMetadataWidth(rootView, viewTag)
-        ) {
-            return true
-        }
-        return contentChanged
     }
 }

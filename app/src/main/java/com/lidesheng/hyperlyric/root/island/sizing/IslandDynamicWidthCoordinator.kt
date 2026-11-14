@@ -30,7 +30,6 @@ internal object IslandDynamicWidthCoordinator {
     private val refreshPending = WeakHashMap<ViewGroup, Boolean>()
     private val relayoutPending = WeakHashMap<ViewGroup, Boolean>()
     private val preflightTargets = WeakHashMap<ViewGroup, MutableMap<String, Float>>()
-    private val metadataContentWidths = WeakHashMap<ViewGroup, MutableMap<String, Float>>()
 
     /** Cancel host-scoped width work before a module generation leaves the process. */
     fun prepareForHotReload() {
@@ -38,7 +37,6 @@ internal object IslandDynamicWidthCoordinator {
         synchronized(refreshPending) { refreshPending.clear() }
         synchronized(relayoutPending) { relayoutPending.clear() }
         synchronized(preflightTargets) { preflightTargets.clear() }
-        synchronized(metadataContentWidths) { metadataContentWidths.clear() }
     }
 
     fun requestRefresh(rootView: ViewGroup) {
@@ -90,36 +88,14 @@ internal object IslandDynamicWidthCoordinator {
             !IslandPresentationCoordinator.isCurrentHost(hostToken)
         ) return false
 
-        val overrides = synchronized(preflightTargets) {
-            val rootTargets = preflightTargets.getOrPut(rootView) { hashMapOf() }
-            rootTargets[viewTag] = contentWidthPx
-            rootTargets.toMap()
+        synchronized(preflightTargets) {
+            preflightTargets.getOrPut(rootView) { hashMapOf() }[viewTag] = contentWidthPx
         }
-        val changed = refreshDynamicSlotWidths(rootView, config, overrides)
+        val changed = refreshDynamicSlotWidths(rootView, config)
         if (changed) {
             scheduleSystemRelayout(rootView, hostToken)
         }
         return changed
-    }
-
-    /**
-     * Stores the currently rendered music-info width for later lyric refreshes.
-     * Music metadata normally changes only when the media item changes, while lyric lines can
-     * change frequently; keeping this value per host avoids re-reading the metadata view on every
-     * lyric update.
-     */
-    fun cacheMetadataWidth(rootView: ViewGroup, viewTag: String): Boolean {
-        val view = rootView.findViewWithTag<View>(viewTag) ?: return false
-        val contentWidthPx = metadataContentWidthPx(view) ?: return false
-        return synchronized(metadataContentWidths) {
-            val rootWidths = metadataContentWidths.getOrPut(rootView) { hashMapOf() }
-            if (rootWidths[viewTag] == contentWidthPx) {
-                false
-            } else {
-                rootWidths[viewTag] = contentWidthPx
-                true
-            }
-        }
     }
 
     fun clearPreflight(rootView: ViewGroup, viewTag: String) {
@@ -134,10 +110,13 @@ internal object IslandDynamicWidthCoordinator {
 
     private fun refreshDynamicSlotWidths(
         rootView: ViewGroup,
-        config: IslandSlotRuntimeConfig,
-        contentWidthOverrides: Map<String, Float> = emptyMap()
+        config: IslandSlotRuntimeConfig
     ): Boolean {
         if (!config.geometry.isDynamicWidth) return false
+        // Every refresh must preserve candidates that are waiting for their line commit.
+        val contentWidthOverrides = synchronized(preflightTargets) {
+            preflightTargets[rootView]?.toMap().orEmpty()
+        }
 
         // 非分离模式保留原有对唱宽度锁定；分离模式按各槽位实际内容自适应。
         val lockedToMaxWidth = shouldLockToMaxWidth(config)
@@ -219,54 +198,26 @@ internal object IslandDynamicWidthCoordinator {
         if (lyricOnly && contentMode == RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO) {
             return null
         }
+        val view = rootView.findViewWithTag<View>(viewTag) ?: return null
         val contentWidthPx = when (contentMode) {
-            RootConstants.ISLAND_CONTENT_MODE_LYRIC -> {
-                val lyricView = rootView.findViewWithTag<View>(viewTag) ?: return null
-                when (lyricView) {
-                    is RichLyricLineView -> contentWidthOverridePx ?: lyricView.main.lineWidth
-                    is SpaceGateRichLyricLineView -> contentWidthOverridePx ?: maxOf(
-                        lyricView.main.lineWidth,
-                        lyricView.secondary.lineWidth
-                    )
-                    else -> return null
-                }
-            }
-
-            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO -> {
-                metadataContentWidthPx(rootView, viewTag) ?: return null
-            }
-
-            else -> return null
-        }
+            RootConstants.ISLAND_CONTENT_MODE_LYRIC ->
+                contentWidthOverridePx ?: renderedContentWidthPx(view)
+            RootConstants.ISLAND_CONTENT_MODE_CUSTOM_MUSIC_INFO -> renderedContentWidthPx(view)
+            else -> null
+        } ?: return null
         return IslandLyricWidthCalculator.baseWidthDp(
             contentWidthPx = contentWidthPx,
             spec = dynamicLyricWidthSpec(rootView, parentName, config)
         )
     }
 
-    private fun metadataContentWidthPx(rootView: ViewGroup, viewTag: String): Float? {
-        val cachedWidth = synchronized(metadataContentWidths) {
-            metadataContentWidths[rootView]?.get(viewTag)
-        }
-        if (cachedWidth != null) return cachedWidth
-
-        val view = rootView.findViewWithTag<View>(viewTag) ?: return null
-        val measuredWidth = metadataContentWidthPx(view) ?: return null
-        synchronized(metadataContentWidths) {
-            metadataContentWidths.getOrPut(rootView) { hashMapOf() }[viewTag] = measuredWidth
-        }
-        return measuredWidth
-    }
-
-    private fun metadataContentWidthPx(view: View): Float? {
-        return when (view) {
-            is RichLyricLineView -> maxOf(view.main.lineWidth, view.secondary.lineWidth)
-            is SpaceGateRichLyricLineView -> maxOf(
-                view.main.lineWidth,
-                view.secondary.lineWidth
-            )
-            else -> null
-        }
+    /** Row models already retain text widths; read the current view instead of a second cache. */
+    private fun renderedContentWidthPx(view: View): Float? = when (view) {
+        is RichLyricLineView ->
+            maxOf(view.main.lineWidth, view.secondary.lineWidth) * view.renderScale
+        is SpaceGateRichLyricLineView ->
+            maxOf(view.main.lineWidth, view.secondary.lineWidth) * view.renderScale
+        else -> null
     }
 
     private fun updateDynamicSlotWidth(
