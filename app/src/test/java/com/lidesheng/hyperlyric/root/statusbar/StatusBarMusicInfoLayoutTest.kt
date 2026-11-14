@@ -36,6 +36,7 @@ class StatusBarMusicInfoLayoutTest {
     @Before
     fun setup() {
         LyriconDataBridge.clearState()
+        LyriconDataBridge.updateSourceState(true, null)
         activity = Robolectric.buildActivity(Activity::class.java).setup()
         val context = activity.get()
         prefs = context.getSharedPreferences("statusbar-metadata", Context.MODE_PRIVATE)

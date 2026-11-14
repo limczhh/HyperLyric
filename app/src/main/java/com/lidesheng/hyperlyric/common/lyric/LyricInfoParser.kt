@@ -42,11 +42,10 @@ object LyricInfoParser {
             val songId = obj.optionalText("songId")
             val songMid = obj.songMidText()
 
-            val parsedPrimary = when {
-                rawLyric != null -> parseLyricLines(rawLyric, enhanced = true) ?: return null
-                lyricRaw != null -> parseLyricLines(lyricRaw, enhanced = false) ?: return null
-                else -> emptyList()
-            }
+            // A valid response without supported lyric lines still confirms source ownership.
+            val parsedPrimary = rawLyric?.let { parseLyricLines(it, enhanced = true) }
+                ?: lyricRaw?.let { parseLyricLines(it, enhanced = false) }
+                ?: emptyList()
             val resultLines = if (parsedPrimary.isEmpty()) {
                 emptyList()
             } else {
@@ -260,7 +259,7 @@ object LyricInfoParser {
     }
 
     private fun JSONObject.optionalText(key: String): String? =
-        optString(key, "").trim().takeIf { it.isNotEmpty() }
+        if (isNull(key)) null else optString(key, "").trim().takeIf { it.isNotEmpty() }
 
     private fun JSONObject.translationText(): String? = TRANSLATION_KEYS
         .asSequence()

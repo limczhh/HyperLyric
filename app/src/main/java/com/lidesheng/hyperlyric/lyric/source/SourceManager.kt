@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.lyric.source
 
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.common.HyperLogger
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
@@ -119,6 +120,9 @@ class SourceManager(
                 if (accepting) block(downstream)
             }
         }
+
+        override fun onSourceStateChanged(sourceAvailable: Boolean, mediaIdentity: MediaIdentity?) =
+            dispatch { it.onSourceStateChanged(sourceAvailable, mediaIdentity) }
 
         override fun onSongChanged(song: Song?) = dispatch { it.onSongChanged(song) }
 

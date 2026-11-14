@@ -48,6 +48,7 @@ class LyricMusicInfoReplacementTest {
             .putBoolean(RootConstants.KEY_HOOK_ANIM_ENABLE, false)
             .commit()
         LyriconDataBridge.clearState()
+        LyriconDataBridge.updateSourceState(true, null)
         LyriconDataBridge.updateTailTimeoutDelaySeconds(1)
         LyriconDataBridge.updateLyricPreviewEnabled(false)
         LyriconDataBridge.updateLongInterludeCountdownEnabled(false)

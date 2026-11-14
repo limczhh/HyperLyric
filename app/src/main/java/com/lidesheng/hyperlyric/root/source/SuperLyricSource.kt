@@ -4,6 +4,7 @@ import com.hchen.superlyricapi.ISuperLyricReceiver
 import com.hchen.superlyricapi.SuperLyricData
 import com.hchen.superlyricapi.SuperLyricHelper
 import com.hchen.superlyricapi.SuperLyricLine
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
@@ -40,7 +41,7 @@ class SuperLyricSource : LyricSource {
         this.sink = sink
         val application = app ?: return
         val streams = LinkedHashMap<String, PublisherStream>()
-        val owner = LyricSessionArbiter(application, sink, 50L) { streams.remove(it) }
+        val owner = LyricSessionArbiter(application, sink, 50L) { streams.remove(it)?.reset() }
         arbiter = owner
         owner.start()
 
@@ -118,6 +119,14 @@ class SuperLyricSource : LyricSource {
         private var activeLyricId: String? = null
         private var fullSong: Song? = null
 
+        fun reset() {
+            activePublisher = null
+            playbackStarted = false
+            clearMetadata()
+            activeLyricId = null
+            fullSong = null
+        }
+
         fun handleLyric(publisher: String, rawData: SuperLyricData) {
             val currentSink = sink ?: return
 
@@ -145,6 +154,8 @@ class SuperLyricSource : LyricSource {
                     currentSink.onStop()
                 }
             }
+            currentSink.onSourceStateChanged(true, MediaIdentity(packageName = publisher))
+            activePublisher = publisher
             if (newLyricId != null) activeLyricId = newLyricId
 
             if (data.hasTitle()) lastMetadataTitle = data.title

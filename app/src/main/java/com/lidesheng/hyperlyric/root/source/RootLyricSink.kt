@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.SystemClock
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
@@ -96,6 +97,17 @@ internal class RootLyricSink(
 
     init {
         MediaMetadataHelper.addActiveSessionsObserver(activeSessionsObserver)
+    }
+
+    override fun onSourceStateChanged(
+        sourceAvailable: Boolean,
+        mediaIdentity: MediaIdentity?
+    ) {
+        if (closed) return
+        LyriconDataBridge.updateSourceState(sourceAvailable, mediaIdentity)
+        if (sourceAvailable) {
+            mediaIdentity?.packageName?.takeIf { it.isNotBlank() }?.let(LyriconDataBridge::updateLyricPackage)
+        }
     }
 
     override fun onSongChanged(song: Song?) {

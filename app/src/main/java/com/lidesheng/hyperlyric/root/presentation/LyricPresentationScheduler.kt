@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.presentation
 
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.content.IslandMetadataContentAssembler
@@ -12,6 +13,8 @@ internal object LyricPresentationScheduler {
         val lyricMode: Int,
         val hasSourceLyrics: Boolean,
         val hasPlaceholder: Boolean = false,
+        val sourceAvailable: Boolean = LyriconDataBridge.sourceAvailable,
+        val mediaIdentity: MediaIdentity? = LyriconDataBridge.mediaIdentity,
     ) {
         val hasLyrics: Boolean
             get() = lyricMode == RootConstants.ISLAND_CONTENT_MODE_LYRIC && hasSourceLyrics
@@ -25,6 +28,9 @@ internal object LyricPresentationScheduler {
     }
 
     fun snapshot(prefs: SharedPreferences? = HookEntry.instance?.prefs): Presentation {
+        if (!LyriconDataBridge.sourceAvailable) {
+            return Presentation(RootConstants.ISLAND_CONTENT_MODE_NONE, false)
+        }
         val hasLyrics = LyriconDataBridge.hasSourceLyrics()
         val behavior = when {
             LyriconDataBridge.isInTailTimeout -> RootConstants.normalizeTailTimeoutBehavior(

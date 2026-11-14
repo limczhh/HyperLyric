@@ -8,6 +8,7 @@ import com.lidesheng.hyperlyric.common.lyric.isPureMusicLyricText
 import com.lidesheng.hyperlyric.common.lyric.isPureMusicMarkerLine
 import com.lidesheng.hyperlyric.common.lyric.isPureMusicSongLyrics
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
@@ -23,6 +24,17 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 
 object LyriconDataBridge {
+    @Volatile
+    var sourceAvailable: Boolean = false
+        private set
+    @Volatile
+    var mediaIdentity: MediaIdentity? = null
+        private set
+
+    fun updateSourceState(available: Boolean, identity: MediaIdentity?) {
+        sourceAvailable = available
+        mediaIdentity = identity?.normalized().takeIf { available }
+    }
 
     private const val HOT_RELOAD_STATE_VERSION = 1
     private const val HOT_RELOAD_VERSION = "version"
@@ -40,6 +52,7 @@ object LyriconDataBridge {
     private const val HOT_RELOAD_ARTIST = "artist"
     private const val HOT_RELOAD_ALBUM = "album"
     private const val HOT_RELOAD_DURATION = "duration"
+    private const val HOT_RELOAD_MEDIA_ID = "mediaId"
     private val hotReloadJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     private const val TAG = "LyriconDataBridge"
@@ -249,6 +262,7 @@ object LyriconDataBridge {
      * MediaSession token, renderer, view, callback or module-class object crosses the boundary.
      */
     fun exportHotReloadSnapshot(): Bundle? {
+        if (!sourceAvailable) return null
         val song = currentSong ?: return null
         val metadata = currentLyricMediaMetadata
         val clock = currentPlaybackClock()
@@ -269,6 +283,7 @@ object LyriconDataBridge {
             putFloat(HOT_RELOAD_SPEED, clock.playbackSpeed)
             putBoolean(HOT_RELOAD_PLAYING, isPlaybackActive())
             putString(HOT_RELOAD_SONG_ID, metadata?.songId)
+            putString(HOT_RELOAD_MEDIA_ID, mediaIdentity?.mediaId)
             putString(HOT_RELOAD_TITLE, metadata?.title)
             putString(HOT_RELOAD_ARTIST, metadata?.artist)
             putString(HOT_RELOAD_ALBUM, metadata?.album)
@@ -294,6 +309,7 @@ object LyriconDataBridge {
                 sourceId = snapshot.getString(HOT_RELOAD_SOURCE).orEmpty(),
                 packageName = snapshot.getString(HOT_RELOAD_PACKAGE),
                 songId = snapshot.getString(HOT_RELOAD_SONG_ID),
+                mediaId = snapshot.getString(HOT_RELOAD_MEDIA_ID),
                 title = snapshot.getString(HOT_RELOAD_TITLE),
                 artist = snapshot.getString(HOT_RELOAD_ARTIST),
                 album = snapshot.getString(HOT_RELOAD_ALBUM),
@@ -305,6 +321,7 @@ object LyriconDataBridge {
             )
         )
         updateLyricPackage(snapshot.getString(HOT_RELOAD_PACKAGE))
+        updateSourceState(true, currentLyricMediaMetadata?.toIdentity())
 
         val position = snapshot.getLong(HOT_RELOAD_POSITION, 0L).coerceAtLeast(0L)
         val speed = snapshot.getFloat(HOT_RELOAD_SPEED, 1f)
@@ -621,6 +638,7 @@ object LyriconDataBridge {
     }
 
     fun clearState() {
+        updateSourceState(false, null)
         currentSong = null
         currentSongName = null
         currentSongHasDuet = false

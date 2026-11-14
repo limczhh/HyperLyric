@@ -2,6 +2,7 @@ package com.lidesheng.hyperlyric.root.source
 
 import android.app.Application
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.lyric.source.LyricSource
@@ -160,6 +161,7 @@ class LyriconSource : LyricSource {
         override fun onSongChanged(song: Song?) {
             val localSong = song?.toLocalSong()
             publish(owner) { packageName ->
+                onSourceStateChanged(true, MediaIdentity(packageName = packageName, songId = localSong?.id))
                 onSongChanged(localSong)
                 onMetadata(LyricMediaMetadata(
                     sourceId = id, packageName = packageName, songId = localSong?.id,
@@ -183,6 +185,7 @@ class LyriconSource : LyricSource {
 
         override fun onReceiveText(text: String?) {
             publish(owner) { packageName ->
+                onSourceStateChanged(true, MediaIdentity(packageName = packageName))
                 onMetadata(LyricMediaMetadata(sourceId = id, packageName = packageName))
                 onPlainText(text)
             }

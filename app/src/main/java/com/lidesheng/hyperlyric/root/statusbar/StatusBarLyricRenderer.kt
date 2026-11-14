@@ -64,9 +64,8 @@ internal object StatusBarLyricRenderer {
             )
             if (!shouldRender(prefs)) {
                 renderingEnabled = false
-                // 本轮没有任何自有内容可展示，必须交还时钟/通知图标/灵动岛，
-                // 否则"播放时隐藏"会把系统元素一起藏掉，留下整条空白的状态栏。
-                refreshClockVisibility(null)
+                // Source ownership can outlive renderable content (loading, empty lyrics, outro).
+                refreshClockVisibility(prefs)
                 refreshNotificationIconVisibility(null)
                 refreshIslandSuppressionPolicy(null)
                 clearOnMain()
@@ -86,7 +85,7 @@ internal object StatusBarLyricRenderer {
     }
 
     /**
-     * 只有模块确实在渲染自有内容时，才有资格隐藏时钟、通知图标与灵动岛。
+     * 通知图标与灵动岛的隐藏仍依赖实际渲染内容；时钟使用独立的歌词源接管状态。
      * 单看设置项或数据桥的内容判定都不够：本方法还要跟 [shouldRender] 的结论保持一致，
      * 否则锁屏隐藏、暂停策略等分支会让系统元素被藏掉而自有视图是空的。
      */
@@ -328,9 +327,12 @@ internal object StatusBarLyricRenderer {
     }
 
     private fun shouldRender(prefs: android.content.SharedPreferences): Boolean {
-        if (!LyricTypePreference.isEnabled(prefs, RootConstants.LYRIC_TYPE_STATUS_BAR) ||
-            !LyricPresentationScheduler.snapshot(prefs).hasManagedContent
-        ) return false
+        return isStatusBarPresentationAllowed(prefs) &&
+                LyricPresentationScheduler.snapshot(prefs).hasManagedContent
+    }
+
+    private fun isStatusBarPresentationAllowed(prefs: android.content.SharedPreferences): Boolean {
+        if (!LyricTypePreference.isEnabled(prefs, RootConstants.LYRIC_TYPE_STATUS_BAR)) return false
         if (prefs.getBoolean(
                 RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN,
                 RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN,
@@ -343,6 +345,10 @@ internal object StatusBarLyricRenderer {
         )
         return isPlaying || pauseBehavior != 0
     }
+
+    internal fun shouldHideClockWhilePlaying(prefs: android.content.SharedPreferences): Boolean =
+        isStatusBarPresentationAllowed(prefs) && LyriconDataBridge.isPlaybackActive() &&
+                LyriconDataBridge.sourceAvailable && !lyricTemporarilyHidden && !clockTemporarilyRevealed
 
     private fun isKeyguardLocked(): Boolean =
         runCatching { keyguardManager?.isKeyguardLocked ?: keyguardLocked }
@@ -368,29 +374,27 @@ internal object StatusBarLyricRenderer {
         StatusBarLyricIslandRegionDispatcher.updateLyricsVisible(false)
     }
 
+    internal fun shouldHideClock(prefs: android.content.SharedPreferences?): Boolean {
+        if (prefs == null || !LyricTypePreference.isEnabled(prefs, RootConstants.LYRIC_TYPE_STATUS_BAR) ||
+            !LyriconDataBridge.isPlaybackActive() || clockTemporarilyRevealed
+        ) return false
+        return when (prefs.getInt(
+            RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
+            RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
+        ).coerceIn(
+            RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE,
+            RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT,
+        )) {
+            RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING -> shouldHideClockWhilePlaying(prefs)
+            RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT ->
+                isOwningStatusBarContent() && StatusBarLyricIslandRegionDispatcher.hasIsland()
+            else -> false
+        }
+    }
+
     private fun refreshClockVisibility(prefs: android.content.SharedPreferences?) {
         runOnMain {
-            val enabled = prefs != null && LyricTypePreference.isEnabled(
-                prefs,
-                RootConstants.LYRIC_TYPE_STATUS_BAR,
-            )
-            val behavior = prefs?.getInt(
-                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
-                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
-            )?.coerceIn(
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE,
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT,
-            ) ?: RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE
-            val shouldHide = !clockTemporarilyRevealed && enabled &&
-                    LyriconDataBridge.isPlaybackActive() && when (behavior) {
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING ->
-                    isOwningStatusBarContent() && !lyricTemporarilyHidden
-
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT ->
-                    StatusBarLyricIslandRegionDispatcher.hasIsland()
-
-                else -> false
-            }
+            val shouldHide = shouldHideClock(prefs)
             StatusBarLyricHostRegistry.liveHosts().forEach { host ->
                 host.setClockHidden(shouldHide)
             }

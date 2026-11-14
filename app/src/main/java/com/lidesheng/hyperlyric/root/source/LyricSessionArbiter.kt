@@ -9,6 +9,7 @@ import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.interfaces.IRichLyricLine
@@ -20,6 +21,7 @@ internal class LyricSessionArbiter(
     context: Context,
     private val downstream: LyricSink,
     private val sampleIntervalMs: Long,
+    private val sourceTracksMediaChanges: Boolean = false,
     private val onOwnerRemoved: (Any) -> Unit = {}
 ) {
     private val manager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
@@ -28,6 +30,7 @@ internal class LyricSessionArbiter(
     private val order = LyricPlaybackOrder<Any>()
     private data class Session(val controller: MediaController, val callback: MediaController.Callback)
     private val sessions = LinkedHashMap<MediaSession.Token, Session>()
+    private val destroyedTokens = HashSet<MediaSession.Token>()
     private val slots = LinkedHashMap<Any, Slot>()
     private val removedPublishers = HashSet<String>()
     private var selected: Slot? = null
@@ -67,7 +70,11 @@ internal class LyricSessionArbiter(
             if (sessions.values.none { it.controller.packageName == packageName }) return@execute
             removedPublishers.remove(key)
         }
-        val slot = slots.getOrPut(key) { Slot(key, packageName, token) }
+        val slot = slots.getOrPut(key) {
+            Slot(key, packageName, token, ::currentMediaId) { onOwnerRemoved(key) }.also {
+                checkTrack(it, token?.let { sessionToken -> sessions[sessionToken]?.controller?.metadata })
+            }
+        }
         slot.delayMs = delayMs
         bind(slot)
         slot.detached = false
@@ -119,6 +126,7 @@ internal class LyricSessionArbiter(
             if (listenerRegistered) runCatching { manager.removeOnActiveSessionsChangedListener(listener) }
             sessions.values.forEach { runCatching { it.controller.unregisterCallback(it.callback) } }
             sessions.clear()
+            destroyedTokens.clear()
             slots.clear()
             order.clear()
             removedPublishers.clear()
@@ -128,17 +136,12 @@ internal class LyricSessionArbiter(
         if (Looper.myLooper() == Looper.getMainLooper()) cleanup() else handler.post { cleanup() }
     }
 
-    private fun syncSessions(controllers: List<MediaController>) {
+    private fun syncSessions(incomingControllers: List<MediaController>) {
         if (closed) return
+        val controllers = incomingControllers.filter { it.sessionToken !in destroyedTokens }
         val tokens = controllers.map { it.sessionToken }.toSet()
         sessions.keys.filter { it !in tokens }.forEach { token ->
-            sessions.remove(token)?.let { runCatching { it.controller.unregisterCallback(it.callback) } }
-            order.remove(token)
-            slots.entries.filter { it.value.token == token }.map { it.key }.forEach {
-                slots.remove(it)
-                if (it is String) removedPublishers += it
-                onOwnerRemoved(it)
-            }
+            removeSession(token)
         }
         order.seed(controllers.map { it.sessionToken to (it.playbackState?.state == PlaybackState.STATE_PLAYING) })
         controllers.forEach { controller ->
@@ -164,12 +167,15 @@ internal class LyricSessionArbiter(
                     override fun onMetadataChanged(metadata: MediaMetadata?) {
                         if (closed || sessions[token]?.controller !== controller) return
                         val affected = slots.values.filter { it.token == token }
-                        affected.forEach { checkTrack(it, metadata) }
+                        if (!sourceTracksMediaChanges) affected.forEach { checkTrack(it, metadata) }
                         reconcile()
                         affected.forEach { it.clearChanges() }
                     }
                     override fun onSessionDestroyed() {
-                        if (!closed) runCatching { syncSessions(manager.getActiveSessions(null)) }
+                        if (closed || sessions[token]?.controller !== controller) return
+                        destroyedTokens += token
+                        removeSession(token)
+                        reconcile()
                     }
                 }
                 runCatching {
@@ -180,6 +186,16 @@ internal class LyricSessionArbiter(
         }
         slots.values.forEach(::bind)
         reconcile()
+    }
+
+    private fun removeSession(token: MediaSession.Token) {
+        sessions.remove(token)?.let { runCatching { it.controller.unregisterCallback(it.callback) } }
+        order.remove(token)
+        slots.entries.filter { it.value.token == token }.map { it.key }.forEach {
+            slots.remove(it)
+            if (it is String) removedPublishers += it
+            onOwnerRemoved(it)
+        }
     }
 
     private fun bind(slot: Slot) {
@@ -203,13 +219,18 @@ internal class LyricSessionArbiter(
         val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE)?.takeIf { it.isNotBlank() }
         val previousId = slot.mediaId
         val previousTitle = slot.mediaTitle
-        if (slot.detached && ((id != null && previousId != null && id != previousId) ||
-            (id == null && previousId == null && title != null && previousTitle != null && title != previousTitle))) {
-            slot.onStop()
+        if ((id != null && previousId != null && id != previousId) ||
+            (slot.detached && id == null && previousId == null &&
+                title != null && previousTitle != null && title != previousTitle)) {
+            slot.resetForMediaChange()
         }
         slot.mediaId = id ?: previousId
         slot.mediaTitle = title ?: previousTitle
     }
+
+    private fun currentMediaId(token: MediaSession.Token): String? =
+        sessions[token]?.controller?.metadata?.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
+            ?.takeIf { it.isNotBlank() }
 
     private fun isPlaying(slot: Slot): Boolean {
         val token = slot.token
@@ -227,14 +248,16 @@ internal class LyricSessionArbiter(
         fun newer(candidate: Slot, current: Slot?): Boolean = current == null ||
             order.rank(candidate.token ?: candidate.key) > order.rank(current.token ?: current.key)
         for (slot in slots.values) {
-            if (!slot.hasContent) continue
+            if (!slot.sourceAvailable) continue
             if (newer(slot, latestContent)) latestContent = slot
             if (!isPlaying(slot)) continue
             if (newer(slot, playingInfo)) playingInfo = slot
             if (slot.hasLyrics && newer(slot, playingLyrics)) playingLyrics = slot
         }
-        return playingLyrics ?: playingInfo
-            ?: selected?.takeIf { slots[it.key] === it && it.hasContent }
+        (playingLyrics ?: playingInfo)?.let { return it }
+        // A different playing session without a source must not display a paused owner's lyrics.
+        if (sessions.keys.any(order::isPlaying)) return null
+        return selected?.takeIf { slots[it.key] === it && it.sourceAvailable }
             ?: latestContent
     }
 
@@ -246,9 +269,12 @@ internal class LyricSessionArbiter(
             selected = winner
         }
         if (winner != null) {
+            downstream.onSourceStateChanged(true, winner.mediaIdentity)
             if (switched || winner.songDirty) downstream.onSongChanged(winner.song)
             if (switched || winner.metadataDirty) downstream.onMetadata(
-                winner.metadata?.let { it.copy(sessionToken = it.sessionToken ?: winner.token) }
+                winner.metadata?.let {
+                    it.copy(sessionToken = it.sessionToken ?: winner.token, mediaId = winner.mediaId ?: it.mediaId)
+                }
             )
             val playingNow = isPlaying(winner)
             if (switched || winner.lastPlaying != playingNow || winner.playbackDirty) {
@@ -295,8 +321,20 @@ internal class LyricSessionArbiter(
         }
     }
 
-    private class Slot(val key: Any, val packageName: String, var token: MediaSession.Token?) : LyricSink {
+    private class Slot(
+        val key: Any,
+        val packageName: String,
+        var token: MediaSession.Token?,
+        private val currentMediaId: (MediaSession.Token) -> String?,
+        private val onMediaChanged: () -> Unit
+    ) : LyricSink {
         var song: Song? = null
+        var sourceAvailable = false
+            private set
+        val mediaIdentity get() = MediaIdentity(
+            packageName = packageName, sessionToken = token,
+            mediaId = mediaId, songId = metadata?.songId
+        )
         private var songHasLyrics = false
         var metadata: LyricMediaMetadata? = null
         var line: IRichLyricLine? = null
@@ -325,9 +363,30 @@ internal class LyricSessionArbiter(
         }
         val hasLyrics get() = songHasLyrics ||
             !line?.text.isNullOrBlank() || !text.isNullOrBlank()
-        val hasContent get() = hasLyrics || metadata?.let {
-            !it.title.isNullOrBlank() || !it.artist.isNullOrBlank() || !it.album.isNullOrBlank()
-        } == true
+
+        override fun onSourceStateChanged(sourceAvailable: Boolean, mediaIdentity: MediaIdentity?) {
+            if (!sourceAvailable) {
+                onStop()
+                return
+            }
+            // Capture the player's item when the source responds. The metadata callback for
+            // this item may still be queued; it must not revoke a response already bound to it.
+            val responseMediaId = mediaIdentity?.mediaId
+                ?: token?.let(currentMediaId)
+            if (responseMediaId != null && mediaId != null && responseMediaId != mediaId) {
+                resetForMediaChange()
+            }
+            if (this.sourceAvailable != sourceAvailable ||
+                responseMediaId != null && responseMediaId != mediaId
+            ) metadataDirty = true
+            this.sourceAvailable = sourceAvailable
+            mediaId = responseMediaId ?: mediaId
+        }
+
+        fun resetForMediaChange() {
+            onStop()
+            onMediaChanged()
+        }
 
         override fun onSongChanged(song: Song?) {
             this.song = song
@@ -376,6 +435,7 @@ internal class LyricSessionArbiter(
             onSongChanged(null)
             onMetadata(null)
             playing = false
+            sourceAvailable = false
         }
     }
 }
