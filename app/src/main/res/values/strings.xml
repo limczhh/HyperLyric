@@ -132,6 +132,7 @@
     <string name="option_status_bar_lyric_clock_hide_never">不隐藏</string>
     <string name="option_status_bar_lyric_clock_hide_playing">播放时隐藏</string>
     <string name="option_status_bar_lyric_clock_hide_island">有超级岛时隐藏</string>
+    <string name="option_status_bar_lyric_clock_hide_media_session">有媒体会话时隐藏</string>
     <string name="title_status_bar_lyric_notification_icon_hide_behavior">通知图标隐藏行为</string>
     <string name="option_status_bar_lyric_notification_icon_hide_none">不隐藏</string>
     <string name="option_status_bar_lyric_notification_icon_hide_playing">播放时隐藏</string>

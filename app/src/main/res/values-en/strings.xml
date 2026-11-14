@@ -132,6 +132,7 @@
     <string name="option_status_bar_lyric_clock_hide_never">Never hide</string>
     <string name="option_status_bar_lyric_clock_hide_playing">While playing with lyrics</string>
     <string name="option_status_bar_lyric_clock_hide_island">While Super Island is present</string>
+    <string name="option_status_bar_lyric_clock_hide_media_session">While a media session exists</string>
     <string name="title_status_bar_lyric_notification_icon_hide_behavior">Notification icon hiding behavior</string>
     <string name="option_status_bar_lyric_notification_icon_hide_none">Do not hide</string>
     <string name="option_status_bar_lyric_notification_icon_hide_playing">Hide while playing</string>

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.StatusBarLyricClockHidePolicy
 import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookConfigSaver
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookPrefs
@@ -160,15 +161,7 @@ fun StatusBarLyricSettingsPage() {
     var showIconSizeDialog by remember { mutableStateOf(false) }
     var showIconSpacingDialog by remember { mutableStateOf(false) }
     var clockHideBehavior by remember(prefs) {
-        mutableIntStateOf(
-            prefs.getInt(
-                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
-                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
-            ).coerceIn(
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE,
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT,
-            )
-        )
+        mutableIntStateOf(StatusBarLyricClockHidePolicy.read(prefs))
     }
     var islandHideBehavior by remember(prefs) {
         mutableIntStateOf(
@@ -817,6 +810,7 @@ private fun statusBarLyricVisibilitySections(
                     stringResource(R.string.option_status_bar_lyric_clock_hide_never),
                     stringResource(R.string.option_status_bar_lyric_clock_hide_playing),
                     stringResource(R.string.option_status_bar_lyric_clock_hide_island),
+                    stringResource(R.string.option_status_bar_lyric_clock_hide_media_session),
                 ),
                 selectedIndex = clockHideBehavior,
                 onSelectedIndexChange = onClockHideBehaviorChange,
