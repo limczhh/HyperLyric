@@ -5,7 +5,6 @@
  *
  * 圆点演出行为参考 AMLL（https://github.com/amll-dev/applemusic-like-lyrics）
  * 的 interlude-dots 实现，按行为规格重写，未复制其源代码。
- * 规格文档：docs/amll-countdown-dots-spec.md
  */
 
 package com.lidesheng.hyperlyric.lyric.view.line
@@ -27,7 +26,7 @@ class AmllInterludeTimelineTest {
 
     @Test
     fun hiddenWhenSpanTooShortForEntry() {
-        // span - EXIT_TOTAL_MS < DOT_ENTER_TOTAL_MS(910) 即 span < 1910。
+        // 跨度容不下入场与退场时整段隐藏。
         val timeline = AmllInterludeTimeline.build(beginMs = 0L, endMs = 1_900L)
         assertTrue(timeline.isHidden)
         assertEquals(AmllInterludeTimeline.Mode.HIDDEN, timeline.mode)
@@ -39,7 +38,7 @@ class AmllInterludeTimelineTest {
 
     @Test
     fun exactlyAtEntryThresholdBecomesVisiblePerformance() {
-        // span = 1910 -> bodyMs = 910，刚好不隐藏；bodyMs < 3000 走 fallback-hold。
+        // 恰好容得下入场与退场时不再隐藏，主演出短于下限而走 fallback-hold。
         val timeline = AmllInterludeTimeline.build(beginMs = 0L, endMs = 1_910L)
         assertFalse(timeline.isHidden)
         assertEquals(AmllInterludeTimeline.Mode.FALLBACK_HOLD, timeline.mode)
@@ -61,7 +60,6 @@ class AmllInterludeTimelineTest {
 
     @Test
     fun fallbackHoldKeepsScaleAtOneAndFillsDots() {
-        // span = 3000 -> bodyMs = 2000，落在 [910, 3000) 区间。
         val timeline = AmllInterludeTimeline.build(beginMs = 0L, endMs = 3_000L)
         assertEquals(AmllInterludeTimeline.Mode.FALLBACK_HOLD, timeline.mode)
 
@@ -81,7 +79,7 @@ class AmllInterludeTimelineTest {
     @Test
     fun fallbackHoldStillExits() {
         val timeline = AmllInterludeTimeline.build(beginMs = 0L, endMs = 3_000L)
-        // 退场第一阶段末：缩放已升到 1.25 附近。
+        // 退场第一阶段末：缩放升到上限附近。
         val peak = timeline.snapshotAt(timeline.bodyEndMs + AmllInterludeTimeline.EXIT_PHASE1_MS)
         assertTrue(peak.scale > 1.2f)
         // 演出终点：全部归零。
@@ -92,7 +90,7 @@ class AmllInterludeTimelineTest {
 
     @Test
     fun bodyBetweenEntryAndFallbackThresholdUsesFallback() {
-        // bodyMs = 2999 -> fallback-hold；bodyMs = 3000 -> breathe。
+        // 阈值两侧分别落入 fallback-hold 与 breathe。
         val justBelow = AmllInterludeTimeline.build(0L, 2_999L + AmllInterludeTimeline.EXIT_TOTAL_MS)
         assertEquals(AmllInterludeTimeline.Mode.FALLBACK_HOLD, justBelow.mode)
 
@@ -223,7 +221,7 @@ class AmllInterludeTimelineTest {
             (AmllInterludeTimeline.DOT_ACTIVE_OPACITY - AmllInterludeTimeline.DOT_INACTIVE_OPACITY) * target
         assertEquals(expectedAtBodyEnd, atBodyEnd.dotOpacity(2), 5e-3f)
 
-        // 退场 750ms 后补齐到全亮（前两颗在退场段恒为 1）。
+        // 补齐窗口结束后第三颗全亮；前两颗在退场段恒为 1。
         val afterTrailing = timeline.snapshotAt(bodyEnd + AmllInterludeTimeline.DOT3_TRAILING_MS)
         val fullOpacity = AmllInterludeTimeline.DOT_ACTIVE_OPACITY
         assertEquals(fullOpacity, afterTrailing.dotOpacity(2), 1e-3f)
@@ -248,8 +246,8 @@ class AmllInterludeTimelineTest {
         var posMs = 1_000L
         // 只扫演出区间内部；终点之后直接切到 HIDDEN，缩放复位不属于连续性问题。
         val lastPosMs = 1_000L + timeline.totalEndMs - 1L
-        // 以 1ms 采样验证函数本身连续：退场缓动末段导数很陡（阶段二控制点 x2 = 1，
-        // 端点切线水平），16ms 的帧间隔会放大成可见的快速塌缩，那是曲线本意而非跳变。
+        // 以 1ms 采样验证函数本身连续；退场缓动末段导数陡峭，帧间隔会放大成快速塌缩，
+        // 属于曲线本意而非跳变。
         while (posMs <= lastPosMs) {
             val current = timeline.snapshotAt(posMs)
             if (previous != null) {
@@ -270,7 +268,7 @@ class AmllInterludeTimelineTest {
     @Test
     fun snapshotIsPureFunctionOfPosition() {
         val timeline = AmllInterludeTimeline.build(beginMs = 2_000L, endMs = 10_000L)
-        // 正向逐帧推进后回头重新查询，结果必须与直接计算完全一致（无隐藏状态）。
+        // 正向逐帧推进后回头重新查询，结果必须与直接计算完全一致。
         for (posMs in 2_000L..10_000L step 250L) {
             val first = timeline.snapshotAt(posMs)
             // 中间穿插大量其他时刻的查询。
@@ -325,7 +323,7 @@ class AmllInterludeTimelineTest {
         assertEquals(AmllInterludeTimeline.BREATHE_BASE_PERIOD_MS, timeline.breathePeriodMs)
         assertEquals(1f, timeline.dot3Target, 0f)
 
-        // 三颗点各自用 4000ms 走完点亮区间，起点依次为 0 / 4000 / 8000。
+        // 三颗圆点按基准周期依次点亮。
         assertEquals(
             AmllInterludeTimeline.DOT_ACTIVE_OPACITY,
             timeline.snapshotAt(4_000L).dotOpacity(0),
@@ -388,7 +386,7 @@ class AmllInterludeTimelineTest {
 
     @Test
     fun enterHoldSegmentIsInvisible() {
-        // 显式传 holdMs = 500 验证入场延迟段（当前调用点传 0）。
+        // 验证入场延迟段。
         val timeline = AmllInterludeTimeline.build(beginMs = 0L, endMs = 10_000L, holdMs = 500L)
         assertEquals(500L, timeline.delayEndMs)
         val duringHold = timeline.snapshotAt(250L)
@@ -413,13 +411,13 @@ class AmllInterludeTimelineTest {
     @Test
     fun dotsStaggerInByEightyMilliseconds() {
         val timeline = AmllInterludeTimeline.build(0L, 10_000L)
-        // 恰好 80ms 时第一颗已开始淡入，第二颗仍为 0。
+        // 首颗开始淡入时，第二颗仍为 0。
         val at80 = timeline.snapshotAt(80L)
         assertTrue(at80.dotOpacity(0) > 0f)
         assertEquals(0f, at80.dotOpacity(1), 1e-6f)
-        // 160ms 时第三颗仍为 0。
+        // 第三颗尚未开始淡入。
         assertEquals(0f, timeline.snapshotAt(160L).dotOpacity(2), 1e-6f)
-        // 910ms（DOT_ENTER_TOTAL_MS）时三颗的错峰入场系数都已到 1。
+        // 错峰入场总时长之后，三颗的错峰入场系数都已到 1。
         val atTotal = timeline.snapshotAt(AmllInterludeTimeline.DOT_ENTER_TOTAL_MS)
         assertTrue(atTotal.dotOpacity(0) > 0f)
     }

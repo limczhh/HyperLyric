@@ -5,7 +5,6 @@
  *
  * 圆点演出行为参考 AMLL（https://github.com/amll-dev/applemusic-like-lyrics）
  * 的 interlude-dots 实现，按行为规格重写，未复制其源代码。
- * 规格文档：docs/amll-countdown-dots-spec.md
  */
 
 package com.lidesheng.hyperlyric.lyric.view.line
@@ -20,7 +19,7 @@ import kotlin.math.sin
  *
  * @property scale 容器缩放，作用于三个圆点围绕内容盒中心的整体缩放。
  * @property opacity 容器不透明度，绘制时必须与每个圆点的不透明度相乘。
- * @property dotOpacities 三个圆点的最终不透明度（已含容器不透明度）。
+ * @property dotOpacities 三个圆点的最终不透明度，已含容器不透明度。
  * @property isVisible 本帧是否有可见墨迹；为 `false` 时绘制方可直接跳过。
  */
 internal class AmllDotsSnapshot(
@@ -64,7 +63,7 @@ internal class AmllDotsSnapshot(
  * 倒计时圆点演出的时间编排：把 `(beginMs, endMs, holdMs)` 编译成一条固定的时间线，
  * 再由 [snapshotAt] 把任意媒体时刻映射成帧快照。
  *
- * 设计要点（见规格 6.3）：演出是**媒体时间的纯函数**。本类不持有跨帧动画状态，
+ * 设计要点：演出是**媒体时间的纯函数**。本类不持有跨帧动画状态，
  * 不累加帧间隔，也没有目标值与重锚阈值；同一 `posMs` 永远得到同一快照，因此
  * 倍速播放、拖动进度、暂停冻结都天然正确。唯一的时变输入由渲染器在每次位置推送时
  * 硬覆盖。
@@ -89,7 +88,7 @@ internal class AmllInterludeTimeline private constructor(
     val dot3DurationMs: Long,
     /** 第三颗圆点在主演出结束时达到的点亮比例，缺口由退场段补齐。 */
     val dot3Target: Float,
-    /** 无界行（跨度不小于 24 小时）标记，见规格 6.8。 */
+    /** 无界行标记。 */
     val unbounded: Boolean,
 ) {
 
@@ -244,7 +243,7 @@ internal class AmllInterludeTimeline private constructor(
         /** 完全点亮圆点不透明度。 */
         const val DOT_ACTIVE_OPACITY = 0.9f
 
-        /** 入场延迟；当前所有调用点传 0，见规格 6.2。 */
+        /** 入场延迟；当前所有调用点传 0。 */
         const val ENTER_HOLD_MS = 500L
 
         /** 容器淡入时长。 */
@@ -292,7 +291,7 @@ internal class AmllInterludeTimeline private constructor(
         /** 第三颗圆点在退场段补齐的时长，同时是它比前两颗少走的时长。 */
         const val DOT3_TRAILING_MS = 750L
 
-        /** 跨度达到此值即视为无界行（纯音乐 / 无歌词占位）。 */
+        /** 跨度达到此值即视为无界行。 */
         const val UNBOUNDED_ROW_THRESHOLD_MS = 86_400_000L
 
         private val ZERO_DOTS = floatArrayOf(0f, 0f, 0f)
@@ -310,7 +309,7 @@ internal class AmllInterludeTimeline private constructor(
          *
          * @param beginMs 行起点，绝对媒体时间。
          * @param endMs 行终点，绝对媒体时间。
-         * @param holdMs 入场延迟；按规格 6.2 恒为 0，保留参数便于日后调整。
+         * @param holdMs 入场延迟；当前恒为 0，保留参数便于日后调整。
          */
         fun build(beginMs: Long, endMs: Long, holdMs: Long = 0L): AmllInterludeTimeline {
             val span = saturatingSpan(beginMs, endMs)
@@ -379,7 +378,7 @@ internal class AmllInterludeTimeline private constructor(
         /**
          * 无界行：纯音乐或无歌词占位行的跨度是 `Long.MAX_VALUE`。
          * 直接套编排公式会让点亮区间大到永远走不完，三颗圆点永远停在未点亮色，
-         * 因此改用固定编排，见规格 6.8。
+         * 因此改用固定编排。
          */
         private fun unbounded(beginMs: Long): AmllInterludeTimeline = AmllInterludeTimeline(
             beginMs = beginMs,

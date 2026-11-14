@@ -5,7 +5,6 @@
  *
  * 圆点演出行为参考 AMLL（https://github.com/amll-dev/applemusic-like-lyrics）
  * 的 interlude-dots 实现，按行为规格重写，未复制其源代码。
- * 规格文档：docs/amll-countdown-dots-spec.md
  */
 
 package com.lidesheng.hyperlyric.lyric.view.line
@@ -15,12 +14,11 @@ import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
 /**
  * 倒计时圆点渲染器的共享骨架。
  *
- * 承载两种圆点样式（原有【倒计时圆点】与【倒计时圆点（AMLL 样式）】）在视图层语义上
- * 完全一致的部分：以 `textSize` 为基准的几何、水平对齐、字号/颜色下发、暂停冻结与
- * 行状态复位。具体演出编排由子类实现。
+ * 承载两种圆点样式在视图层语义上完全一致的部分：以 `textSize` 为基准的几何、
+ * 水平对齐、字号/颜色下发、暂停冻结与行状态复位。具体演出编排由子类实现。
  *
  * **兼容性约束**：原有 [CountdownDotsRenderer] 的视觉与时间行为必须逐像素不变，
- * 因此它保持独立实现、不继承本类（其源码零改动）。视图层统一通过
+ * 因此它保持独立实现、不继承本类。视图层统一通过
  * [isCountdownDotsRenderer]、[freezeCountdownDots]、[syncCountdownDotsFrom] 三个
  * 共享入口判断，避免在两个视图里各写一套重复分支。
  */
@@ -69,10 +67,10 @@ internal abstract class CountdownDotsBase : LineRenderer {
 }
 
 /**
- * 该渲染器是否为倒计时圆点渲染器（两种样式之一）。
+ * 该渲染器是否为倒计时圆点渲染器。
  *
- * 原有渲染器不继承 [CountdownDotsBase]（其行为必须逐像素不变），
- * 因此这里同时识别两个实现，让视图层只写一处判断。
+ * 原有渲染器不继承 [CountdownDotsBase]，因此这里同时识别两个实现，
+ * 让视图层只写一处判断。
  */
 internal val LineRenderer.isCountdownDotsRenderer: Boolean
     get() = this is CountdownDotsBase || this is CountdownDotsRenderer

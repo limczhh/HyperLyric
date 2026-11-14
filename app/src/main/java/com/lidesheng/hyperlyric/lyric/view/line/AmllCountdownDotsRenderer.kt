@@ -5,7 +5,6 @@
  *
  * 圆点演出行为参考 AMLL（https://github.com/amll-dev/applemusic-like-lyrics）
  * 的 interlude-dots 实现，按行为规格重写，未复制其源代码。
- * 规格文档：docs/amll-countdown-dots-spec.md
  */
 
 package com.lidesheng.hyperlyric.lyric.view.line
@@ -25,16 +24,16 @@ import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
  * 1. **维持帧内平滑**：位置推送被节流到约 33ms，而 `step()` / `draw()` 的签名里没有
  *    `posMs`，因此需要一个可推进的镜像时钟 [clockPosMs]。它每次 [update] 都被
  *    `posMs` **无条件硬覆盖**，只是 `posMs` 的线性外推镜像——没有目标值、没有缓动进度、
- *    没有重锚阈值、不跨行累积，与 [ProgressAnimator] 无关（规格 6.3）。
- * 2. **按 AMLL 几何绘制**：三个圆点，直径 `0.3em`、间距 `0.18em`，
- *    以内容盒中心为原点整体缩放（规格 1.5）。
+ *    没有重锚阈值、不跨行累积，与 [ProgressAnimator] 无关。
+ * 2. **按 AMLL 几何绘制**：三个圆点按 [AmllInterludeTimeline] 的几何常量排布，
+ *    以内容盒中心为原点整体缩放。
  *
- * 颜色为单色：取 `highlightColors` 首色，未点亮与点亮只靠不透明度区分（规格 6.9）。
+ * 颜色为单色：取 `highlightColors` 首色，未点亮与点亮只靠不透明度区分。
  * `setColors` 保留与原有渲染器相同的签名，`background` 参数接收但忽略，
  * 使视图层的颜色下发调用点无需改动。
  */
 internal class AmllCountdownDotsRenderer(
-    /** 入场延迟。按规格 6.2 恒为 0：延迟由占位行的起点承担，渲染器不叠加。 */
+    /** 入场延迟。恒为 0：延迟由占位行的起点承担，渲染器不叠加。 */
     private val holdMs: Long = 0L,
 ) : CountdownDotsBase() {
 
@@ -69,7 +68,7 @@ internal class AmllCountdownDotsRenderer(
         get() = timeline?.isStartedAt(clockPosMs) ?: false
 
     override fun setColors(background: IntArray, highlight: IntArray) {
-        // 单色：只取高亮首色。background 按规格 6.9 接收但不使用。
+        // 单色：只取高亮首色。background 接收但不使用。
         val resolved = highlight.firstOrNull() ?: return
         if (highlightColor == resolved) return
         highlightColor = resolved
@@ -89,7 +88,7 @@ internal class AmllCountdownDotsRenderer(
 
     override fun syncFrom(other: CountdownDotsBase) {
         val source = other as? AmllCountdownDotsRenderer ?: return
-        // 派生时间线只由 (begin, end, holdMs) 决定，无需同步（规格 6.5）。
+        // 派生时间线只由 (begin, end, holdMs) 决定，无需同步。
         clockPosMs = source.clockPosMs
         frozen = source.frozen
         playbackSpeed = source.playbackSpeed

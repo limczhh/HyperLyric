@@ -95,8 +95,7 @@ internal class SongPreprocessor(
     /**
      * 当前占位符选项对应的圆点样式。
      *
-     * 第 5 个选项控制**所有**倒计时占位行的样式（前奏行、间奏行、无歌词行），
-     * 因为它们走的是同一条管线；否则会出现「前奏是 AMLL 风格、间奏还是旧风格」的割裂。
+     * 该选项统一控制所有倒计时占位行；它们走同一条管线，样式必须一致。
      */
     private fun countdownDotStyle(): CountdownDotStyle =
         if (placeholder == TitleSlot.COUNTDOWN_AMLL) {
