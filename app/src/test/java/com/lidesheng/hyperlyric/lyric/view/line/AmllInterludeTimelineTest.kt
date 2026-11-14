@@ -188,7 +188,10 @@ class AmllInterludeTimelineTest {
     fun exitEndsNearMinScale() {
         val timeline = AmllInterludeTimeline.build(0L, 8_000L)
         val lastFrame = timeline.snapshotAt(timeline.totalEndMs - 1L)
-        assertTrue("退场末缩放: ${lastFrame.scale}", lastFrame.scale < 0.5f)
+        assertTrue(
+            "退场末缩放: ${lastFrame.scale}",
+            lastFrame.scale < AmllInterludeTimeline.BREATHE_MAX_SCALE - 0.5f,
+        )
         assertTrue(lastFrame.scale > AmllInterludeTimeline.BREATHE_MIN_SCALE - 0.01f)
     }
 

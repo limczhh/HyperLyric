@@ -216,17 +216,27 @@ internal class AmllInterludeTimeline private constructor(
         /** 圆点数量。 */
         const val DOT_COUNT = 3
 
-        /** 圆点直径，单位 em（1em = textSize px）。 */
-        const val DOT_DIAMETER_EM = 0.3f
+        /**
+         * 圆点直径，单位 em，以 textSize 为 1em 基准。
+         *
+         * 上游的容器字号基准与歌词行不同，照搬 0.3em 会明显偏小；
+         * 放大到与原有倒计时圆点等大，两个选项切换时观感连续。
+         */
+        const val DOT_DIAMETER_EM = 0.5f
 
         /** 圆点半径，单位 em。 */
         const val DOT_RADIUS_EM = DOT_DIAMETER_EM / 2f
 
-        /** 相邻圆点间距，单位 em；与直径保持 0.6 : 1 的比例。 */
-        const val DOT_GAP_EM = 0.18f
+        /** 相邻圆点间距，单位 em；与直径保持 0.6 比 1，随直径等比放大。 */
+        const val DOT_GAP_EM = 0.3f
 
-        /** 容器左右内边距，单位 em。 */
-        const val DOT_PADDING_X_EM = 1.0f
+        /**
+         * 容器左右内边距，单位 em。
+         *
+         * 上游沿用歌词行自身的横向 padding，本渲染器已由视图层负责行内边距，
+         * 这里只保留一个与圆点直径相称的留白，避免整行无谓变宽。
+         */
+        const val DOT_PADDING_X_EM = 0.25f
 
         /** 未点亮圆点不透明度。 */
         const val DOT_INACTIVE_OPACITY = 0.2f
@@ -259,8 +269,13 @@ internal class AmllInterludeTimeline private constructor(
         /** 呼吸缩放上限，contentWidth 必须按此预留。 */
         const val BREATHE_MAX_SCALE = 1.25f
 
-        /** 缩放下限，仅用于退场第二阶段。 */
-        const val BREATHE_MIN_SCALE = 0.4f
+        /**
+         * 缩放下限，仅用于退场第二阶段。
+         *
+         * 上游为 0.4，按歌词行字号基准会让圆点缩到几乎不可见；
+         * 提到 0.6 后呼吸仍有明显起伏，最小时也清晰可辨。
+         */
+        const val BREATHE_MIN_SCALE = 0.6f
 
         /** 退场第一阶段（放大蓄力）时长。 */
         const val EXIT_PHASE1_MS = 750L
