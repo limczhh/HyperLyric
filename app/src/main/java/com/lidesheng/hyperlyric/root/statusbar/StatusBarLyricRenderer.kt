@@ -9,7 +9,9 @@ import android.view.ViewGroup
 import com.lidesheng.hyperlyric.common.LyricTypePreference
 import com.lidesheng.hyperlyric.common.LyricTextColorStylePolicy
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.StatusBarLyricClockHidePolicy
 import com.lidesheng.hyperlyric.common.StatusBarLyricPreferences
+import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 import com.lidesheng.hyperlyric.root.HookEntry
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.hooks.StatusBarLyricMediaIslandCoordinator
@@ -66,7 +68,8 @@ internal object StatusBarLyricRenderer {
                 renderingEnabled = false
                 // 本轮没有任何自有内容可展示，必须交还时钟/通知图标/灵动岛，
                 // 否则"播放时隐藏"会把系统元素一起藏掉，留下整条空白的状态栏。
-                refreshClockVisibility(null)
+                // 「有媒体会话时隐藏」是例外：切歌瞬间歌词尚未到达，时钟仍应保持隐藏。
+                refreshClockVisibilityAfterContentCleared(prefs)
                 refreshNotificationIconVisibility(null)
                 refreshIslandSuppressionPolicy(null)
                 clearOnMain()
@@ -268,11 +271,12 @@ internal object StatusBarLyricRenderer {
         runOnMain {
             if (generation != renderGeneration.get()) return@runOnMain
             StatusBarLyricHostRegistry.liveHosts().forEach { host ->
-                host.setClockHidden(false)
                 host.setNotificationIconContainerHidden(false)
                 host.setNotificationIconContainerMovedRight(false)
             }
             clearOnMain()
+            // 清除自有内容不等于归还时钟：「有媒体会话时隐藏」在暂停或切歌期间仍要保持隐藏。
+            refreshClockVisibilityAfterContentCleared(HookEntry.instance?.prefs)
         }
     }
 
@@ -374,28 +378,59 @@ internal object StatusBarLyricRenderer {
                 prefs,
                 RootConstants.LYRIC_TYPE_STATUS_BAR,
             )
-            val behavior = prefs?.getInt(
-                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
-                RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_CLOCK_HIDE_BEHAVIOR,
-            )?.coerceIn(
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE,
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT,
-            ) ?: RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE
-            val shouldHide = !clockTemporarilyRevealed && enabled &&
-                    LyriconDataBridge.isPlaybackActive() && when (behavior) {
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHILE_PLAYING ->
-                    isOwningStatusBarContent() && !lyricTemporarilyHidden
-
-                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_ISLAND_PRESENT ->
-                    StatusBarLyricIslandRegionDispatcher.hasIsland()
-
-                else -> false
-            }
+            val behavior = prefs?.let(StatusBarLyricClockHidePolicy::read)
+                ?: RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_NONE
+            val state = StatusBarLyricClockHidePolicy.State(
+                lyricTypeEnabled = enabled,
+                temporarilyRevealed = clockTemporarilyRevealed,
+                playbackActive = LyriconDataBridge.isPlaybackActive(),
+                ownsStatusBarContent = isOwningStatusBarContent(),
+                lyricTemporarilyHidden = lyricTemporarilyHidden,
+                islandPresent = StatusBarLyricIslandRegionDispatcher.hasIsland(),
+                mediaSessionPresent = hasActiveMediaSession(),
+                lockScreenSuppressed = isLockScreenSuppressed(prefs),
+            )
+            val shouldHide = StatusBarLyricClockHidePolicy.shouldHide(behavior, state)
             StatusBarLyricHostRegistry.liveHosts().forEach { host ->
                 host.setClockHidden(shouldHide)
             }
         }
     }
+
+    /**
+     * Releases the Clock unless the configured behavior owns it independently of rendered
+     * content. Passing a null prefs keeps the other behaviors on their existing "no content, no
+     * ownership" contract, so only the media-session behavior survives a cleared projection.
+     */
+    private fun refreshClockVisibilityAfterContentCleared(
+        prefs: android.content.SharedPreferences?,
+    ) {
+        val ownsClockWithoutContent = prefs != null &&
+                StatusBarLyricClockHidePolicy.read(prefs) ==
+                RootConstants.STATUS_BAR_LYRIC_CLOCK_HIDE_WHEN_MEDIA_SESSION_PRESENT
+        refreshClockVisibility(if (ownsClockWithoutContent) prefs else null)
+    }
+
+    /**
+     * Media sessions outlive playback: a paused player keeps its session, and a source that has
+     * not delivered lyrics yet still owns one. The bridge knows the current song before any
+     * session lookup succeeds, so it short-circuits the binder-backed query.
+     */
+    private fun hasActiveMediaSession(): Boolean {
+        if (LyriconDataBridge.currentSong != null || LyriconDataBridge.isPlaybackActive()) {
+            return true
+        }
+        val context = StatusBarLyricHostRegistry.liveHosts()
+            .firstNotNullOfOrNull { host -> host.rootView()?.context }
+            ?: return false
+        return MediaMetadataHelper.hasActiveMediaSessions(context)
+    }
+
+    private fun isLockScreenSuppressed(prefs: android.content.SharedPreferences?): Boolean =
+        prefs != null && prefs.getBoolean(
+            RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN,
+            RootConstants.DEFAULT_HOOK_STATUS_BAR_LYRIC_HIDE_ON_LOCK_SCREEN,
+        ) && isKeyguardLocked()
 
     private fun refreshNotificationIconVisibility(prefs: android.content.SharedPreferences?) {
         runOnMain {

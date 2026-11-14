@@ -185,6 +185,26 @@ object MediaMetadataHelper {
         }
     }
 
+    /**
+     * Reports whether any media session still exists. Paused, buffering and connecting states
+     * count as present so a paused player keeps owning the status bar; only sessions that were
+     * torn down are treated as absent. The cached controller list is used so this stays off the
+     * binder path of [MediaSessionManager.getActiveSessions].
+     */
+    fun hasActiveMediaSessions(context: Context): Boolean {
+        return try {
+            ensureSessionSnapshot(context)
+            activeControllers.any { controller ->
+                val state = controller.playbackState?.state ?: return@any false
+                state != PlaybackState.STATE_NONE &&
+                        state != PlaybackState.STATE_STOPPED &&
+                        state != PlaybackState.STATE_ERROR
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Returns all sessions for a package without guessing from controller list order. */
     internal fun getSessionCandidates(
         context: Context,
