@@ -591,7 +591,12 @@ class SpaceGateRichLyricLineView(
     }
 
     private fun updateLayoutTransitionX(config: String? = LayoutTransitionX.TRANSITION_CONFIG_SMOOTH) {
-        layoutTransition = LayoutTransitionX(config).apply { setAnimateParentHierarchy(true) }
+        val transition = layoutTransition as? LayoutTransitionX
+        if (transition == null) {
+            layoutTransition = LayoutTransitionX(config)
+        } else {
+            transition.configure(config)
+        }
     }
 
     private fun animateNextLinePromotion(nextMainText: String?, nextMainAlignedRight: Boolean) {

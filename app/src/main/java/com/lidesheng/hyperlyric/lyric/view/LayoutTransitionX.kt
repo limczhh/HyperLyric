@@ -15,18 +15,17 @@ import androidx.interpolator.view.animation.LinearOutSlowInInterpolator
 class LayoutTransitionX : LayoutTransition {
 
     constructor(config: Config = Smooth) : super() {
+        // Host containers own their bounds. Row visibility must not animate SystemUI ancestors.
+        setAnimateParentHierarchy(false)
         applyConfig(config)
     }
 
-    constructor(type: String?) : this(
-        when (type) {
-            TRANSITION_CONFIG_FAST -> Fast
-            TRANSITION_CONFIG_SLOW -> Slow
-            TRANSITION_CONFIG_SMOOTH -> Smooth
-            TRANSITION_CONFIG_NONE -> None
-            else -> Smooth
-        }
-    )
+    constructor(type: String?) : this(configFor(type))
+
+    /** Keep pending layout listeners attached to the same transition and its owning ViewGroup. */
+    fun configure(type: String?) {
+        applyConfig(configFor(type))
+    }
 
     private fun applyConfig(config: Config) {
         setDuration(APPEARING, config.appearingDuration)
@@ -64,6 +63,13 @@ class LayoutTransitionX : LayoutTransition {
         const val TRANSITION_CONFIG_FAST = "fast"
         const val TRANSITION_CONFIG_SMOOTH = "smooth"
         const val TRANSITION_CONFIG_SLOW = "slow"
+
+        private fun configFor(type: String?): Config = when (type) {
+            TRANSITION_CONFIG_FAST -> Fast
+            TRANSITION_CONFIG_SLOW -> Slow
+            TRANSITION_CONFIG_NONE -> None
+            else -> Smooth
+        }
 
         private val INTERPOLATOR_ACCEL_DECEL get() = FastOutSlowInInterpolator()
         private val INTERPOLATOR_DECEL get() = LinearOutSlowInInterpolator()
