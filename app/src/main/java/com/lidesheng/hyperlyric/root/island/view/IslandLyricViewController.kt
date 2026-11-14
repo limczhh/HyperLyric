@@ -4,6 +4,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.lyric.view.SpaceGateRichLyricLineView
+import com.lidesheng.hyperlyric.root.LyriconDataBridge
 
 /**
  * Applies playback state to one injected island projection.
@@ -28,9 +29,11 @@ internal object IslandLyricViewController {
     }
 
     fun setPlaybackActive(view: View, active: Boolean) {
+        // Loading preserves the presentation but must not run the view's own lyric clock.
+        val advancing = active && LyriconDataBridge.isPlaybackAdvancing()
         when (view) {
-            is RichLyricLineView -> view.setPlaybackActive(active)
-            is SpaceGateRichLyricLineView -> view.setPlaybackActive(active)
+            is RichLyricLineView -> view.setPlaybackActive(advancing)
+            is SpaceGateRichLyricLineView -> view.setPlaybackActive(advancing)
         }
     }
 

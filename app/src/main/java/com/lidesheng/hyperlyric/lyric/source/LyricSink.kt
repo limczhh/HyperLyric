@@ -13,6 +13,11 @@ interface LyricSink {
     fun onPlainText(text: String?)
     fun onStop()
     fun onMetadata(metadata: LyricMediaMetadata?)
-    fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float = Float.NaN)
+    /** [isActive] also includes loading/skipping; [isPlaying] controls clock advancement. */
+    fun onPlaybackStateChanged(
+        isPlaying: Boolean,
+        playbackSpeed: Float = Float.NaN,
+        isActive: Boolean = isPlaying
+    )
     fun onPositionChanged(position: Long, playbackSpeed: Float = Float.NaN)
 }

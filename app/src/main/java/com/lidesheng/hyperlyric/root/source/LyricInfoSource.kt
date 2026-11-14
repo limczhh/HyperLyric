@@ -119,11 +119,20 @@ class LyricInfoSource(private val context: Context) : LyricSource {
         // explicitly malformed response must never inherit the previous item's ownership.
         if (payload != null) session.payload = raw
         else if (trackChanged || raw != null && changed) session.payload = null
+        val state = controller.playbackState
+        HookLogger.dState(
+            stateId = "LyricInfoSource.${controller.sessionToken.hashCode()}",
+            tag = "LyricInfoSource",
+            state = "$mediaId|${raw != null}|${session.payload != null}|${state?.state}"
+        ) {
+            "媒体回调: package=${controller.packageName}, mediaId=$mediaId, " +
+                "lyricInfoPresent=${raw != null}, sourceAvailable=${session.payload != null}, " +
+                "playbackState=${state?.state}"
+        }
         if (session.payload == null) {
             owner.remove(controller.sessionToken)
             return
         }
-        val state = controller.playbackState
         owner.update(controller.sessionToken, controller.packageName, controller.sessionToken) {
             onSourceStateChanged(true, MediaIdentity(
                 packageName = controller.packageName, sessionToken = controller.sessionToken,
@@ -138,7 +147,10 @@ class LyricInfoSource(private val context: Context) : LyricSource {
                     sessionToken = controller.sessionToken, mediaId = session.mediaId
                 ))
             }
-            onPlaybackStateChanged(state?.state == PlaybackState.STATE_PLAYING, state?.playbackSpeed ?: Float.NaN)
+            onPlaybackStateChanged(
+                LyricPlaybackState.isAdvancing(state), state?.playbackSpeed ?: Float.NaN,
+                LyricPlaybackState.isActive(state)
+            )
         }
     }
 }

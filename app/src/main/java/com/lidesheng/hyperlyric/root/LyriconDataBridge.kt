@@ -36,7 +36,7 @@ object LyriconDataBridge {
         mediaIdentity = identity?.normalized().takeIf { available }
     }
 
-    private const val HOT_RELOAD_STATE_VERSION = 1
+    private const val HOT_RELOAD_STATE_VERSION = 2
     private const val HOT_RELOAD_VERSION = "version"
     private const val HOT_RELOAD_SOURCE = "source"
     private const val HOT_RELOAD_PACKAGE = "package"
@@ -47,6 +47,7 @@ object LyriconDataBridge {
     private const val HOT_RELOAD_POSITION = "position"
     private const val HOT_RELOAD_SPEED = "speed"
     private const val HOT_RELOAD_PLAYING = "playing"
+    private const val HOT_RELOAD_ACTIVE = "active"
     private const val HOT_RELOAD_SONG_ID = "songId"
     private const val HOT_RELOAD_TITLE = "title"
     private const val HOT_RELOAD_ARTIST = "artist"
@@ -143,6 +144,9 @@ object LyriconDataBridge {
         sampledAtUptimeMs = SystemClock.uptimeMillis(),
         isPlaying = false
     )
+    /** A buffering/connecting session remains active while its playback clock is frozen. */
+    @Volatile
+    private var playbackActive = false
     private val playbackClockLock = Any()
 
     @Volatile
@@ -201,9 +205,11 @@ object LyriconDataBridge {
         positionMs: Long,
         playbackSpeed: Float,
         isPlaying: Boolean,
-        sampledAtUptimeMs: Long = SystemClock.uptimeMillis()
+        sampledAtUptimeMs: Long = SystemClock.uptimeMillis(),
+        isActive: Boolean = isPlaying
     ) {
         synchronized(playbackClockLock) {
+            playbackActive = isActive
             val previous = playbackClock
             val previousReading = previous.readAt(sampledAtUptimeMs)
             playbackClock = PlaybackClockSnapshot(
@@ -219,9 +225,11 @@ object LyriconDataBridge {
     fun updatePlaybackState(
         isPlaying: Boolean,
         playbackSpeed: Float,
-        eventUptimeMs: Long = SystemClock.uptimeMillis()
+        eventUptimeMs: Long = SystemClock.uptimeMillis(),
+        isActive: Boolean = isPlaying
     ) {
         synchronized(playbackClockLock) {
+            playbackActive = isActive
             val previous = playbackClock
             val reading = previous.readAt(eventUptimeMs)
             playbackClock = PlaybackClockSnapshot(
@@ -238,9 +246,11 @@ object LyriconDataBridge {
         positionMs: Long = 0L,
         isPlaying: Boolean = false,
         playbackSpeed: Float = 1f,
-        sampledAtUptimeMs: Long = SystemClock.uptimeMillis()
+        sampledAtUptimeMs: Long = SystemClock.uptimeMillis(),
+        isActive: Boolean = isPlaying
     ) {
         synchronized(playbackClockLock) {
+            playbackActive = isActive
             playbackClock = PlaybackClockSnapshot(
                 positionMs = positionMs.coerceAtLeast(0L),
                 playbackSpeed = normalizePlaybackSpeed(playbackSpeed, 1f),
@@ -255,7 +265,9 @@ object LyriconDataBridge {
         uptimeMs: Long = SystemClock.uptimeMillis()
     ): PlaybackClockReading = playbackClock.readAt(uptimeMs)
 
-    fun isPlaybackActive(): Boolean = playbackClock.isPlaying
+    fun isPlaybackActive(): Boolean = playbackActive
+
+    fun isPlaybackAdvancing(): Boolean = playbackClock.isPlaying
 
     /**
      * Exports only JSON/primitives for an API 102 generation handoff.  No Song, lyric line,
@@ -281,7 +293,8 @@ object LyriconDataBridge {
             putBoolean(HOT_RELOAD_TEXT_MODE, isTextMode)
             putLong(HOT_RELOAD_POSITION, clock.positionMs)
             putFloat(HOT_RELOAD_SPEED, clock.playbackSpeed)
-            putBoolean(HOT_RELOAD_PLAYING, isPlaybackActive())
+            putBoolean(HOT_RELOAD_PLAYING, playbackClock.isPlaying)
+            putBoolean(HOT_RELOAD_ACTIVE, isPlaybackActive())
             putString(HOT_RELOAD_SONG_ID, metadata?.songId)
             putString(HOT_RELOAD_MEDIA_ID, mediaIdentity?.mediaId)
             putString(HOT_RELOAD_TITLE, metadata?.title)
@@ -326,7 +339,7 @@ object LyriconDataBridge {
         val position = snapshot.getLong(HOT_RELOAD_POSITION, 0L).coerceAtLeast(0L)
         val speed = snapshot.getFloat(HOT_RELOAD_SPEED, 1f)
         val playing = snapshot.getBoolean(HOT_RELOAD_PLAYING, false)
-        resetPlaybackClock(position, playing, speed)
+        resetPlaybackClock(position, playing, speed, isActive = snapshot.getBoolean(HOT_RELOAD_ACTIVE, false))
         if (snapshot.getBoolean(HOT_RELOAD_TEXT_MODE, false)) {
             updateLyric(snapshot.getString(HOT_RELOAD_TEXT))
         } else {

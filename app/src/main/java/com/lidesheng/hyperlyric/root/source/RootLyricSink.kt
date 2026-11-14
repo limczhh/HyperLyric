@@ -44,6 +44,7 @@ internal class RootLyricSink(
     private var pendingPosition: PositionSample? = null
     private var positionDispatchScheduled = false
     private var playbackActive = false
+    private var playbackAdvancing = false
     private var lastReceivedPosition = Long.MIN_VALUE
     private var lastReceivedPositionTimeMs = 0L
     private var lastReceivedPlaybackSpeed = Float.NaN
@@ -135,8 +136,9 @@ internal class RootLyricSink(
         // A different song must never inherit the previous song's extrapolated renderer clock.
         // The first position callback will replace this zero anchor with the source sample.
         LyriconDataBridge.resetPlaybackClock(
-            isPlaying = playbackActive,
-            playbackSpeed = currentPlaybackSpeed
+            isPlaying = playbackAdvancing,
+            playbackSpeed = currentPlaybackSpeed,
+            isActive = playbackActive
         )
         LyriconDataBridge.updateSong(
             song = ownedSong,
@@ -174,6 +176,7 @@ internal class RootLyricSink(
         if (closed) return
         cancelArtworkColorRefresh()
         playbackActive = false
+        playbackAdvancing = false
         cancelPendingPositionDispatch()
         lastReceivedPosition = Long.MIN_VALUE
         lastReceivedPositionTimeMs = 0L
@@ -300,23 +303,25 @@ internal class RootLyricSink(
         }
     }
 
-    override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float) {
+    override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float, isActive: Boolean) {
         if (closed) return
-        playbackActive = isPlaying
+        playbackActive = isActive
+        playbackAdvancing = isPlaying
         explicitPlaybackSpeed(playbackSpeed)?.let { currentPlaybackSpeed = it }
         LyriconDataBridge.updatePlaybackState(
             isPlaying = isPlaying,
-            playbackSpeed = currentPlaybackSpeed
+            playbackSpeed = currentPlaybackSpeed,
+            isActive = isActive
         )
         if (!isPlaying) cancelPendingPositionDispatch()
-        if (isPlaying) {
+        if (isActive) {
             handleColorBindingUpdate(
                 update = LyricColorBindingCoordinator.onPlaybackStarted(context),
                 reason = "playback_started"
             )
             scheduleArtworkColorRefresh()
         }
-        renderer.onPlaybackStateChanged(isPlaying)
+        renderer.onPlaybackStateChanged(isActive)
     }
 
     override fun onPositionChanged(position: Long, playbackSpeed: Float) {
@@ -332,15 +337,16 @@ internal class RootLyricSink(
         LyriconDataBridge.updatePlaybackClock(
             positionMs = position,
             playbackSpeed = resolvedSpeed,
-            isPlaying = playbackActive,
-            sampledAtUptimeMs = now
+            isPlaying = playbackAdvancing,
+            sampledAtUptimeMs = now,
+            isActive = playbackActive
         )
         val lyricChanged = LyriconDataBridge.updatePosition(position)
         if (lyricChanged) {
             renderer.updateLyricLine()
         }
         val sample = PositionSample(position, resolvedSpeed)
-        if (playbackActive) {
+        if (playbackAdvancing) {
             dispatchPositionThrottled(sample, now)
         } else {
             dispatchPosition(sample, now)
@@ -392,7 +398,7 @@ internal class RootLyricSink(
             return it
         }
 
-        if (playbackActive && lastReceivedPosition != Long.MIN_VALUE &&
+        if (playbackAdvancing && lastReceivedPosition != Long.MIN_VALUE &&
             lastReceivedPositionTimeMs > 0L && now > lastReceivedPositionTimeMs &&
             position >= lastReceivedPosition
         ) {

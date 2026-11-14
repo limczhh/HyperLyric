@@ -15,6 +15,7 @@ import com.lidesheng.hyperlyric.root.utils.HookLogger
 
 /** Applies one playback policy to every registered Real/Fake projection. */
 internal object IslandPlaybackStateCoordinator {
+    private var lastPlaybackAdvancing = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var clearedByPause = false
 
@@ -47,6 +48,9 @@ internal object IslandPlaybackStateCoordinator {
         }
 
         val stateChanged = IslandPresentationCoordinator.updatePlaybackState(isPlaying)
+        val advancing = LyriconDataBridge.isPlaybackAdvancing()
+        val clockChanged = lastPlaybackAdvancing != advancing
+        lastPlaybackAdvancing = advancing
         if (stateChanged) {
             IslandProgressGlowController.onPlaybackStateChanged(isPlaying)
         }
@@ -62,7 +66,7 @@ internal object IslandPlaybackStateCoordinator {
                 restoreActiveViewsAfterPause(onRefreshRequested)
             }
 
-            isPlaying && stateChanged -> applyPlaybackStateToActiveViews(true)
+            isPlaying && (stateChanged || clockChanged) -> applyPlaybackStateToActiveViews(true)
 
             !isPlaying && behavior == 0 && !clearedByPause -> {
                 applyPlaybackStateToActiveViews(false)
@@ -74,7 +78,7 @@ internal object IslandPlaybackStateCoordinator {
 
         val action = when {
             isPlaying && wasClearedByPause -> "restore_after_pause"
-            isPlaying && stateChanged -> "resume_active_views"
+            isPlaying && (stateChanged || clockChanged) -> "sync_active_views"
             !isPlaying && behavior == 0 && !wasClearedByPause -> "clear_on_pause"
             !isPlaying && stateChanged -> "pause_active_views"
             else -> "no_change"

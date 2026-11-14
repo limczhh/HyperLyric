@@ -79,7 +79,7 @@ internal class LyricSessionArbiter(
         bind(slot)
         slot.detached = false
         slot.block()
-        if (slot.token == null) order.update(key, slot.playing)
+        if (slot.token == null) order.update(key, slot.active)
         if (slot.requiresSelection) {
             reconcile()
         } else if (slot === selected && slot.positionDirty) {
@@ -143,21 +143,21 @@ internal class LyricSessionArbiter(
         sessions.keys.filter { it !in tokens }.forEach { token ->
             removeSession(token)
         }
-        order.seed(controllers.map { it.sessionToken to (it.playbackState?.state == PlaybackState.STATE_PLAYING) })
+        order.seed(controllers.map { it.sessionToken to LyricPlaybackState.isActive(it.playbackState) })
         controllers.forEach { controller ->
             val token = controller.sessionToken
             if (token !in sessions) {
                 val callback = object : MediaController.Callback() {
                     override fun onPlaybackStateChanged(state: PlaybackState?) {
                         if (closed || sessions[token]?.controller !== controller) return
-                        order.update(token, state?.state == PlaybackState.STATE_PLAYING)
+                        order.update(token, LyricPlaybackState.isActive(state))
                         // A playback transition may make a previously ambiguous package bindable.
                         val packageSlots = slots.values.filter { it.packageName == controller.packageName }
                         packageSlots.forEach(::bind)
                         val affected = packageSlots.filter { it.token == token }
                         affected.forEach {
-                            it.onPlaybackStateChanged(state?.state == PlaybackState.STATE_PLAYING,
-                                state?.playbackSpeed ?: Float.NaN)
+                            it.onPlaybackStateChanged(LyricPlaybackState.isAdvancing(state),
+                                state?.playbackSpeed ?: Float.NaN, LyricPlaybackState.isActive(state))
                             it.onPositionChanged(MediaMetadataHelper.estimatePlaybackPosition(state),
                                 state?.playbackSpeed ?: Float.NaN)
                         }
@@ -202,7 +202,7 @@ internal class LyricSessionArbiter(
         if (slot.token == null) {
             // A package is not a session identity. Do not guess when several sessions exist.
             val matching = sessions.values.filter { it.controller.packageName == slot.packageName }
-            val playing = matching.filter { order.isPlaying(it.controller.sessionToken) }
+            val playing = matching.filter { order.isActive(it.controller.sessionToken) }
             val controller = (playing.singleOrNull() ?: matching.singleOrNull())?.controller
             if (controller != null) {
                 slot.token = controller.sessionToken
@@ -232,13 +232,17 @@ internal class LyricSessionArbiter(
         sessions[token]?.controller?.metadata?.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
             ?.takeIf { it.isNotBlank() }
 
-    private fun isPlaying(slot: Slot): Boolean {
+    private fun isActive(slot: Slot): Boolean {
         val token = slot.token
-        if (token != null) return order.isPlaying(token)
+        if (token != null) return order.isActive(token)
         // No controller yet: use the source signal only while MediaSession identity is unavailable.
         if (sessions.values.any { it.controller.packageName == slot.packageName }) return false
-        return slot.playing
+        return slot.active
     }
+
+    private fun isPlaying(slot: Slot): Boolean = slot.token?.let {
+        LyricPlaybackState.isAdvancing(sessions[it]?.controller?.playbackState)
+    } ?: slot.playing
 
     /** Choose whose source snapshot to publish. Renderers decide whether to display it. */
     private fun selectOwner(): Slot? {
@@ -250,13 +254,13 @@ internal class LyricSessionArbiter(
         for (slot in slots.values) {
             if (!slot.sourceAvailable) continue
             if (newer(slot, latestContent)) latestContent = slot
-            if (!isPlaying(slot)) continue
+            if (!isActive(slot)) continue
             if (newer(slot, playingInfo)) playingInfo = slot
             if (slot.hasLyrics && newer(slot, playingLyrics)) playingLyrics = slot
         }
         (playingLyrics ?: playingInfo)?.let { return it }
         // A different playing session without a source must not display a paused owner's lyrics.
-        if (sessions.keys.any(order::isPlaying)) return null
+        if (sessions.keys.any(order::isActive)) return null
         return selected?.takeIf { slots[it.key] === it && it.sourceAvailable }
             ?: latestContent
     }
@@ -277,9 +281,11 @@ internal class LyricSessionArbiter(
                 }
             )
             val playingNow = isPlaying(winner)
-            if (switched || winner.lastPlaying != playingNow || winner.playbackDirty) {
-                downstream.onPlaybackStateChanged(playingNow, winner.speed)
+            val activeNow = isActive(winner)
+            if (switched || winner.lastPlaying != playingNow || winner.lastActive != activeNow || winner.playbackDirty) {
+                downstream.onPlaybackStateChanged(playingNow, winner.speed, activeNow)
                 winner.lastPlaying = playingNow
+                winner.lastActive = activeNow
             }
             if (switched || winner.contentDirty) {
                 winner.line?.let(downstream::onLyricLine)
@@ -342,10 +348,12 @@ internal class LyricSessionArbiter(
         var textSet = false
         var detached = false
         var playing = false
+        var active = false
         var speed = Float.NaN
         var position = -1L
         var delayMs = 0
         var lastPlaying: Boolean? = null
+        var lastActive: Boolean? = null
         var mediaId: String? = null
         var mediaTitle: String? = null
         var songDirty = false
@@ -421,8 +429,9 @@ internal class LyricSessionArbiter(
             line = null
             contentDirty = true
         }
-        override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float) {
+        override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float, isActive: Boolean) {
             playing = isPlaying
+            active = isActive
             speed = playbackSpeed
             playbackDirty = true
         }
@@ -435,6 +444,7 @@ internal class LyricSessionArbiter(
             onSongChanged(null)
             onMetadata(null)
             playing = false
+            active = false
             sourceAvailable = false
         }
     }

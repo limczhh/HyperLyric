@@ -135,8 +135,8 @@ class SourceManager(
         override fun onMetadata(metadata: LyricMediaMetadata?) =
             dispatch { it.onMetadata(metadata) }
 
-        override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float) =
-            dispatch { it.onPlaybackStateChanged(isPlaying, playbackSpeed) }
+        override fun onPlaybackStateChanged(isPlaying: Boolean, playbackSpeed: Float, isActive: Boolean) =
+            dispatch { it.onPlaybackStateChanged(isPlaying, playbackSpeed, isActive) }
 
         override fun onPositionChanged(position: Long, playbackSpeed: Float) =
             dispatch { it.onPositionChanged(position, playbackSpeed) }
