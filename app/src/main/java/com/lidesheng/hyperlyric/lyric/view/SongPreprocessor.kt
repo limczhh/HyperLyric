@@ -87,10 +87,22 @@ internal class SongPreprocessor(
                 current.end + INTERLUDE_COUNTDOWN_DELAY_MS
             }
             if (begin >= next.begin) continue
-            countdowns.add(TimedLine(countdownPlaceholderLine(begin, next.begin)))
+            countdowns.add(TimedLine(countdownPlaceholderLine(begin, next.begin, countdownDotStyle())))
         }
         return countdowns
     }
+
+    /**
+     * 当前占位符选项对应的圆点样式。
+     *
+     * 该选项统一控制所有倒计时占位行；它们走同一条管线，样式必须一致。
+     */
+    private fun countdownDotStyle(): CountdownDotStyle =
+        if (placeholder == TitleSlot.COUNTDOWN_AMLL) {
+            CountdownDotStyle.AMLL
+        } else {
+            CountdownDotStyle.LEGACY
+        }
 
     private fun hasPreciseWordTiming(line: TimedLine): Boolean {
         val words = line.words ?: return false
@@ -118,6 +130,11 @@ internal class SongPreprocessor(
     internal fun noLyricsPlaceholder(song: Song): RichLyricLine? = when (placeholder) {
         TitleSlot.NONE -> null
         TitleSlot.COUNTDOWN -> countdownPlaceholderLine(0L, Long.MAX_VALUE)
+        TitleSlot.COUNTDOWN_AMLL -> countdownPlaceholderLine(
+            0L,
+            Long.MAX_VALUE,
+            CountdownDotStyle.AMLL
+        )
         TitleSlot.NAME_ARTIST,
         TitleSlot.NAME -> songTitle(song)?.let {
             titleLine(Long.MAX_VALUE, Long.MAX_VALUE, it)
@@ -133,6 +150,11 @@ internal class SongPreprocessor(
         return when (placeholder) {
             TitleSlot.NONE -> null
             TitleSlot.COUNTDOWN -> countdownPlaceholderLine(0L, end)
+            TitleSlot.COUNTDOWN_AMLL -> countdownPlaceholderLine(
+                0L,
+                end,
+                CountdownDotStyle.AMLL
+            )
             TitleSlot.NAME_ARTIST,
             TitleSlot.NAME -> songTitle(song)?.let {
                 titleLine(end, end, it)
@@ -169,7 +191,8 @@ internal class SongPreprocessor(
             }
 
             TitleSlot.NAME -> name?.takeIf { it.isNotBlank() }
-            TitleSlot.COUNTDOWN -> null
+            TitleSlot.COUNTDOWN,
+            TitleSlot.COUNTDOWN_AMLL -> null
         }
     }
 }

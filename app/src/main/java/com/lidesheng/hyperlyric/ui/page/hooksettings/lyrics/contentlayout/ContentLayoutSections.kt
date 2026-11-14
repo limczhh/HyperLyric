@@ -281,7 +281,8 @@ internal fun LazyListScope.contentLayoutSections(
             stringResource(id = R.string.option_placeholder_none),
             stringResource(id = R.string.option_placeholder_title_artist),
             stringResource(id = R.string.option_placeholder_title),
-            stringResource(id = R.string.option_placeholder_countdown)
+            stringResource(id = R.string.option_placeholder_countdown),
+            stringResource(id = R.string.option_placeholder_countdown_amll)
         )
         val lyricBehaviorOptions = listOf(
             stringResource(id = R.string.option_lyric_behavior_keep),
@@ -300,7 +301,7 @@ internal fun LazyListScope.contentLayoutSections(
                     items = placeholderOptions,
                     selectedIndex = placeholderFormat.coerceIn(
                         RootConstants.PLACEHOLDER_FORMAT_NONE,
-                        RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN
+                        RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN_AMLL
                     ),
                     onSelectedIndexChange = onPlaceholderFormatChange
                 )

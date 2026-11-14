@@ -76,7 +76,7 @@ fun ContentLayoutPage() {
                 RootConstants.DEFAULT_HOOK_PLACEHOLDER_FORMAT
             ).coerceIn(
                 RootConstants.PLACEHOLDER_FORMAT_NONE,
-                RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN
+                RootConstants.PLACEHOLDER_FORMAT_COUNTDOWN_AMLL
             )
         )
     }

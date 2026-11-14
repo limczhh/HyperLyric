@@ -351,6 +351,7 @@
     <string name="option_placeholder_title_artist">Title - Artist</string>
     <string name="option_placeholder_title">Title</string>
     <string name="option_placeholder_countdown">Countdown Dots</string>
+    <string name="option_placeholder_countdown_amll">Countdown Dots (AMLL Style)</string>
     <string name="title_lyric_preview">Lyric preview</string>
     <string name="summary_lyric_preview">Preview the next lyric after a line with an end time finishes</string>
     <string name="title_lyric_long_interlude_countdown">Show countdown dots during long lyric interludes</string>

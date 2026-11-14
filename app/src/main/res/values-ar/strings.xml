@@ -271,6 +271,7 @@
   <string name="option_placeholder_title_artist">العنوان - الفنان</string>
   <string name="option_placeholder_title">العنوان</string>
   <string name="option_placeholder_countdown">نقاط العد التنازلي</string>
+  <string name="option_placeholder_countdown_amll">نقاط العد التنازلي (نمط AMLL)</string>
   <string name="title_no_lyrics_lyric_behavior">سلوك كلمات الأغاني بدون كلمات أو الموسيقى الصرفة</string>
   <string name="title_tail_timeout_behavior">سلوك مهلة نهاية الأغنية</string>
   <string name="title_tail_timeout_delay">مدة مهلة نهاية الأغنية</string>
