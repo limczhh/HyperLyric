@@ -26,6 +26,7 @@ import com.lidesheng.hyperlyric.lyric.view.UpdatableColor
 import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.WordMotion
 import com.lidesheng.hyperlyric.lyric.view.dp
+import com.lidesheng.hyperlyric.lyric.view.isAmllCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.isCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
 import com.lidesheng.hyperlyric.lyric.view.line.model.createModel
@@ -56,7 +57,11 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
     private var _model: LyricModel = emptyLyricModel()
 
     val lineWidth: Float
-        get() = if (_model.isCountdownLine()) countdownRenderer.contentWidth() else _model.width
+        get() = when {
+            _model.isAmllCountdownLine() -> amllCountdownRenderer.contentWidth()
+            _model.isCountdownLine() -> countdownRenderer.contentWidth()
+            else -> _model.width
+        }
 
     // ---- Metadata marquee overrides (called from HyperLyric) ----
     fun setMarqueeSpeed(speed: Float) {
@@ -126,6 +131,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
             scrollRenderer.centerIfPossible = value
             lineTimelineRenderer.centerIfPossible = value
             countdownRenderer.centerIfPossible = value
+            amllCountdownRenderer.centerIfPossible = value
         }
 
     var hasSourceWordTiming: Boolean
@@ -153,6 +159,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
             scrollRenderer.rightIfPossible = value
             lineTimelineRenderer.rightIfPossible = value
             countdownRenderer.rightIfPossible = value
+            amllCountdownRenderer.rightIfPossible = value
         }
 
     var playListener: LyricPlayListener? = null
@@ -223,6 +230,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
     internal val syncRenderer = SpaceGateWordSyncRenderer(this)
     internal val lineTimelineRenderer = LineTimelineRenderer()
     private val countdownRenderer = CountdownDotsRenderer()
+    private val amllCountdownRenderer = AmllCountdownDotsRenderer()
     private val animator = Animator()
 
     internal var activeRenderer: LineRenderer = scrollRenderer
@@ -289,6 +297,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         textPaint.textSize = size
         syncRenderer.setTextSize(size)
         countdownRenderer.setTextSize(size)
+        amllCountdownRenderer.setTextSize(size)
         refreshSizes()
         syncRenderer.updateLayout(_model, lineState, getSpaceGateVirtualWidth(), measuredHeight)
         lineTimelineRenderer.updateLayout(
@@ -306,6 +315,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
         _model = line?.normalize()?.createModel() ?: emptyLyricModel()
         activeRenderer = when {
+            _model.isAmllCountdownLine() -> amllCountdownRenderer
             _model.isCountdownLine() -> countdownRenderer
             useLineTimeline && _model.isPlainText -> lineTimelineRenderer
             _model.isPlainText -> scrollRenderer
@@ -378,6 +388,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
     fun measureLineWidth(rawLine: LyricLine?): Float {
         val line = if (rawLine?.text.isNullOrBlank() && !rawLine.isCountdownLine()) null else rawLine
         val model = line?.normalize()?.createModel() ?: emptyLyricModel()
+        if (model.isAmllCountdownLine()) return amllCountdownRenderer.contentWidth()
         if (model.isCountdownLine()) return countdownRenderer.contentWidth()
         model.updateSizes(textPaint)
         return model.width
@@ -442,7 +453,8 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
                 getSpaceGateVirtualWidth(),
                 measuredHeight
             )
-            if (activeRenderer === countdownRenderer || activeRenderer === lineTimelineRenderer) {
+            animator.rebaseFrameClock()
+            if (activeRenderer.isCountdownDotsRenderer || activeRenderer === lineTimelineRenderer) {
                 invalidate()
                 siblingView?.invalidate()
             }
@@ -471,7 +483,8 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
                     measuredHeight,
                     playbackSpeed
                 )
-                if (activeRenderer === countdownRenderer || activeRenderer === lineTimelineRenderer) {
+                animator.rebaseFrameClock()
+                if (activeRenderer.isCountdownDotsRenderer || activeRenderer === lineTimelineRenderer) {
                     invalidate()
                     siblingView?.invalidate()
                 }
@@ -513,8 +526,8 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
                 if (isShown) invalidate()
                 siblingView?.takeIf { it.isShown }?.invalidate()
             }
-            (activeRenderer as? CountdownDotsRenderer)?.let { renderer ->
-                renderer.freeze()
+            if (activeRenderer.isCountdownDotsRenderer) {
+                activeRenderer.freezeCountdownDots()
                 if (isShown) invalidate()
                 siblingView?.takeIf { it.isShown }?.invalidate()
             }
@@ -578,6 +591,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         syncRenderer.reset(lineState)
         lineTimelineRenderer.reset(lineState)
         countdownRenderer.reset(lineState)
+        amllCountdownRenderer.reset(lineState)
         _model = emptyLyricModel()
         activeRenderer = scrollRenderer
         refreshSizes()
@@ -631,8 +645,8 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
                 myRenderer.syncFrom(masterRenderer)
             } else if (myRenderer is LineTimelineRenderer && masterRenderer is LineTimelineRenderer) {
                 myRenderer.syncFrom(masterRenderer)
-            } else if (myRenderer is CountdownDotsRenderer && masterRenderer is CountdownDotsRenderer) {
-                myRenderer.syncFrom(masterRenderer)
+            } else if (myRenderer.isCountdownDotsRenderer && masterRenderer.isCountdownDotsRenderer) {
+                myRenderer.syncCountdownDotsFrom(masterRenderer)
             }
         }
 
@@ -710,6 +724,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
                 measuredHeight,
                 playbackSpeed
             )
+            animator.rebaseFrameClock()
             if (activeRenderer.isPlaying && !activeRenderer.isFinished) {
                 animator.startIfNeeded()
             }
@@ -850,6 +865,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         updatePlainTextColors()
         syncRenderer.setColors(backgroundColors, highlightColors)
         countdownRenderer.setColors(backgroundColors, highlightColors)
+        amllCountdownRenderer.setColors(backgroundColors, highlightColors)
         invalidate()
     }
 
@@ -901,13 +917,13 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
     private inner class Animator : Choreographer.FrameCallback {
         private var running = false
-        private var lastFrameNanos = 0L
+        private val frameClock = FrameDeltaTracker()
 
         fun startIfNeeded() {
             if (!isRightSide && spaceGateEnabled) return // Slave doesn't run frame callback
             if (playbackActive && !running && canAdvancePlaybackClock()) {
                 running = true
-                lastFrameNanos = 0L
+                frameClock.reset()
                 Choreographer.getInstance().postFrameCallback(this)
             }
         }
@@ -915,7 +931,12 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
         fun stop() {
             running = false
             Choreographer.getInstance().removeFrameCallback(this)
-            lastFrameNanos = 0L
+            frameClock.reset()
+        }
+
+        /** 位置样本落地后重锚帧间隔，下一帧不再累加样本已覆盖的时长。 */
+        fun rebaseFrameClock() {
+            frameClock.rebase(System.nanoTime())
         }
 
         override fun doFrame(frameTimeNanos: Long) {
@@ -925,8 +946,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
             }
 
             val virtualWidth = getSpaceGateVirtualWidth()
-            val deltaNanos = if (lastFrameNanos == 0L) 0L else frameTimeNanos - lastFrameNanos
-            lastFrameNanos = frameTimeNanos
+            val deltaNanos = frameClock.deltaNanos(frameTimeNanos)
 
             val renderer = activeRenderer
             val changed = renderer.step(deltaNanos, _model, lineState, virtualWidth)
@@ -939,7 +959,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
                 Choreographer.getInstance().postFrameCallback(this)
             } else {
                 running = false
-                lastFrameNanos = 0L
+                frameClock.reset()
             }
         }
     }

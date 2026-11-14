@@ -111,5 +111,5 @@ data class AnimParams(
     val presetId: String = "stack_flow",
 )
 
-enum class TitleSlot { NAME_ARTIST, NAME, COUNTDOWN, NONE }
+enum class TitleSlot { NAME_ARTIST, NAME, COUNTDOWN, COUNTDOWN_AMLL, NONE }
 
