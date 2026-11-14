@@ -237,6 +237,28 @@ internal class AmllInterludeTimeline private constructor(
          */
         const val DOT_PADDING_X_EM = 0.25f
 
+        /** 整组圆点未缩放时的宽度，单位 em。 */
+        val DOT_GROUP_WIDTH_EM: Float
+            get() = DOT_COUNT * DOT_DIAMETER_EM + (DOT_COUNT - 1) * DOT_GAP_EM
+
+        /**
+         * 内容盒宽度，单位 em。
+         *
+         * 左右内边距之外按缩放上限预留整组圆点；缩放原点取内容盒中心，
+         * 呼吸放到最大时首末两颗圆点仍各自留在内边距之内。
+         */
+        val CONTENT_WIDTH_EM: Float
+            get() = 2f * DOT_PADDING_X_EM + DOT_GROUP_WIDTH_EM * BREATHE_MAX_SCALE
+
+        /** 第 [index] 颗圆点圆心相对内容盒左边界的偏移，单位 em。 */
+        fun dotCenterXEm(index: Int, scale: Float): Float =
+            CONTENT_WIDTH_EM / 2f +
+                (index * (DOT_DIAMETER_EM + DOT_GAP_EM) - DOT_GROUP_WIDTH_EM / 2f +
+                    DOT_DIAMETER_EM / 2f) * scale
+
+        /** 圆点半径，单位 em。 */
+        fun dotRadiusEm(scale: Float): Float = DOT_RADIUS_EM * scale
+
         /** 未点亮圆点不透明度。 */
         const val DOT_INACTIVE_OPACITY = 0.2f
 

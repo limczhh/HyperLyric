@@ -74,13 +74,7 @@ internal class AmllCountdownDotsRenderer(
         highlightColor = resolved
     }
 
-    override fun contentWidth(): Float {
-        val padding = 2f * AmllInterludeTimeline.DOT_PADDING_X_EM
-        val dots = AmllInterludeTimeline.DOT_COUNT * AmllInterludeTimeline.DOT_DIAMETER_EM *
-            AmllInterludeTimeline.BREATHE_MAX_SCALE
-        val gaps = (AmllInterludeTimeline.DOT_COUNT - 1) * AmllInterludeTimeline.DOT_GAP_EM
-        return (padding + dots + gaps) * baseTextSize
-    }
+    override fun contentWidth(): Float = AmllInterludeTimeline.CONTENT_WIDTH_EM * baseTextSize
 
     override fun freeze() {
         frozen = true
@@ -151,23 +145,16 @@ internal class AmllCountdownDotsRenderer(
 
         val boxWidth = contentWidth()
         val boxLeft = alignedStart(boxWidth, model, viewWidth)
-        val boxCenterX = boxLeft + boxWidth / 2f
         val centerY = viewHeight / 2f
-
-        val diameterPx = AmllInterludeTimeline.DOT_DIAMETER_EM * baseTextSize
-        val gapPx = AmllInterludeTimeline.DOT_GAP_EM * baseTextSize
-        val stepPx = diameterPx + gapPx
-        val firstCenterX = boxLeft +
-            AmllInterludeTimeline.DOT_PADDING_X_EM * baseTextSize +
-            diameterPx / 2f
+        val scale = frame.scale
 
         dotPaint.color = highlightColor
         val baseAlpha = dotPaint.alpha
         repeat(AmllInterludeTimeline.DOT_COUNT) { index ->
             val opacity = frame.dotOpacity(index)
             if (opacity <= 0f) return@repeat
-            val centerX = boxCenterX + (firstCenterX + index * stepPx - boxCenterX) * frame.scale
-            val radius = AmllInterludeTimeline.DOT_RADIUS_EM * baseTextSize * frame.scale
+            val centerX = boxLeft + AmllInterludeTimeline.dotCenterXEm(index, scale) * baseTextSize
+            val radius = AmllInterludeTimeline.dotRadiusEm(scale) * baseTextSize
             dotPaint.alpha = (baseAlpha * opacity).toInt().coerceIn(0, 255)
             canvas.drawCircle(centerX, centerY, radius, dotPaint)
         }
