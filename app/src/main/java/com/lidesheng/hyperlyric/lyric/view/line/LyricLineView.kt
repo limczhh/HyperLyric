@@ -412,6 +412,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
             if (playbackActive) startScrolling()
         } else {
             activeRenderer.seek(_model, lineState, posMs, measuredWidth, measuredHeight)
+            animator.rebaseFrameClock()
             if (activeRenderer.isCountdownDotsRenderer || activeRenderer === lineTimelineRenderer) {
                 invalidate()
             }
@@ -438,6 +439,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                     measuredHeight,
                     playbackSpeed
                 )
+                animator.rebaseFrameClock()
                 if (activeRenderer.isCountdownDotsRenderer || activeRenderer === lineTimelineRenderer) {
                     invalidate()
                 }
@@ -630,6 +632,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                 measuredHeight,
                 playbackSpeed
             )
+            animator.rebaseFrameClock()
             if (activeRenderer.isPlaying && !activeRenderer.isFinished) {
                 animator.startIfNeeded()
             }
@@ -746,12 +749,12 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
 
     private inner class Animator : Choreographer.FrameCallback {
         private var running = false
-        private var lastFrameNanos = 0L
+        private val frameClock = FrameDeltaTracker()
 
         fun startIfNeeded() {
             if (playbackActive && !running && canAdvancePlaybackClock()) {
                 running = true
-                lastFrameNanos = 0L
+                frameClock.reset()
                 Choreographer.getInstance().postFrameCallback(this)
             }
         }
@@ -759,7 +762,12 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
         fun stop() {
             running = false
             Choreographer.getInstance().removeFrameCallback(this)
-            lastFrameNanos = 0L
+            frameClock.reset()
+        }
+
+        /** 位置样本落地后重锚帧间隔，下一帧不再累加样本已覆盖的时长。 */
+        fun rebaseFrameClock() {
+            frameClock.rebase(System.nanoTime())
         }
 
         override fun doFrame(frameTimeNanos: Long) {
@@ -768,8 +776,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                 return
             }
 
-            val deltaNanos = if (lastFrameNanos == 0L) 0L else frameTimeNanos - lastFrameNanos
-            lastFrameNanos = frameTimeNanos
+            val deltaNanos = frameClock.deltaNanos(frameTimeNanos)
 
             val renderer = activeRenderer
             val changed = renderer.step(deltaNanos, _model, lineState, measuredWidth)
@@ -779,7 +786,7 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
                 Choreographer.getInstance().postFrameCallback(this)
             } else {
                 running = false
-                lastFrameNanos = 0L
+                frameClock.reset()
             }
         }
     }
