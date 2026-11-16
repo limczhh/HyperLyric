@@ -32,14 +32,14 @@ class SourceManager(
         }
 
         if (source.id != sourceId) {
-            logger.d(
+            logger.w(
                 "SourceManager",
                 "歌词源配置回退: requested=$sourceId, actual=${source.id}, reason=unavailable"
             )
         }
         startSession(source)
         if (activeSource === source) {
-            logger.i("SourceManager", "启动歌词源: ${source.displayName}")
+            logger.i("SourceManager", "启动歌词源成功: ${source.displayName} (id=${source.id})")
         }
     }
 

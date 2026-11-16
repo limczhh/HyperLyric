@@ -615,8 +615,14 @@ class HookEntry : XposedModule() {
                 RootConstants.KEY_HOOK_LYRIC_MODE,
                 RootConstants.DEFAULT_HOOK_LYRIC_MODE
             )
+            val configuredSourceId = prefs.getString(
+                RootConstants.KEY_HOOK_LYRIC_SOURCE,
+                RootConstants.DEFAULT_HOOK_LYRIC_SOURCE
+            )
+            HookLogger.d(TAG, "初始化歌词源管理器: configuredSource=$configuredSourceId, shouldRun=${shouldRunLyricSource()}")
             if (shouldRunLyricSource()) {
                 sourceManager?.start()
+                HookLogger.d(TAG, "歌词源管理器已启动: activeSource=${sourceManager?.getActiveSource()?.id}")
             }
             renderer.updateLyricLine()
 
@@ -653,11 +659,10 @@ class HookEntry : XposedModule() {
                             }
                             Handler(Looper.getMainLooper()).post {
                                 val manager = sourceManager
+                                HookLogger.d(TAG, "收到歌词源切换请求: target=$newSourceId, current=${manager?.getActiveSource()?.id}")
                                 manager?.switchSource(newSourceId)
                                 val activeSourceId = manager?.getActiveSource()?.id
-                                if (activeSourceId == newSourceId) {
-                                    HookLogger.d(TAG, "歌词源切换完成: source=$newSourceId")
-                                }
+                                HookLogger.d(TAG, "歌词源切换结果: requested=$newSourceId, active=$activeSourceId")
                             }
                         }
 
