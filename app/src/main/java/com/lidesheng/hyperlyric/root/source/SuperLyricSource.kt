@@ -1,14 +1,16 @@
 package com.lidesheng.hyperlyric.root.source
 
-import com.hchen.superlyricapi.ISuperLyricReceiver
-import com.hchen.superlyricapi.SuperLyricData
-import com.hchen.superlyricapi.SuperLyricHelper
-import com.hchen.superlyricapi.SuperLyricLine
+import com.hchen.superlyricapi.LyricListener
+import com.hchen.superlyricapi.LyricView
+import com.hchen.superlyricapi.SuperLyric
+import com.hchen.superlyricapi.model.Line
+import com.hchen.superlyricapi.model.PlaybackState
+import com.hchen.superlyricapi.model.Stop
 import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
-import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
+import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.lyric.source.LyricSink
 import com.lidesheng.hyperlyric.lyric.source.LyricSource
 import com.lidesheng.hyperlyric.root.utils.HookLogger
@@ -21,7 +23,7 @@ class SuperLyricSource : LyricSource {
     private var app: android.app.Application? = null
     @Volatile
     private var sink: LyricSink? = null
-    private var receiver: ISuperLyricReceiver? = null
+    private var listener: LyricListener? = null
     private var arbiter: LyricSessionArbiter? = null
 
     fun initialize(app: android.app.Application) {
@@ -29,7 +31,7 @@ class SuperLyricSource : LyricSource {
     }
 
     override fun isAvailable(): Boolean = try {
-        val available = SuperLyricHelper.isAvailable()
+        val available = SuperLyric.isAvailable()
         HookLogger.d(TAG, "检查数据源可用性: available=$available")
         available
     } catch (e: Exception) {
@@ -46,7 +48,7 @@ class SuperLyricSource : LyricSource {
         owner.start()
 
         // 先检查 SuperLyric 系统服务是否可用
-        val available = runCatching { SuperLyricHelper.isAvailable() }
+        val available = runCatching { SuperLyric.isAvailable() }
             .getOrElse {
                 HookLogger.w(TAG, "跳过接收端注册: reason=availability_check_failed", it)
                 return
@@ -56,33 +58,40 @@ class SuperLyricSource : LyricSource {
             return
         }
 
-        val stub = object : ISuperLyricReceiver.Stub() {
-            override fun onLyric(publisher: String, data: SuperLyricData) {
+        val stub = object : LyricListener {
+            override fun onLyric(view: LyricView) {
                 try {
+                    val publisher = view.publisher?.takeIf { it.isNotBlank() } ?: "unknown"
                     owner.update(publisher, publisher) {
                         val stream = streams.getOrPut(publisher) { PublisherStream(owner) }
                         stream.sink = this
-                        stream.handleLyric(publisher, data)
+                        stream.handleLyric(publisher, view)
                     }
                 } catch (e: Exception) {
                     HookLogger.w(TAG, "处理歌词数据失败", e)
                 }
             }
 
-            override fun onStop(publisher: String, data: SuperLyricData) {
-                owner.update(publisher, publisher) {
-                    streams[publisher]?.playbackStarted = false
-                    onPlaybackStateChanged(false)
+            override fun onStop(stop: Stop) {
+                try {
+                    val publisher = stop.publisher?.takeIf { it.isNotBlank() } ?: ""
+                    owner.update(publisher, publisher) {
+                        streams[publisher]?.playbackStarted = false
+                        onPlaybackStateChanged(false)
+                    }
+                } catch (e: Exception) {
+                    HookLogger.w(TAG, "处理停止事件失败", e)
                 }
             }
         }
-        receiver = stub
+        listener = stub
 
         try {
-            SuperLyricHelper.registerReceiver(stub)
-            if (HookLogger.isDebugEnabled) {
-                val registered = SuperLyricHelper.isReceiverRegistered(stub)
-                HookLogger.d(TAG, "更新接收端注册状态: registered=$registered")
+            SuperLyric.receiver().register(stub)
+            HookLogger.d(TAG, "已注册 SuperLyric 4.0 接收端")
+            val latest = runCatching { SuperLyric.receiver().latest() }.getOrNull()
+            if (latest != null) {
+                stub.onLyric(latest)
             }
         } catch (e: Exception) {
             HookLogger.e(TAG, "注册接收端失败", e)
@@ -92,14 +101,14 @@ class SuperLyricSource : LyricSource {
     override fun stop() {
         val owner = arbiter
         owner?.close()
-        receiver?.let {
+        listener?.let {
             try {
-                SuperLyricHelper.unregisterReceiver(it)
+                SuperLyric.receiver().unregister(it)
             } catch (e: Exception) {
                 HookLogger.w(TAG, "注销接收端失败", e)
             }
         }
-        receiver = null
+        listener = null
         if (owner == null) sink?.onStop()
         arbiter = null
         sink = null
@@ -127,19 +136,11 @@ class SuperLyricSource : LyricSource {
             fullSong = null
         }
 
-        fun handleLyric(publisher: String, rawData: SuperLyricData) {
+        fun handleLyric(publisher: String, view: LyricView) {
             val currentSink = sink ?: return
+            val lyric = view.lyric
 
-            // Timelines are kept per publisher. Deltas only update that publisher's ID/position;
-            // using the SDK's global lyricId cache would mix publishers that reuse the same ID.
-            val data = rawData
-
-            // 无实际数据（如拖动进度条时的 BUFFERING 状态），忽略
-            val hasContent = data.hasLyric() || data.hasAllLyrics() ||
-                data.hasTitle() || data.hasArtist() || data.hasAlbum() || data.hasLyricId()
-            if (!hasContent) return
-
-            val newLyricId = data.lyricId?.takeIf { it.isNotBlank() }
+            val newLyricId = lyric.id.takeIf { it.isNotBlank() }
             val publisherChanged = activePublisher != publisher
             val lyricIdChanged = !publisherChanged && activeLyricId != null &&
                 newLyricId != null && activeLyricId != newLyricId
@@ -158,9 +159,14 @@ class SuperLyricSource : LyricSource {
             activePublisher = publisher
             if (newLyricId != null) activeLyricId = newLyricId
 
-            if (data.hasTitle()) lastMetadataTitle = data.title
-            if (data.hasArtist()) lastMetadataArtist = data.artist
-            if (data.hasAlbum()) lastMetadataAlbum = data.album
+            val title = lyric.title.takeIf { it.isNotBlank() }
+            val artist = lyric.artist.takeIf { it.isNotBlank() }
+            val album = lyric.album.takeIf { it.isNotBlank() }
+
+            if (title != null) lastMetadataTitle = title
+            if (artist != null) lastMetadataArtist = artist
+            if (album != null) lastMetadataAlbum = album
+
             val metadataKey = listOf(
                 publisher,
                 lastMetadataTitle,
@@ -171,133 +177,91 @@ class SuperLyricSource : LyricSource {
             if (metadataChanged) {
                 lastMetadataKey = metadataKey
             }
-            if (fullSong != null && !data.hasAllLyrics() && newLyricId == null &&
-                (data.hasTitle() && lastMetadataTitle != fullSong?.name ||
-                    data.hasArtist() && lastMetadataArtist != fullSong?.artist ||
-                    data.hasAlbum() && lastMetadataAlbum != fullSong?.album)
+
+            if (fullSong != null && lyric.lines.isEmpty() &&
+                (title != null && lastMetadataTitle != fullSong?.name ||
+                    artist != null && lastMetadataArtist != fullSong?.artist ||
+                    album != null && lastMetadataAlbum != fullSong?.album)
             ) {
                 fullSong = null
             }
-            val incomingFullSong = if (data.hasAllLyrics() &&
-                (fullSong == null || rawData.hasAllLyrics())
-            ) {
+
+            val incomingFullSong = if (lyric.lines.isNotEmpty()) {
                 Song(
-                    // lyricId identifies the lyric payload, not the music platform's song ID.
-                    // AMLL's platform probe must not receive it as Song.id.
                     name = lastMetadataTitle,
                     artist = lastMetadataArtist,
                     album = lastMetadataAlbum,
-                    duration = data.duration.takeIf { data.hasDuration() } ?: 0L,
-                    lyrics = data.allLyrics.orEmpty().mapNotNull { line ->
-                        line?.let { convertToRichLyricLine(it) }
-                    }
+                    duration = lyric.duration.coerceAtLeast(0L),
+                    lyrics = lyric.lines.map { line -> convertToRichLyricLine(line) }
                 )
             } else null
-            // Do not re-publish a recovered timeline on every progress delta: that would discard
-            // the enhancement result and rebuild the timeline at the publisher's update rate.
+
             val publishFull = incomingFullSong != null &&
-                (fullSong == null || (rawData.hasAllLyrics() && incomingFullSong != fullSong))
+                (fullSong == null || incomingFullSong != fullSong)
+
             if (publishFull) {
                 fullSong = incomingFullSong
                 currentSink.onSongChanged(incomingFullSong)
             } else if (metadataChanged && fullSong == null) {
                 currentSink.onSongChanged(
-                    Song(name = lastMetadataTitle, artist = lastMetadataArtist,
-                        album = lastMetadataAlbum, lyrics = emptyList())
+                    Song(
+                        name = lastMetadataTitle,
+                        artist = lastMetadataArtist,
+                        album = lastMetadataAlbum,
+                        lyrics = emptyList()
+                    )
                 )
             }
+
             if (metadataChanged || publishFull) {
                 currentSink.onMetadata(
-                    LyricMediaMetadata(sourceId = id, packageName = publisher,
-                        title = lastMetadataTitle, artist = lastMetadataArtist,
-                        album = lastMetadataAlbum)
+                    LyricMediaMetadata(
+                        sourceId = id,
+                        packageName = publisher,
+                        title = lastMetadataTitle,
+                        artist = lastMetadataArtist,
+                        album = lastMetadataAlbum
+                    )
                 )
             }
-            // Establish the new stream owner before asking the renderer to resume. A SuperLyric
-            // stream may deliver its first lyric line immediately after metadata; publishing the
-            // package first and playback before the line lets the self-heal path see a ready session.
-            if (!playbackStarted) {
-                playbackStarted = true
-                currentSink.onPlaybackStateChanged(true)
+
+            val isPlaying = if (view.state != null) view.state == PlaybackState.PLAYING else true
+            if (playbackStarted != isPlaying) {
+                playbackStarted = isPlaying
+                currentSink.onPlaybackStateChanged(isPlaying)
             }
 
-            if (data.hasPosition()) {
-                currentSink.onPositionChanged(data.position, 1f)
+            if (view.position >= 0L) {
+                val speed = if (view.speed > 0f) view.speed else 1f
+                currentSink.onPositionChanged(view.position, speed)
             }
 
-            if (fullSong == null && data.hasLyric()) {
-                val lyric = data.lyric
-                if (lyric != null) {
-                    val st = lyric.startTime
-                    val et = lyric.endTime
-
-                    @Suppress("DEPRECATION")
-                    val dl = lyric.delay
-                    if (st == 0L && et == 0L) {
-                        val pos = data.position.takeIf { data.hasPosition() && it >= 0L }
-                            ?: owner.currentPosition(publisher).takeIf { it >= 0L }
-                        if (dl > 0 && pos != null) {
-                            val richLine = convertToRichLyricLine(lyric, data).copy(
-                                begin = pos,
-                                end = pos + dl,
-                                duration = dl
-                            )
-                            currentSink.onLyricLine(richLine)
-                        } else if (data.hasTranslation() || data.hasSecondary()) {
-                            // Keep all structured lanes when SuperLyric has no usable line timing.
-                            // The plain-text sink can represent only the original and one translated
-                            // line, so sending this as text would silently discard secondary content.
-                            currentSink.onLyricLine(convertToRichLyricLine(lyric, data))
-                        } else {
-                            currentSink.onPlainText(lyric.text)
-                        }
-                    } else {
-                        val richLine = convertToRichLyricLine(lyric, data)
-                        currentSink.onLyricLine(richLine)
-                    }
-                }
+            if (fullSong == null && view.index in lyric.lines.indices) {
+                val line = lyric.lines[view.index]
+                val richLine = convertToRichLyricLine(line)
+                currentSink.onLyricLine(richLine)
             }
         }
 
-        private fun convertToRichLyricLine(
-            line: SuperLyricLine,
-            data: SuperLyricData? = null
-        ): RichLyricLine {
+        private fun convertToRichLyricLine(line: Line): RichLyricLine {
             val words = line.words?.map { word ->
                 LyricWord(
-                    begin = word.startTime,
-                    end = word.endTime,
-                    text = word.word
+                    begin = word.start,
+                    end = word.end,
+                    text = word.text
                 )
             }
 
-            val translationText = data?.translation?.text ?: line.translation
-            val translationWords = if (data?.hasTranslation() == true) {
-                data.translation?.words?.map { word ->
-                    LyricWord(
-                        begin = word.startTime,
-                        end = word.endTime,
-                        text = word.word
-                    )
-                }
-            } else null
-
-            // SuperLyric calls this lane "secondary", but the unified model exposes it as
-            // romanization. RichLyricLine has no romaWords field, so retain word-only payloads by
-            // joining their text rather than leaving the Roma lane empty.
-            val romaText = if (data?.hasSecondary() == true) {
-                data.secondary?.text?.takeIf { it.isNotBlank() }
-                    ?: data.secondary?.words?.joinToString("") { it.word }
-                        ?.takeIf { it.isNotBlank() }
-            } else line.secondary
+            val translationText = line.translation?.takeIf { it.isNotBlank() }
+            val romaText = line.phonetic?.takeIf { it.isNotBlank() }
 
             return RichLyricLine(
-                begin = line.startTime,
-                end = line.endTime,
+                begin = line.start,
+                end = line.end,
                 text = line.text,
                 words = words,
                 translation = translationText,
-                translationWords = translationWords,
+                translationWords = null,
                 roma = romaText
             )
         }

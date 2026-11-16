@@ -144,7 +144,11 @@ internal fun SuperLyricAppSection(
                 val contentPadding = remember(top, bottom) {
                     PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
                 }
-                val isInstalled = remember { isSuperLyricInstalled(context) }
+                val isInstalled = if (uiState.hasLoaded) {
+                    uiState.superLyricInstalled
+                } else {
+                    remember { isSuperLyricInstalled(context) }
+                }
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier.pageScrollModifiers(

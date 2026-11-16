@@ -32,7 +32,7 @@ data class SuperLyricApp(
     val versionName: String?,
     val versionCode: String,
     val lastUpdateTime: Long,
-    @StringRes val usageResId: Int,
+    @param:StringRes val usageResId: Int,
     val apiVersionName: String? = null,
     val apiVersionCode: String? = null
 )
@@ -43,14 +43,21 @@ data class SuperLyricAppUiState(
     val hookApps: List<SuperLyricApp> = emptyList(),
     val hasLoaded: Boolean = false,
     val isInitialLoading: Boolean = false,
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val superLyricInstalled: Boolean = false,
+    val superLyricVersionName: String? = null,
+    val superLyricVersionCode: Long? = null,
+    val isV42OrHigher: Boolean = false
 )
 
 object SuperLyricAppManager {
 
+    private const val SUPERLYRIC_PACKAGE_NAME = "com.hchen.superlyric"
+    private const val SUPERLYRIC_V42_VERSION_CODE = 2026111400L
+
     private data class AppDefinition(
         val packageName: String,
-        @StringRes val usageResId: Int
+        @param:StringRes val usageResId: Int
     )
 
     private data class ApiVersion(
@@ -60,7 +67,11 @@ object SuperLyricAppManager {
 
     private data class ScanResult(
         val apiApps: List<SuperLyricApp>,
-        val hookApps: List<SuperLyricApp>
+        val hookApps: List<SuperLyricApp>,
+        val superLyricInstalled: Boolean,
+        val superLyricVersionName: String?,
+        val superLyricVersionCode: Long?,
+        val isV42OrHigher: Boolean
     )
 
     private const val ICON_CACHE_SIZE_KB = 8 * 1024
@@ -74,7 +85,7 @@ object SuperLyricAppManager {
         }
     }
 
-    private val appDefinitions = listOf(
+    private val legacyAppDefinitions = listOf(
         AppDefinition("remix.myplayer", R.string.superlyric_usage_aplayer),
         AppDefinition("com.apple.android.music", R.string.superlyric_usage_apple_music),
         AppDefinition("cn.aqzscn.stream_music", R.string.superlyric_usage_yinliu),
@@ -106,6 +117,23 @@ object SuperLyricAppManager {
         AppDefinition("com.xuncorp.suvine.music", R.string.superlyric_usage_suvine),
         AppDefinition("app.symfonik.music.player", R.string.superlyric_usage_symfonium),
         AppDefinition("com.spotify.music", R.string.superlyric_usage_spotify)
+    ).associateBy(AppDefinition::packageName)
+
+    private val v42AppDefinitions = listOf(
+        AppDefinition("com.apple.android.music", R.string.superlyric_v42_usage_apple_music),
+        AppDefinition("cn.wenyu.bodian", R.string.superlyric_v42_usage_bodian),
+        AppDefinition("com.kugou.android", R.string.superlyric_v42_usage_kugou),
+        AppDefinition("com.kugou.android.lite", R.string.superlyric_v42_usage_kugou_lite),
+        AppDefinition("cn.kuwo.player", R.string.superlyric_v42_usage_kuwo),
+        AppDefinition("cn.kuwo.kwmusiccar", R.string.superlyric_usage_kuwo_car),
+        AppDefinition("com.miui.player", R.string.superlyric_usage_miui),
+        AppDefinition("cmccwm.mobilemusic", R.string.superlyric_v42_usage_migu),
+        AppDefinition("com.netease.cloudmusic", R.string.superlyric_v42_usage_netease),
+        AppDefinition("com.maxmpz.audioplayer", R.string.superlyric_v42_usage_poweramp),
+        AppDefinition("com.luna.music", R.string.superlyric_v42_usage_qishui),
+        AppDefinition("com.tencent.qqmusic", R.string.superlyric_v42_usage_qq),
+        AppDefinition("com.salt.music", R.string.superlyric_v42_usage_salt),
+        AppDefinition("com.spotify.music", R.string.superlyric_v42_usage_spotify)
     ).associateBy(AppDefinition::packageName)
 
     fun getCachedIcon(app: SuperLyricApp, targetSizePx: Int): ImageBitmap? {
@@ -156,6 +184,10 @@ object SuperLyricAppManager {
                     state.copy(
                         apiApps = apps.apiApps,
                         hookApps = apps.hookApps,
+                        superLyricInstalled = apps.superLyricInstalled,
+                        superLyricVersionName = apps.superLyricVersionName,
+                        superLyricVersionCode = apps.superLyricVersionCode,
+                        isV42OrHigher = apps.isV42OrHigher,
                         hasLoaded = true,
                         isInitialLoading = false,
                         isRefreshing = false
@@ -177,21 +209,37 @@ object SuperLyricAppManager {
     private suspend fun scanApps(context: Context): ScanResult {
         return withContext(Dispatchers.IO) {
             val packageManager = context.packageManager
+            val superLyricPackageInfo = try {
+                packageManager.getPackageInfo(SUPERLYRIC_PACKAGE_NAME, 0)
+            } catch (_: PackageManager.NameNotFoundException) {
+                null
+            }
+            val superLyricInstalled = superLyricPackageInfo != null
+            val superLyricVersionName = superLyricPackageInfo?.versionName
+            val superLyricVersionCode = superLyricPackageInfo?.let { PackageInfoCompat.getLongVersionCode(it) }
+            val isV42OrHigher = (superLyricVersionCode ?: 0L) >= SUPERLYRIC_V42_VERSION_CODE
+            val activeDefinitions = if (isV42OrHigher) v42AppDefinitions else legacyAppDefinitions
+
             @Suppress("DEPRECATION")
             val packageInfos = packageManager.getInstalledPackages(PackageManager.GET_META_DATA)
             val apiApps = mutableListOf<SuperLyricApp>()
             val hookApps = mutableListOf<SuperLyricApp>()
 
             packageInfos.forEach { packageInfo ->
-                appDefinitions[packageInfo.packageName]?.let { definition ->
+                activeDefinitions[packageInfo.packageName]?.let { definition ->
                     processPackage(packageManager, packageInfo, definition.usageResId)?.let(hookApps::add)
                 }
 
                 getApiVersion(packageInfo)?.let { apiVersion ->
+                    val usageResId = if (isV42OrHigher) {
+                        R.string.superlyric_v42_usage_api
+                    } else {
+                        R.string.superlyric_usage_api
+                    }
                     processPackage(
                         packageManager,
                         packageInfo,
-                        R.string.superlyric_usage_api,
+                        usageResId,
                         apiVersion
                     )?.let(apiApps::add)
                 }
@@ -203,7 +251,11 @@ object SuperLyricAppManager {
                 },
                 hookApps = hookApps.sortedWith { first, second ->
                     collator.compare(first.label, second.label)
-                }
+                },
+                superLyricInstalled = superLyricInstalled,
+                superLyricVersionName = superLyricVersionName,
+                superLyricVersionCode = superLyricVersionCode,
+                isV42OrHigher = isV42OrHigher
             )
         }
     }
