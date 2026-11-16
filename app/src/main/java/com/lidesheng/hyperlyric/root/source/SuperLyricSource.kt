@@ -1,7 +1,5 @@
 package com.lidesheng.hyperlyric.root.source
 
-import android.os.Handler
-import android.os.Looper
 import com.hchen.superlyricapi.LyricListener
 import com.hchen.superlyricapi.LyricView
 import com.hchen.superlyricapi.SuperLyric
@@ -27,18 +25,18 @@ class SuperLyricSource : LyricSource {
     private var sink: LyricSink? = null
     private var listener: LyricListener? = null
     private var arbiter: LyricSessionArbiter? = null
-    private val retryHandler = Handler(Looper.getMainLooper())
-    @Volatile private var retryCount = 0
-    @Volatile private var registered = false
 
     fun initialize(app: android.app.Application) {
         this.app = app
     }
 
-    override fun isAvailable(): Boolean {
-        val appReady = app != null
-        HookLogger.d(TAG, "isAvailable: appReady=$appReady")
-        return appReady
+    override fun isAvailable(): Boolean = try {
+        val available = SuperLyric.isAvailable()
+        HookLogger.d(TAG, "isAvailable: available=$available")
+        available
+    } catch (e: Exception) {
+        HookLogger.w(TAG, "检查数据源可用性失败", e)
+        false
     }
 
     override fun start(sink: LyricSink) {
@@ -53,8 +51,16 @@ class SuperLyricSource : LyricSource {
         val owner = LyricSessionArbiter(application, sink, 50L) { streams.remove(it)?.reset() }
         arbiter = owner
         owner.start()
-        retryCount = 0
-        registered = false
+
+        val available = runCatching { SuperLyric.isAvailable() }
+            .getOrElse {
+                HookLogger.w(TAG, "跳过接收端注册: reason=availability_check_failed", it)
+                return
+            }
+        if (!available) {
+            HookLogger.w(TAG, "跳过接收端注册: reason=service_unavailable")
+            return
+        }
 
         val stub = object : LyricListener {
             override fun onLyric(view: LyricView) {
@@ -90,35 +96,9 @@ class SuperLyricSource : LyricSource {
         }
         listener = stub
 
-        // 尝试注册，服务不可用时走重试路径
-        tryRegister(stub)
-    }
-
-    private fun tryRegister(stub: LyricListener) {
-        if (sink == null || registered) return   // 已停止或已注册，不再重试
-
-        val available = runCatching { SuperLyric.isAvailable() }.getOrElse {
-            HookLogger.e(TAG, "isAvailable 异常，停止重试", it)
-            return
-        }
-        HookLogger.d(TAG, "tryRegister #$retryCount: available=$available")
-
-        if (!available) {
-            if (retryCount >= MAX_RETRY) {
-                HookLogger.w(TAG, "SuperLyric 服务始终不可用，放弃重试 (retryCount=$retryCount)")
-                return
-            }
-            val delayMs = RETRY_DELAY_MS * (1L shl retryCount.coerceAtMost(4))
-            retryCount++
-            HookLogger.d(TAG, "SuperLyric 服务暂不可用，${delayMs}ms 后重试 (#$retryCount)")
-            retryHandler.postDelayed({ tryRegister(stub) }, delayMs)
-            return
-        }
-
         try {
             val result = SuperLyric.receiver().register(stub)
             HookLogger.d(TAG, "receiver().register 完成: result=$result")
-            registered = true
             val latest = runCatching { SuperLyric.receiver().latest() }.getOrNull()
             if (latest != null) {
                 HookLogger.d(TAG, "拉取到 latest 歌词: title=${latest.lyric.title}")
@@ -131,23 +111,19 @@ class SuperLyricSource : LyricSource {
 
     override fun stop() {
         HookLogger.d(TAG, "stop() 停止 SuperLyric 数据源")
-        sink = null
-        retryHandler.removeCallbacksAndMessages(null)
         val owner = arbiter
         owner?.close()
         listener?.let {
-            if (registered) {
-                try {
-                    SuperLyric.receiver().unregister(it)
-                } catch (e: Exception) {
-                    HookLogger.w(TAG, "注销接收端失败", e)
-                }
+            try {
+                SuperLyric.receiver().unregister(it)
+            } catch (e: Exception) {
+                HookLogger.w(TAG, "注销接收端失败", e)
             }
         }
         listener = null
-        registered = false
-        retryCount = 0
+        if (owner == null) sink?.onStop()
         arbiter = null
+        sink = null
         HookLogger.d(TAG, "数据源已停止")
     }
 
@@ -329,9 +305,5 @@ class SuperLyricSource : LyricSource {
 
     companion object {
         private const val TAG = "SuperLyricSource"
-        /** 重试间隔基数（毫秒），实际延迟 = RETRY_DELAY_MS * 2^retryCount（最多 4 次翻倍）*/
-        private const val RETRY_DELAY_MS = 2_000L
-        /** 最多重试次数，对应约 2+4+8+16+32 = 62s 内完成所有尝试 */
-        private const val MAX_RETRY = 5
     }
 }

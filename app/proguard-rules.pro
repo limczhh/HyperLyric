@@ -11,5 +11,7 @@
 }
 
 # --- SuperLyric API ---
--keep class com.hchen.superlyricapi.* { *; }
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+-keep class com.hchen.superlyricapi.** { *; }
+-keep interface com.hchen.superlyricapi.** { *; }
 -dontwarn android.os.ServiceManager
