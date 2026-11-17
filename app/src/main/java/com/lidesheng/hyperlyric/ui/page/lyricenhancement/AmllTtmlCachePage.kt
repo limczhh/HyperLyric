@@ -145,22 +145,20 @@ internal fun AmllTtmlCachePage() {
         }
     }
 
-    if (showClearAllDialog) {
-        WindowDialog(
-            title = clearAllText,
-            show = true,
-            onDismissRequest = { showClearAllDialog = false }
-        ) {
-            CacheConfirmContent(
-                message = stringResource(
-                    R.string.dialog_lyric_enhancement_cache_clear_all_summary
-                ),
-                confirmText = stringResource(R.string.confirm),
-                cancelText = stringResource(R.string.cancel),
-                onConfirm = ::clearAll,
-                onDismiss = { showClearAllDialog = false }
-            )
-        }
+    WindowDialog(
+        title = clearAllText,
+        show = showClearAllDialog,
+        onDismissRequest = { showClearAllDialog = false }
+    ) {
+        CacheConfirmContent(
+            message = stringResource(
+                R.string.dialog_lyric_enhancement_cache_clear_all_summary
+            ),
+            confirmText = stringResource(R.string.confirm),
+            cancelText = stringResource(R.string.cancel),
+            onConfirm = ::clearAll,
+            onDismiss = { showClearAllDialog = false }
+        )
     }
 
     XposedLyricSettingPage(

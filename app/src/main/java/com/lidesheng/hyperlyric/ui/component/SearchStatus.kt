@@ -16,6 +16,7 @@ data class SearchStatus(
     val label: String,
     val searchText: String = "",
     val current: Status = Status.COLLAPSED,
+    val resultStatus: ResultStatus = ResultStatus.DEFAULT,
     val offsetY: Dp = 0.dp
 ) {
     fun isExpand() = current == Status.EXPANDED
@@ -53,4 +54,5 @@ data class SearchStatus(
     }
 
     enum class Status { EXPANDED, EXPANDING, COLLAPSED, COLLAPSING }
+    enum class ResultStatus { DEFAULT, EMPTY, SHOW }
 }

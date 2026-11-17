@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -51,9 +52,7 @@ internal fun LyricSourcePromptContent(
     val lazyListState = rememberLazyListState()
     val top = innerPadding.calculateTopPadding()
     val bottom = innerPadding.calculateBottomPadding()
-    val contentPadding = remember(top, bottom) {
-        PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
-    }
+    val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)
 
     Box(
         modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)

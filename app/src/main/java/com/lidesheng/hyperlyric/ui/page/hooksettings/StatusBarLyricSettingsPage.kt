@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -904,11 +905,13 @@ private fun StatusBarLyricPaddingDialog(
     onDismiss: () -> Unit,
     onConfirm: (leftDp: Float, rightDp: Float) -> Unit,
 ) {
-    if (!show) return
 
     val initialValues = listOf(leftDp, rightDp)
-    var inputValues by remember(initialValues) {
+    var inputValues by remember {
         mutableStateOf(initialValues.map(::formatStatusBarLyricPaddingDp))
+    }
+    LaunchedEffect(show) {
+        if (show) inputValues = initialValues.map(::formatStatusBarLyricPaddingDp)
     }
     val parsedValues = inputValues.map { it.toFloatOrNull() }
     val canConfirm = parsedValues.all { value ->
@@ -928,7 +931,7 @@ private fun StatusBarLyricPaddingDialog(
             formatStatusBarLyricPaddingDp(RootConstants.MIN_HOOK_STATUS_BAR_LYRIC_PADDING_DP),
             formatStatusBarLyricPaddingDp(RootConstants.MAX_HOOK_STATUS_BAR_LYRIC_PADDING_DP),
         ),
-        show = true,
+        show = show,
         onDismissRequest = onDismiss,
     ) {
         fun updateValue(index: Int, value: String) {

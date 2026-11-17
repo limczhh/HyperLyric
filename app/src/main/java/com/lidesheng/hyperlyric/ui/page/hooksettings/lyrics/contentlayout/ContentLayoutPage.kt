@@ -163,6 +163,8 @@ fun ContentLayoutPage() {
         )
     }
     var editingRow by remember { mutableStateOf<Int?>(null) }
+    var showEditingSheet by remember { mutableStateOf(false) }
+    var holdLyricContentSheet by remember { mutableStateOf(false) }
     var showTailTimeoutDelayDialog by remember { mutableStateOf(false) }
 
     val currentEditingRow = editingRow
@@ -177,6 +179,7 @@ fun ContentLayoutPage() {
         show = showLyricContentSheet,
         currentSettings = lyricContentDisplay,
         onDismiss = { showLyricContentSheet = false },
+        onDismissFinished = { if (!showLyricContentSheet) holdLyricContentSheet = false },
         onConfirm = { settings ->
             lyricContentDisplay = settings
             saveConfig(
@@ -204,7 +207,7 @@ fun ContentLayoutPage() {
     )
 
     ContentLayoutEditorBottomSheet(
-        show = currentEditingRow != null,
+        show = showEditingSheet,
         title = stringResource(
             id = if (currentEditingRow == 1) {
                 R.string.title_content_layout_second_line
@@ -215,7 +218,8 @@ fun ContentLayoutPage() {
         currentFields = currentFields,
         availableFields = availableFields,
         requireSelection = currentEditingRow == 0,
-        onDismiss = { editingRow = null },
+        onDismiss = { showEditingSheet = false },
+        onDismissFinished = { if (!showEditingSheet) editingRow = null },
         onConfirm = { selectedFields ->
             when (currentEditingRow) {
                 0 -> {
@@ -259,7 +263,7 @@ fun ContentLayoutPage() {
             firstLine = firstLine,
             secondLine = secondLine,
             separator = separator,
-            onEditField = { editingRow = it },
+            onEditField = { editingRow = it; showEditingSheet = true },
             onSeparatorChange = {
                 separator = it
                 PrefsBridge.putString(
@@ -316,8 +320,8 @@ fun ContentLayoutPage() {
                 )
             },
             lyricContentDisplay = lyricContentDisplay,
-            onEditLyricContent = { showLyricContentSheet = true },
-            lyricContentSheetVisible = showLyricContentSheet,
+            onEditLyricContent = { holdLyricContentSheet = true; showLyricContentSheet = true },
+            lyricContentSheetVisible = holdLyricContentSheet,
             onlySecondary = onlySecondary,
             onOnlySecondaryChange = {
                 onlySecondary = it

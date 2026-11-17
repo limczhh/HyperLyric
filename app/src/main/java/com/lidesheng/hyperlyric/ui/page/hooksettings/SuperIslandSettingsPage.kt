@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
@@ -43,7 +44,7 @@ import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -522,7 +523,7 @@ fun SuperIslandSettingsPage() {
     Scaffold(
         topBar = {
             BlurredBar(backdrop, blurActive) {
-                TopAppBar(
+                AdaptiveTopAppBar(
                     color = barColor,
                     title = stringResource(id = R.string.title_super_island),
                     scrollBehavior = topAppBarScrollBehavior,
@@ -566,9 +567,7 @@ fun SuperIslandSettingsPage() {
 
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
-        val contentPadding = remember(top, bottom) {
-            PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
-        }
+        val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             LazyColumn(
                 state = lazyListState,

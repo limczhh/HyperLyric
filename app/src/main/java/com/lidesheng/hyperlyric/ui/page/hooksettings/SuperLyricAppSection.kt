@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import android.content.pm.PackageManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -33,7 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lidesheng.hyperlyric.R
-import com.lidesheng.hyperlyric.ui.component.ProComponent
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.utils.SuperLyricApp
 import com.lidesheng.hyperlyric.utils.SuperLyricAppManager
@@ -133,7 +134,6 @@ internal fun SuperLyricAppSection(
                     }
                 },
                 pullToRefreshState = pullToRefreshState,
-                topAppBarScrollBehavior = topAppBarScrollBehavior,
                 contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
                 refreshTexts = refreshTexts,
                 modifier = Modifier.fillMaxSize()
@@ -141,9 +141,7 @@ internal fun SuperLyricAppSection(
                 val lazyListState = rememberLazyListState()
                 val top = innerPadding.calculateTopPadding()
                 val bottom = innerPadding.calculateBottomPadding()
-                val contentPadding = remember(top, bottom) {
-                    PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
-                }
+                val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)
                 val isInstalled = if (uiState.hasLoaded) {
                     uiState.superLyricInstalled
                 } else {
@@ -153,7 +151,7 @@ internal fun SuperLyricAppSection(
                     state = lazyListState,
                     modifier = Modifier.pageScrollModifiers(
                         enableScrollEndHaptic = true,
-                        showTopAppBar = false,
+                        showTopAppBar = true,
                         topAppBarScrollBehavior = topAppBarScrollBehavior
                     ),
                     contentPadding = contentPadding
@@ -169,7 +167,7 @@ internal fun SuperLyricAppSection(
                                     .padding(bottom = APP_CARD_BOTTOM_PADDING)
                                     .fillMaxWidth()
                             ) {
-                                ProComponent(
+                                BasicComponent(
                                     title = stringResource(R.string.title_superlyric_not_installed),
                                     summary = stringResource(R.string.summary_superlyric_not_installed)
                                 )
@@ -183,7 +181,7 @@ internal fun SuperLyricAppSection(
                                     .padding(bottom = APP_CARD_BOTTOM_PADDING)
                                     .fillMaxWidth()
                             ) {
-                                ProComponent(
+                                BasicComponent(
                                     title = stringResource(R.string.title_no_superlyric_apps),
                                     summary = stringResource(R.string.summary_no_superlyric_apps)
                                 )
@@ -240,7 +238,7 @@ private fun SuperLyricAppItem(app: SuperLyricApp) {
         onClick = { expanded = !expanded },
         showIndication = false
     ) {
-        ProComponent(
+        BasicComponent(
             title = app.label,
             summary = stringResource(
                 R.string.format_version_code,
@@ -252,7 +250,7 @@ private fun SuperLyricAppItem(app: SuperLyricApp) {
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.padding(bottom = 16.dp)) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                ProComponent(
+                BasicComponent(
                     summary = stringResource(app.usageResId),
                     insideMargin = PaddingValues(
                         start = 16.dp,

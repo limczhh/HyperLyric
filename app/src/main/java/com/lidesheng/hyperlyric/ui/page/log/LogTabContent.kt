@@ -60,7 +60,6 @@ fun LogTabContent(
             onRefresh = onRefresh,
             pullToRefreshState = pullToRefreshState,
             contentPadding = PaddingValues(top = contentPadding.calculateTopPadding()),
-            topAppBarScrollBehavior = topAppBarScrollBehavior,
             refreshTexts = listOf(
                 stringResource(R.string.refresh_pull_down),
                 stringResource(R.string.refresh_release),
@@ -75,7 +74,7 @@ fun LogTabContent(
                     state = lazyListState,
                     modifier = Modifier.pageScrollModifiers(
                         enableScrollEndHaptic = true,
-                        showTopAppBar = false,
+                        showTopAppBar = true,
                         topAppBarScrollBehavior = topAppBarScrollBehavior
                     ),
                     contentPadding = contentPadding

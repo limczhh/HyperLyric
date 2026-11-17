@@ -97,7 +97,6 @@ fun AboutPage(
         val contentPadding = pageContentPadding(
             innerPadding = innerPadding,
             outerPadding = outerPadding,
-            isWideScreen = false,
         )
 
         BoxWithConstraints(

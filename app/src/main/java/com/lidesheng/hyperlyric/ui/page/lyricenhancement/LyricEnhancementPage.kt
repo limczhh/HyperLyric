@@ -184,14 +184,19 @@ private fun OpenAiTranslationSettingsPage() {
     }
 
     var showSkipLanguagesDialog by remember { mutableStateOf(false) }
+    var holdSkipLanguagesDialog by remember { mutableStateOf(false) }
     var showTargetLanguageDialog by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showModelDialog by remember { mutableStateOf(false) }
     var showBaseUrlDialog by remember { mutableStateOf(false) }
     var showPromptDialog by remember { mutableStateOf(false) }
+    var holdPromptDialog by remember { mutableStateOf(false) }
     var showTemperatureDialog by remember { mutableStateOf(false) }
+    var holdTemperatureDialog by remember { mutableStateOf(false) }
     var showTopPDialog by remember { mutableStateOf(false) }
+    var holdTopPDialog by remember { mutableStateOf(false) }
     var showMaxTokensDialog by remember { mutableStateOf(false) }
+    var holdMaxTokensDialog by remember { mutableStateOf(false) }
 
     val languageOptions = listOf(
         AiTranslationLanguageSettings.LANGUAGE_CHINESE to
@@ -219,6 +224,7 @@ private fun OpenAiTranslationSettingsPage() {
         },
         selectedKeys = skipLanguages,
         onDismiss = { showSkipLanguagesDialog = false },
+        onDismissFinished = { if (!showSkipLanguagesDialog) holdSkipLanguagesDialog = false },
         onConfirm = {
             skipLanguages = it
             saveConfig(AI_KEY_SKIP_LANGUAGES_ENABLED, it.isNotEmpty())
@@ -276,6 +282,7 @@ private fun OpenAiTranslationSettingsPage() {
         title = stringResource(R.string.title_ai_translation_prompt),
         initialValue = prompt,
         onDismiss = { showPromptDialog = false },
+        onDismissFinished = { if (!showPromptDialog) holdPromptDialog = false },
         onConfirm = {
             prompt = it
             saveConfig(AI_KEY_PROMPT, it)
@@ -290,6 +297,7 @@ private fun OpenAiTranslationSettingsPage() {
         min = 0f,
         max = 2f,
         onDismiss = { showTemperatureDialog = false },
+        onDismissFinished = { if (!showTemperatureDialog) holdTemperatureDialog = false },
         onConfirm = {
             temperature = it
             saveConfig(AI_KEY_TEMPERATURE, it)
@@ -304,6 +312,7 @@ private fun OpenAiTranslationSettingsPage() {
         min = 0f,
         max = 1f,
         onDismiss = { showTopPDialog = false },
+        onDismissFinished = { if (!showTopPDialog) holdTopPDialog = false },
         onConfirm = {
             topP = it
             saveConfig(AI_KEY_TOP_P, it)
@@ -318,6 +327,7 @@ private fun OpenAiTranslationSettingsPage() {
         min = 0,
         max = Int.MAX_VALUE,
         onDismiss = { showMaxTokensDialog = false },
+        onDismissFinished = { if (!showMaxTokensDialog) holdMaxTokensDialog = false },
         onConfirm = {
             maxTokens = it
             saveConfig(AI_KEY_MAX_TOKENS, it.toLong())
@@ -370,8 +380,8 @@ private fun OpenAiTranslationSettingsPage() {
                         title = stringResource(R.string.title_ai_translation_skip_languages),
                         summary = skipLanguagesSummary,
                         enabled = enabled,
-                        holdDownState = showSkipLanguagesDialog,
-                        onClick = { showSkipLanguagesDialog = true }
+                        holdDownState = holdSkipLanguagesDialog,
+                        onClick = { holdSkipLanguagesDialog = true; showSkipLanguagesDialog = true }
                     )
                     SwitchPreference(
                         title = stringResource(R.string.title_ai_translation_skip_existing),
@@ -471,8 +481,8 @@ private fun OpenAiTranslationSettingsPage() {
                     ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_prompt),
                         summary = previewSettingValue(prompt, 2),
-                        holdDownState = showPromptDialog,
-                        onClick = { showPromptDialog = true }
+                        holdDownState = holdPromptDialog,
+                        onClick = { holdPromptDialog = true; showPromptDialog = true }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_temperature),
@@ -483,8 +493,8 @@ private fun OpenAiTranslationSettingsPage() {
                                 color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        holdDownState = showTemperatureDialog,
-                        onClick = { showTemperatureDialog = true }
+                        holdDownState = holdTemperatureDialog,
+                        onClick = { holdTemperatureDialog = true; showTemperatureDialog = true }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_top_p),
@@ -495,8 +505,8 @@ private fun OpenAiTranslationSettingsPage() {
                                 color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        holdDownState = showTopPDialog,
-                        onClick = { showTopPDialog = true }
+                        holdDownState = holdTopPDialog,
+                        onClick = { holdTopPDialog = true; showTopPDialog = true }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.title_ai_translation_max_tokens),
@@ -507,8 +517,8 @@ private fun OpenAiTranslationSettingsPage() {
                                 color = MiuixTheme.colorScheme.onSurfaceVariantActions
                             )
                         },
-                        holdDownState = showMaxTokensDialog,
-                        onClick = { showMaxTokensDialog = true }
+                        holdDownState = holdMaxTokensDialog,
+                        onClick = { holdMaxTokensDialog = true; showMaxTokensDialog = true }
                     )
                 }
             }

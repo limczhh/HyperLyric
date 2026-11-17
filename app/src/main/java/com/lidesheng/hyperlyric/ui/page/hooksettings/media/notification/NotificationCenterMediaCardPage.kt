@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings.media.notification
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +49,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -288,7 +289,7 @@ fun NotificationCenterMediaCardPage() {
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
             BlurredBar(backdrop, blurActive) {
-                TopAppBar(
+                AdaptiveTopAppBar(
                     color = barColor,
                     title = stringResource(id = R.string.title_notification_center),
                     scrollBehavior = topAppBarScrollBehavior,
@@ -370,14 +371,7 @@ fun NotificationCenterMediaCardPage() {
                 }
                 val topPadding = innerPadding.calculateTopPadding()
                 val bottomPadding = innerPadding.calculateBottomPadding()
-                val contentPadding = remember(topPadding, bottomPadding) {
-                    PaddingValues(
-                        top = topPadding,
-                        start = 0.dp,
-                        end = 0.dp,
-                        bottom = bottomPadding + 16.dp
-                    )
-                }
+                val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.pageScrollModifiers(

@@ -1,6 +1,7 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings
 
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -49,7 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
-import com.lidesheng.hyperlyric.ui.component.ProComponent
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import com.lidesheng.hyperlyric.ui.component.TagComponent
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.utils.LyricProviderManager
@@ -168,7 +169,6 @@ internal fun LyricProviderSection(
                     }
                 },
                 pullToRefreshState = pullToRefreshState,
-                topAppBarScrollBehavior = topAppBarScrollBehavior,
                 contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
                 refreshTexts = refreshTexts,
                 modifier = Modifier.fillMaxSize()
@@ -176,14 +176,12 @@ internal fun LyricProviderSection(
                 val lazyListState = rememberLazyListState()
                 val top = innerPadding.calculateTopPadding()
                 val bottom = innerPadding.calculateBottomPadding()
-                val contentPadding = remember(top, bottom) {
-                    PaddingValues(top = top, start = 0.dp, end = 0.dp, bottom = bottom)
-                }
+                val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier.pageScrollModifiers(
                         enableScrollEndHaptic = true,
-                        showTopAppBar = false,
+                        showTopAppBar = true,
                         topAppBarScrollBehavior = topAppBarScrollBehavior
                     ),
                     contentPadding = contentPadding,
@@ -219,7 +217,7 @@ private fun LazyListScope.providerSections(
                     .padding(bottom = 12.dp)
                     .fillMaxWidth()
             ) {
-                ProComponent(
+                BasicComponent(
                     title = stringResource(id = R.string.title_no_provider),
                     summary = stringResource(id = R.string.summary_no_provider)
                 )
@@ -278,7 +276,7 @@ private fun LazyListScope.providerSections(
                         AnimatedVisibility(visible = isExpanded) {
                             Column(modifier = Modifier.padding(bottom = 16.dp)) {
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                                ProComponent(
+                                BasicComponent(
                                     summary = module.description,
                                     insideMargin = PaddingValues(
                                         start = 16.dp,

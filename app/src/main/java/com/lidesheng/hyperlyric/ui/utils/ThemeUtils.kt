@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +20,8 @@ import com.lidesheng.hyperlyric.common.UIConstants
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
+
+val LocalAppDarkTheme = staticCompositionLocalOf { false }
 
 object ThemeUtils {
 
@@ -114,7 +118,7 @@ object ThemeUtils {
         }
 
         MiuixTheme(controller = themeController) {
-            content()
+            CompositionLocalProvider(LocalAppDarkTheme provides isDark) { content() }
         }
     }
 }

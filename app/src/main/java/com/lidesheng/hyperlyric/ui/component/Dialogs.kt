@@ -64,16 +64,18 @@ fun MultiSelectDialog(
     options: List<MultiSelectDialogOption>,
     selectedKeys: Set<String>,
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit = {},
     onConfirm: (Set<String>) -> Unit
 ) {
-    if (!show) return
-    var draftSelection by remember(selectedKeys) { mutableStateOf(selectedKeys) }
+    var draftSelection by remember { mutableStateOf(selectedKeys) }
+    LaunchedEffect(show) { if (show) draftSelection = selectedKeys }
 
     WindowDialog(
         title = title,
         summary = summary,
-        show = true,
-        onDismissRequest = onDismiss
+        show = show,
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Card(
@@ -136,19 +138,26 @@ fun NumberInputDialog(
     min: Int,
     max: Int,
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit = {},
     onConfirm: (Int) -> Unit
 ) {
-    if (!show) return
     var inputValue by remember {
         val text = initialValue.toString()
         mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    }
+    LaunchedEffect(show) {
+        if (show) {
+            val text = initialValue.toString()
+            inputValue = TextFieldValue(text, selection = TextRange(text.length))
+        }
     }
 
     WindowDialog(
         title = title,
         summary = summary,
-        show = true,
-        onDismissRequest = onDismiss
+        show = show,
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
     ) {
         val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -200,20 +209,24 @@ fun TextInputDialog(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     confirmText: String = stringResource(id = R.string.confirm),
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit = {},
     onConfirm: (String) -> Unit
 ) {
-    if (!show) return
     var inputValue by remember {
         mutableStateOf(
             TextFieldValue(initialValue, selection = TextRange(initialValue.length))
         )
     }
+    LaunchedEffect(show) {
+        if (show) inputValue = TextFieldValue(initialValue, selection = TextRange(initialValue.length))
+    }
 
     WindowDialog(
         title = title,
         summary = summary,
-        show = true,
-        onDismissRequest = onDismiss
+        show = show,
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
     ) {
         val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -256,15 +269,16 @@ fun SimpleDialog(
     confirmText: String = stringResource(id = R.string.confirm),
     cancelText: String = stringResource(id = R.string.cancel),
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit = {},
     onConfirm: () -> Unit
 ) {
-    if (!show) return
 
     WindowDialog(
         title = title,
         summary = summary,
         show = show,
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(text = cancelText, onClick = onDismiss, modifier = Modifier.weight(1f))
@@ -292,19 +306,26 @@ fun FloatInputDialog(
     min: Float,
     max: Float,
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit = {},
     onConfirm: (Float) -> Unit
 ) {
-    if (!show) return
     var inputValue by remember {
         val text = initialValue.toString()
         mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    }
+    LaunchedEffect(show) {
+        if (show) {
+            val text = initialValue.toString()
+            inputValue = TextFieldValue(text, selection = TextRange(text.length))
+        }
     }
 
     WindowDialog(
         title = title,
         summary = summary,
-        show = true,
-        onDismissRequest = onDismiss
+        show = show,
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
     ) {
         val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -368,13 +389,20 @@ fun PaddingInputDialog(
     initialLeft: Int,
     initialRight: Int,
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit = {},
     onConfirm: (Int, Int) -> Unit
 ) {
-    if (!show) return
     var leftValue by remember { mutableStateOf(initialLeft.toString()) }
     var rightValue by remember { mutableStateOf(initialRight.toString()) }
+    LaunchedEffect(show) {
+        if (show) {
+            leftValue = initialLeft.toString()
+            rightValue = initialRight.toString()
+        }
+    }
 
-    WindowDialog(title = title, show = true, onDismissRequest = onDismiss) {
+    WindowDialog(title = title, show = show, onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished) {
         Column(modifier = Modifier.fillMaxWidth()) {
             val filter = { text: String ->
                 if (text == "-" || text.isEmpty()) true

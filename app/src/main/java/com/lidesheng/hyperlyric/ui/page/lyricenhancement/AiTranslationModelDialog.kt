@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,6 +41,7 @@ import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.ui.component.rememberDialogInputFocusModifier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -66,7 +68,6 @@ internal fun AiTranslationModelDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    if (!show) return
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -94,10 +95,22 @@ internal fun AiTranslationModelDialog(
             }
         }
     }
-    var inputValue by remember(currentModel) { mutableStateOf(currentModel) }
+    var inputValue by remember { mutableStateOf(currentModel) }
     var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var pendingSnackbarCount by remember { mutableIntStateOf(0) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    var requestGeneration by remember { mutableIntStateOf(0) }
+    LaunchedEffect(show) {
+        requestGeneration++
+        searchJob?.cancel()
+        searchJob = null
+        if (show) {
+            inputValue = currentModel
+            availableModels = emptyList()
+            isLoading = false
+        }
+    }
 
     val apiKeyRequiredMessage = stringResource(
         R.string.toast_ai_translation_models_api_key_required
@@ -134,13 +147,15 @@ internal fun AiTranslationModelDialog(
                 val selectedModel = inputValue
                 availableModels = emptyList()
                 isLoading = true
-                coroutineScope.launch {
+                val requestId = ++requestGeneration
+                searchJob = coroutineScope.launch {
                     try {
                         val fetchedModels = OpenAiModelDiscovery.fetch(
                             provider = provider,
                             baseUrl = baseUrl,
                             apiKey = apiKey
                         )
+                        if (requestId != requestGeneration) return@launch
                         if (fetchedModels.isEmpty()) {
                             showSearchMessage(modelListEmptyMessage)
                         } else {
@@ -160,9 +175,9 @@ internal fun AiTranslationModelDialog(
                         } else {
                             modelFetchFailedMessage
                         }
-                        showSearchMessage(message)
+                        if (requestId == requestGeneration) showSearchMessage(message)
                     } finally {
-                        isLoading = false
+                        if (requestId == requestGeneration) isLoading = false
                     }
                 }
             }
@@ -174,7 +189,7 @@ internal fun AiTranslationModelDialog(
             val position = coordinates.positionInWindow()
             dialogTopPx = position.y.roundToInt()
         },
-        show = true,
+        show = show,
         title = stringResource(R.string.title_ai_translation_model),
         onDismissRequest = onDismiss
     ) {

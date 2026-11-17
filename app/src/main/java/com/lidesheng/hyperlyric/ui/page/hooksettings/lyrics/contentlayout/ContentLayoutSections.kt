@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -406,20 +407,26 @@ internal fun LyricContentDisplayBottomSheet(
     show: Boolean,
     currentSettings: LyricContentDisplaySettings,
     onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit,
     onConfirm: (LyricContentDisplaySettings) -> Unit
 ) {
-    if (!show) return
 
-    val initialOrder = remember(show, currentSettings) {
+    val initialOrder = remember {
         LyricContentDisplayPolicy.normalizeOrder(currentSettings.order)
     }
-    var draftOrder by remember(show, initialOrder) { mutableStateOf(initialOrder) }
+    var draftOrder by remember { mutableStateOf(initialOrder) }
     var draftSelection by remember(show, currentSettings) {
         mutableStateOf(
             LyricSecondaryContent.entries
                 .filter(currentSettings::isEnabled)
                 .toSet()
         )
+    }
+    LaunchedEffect(show) {
+        if (show) {
+            draftOrder = initialOrder
+            draftSelection = LyricSecondaryContent.entries.filter(currentSettings::isEnabled).toSet()
+        }
     }
     val checkboxItems = draftOrder.map { content ->
         ReorderableCheckboxItem(
@@ -438,7 +445,7 @@ internal fun LyricContentDisplayBottomSheet(
     val maxListHeight = (maxSheetHeight - 122.dp).coerceAtLeast(0.dp)
 
     WindowBottomSheet(
-        show = true,
+        show = show,
         modifier = Modifier.heightIn(max = maxSheetHeight),
         title = stringResource(id = R.string.title_double_line_content),
         backgroundColor = MiuixTheme.colorScheme.surface,
@@ -476,7 +483,8 @@ internal fun LyricContentDisplayBottomSheet(
                 )
             }
         },
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
     ) {
         Box(
             modifier = Modifier

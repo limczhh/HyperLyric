@@ -2,6 +2,7 @@
 
 package com.lidesheng.hyperlyric.ui.page
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,6 +22,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -60,7 +64,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.basic.VerticalScrollBar
 import top.yukonga.miuix.kmp.basic.rememberScrollBarAdapter
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -73,7 +77,17 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun PoetryPage() {
     val navigator = LocalNavigator.current
     val searchLabel = stringResource(R.string.search)
-    var searchStatus by remember { mutableStateOf(SearchStatus(label = searchLabel)) }
+    val searchSaver = remember {
+        listSaver<SearchStatus, String>(
+            save = { listOf(it.searchText, if (it.shouldExpand()) "expanded" else "collapsed") },
+            restore = { SearchStatus(label = "", searchText = it[0], current =
+                if (it[1] == "expanded") SearchStatus.Status.EXPANDED else SearchStatus.Status.COLLAPSED) },
+        )
+    }
+    var searchStatus by rememberSaveable(stateSaver = searchSaver) {
+        mutableStateOf(SearchStatus(label = searchLabel))
+    }
+    LaunchedEffect(searchLabel) { searchStatus = searchStatus.copy(label = searchLabel) }
 
     val filteredQuotes = remember(searchStatus.searchText) {
         if (searchStatus.searchText.isBlank()) QuotesData.list
@@ -94,7 +108,7 @@ fun PoetryPage() {
         topBar = {
             BlurredBar(backdrop, blurActive) {
                 searchStatus.TopAppBarAnim(backgroundColor = barColor) {
-                    TopAppBar(
+                    AdaptiveTopAppBar(
                         color = barColor,
                         title = "HyperLyric",
                         scrollBehavior = topAppBarScrollBehavior,
@@ -168,7 +182,12 @@ fun PoetryPage() {
             }
         },
         popupHost = {
-            searchStatus.SearchPager(
+            val resultStatus = when {
+                searchStatus.searchText.isBlank() -> SearchStatus.ResultStatus.DEFAULT
+                filteredQuotes.isEmpty() -> SearchStatus.ResultStatus.EMPTY
+                else -> SearchStatus.ResultStatus.SHOW
+            }
+            searchStatus.copy(resultStatus = resultStatus).SearchPager(
                 onSearchStatusChange = { searchStatus = it },
                 offsetY = searchStatus.offsetY,
                 defaultResult = {},
@@ -199,9 +218,7 @@ fun PoetryPage() {
             Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
                 val top = padding.calculateTopPadding()
                 val bottom = padding.calculateBottomPadding()
-                val contentPadding = remember(top, bottom) {
-                    PaddingValues(top = top, bottom = bottom + 16.dp)
-                }
+                val contentPadding = pageContentPadding(padding, extraBottom = 16.dp)
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.pageScrollModifiers(

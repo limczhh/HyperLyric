@@ -2,6 +2,7 @@
 
 package com.lidesheng.hyperlyric.ui.page
 
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -49,7 +50,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -89,6 +90,7 @@ fun LogPage() {
     var moduleSelectedLevel by remember { mutableStateOf("ALL") }
 
     var showMorePopup by remember { mutableStateOf(false) }
+    var holdMorePopup by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
     val copiedMsg = stringResource(R.string.copied)
@@ -263,7 +265,7 @@ fun LogPage() {
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
             BlurredBar(backdrop, blurActive) {
-                TopAppBar(
+                AdaptiveTopAppBar(
                     color = barColor,
                     title = stringResource(R.string.title_view_logs),
                     scrollBehavior = topAppBarScrollBehavior,
@@ -278,8 +280,8 @@ fun LogPage() {
                     actions = {
                         Box {
                             IconButton(
-                                onClick = { showMorePopup = true },
-                                holdDownState = showMorePopup
+                                onClick = { holdMorePopup = true; showMorePopup = true },
+                                holdDownState = holdMorePopup
                             ) {
                                 Icon(
                                     imageVector = MiuixIcons.More,
@@ -291,7 +293,8 @@ fun LogPage() {
                                 entries = logEntries,
                                 alignment = PopupPositionProvider.Align.TopEnd,
                                 popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                onDismissRequest = { showMorePopup = false }
+                                onDismissRequest = { showMorePopup = false },
+                                onDismissFinished = { if (!showMorePopup) holdMorePopup = false }
                             )
                         }
                     },
@@ -325,9 +328,7 @@ fun LogPage() {
                 val currentHasLoaded = if (isApp) appHasLoaded else moduleHasLoaded
                 val top = padding.calculateTopPadding()
                 val bottom = padding.calculateBottomPadding()
-                val contentPadding = remember(top, bottom) {
-                    PaddingValues(top = top, bottom = bottom + 16.dp)
-                }
+                val contentPadding = pageContentPadding(padding, extraBottom = 16.dp)
 
                 LogTabContent(
                     logs = currentLogs,

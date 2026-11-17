@@ -28,6 +28,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
@@ -36,7 +42,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +50,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.offset
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
@@ -86,7 +94,7 @@ fun SearchStatus.SearchPager(
             )
         }
     }
-    val systemBarsPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
+    val systemBarsPadding = WindowInsets.systemBars.union(WindowInsets.captionBar).union(WindowInsets.displayCutout).asPaddingValues().calculateTopPadding()
     val topPadding by animateDpAsState(
         targetValue = if (searchStatus.shouldExpand()) {
             systemBarsPadding + 12.dp
@@ -96,7 +104,7 @@ fun SearchStatus.SearchPager(
         animationSpec = tween(300, easing = LinearOutSlowInEasing),
         label = "SearchPagerTopPadding",
     ) {
-        onSearchStatusChange(searchStatus.onAnimationComplete())
+        onSearchStatusChangeUpdated.value(searchStatusUpdated.value.onAnimationComplete())
     }
     val surfaceAlpha by animateFloatAsState(
         if (searchStatus.shouldExpand()) 1f else 0f,
@@ -108,6 +116,7 @@ fun SearchStatus.SearchPager(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal))
             .zIndex(5f)
             .drawBehind { drawRect(surfaceColor.copy(alpha = surfaceAlpha)) }
             .semantics { onClick { false } }
@@ -118,7 +127,13 @@ fun SearchStatus.SearchPager(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = topPadding)
+                .layout { measurable, constraints ->
+                    val top = topPadding.roundToPx().coerceAtLeast(0)
+                    val placeable = measurable.measure(constraints.offset(vertical = -top))
+                    layout(placeable.width, constraints.constrainHeight(placeable.height + top)) {
+                        placeable.placeRelative(0, top)
+                    }
+                }
                 .then(
                     if (!searchStatus.isCollapsed()) {
                         Modifier.background(MiuixTheme.colorScheme.surface)
@@ -156,10 +171,8 @@ fun SearchStatus.SearchPager(
                             onClick = onCancelSearch,
                         ),
                 )
-                BackHandler(enabled = searchStatus.isExpand()) {
-                    onSearchStatusChange(
-                        searchStatus.copy(searchText = "", current = SearchStatus.Status.COLLAPSING)
-                    )
+                BackHandler(enabled = searchStatus.shouldExpand()) {
+                    onCancelSearch()
                 }
             }
         }
@@ -171,12 +184,12 @@ fun SearchStatus.SearchPager(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            LazyColumn(
-                Modifier
-                    .fillMaxSize()
-                    .overScrollVertical(),
-            ) {
-                result()
+            when (searchStatus.resultStatus) {
+                SearchStatus.ResultStatus.DEFAULT -> defaultResult()
+                SearchStatus.ResultStatus.EMPTY -> Unit
+                SearchStatus.ResultStatus.SHOW -> LazyColumn(
+                    Modifier.fillMaxSize().overScrollVertical(),
+                ) { result() }
             }
         }
     }
@@ -188,7 +201,6 @@ fun SearchBar(
     onSearchStatusChange: (SearchStatus) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-    var expanded by rememberSaveable { mutableStateOf(false) }
     val onSearchStatusChangeUpdated = rememberUpdatedState(onSearchStatusChange)
     val searchStatusUpdated = rememberUpdatedState(searchStatus)
     val onClearSearch = remember {
@@ -240,16 +252,14 @@ fun SearchBar(
         onExpandedChange = {
             onSearchStatusChange(
                 searchStatus.copy(
-                    current = if (it) SearchStatus.Status.EXPANDED else SearchStatus.Status.COLLAPSED,
+                    searchText = if (it) searchStatus.searchText else "",
+                    current = if (it) SearchStatus.Status.EXPANDED else SearchStatus.Status.COLLAPSING,
                 ),
             )
         },
     )
-    LaunchedEffect(Unit) {
-        if (!expanded && searchStatus.shouldExpand()) {
-            focusRequester.requestFocus()
-            expanded = true
-        }
+    LaunchedEffect(searchStatus.shouldExpand()) {
+        if (searchStatus.shouldExpand()) focusRequester.requestFocus()
     }
 }
 
