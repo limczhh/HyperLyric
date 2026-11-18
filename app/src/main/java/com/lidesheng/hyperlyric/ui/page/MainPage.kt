@@ -82,6 +82,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
@@ -330,7 +331,13 @@ fun MainPage() {
         ) {
             Box {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.defaultColors(
+                            color = if (glassStyle) Color.Transparent else MiuixTheme.colorScheme.surface,
+                            contentColor = MiuixTheme.colorScheme.onSurface
+                        )
+                    ) {
                         Column {
                             migrationNotes.flatMap { it.items }.forEach { item ->
                                 if (item.url != null) {

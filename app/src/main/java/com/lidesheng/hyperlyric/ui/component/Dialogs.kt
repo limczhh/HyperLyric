@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -51,7 +52,7 @@ import com.lidesheng.hyperlyric.ui.utils.LocalAppBackdrop
 import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 
 
-private val LocalGlassDialog = staticCompositionLocalOf { false }
+internal val LocalGlassDialog = staticCompositionLocalOf { false }
 
 @Composable
 fun AdaptiveDialog(
@@ -142,13 +143,14 @@ fun MultiSelectDialog(
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished
     ) {
+        val isGlass = LocalGlassDialog.current
         Column(modifier = Modifier.fillMaxWidth()) {
             Card(
                 modifier = Modifier
                     .padding(bottom = 16.dp)
                     .fillMaxWidth(),
                 colors = CardDefaults.defaultColors(
-                    color = MiuixTheme.colorScheme.surface,
+                    color = if (isGlass) Color.Transparent else MiuixTheme.colorScheme.surface,
                     contentColor = MiuixTheme.colorScheme.onSurface
                 )
             ) {

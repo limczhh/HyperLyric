@@ -89,7 +89,7 @@ fun AboutPage(
                     color = barColor,
                     title = stringResource(R.string.about),
                     titleColor = titleColor,
-                    defaultWindowInsetsPadding = false,
+                    defaultWindowInsetsPadding = true,
                     scrollBehavior = topAppBarScrollBehavior,
                     isContentScrolled = collapsed,
                 )

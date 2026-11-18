@@ -58,6 +58,8 @@ import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -821,10 +823,15 @@ fun DynamicIslandNotificationPage() {
                     .fillMaxWidth()
                     .padding(bottom = 40.dp)
             ) {
+                val glassStyle = LocalGlassStyle.current
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp)
-                        .fillMaxWidth()
+                        .fillMaxWidth(),
+                    colors = CardDefaults.defaultColors(
+                        color = if (glassStyle) Color.Transparent else MiuixTheme.colorScheme.surface,
+                        contentColor = MiuixTheme.colorScheme.onSurface
+                    )
                 ) {
                     ArrowPreference(
                         title = stringResource(R.string.title_permission_post_notification),

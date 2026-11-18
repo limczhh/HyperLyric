@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.ui.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import com.lidesheng.hyperlyric.ui.utils.LocalBlurEnabled
 import com.lidesheng.hyperlyric.ui.utils.LocalAppBackdrop
@@ -59,8 +61,13 @@ fun AppNavigation(startRoute: Route) {
     val backdrop = if (blurEnabled) rememberBlurBackdrop() else null
 
     CompositionLocalProvider(LocalNavigator provides navigator, LocalAppBackdrop provides backdrop) {
-        Scaffold(containerColor = Color.Transparent, contentWindowInsets = WindowInsets(0)) {
-            Box(Modifier.fillMaxSize().then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)) {
+        Scaffold(containerColor = MiuixTheme.colorScheme.surface, contentWindowInsets = WindowInsets(0)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MiuixTheme.colorScheme.surface)
+                    .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+            ) {
                 NavDisplay(
                     backStack = backStack,
                     onBack = { navigator.pop() },

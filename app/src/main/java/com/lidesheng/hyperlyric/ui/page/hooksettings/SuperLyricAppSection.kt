@@ -45,6 +45,7 @@ import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -250,14 +251,13 @@ private fun SuperLyricAppItem(app: SuperLyricApp) {
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.padding(bottom = 16.dp)) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                BasicComponent(
-                    summary = stringResource(app.usageResId),
-                    insideMargin = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 10.dp,
-                        bottom = 0.dp
-                    )
+                Text(
+                    text = stringResource(app.usageResId),
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MiuixTheme.textStyles.body2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 10.dp)
                 )
             }
         }
