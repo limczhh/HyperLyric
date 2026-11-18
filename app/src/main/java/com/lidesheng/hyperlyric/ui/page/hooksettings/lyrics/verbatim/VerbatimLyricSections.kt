@@ -14,7 +14,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -93,7 +93,7 @@ fun LazyListScope.verbatimLyricSections(
                     .padding(bottom = 12.dp)
                     .fillMaxWidth()
             ) {
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(id = R.string.title_word_effect),
                     items = listOf(
                         stringResource(id = R.string.option_word_effect_highlight),
@@ -222,7 +222,7 @@ fun LazyListScope.verbatimLyricSections(
                         .fillMaxWidth()
                 ) {
                     Column {
-                        OverlayDropdownPreference(
+                        AdaptiveOverlayDropdownPreference(
                             title = stringResource(id = R.string.title_word_reveal_animation),
                             items = listOf(
                                 stringResource(id = R.string.option_anim_none),
@@ -239,7 +239,7 @@ fun LazyListScope.verbatimLyricSections(
                             selectedIndex = wordRevealAnimation,
                             onSelectedIndexChange = onWordRevealAnimationChange
                         )
-                        OverlayDropdownPreference(
+                        AdaptiveOverlayDropdownPreference(
                             title = stringResource(id = R.string.title_anim_speed),
                             items = animationSpeedOptions,
                             selectedIndex = RootConstants.HOOK_WORD_REVEAL_SPEED_RATES

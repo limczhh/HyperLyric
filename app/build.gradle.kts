@@ -9,6 +9,7 @@ plugins {
 android {
     namespace = "com.lidesheng.hyperlyric"
     compileSdk = 37
+    compileSdkMinor = 2
     defaultConfig {
         applicationId = "com.lidesheng.hyperlyric"
         minSdk = 33
@@ -101,6 +102,7 @@ dependencies {
     implementation(libs.miuix.ui.android)
     implementation(libs.miuix.preference.android)
     implementation(libs.miuix.blur.android)
+    implementation(libs.miuix.glass.android)
     implementation(libs.miuix.icons.android)
     implementation(libs.miuix.nav.android)
     implementation(libs.androidx.compose.animation.graphics)

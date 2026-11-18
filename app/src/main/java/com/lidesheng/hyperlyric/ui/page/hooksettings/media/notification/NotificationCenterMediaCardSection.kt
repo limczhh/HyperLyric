@@ -32,7 +32,7 @@ import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.roundToInt
@@ -73,7 +73,7 @@ fun LazyListScope.notificationCenterMediaElementSection(
                     RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_ROTATING_CIRCLE,
                     RootConstants.NOTIFICATION_MEDIA_COVER_STYLE_HIDDEN
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_audio_cover_style),
                     items = listOf(
                         stringResource(R.string.option_audio_cover_style_default),
@@ -136,7 +136,7 @@ fun LazyListScope.notificationCenterMediaElementSection(
                     RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_DEFAULT,
                     RootConstants.NOTIFICATION_MEDIA_PROGRESS_STYLE_WAVE
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_media_progress_style),
                     items = listOf(
                         stringResource(R.string.option_media_progress_style_default),
@@ -171,7 +171,7 @@ fun LazyListScope.notificationCenterMediaElementSection(
                             RootConstants.NOTIFICATION_MEDIA_THUMB_STYLE_VERTICAL,
                             RootConstants.NOTIFICATION_MEDIA_THUMB_STYLE_HIDDEN
                         )
-                        OverlayDropdownPreference(
+                        AdaptiveOverlayDropdownPreference(
                             title = stringResource(R.string.title_media_thumb_style),
                             items = listOf(
                                 stringResource(R.string.option_media_thumb_style_default),
@@ -221,7 +221,7 @@ fun LazyListScope.notificationCenterMediaBackgroundSection(
                 RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_LINEAR_GRADIENT,
                 RootConstants.NOTIFICATION_MEDIA_BACKGROUND_STYLE_SOFT_COVER
             )
-            OverlayDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(R.string.title_notification_media_background_style),
                 items = listOf(
                     stringResource(R.string.option_notification_media_background_default),
@@ -248,7 +248,7 @@ fun LazyListScope.notificationCenterMediaBackgroundSection(
                             RootConstants.MEDIA_CARD_THEME_ALWAYS_LIGHT,
                             RootConstants.MEDIA_CARD_THEME_ALWAYS_DARK
                         )
-                        OverlayDropdownPreference(
+                        AdaptiveOverlayDropdownPreference(
                             title = stringResource(R.string.title_media_card_background_theme),
                             items = listOf(
                                 stringResource(R.string.option_media_card_theme_follow_system_default),
@@ -266,7 +266,7 @@ fun LazyListScope.notificationCenterMediaBackgroundSection(
                             RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_CUSTOM_FULL,
                             RootConstants.NOTIFICATION_MEDIA_AMBIENT_FLOW_MODE_DISABLED
                         )
-                        OverlayDropdownPreference(
+                        AdaptiveOverlayDropdownPreference(
                             title = stringResource(R.string.title_notification_media_ambient_flow_mode),
                             items = listOf(
                                 stringResource(R.string.option_notification_media_ambient_flow_dynamic),
@@ -295,7 +295,7 @@ fun LazyListScope.notificationCenterMediaBackgroundSection(
                                     RootConstants.MEDIA_SOFT_COVER_TONE_LIGHT,
                                     RootConstants.MEDIA_SOFT_COVER_TONE_DARK
                                 )
-                                OverlayDropdownPreference(
+                                AdaptiveOverlayDropdownPreference(
                                     title = stringResource(R.string.title_media_soft_cover_tone),
                                     items = listOf(
                                         stringResource(
@@ -392,7 +392,7 @@ fun LazyListScope.notificationCenterMediaLayoutSection(
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            OverlayDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(R.string.title_notification_media_layout_style),
                 items = listOf(
                     stringResource(R.string.option_notification_media_layout_system),
@@ -483,7 +483,7 @@ fun LazyListScope.notificationCenterMediaLayoutSection(
                     RootConstants.NOTIFICATION_MEDIA_ACTION_ORDER_CUSTOM_RIGHT,
                     RootConstants.NOTIFICATION_MEDIA_ACTION_ORDER_PLAY_LEFT
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_media_action_order),
                     items = listOf(
                         stringResource(R.string.option_media_action_order_default),

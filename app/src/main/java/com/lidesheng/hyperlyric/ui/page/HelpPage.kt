@@ -33,13 +33,13 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.basic.TabRow
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -75,8 +75,9 @@ fun HelpPage() {
                     color = barColor,
                     title = stringResource(R.string.title_help),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = (if (pagerState.currentPage == 0) superIslandListState else dynamicIslandListState).canScrollBackward,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.back)
@@ -84,9 +85,9 @@ fun HelpPage() {
                         }
                     },
                     bottomContent = {
-                        TabRow(
+                        AdaptiveTabRow(
                             tabs = tabs,
-                            selectedTabIndex = pagerState.currentPage,
+                            selectedTabIndex = pagerState.targetPage,
                             onTabSelected = { index ->
                                 coroutineScope.launch { pagerState.animateScrollToPage(index) }
                             },

@@ -13,7 +13,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -116,7 +116,7 @@ fun LazyListScope.lyricDisplaySections(
                     },
                     onClick = onFadingEdgeClick
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(id = R.string.title_text_color),
                     items = textColorOptions,
                     selectedIndex = selectedTextColorIndex,

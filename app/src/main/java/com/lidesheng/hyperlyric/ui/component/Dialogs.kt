@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,11 +33,71 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextButtonColors
+import top.yukonga.miuix.kmp.basic.ButtonColors
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.glass.GlassDialogButton
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.glass.glassDialogSurface
+import top.yukonga.miuix.kmp.glass.GlassDialogDefaults
+import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
+import com.lidesheng.hyperlyric.ui.utils.LocalAppBackdrop
+
+
+private val LocalGlassDialog = staticCompositionLocalOf { false }
+
+@Composable
+fun AdaptiveDialog(
+    show: Boolean,
+    title: String? = null,
+    summary: String? = null,
+    modifier: Modifier = Modifier,
+    onDismissRequest: () -> Unit,
+    onDismissFinished: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    val glassStyle = LocalGlassStyle.current
+    val backdrop = LocalAppBackdrop.current
+    OverlayDialog(
+        show = show,
+        title = title,
+        summary = summary,
+        modifier = modifier,
+        dimColor = if (glassStyle) GlassDialogDefaults.ScrimColor else MiuixTheme.colorScheme.windowDimming,
+        onDismissRequest = onDismissRequest,
+        onDismissFinished = onDismissFinished,
+        surface = if (glassStyle) glassDialogSurface(backdrop = backdrop) else null,
+    ) {
+        CompositionLocalProvider(LocalGlassDialog provides glassStyle) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun AdaptiveDialogButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: TextButtonColors? = null,
+) {
+    if (LocalGlassDialog.current) {
+        GlassDialogButton(onClick = onClick, modifier = modifier, enabled = enabled,
+            colors = colors?.let { ButtonColors(it.color, it.disabledColor, it.textColor, it.disabledTextColor) }
+                ?: GlassDialogButtonDefaults.buttonColors()) {
+            Text(text = text, style = MiuixTheme.textStyles.button)
+        }
+    } else {
+        TextButton(text = text, onClick = onClick, modifier = modifier, enabled = enabled,
+            colors = colors ?: ButtonDefaults.textButtonColors())
+    }
+}
 
 /** Attach only to the editable field in a single-input dialog. */
 @Composable
@@ -70,7 +132,7 @@ fun MultiSelectDialog(
     var draftSelection by remember { mutableStateOf(selectedKeys) }
     LaunchedEffect(show) { if (show) draftSelection = selectedKeys }
 
-    WindowDialog(
+    AdaptiveDialog(
         title = title,
         summary = summary,
         show = show,
@@ -108,13 +170,13 @@ fun MultiSelectDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(20.dp))
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
                         onConfirm(draftSelection)
@@ -152,7 +214,7 @@ fun NumberInputDialog(
         }
     }
 
-    WindowDialog(
+    AdaptiveDialog(
         title = title,
         summary = summary,
         show = show,
@@ -177,13 +239,13 @@ fun NumberInputDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(20.dp))
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
                         inputValue.text.toIntOrNull()?.let {
@@ -221,7 +283,7 @@ fun TextInputDialog(
         if (show) inputValue = TextFieldValue(initialValue, selection = TextRange(initialValue.length))
     }
 
-    WindowDialog(
+    AdaptiveDialog(
         title = title,
         summary = summary,
         show = show,
@@ -244,13 +306,13 @@ fun TextInputDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(20.dp))
-                TextButton(
+                AdaptiveDialogButton(
                     text = confirmText,
                     onClick = { onConfirm(inputValue.text); onDismiss() },
                     modifier = Modifier.weight(1f),
@@ -273,7 +335,7 @@ fun SimpleDialog(
     onConfirm: () -> Unit
 ) {
 
-    WindowDialog(
+    AdaptiveDialog(
         title = title,
         summary = summary,
         show = show,
@@ -281,9 +343,9 @@ fun SimpleDialog(
         onDismissFinished = onDismissFinished
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(text = cancelText, onClick = onDismiss, modifier = Modifier.weight(1f))
+            AdaptiveDialogButton(text = cancelText, onClick = onDismiss, modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.width(20.dp))
-            TextButton(
+            AdaptiveDialogButton(
                 text = confirmText,
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 modifier = Modifier.weight(1f),
@@ -320,7 +382,7 @@ fun FloatInputDialog(
         }
     }
 
-    WindowDialog(
+    AdaptiveDialog(
         title = title,
         summary = summary,
         show = show,
@@ -345,13 +407,13 @@ fun FloatInputDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(20.dp))
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
                         inputValue.text.toFloatOrNull()?.let {
@@ -401,7 +463,7 @@ fun PaddingInputDialog(
         }
     }
 
-    WindowDialog(title = title, show = show, onDismissRequest = onDismiss,
+    AdaptiveDialog(title = title, show = show, onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished) {
         Column(modifier = Modifier.fillMaxWidth()) {
             val filter = { text: String ->
@@ -430,13 +492,13 @@ fun PaddingInputDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(20.dp))
-                TextButton(
+                AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
                         val l = leftValue.toIntOrNull() ?: 0

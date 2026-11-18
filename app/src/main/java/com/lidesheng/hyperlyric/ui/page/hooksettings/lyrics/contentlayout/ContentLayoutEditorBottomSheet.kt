@@ -31,7 +31,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
 
 @Composable
 internal fun ContentLayoutEditorBottomSheet(
@@ -74,7 +74,7 @@ internal fun ContentLayoutEditorBottomSheet(
     val maxSheetHeight = (windowHeight - safeTopInset).coerceAtLeast(0.dp)
     val maxListHeight = (maxSheetHeight - 122.dp).coerceAtLeast(0.dp)
 
-    WindowBottomSheet(
+    AdaptiveBottomSheet(
         show = show,
         modifier = Modifier.heightIn(max = maxSheetHeight),
         title = title,

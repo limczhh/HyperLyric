@@ -59,13 +59,13 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.basic.TabRow
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -75,7 +75,7 @@ import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
 
 @SuppressLint("BatteryLife")
 @Composable
@@ -374,8 +374,9 @@ fun DynamicIslandNotificationPage() {
                     color = barColor,
                     title = stringResource(R.string.title_dynamic_island_lyrics),
                     scrollBehavior = scrollBehavior,
+                    isContentScrolled = (if (pagerState.currentPage == 0) configLazyListState else whitelistLazyListState).canScrollBackward,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.back)
@@ -383,9 +384,9 @@ fun DynamicIslandNotificationPage() {
                         }
                     },
                     bottomContent = {
-                        TabRow(
+                        AdaptiveTabRow(
                             tabs = tabs,
-                            selectedTabIndex = pagerState.currentPage,
+                            selectedTabIndex = pagerState.targetPage,
                             onTabSelected = {
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(
@@ -778,12 +779,12 @@ fun DynamicIslandNotificationPage() {
         }
     }
 
-    WindowBottomSheet(
+    AdaptiveBottomSheet(
         show = showPermissionSheet,
         title = stringResource(R.string.sheet_permission_title),
         backgroundColor = MiuixTheme.colorScheme.surface,
         startAction = {
-            IconButton(onClick = { showPermissionSheet = false }) {
+            AdaptiveIconButton(onClick = { showPermissionSheet = false }) {
                 Icon(
                     imageVector = MiuixIcons.Close,
                     contentDescription = stringResource(R.string.close),
@@ -792,7 +793,7 @@ fun DynamicIslandNotificationPage() {
             }
         },
         endAction = {
-            IconButton(onClick = confirmPermissionSheet) {
+            AdaptiveIconButton(onClick = confirmPermissionSheet) {
                 Icon(
                     imageVector = MiuixIcons.Ok,
                     contentDescription = stringResource(R.string.confirm),

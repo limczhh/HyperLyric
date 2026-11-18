@@ -20,13 +20,13 @@ import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -63,7 +63,7 @@ fun LyricSourcePage() {
                     title = stringResource(R.string.title_lyric_source),
                     scrollBehavior = topAppBarScrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.back)
@@ -77,7 +77,7 @@ fun LyricSourcePage() {
                                 .padding(bottom = 12.dp)
                                 .fillMaxWidth()
                         ) {
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(R.string.title_lyric_source),
                                 items = sourceOptions,
                                 selectedIndex = selectedSourceIndex,

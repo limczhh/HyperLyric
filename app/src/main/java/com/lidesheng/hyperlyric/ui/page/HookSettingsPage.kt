@@ -38,7 +38,7 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
@@ -51,7 +51,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -151,7 +151,7 @@ fun HookSettingsPage() {
                     title = stringResource(R.string.title_lyric_settings),
                     scrollBehavior = topAppBarScrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.back)
@@ -230,7 +230,7 @@ private fun LazyListScope.hookSettingsSections(
                     checked = hookEnabled,
                     onCheckedChange = onHookEnabledChange,
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_lyric_type),
                     items = listOf(
                         stringResource(R.string.option_lyric_type_super_island),

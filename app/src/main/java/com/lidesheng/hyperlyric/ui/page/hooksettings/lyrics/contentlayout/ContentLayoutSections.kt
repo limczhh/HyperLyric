@@ -40,10 +40,10 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
 
 internal enum class ContentLayoutField(
     val key: String,
@@ -184,7 +184,7 @@ internal fun LazyListScope.contentLayoutSections(
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            OverlayDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(id = R.string.title_content_layout_alignment),
                 items = ContentLayoutAlignment.values().map { alignment ->
                     stringResource(id = alignment.labelRes)
@@ -218,7 +218,7 @@ internal fun LazyListScope.contentLayoutSections(
                     separator = separator,
                     onEditField = { onEditField(1) }
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(id = R.string.title_content_layout_separator),
                     summary = stringResource(id = R.string.summary_content_layout_separator),
                     items = ContentLayoutSeparator.values().map { separatorOption ->
@@ -257,7 +257,7 @@ internal fun LazyListScope.contentLayoutSections(
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            OverlayDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(id = R.string.title_content_layout_alignment),
                 items = ContentLayoutAlignment.values().map { alignment ->
                     stringResource(id = alignment.labelRes)
@@ -297,7 +297,7 @@ internal fun LazyListScope.contentLayoutSections(
                 .fillMaxWidth()
         ) {
             Column {
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(id = R.string.title_placeholder_format),
                     items = placeholderOptions,
                     selectedIndex = placeholderFormat.coerceIn(
@@ -306,7 +306,7 @@ internal fun LazyListScope.contentLayoutSections(
                     ),
                     onSelectedIndexChange = onPlaceholderFormatChange
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(id = R.string.title_no_lyrics_lyric_behavior),
                     items = lyricBehaviorOptions,
                     selectedIndex = noLyricsBehavior.coerceIn(
@@ -315,7 +315,7 @@ internal fun LazyListScope.contentLayoutSections(
                     ),
                     onSelectedIndexChange = onNoLyricsBehaviorChange
                 )
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(id = R.string.title_tail_timeout_behavior),
                     items = lyricBehaviorOptions,
                     selectedIndex = tailTimeoutBehavior.coerceIn(
@@ -444,7 +444,7 @@ internal fun LyricContentDisplayBottomSheet(
     val maxSheetHeight = (windowHeight - safeTopInset).coerceAtLeast(0.dp)
     val maxListHeight = (maxSheetHeight - 122.dp).coerceAtLeast(0.dp)
 
-    WindowBottomSheet(
+    AdaptiveBottomSheet(
         show = show,
         modifier = Modifier.heightIn(max = maxSheetHeight),
         title = stringResource(id = R.string.title_double_line_content),

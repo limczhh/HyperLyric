@@ -15,7 +15,7 @@ import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
@@ -54,7 +54,7 @@ fun HomePage(
                     title = "HyperLyric",
                     scrollBehavior = topAppBarScrollBehavior,
                     actions = {
-                        IconButton(onClick = onRestartClick) {
+                        AdaptiveIconButton(onClick = onRestartClick) {
                             Icon(
                                 imageVector = MiuixIcons.Refresh,
                                 contentDescription = stringResource(id = R.string.dialog_restart_title)

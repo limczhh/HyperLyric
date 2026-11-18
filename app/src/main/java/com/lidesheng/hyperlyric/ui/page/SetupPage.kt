@@ -47,6 +47,7 @@ import com.lidesheng.hyperlyric.common.PrefsBridge
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.root.RootApplication
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import com.lidesheng.hyperlyric.ui.utils.rememberExternalLinkOpener
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -61,7 +62,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.launch
@@ -111,7 +112,7 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
-            TopAppBar(title = stringResource(pageTitle))
+            AdaptiveTopAppBar(title = stringResource(pageTitle))
         },
         bottomBar = {
             Column {
@@ -339,7 +340,7 @@ private fun LyricConfigurationPage(
     ) {
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_lyric_type),
                     items = outputOptions,
                     selectedIndex = outputTarget.coerceIn(
@@ -359,7 +360,7 @@ private fun LyricConfigurationPage(
         }
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_lyric_source),
                     items = sourceOptions,
                     selectedIndex = selectedSourceIndex,

@@ -8,7 +8,7 @@ kotlinComposePlugin = "2.3.21"
 activityCompose = "1.12.4"
 composeBom = "2026.04.01"
 constraintlayout-compose = "1.1.0"
-miuix = "0.9.4"
+miuix = "0.9.5-beta01"
 palette = "1.0.0"
 kotlin = "2.3.21"
 retrofit = "2.11.0"
@@ -55,6 +55,7 @@ reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.r
 miuix-ui-android = { group = "top.yukonga.miuix.kmp", name = "miuix-ui-android", version.ref = "miuix" }
 miuix-preference-android = { group = "top.yukonga.miuix.kmp", name = "miuix-preference-android", version.ref = "miuix" }
 miuix-blur-android = { group = "top.yukonga.miuix.kmp", name = "miuix-blur-android", version.ref = "miuix" }
+miuix-glass-android = { group = "top.yukonga.miuix.kmp", name = "miuix-glass-android", version.ref = "miuix" }
 miuix-icons-android = { group = "top.yukonga.miuix.kmp", name = "miuix-icons-android", version.ref = "miuix" }
 miuix-nav-android = { group = "top.yukonga.miuix.kmp", name = "miuix-nav-android", version.ref = "miuix" }
 

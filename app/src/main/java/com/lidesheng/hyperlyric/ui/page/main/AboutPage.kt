@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveSmallTopAppBar
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
@@ -84,12 +85,13 @@ fun AboutPage(
                 alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
             )
             BlurredBar(backdrop, blurActive) {
-                SmallTopAppBar(
+                AdaptiveSmallTopAppBar(
                     color = barColor,
                     title = stringResource(R.string.about),
                     titleColor = titleColor,
                     defaultWindowInsetsPadding = false,
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = collapsed,
                 )
             }
         }

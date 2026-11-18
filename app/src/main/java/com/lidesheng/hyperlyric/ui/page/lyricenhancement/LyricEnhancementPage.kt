@@ -35,7 +35,7 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -429,7 +429,7 @@ private fun OpenAiTranslationSettingsPage() {
                         RootConstants.AI_TRANS_PROVIDER_ANTHROPIC
                     )
                     val selectedProviderIndex = if (provider.equals(RootConstants.AI_TRANS_PROVIDER_ANTHROPIC, ignoreCase = true)) 1 else 0
-                    OverlayDropdownPreference(
+                    AdaptiveOverlayDropdownPreference(
                         title = stringResource(R.string.title_ai_translation_provider),
                         items = providerOptions,
                         selectedIndex = selectedProviderIndex,

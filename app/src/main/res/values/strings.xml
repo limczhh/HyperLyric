@@ -806,4 +806,8 @@
 
     <string name="open_system_settings_failed">无法打开系统设置，请手动前往</string>
 
+    <string name="title_ui_style">UI 风格</string>
+    <string name="ui_style_follow_system">跟随系统</string>
+    <string name="ui_style_os3">OS 3</string>
+    <string name="ui_style_os4">OS 4</string>
 </resources>

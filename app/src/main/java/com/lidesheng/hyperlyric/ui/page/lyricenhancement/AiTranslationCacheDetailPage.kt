@@ -38,7 +38,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
@@ -52,7 +52,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
+import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
 import java.text.DateFormat
 import java.util.Date
 
@@ -100,7 +100,7 @@ internal fun AiTranslationCacheDetailPage(route: Route.AiTranslationCacheDetail)
         }
     }
 
-    WindowDialog(
+    AdaptiveDialog(
         title = deleteText,
         show = showDeleteDialog,
         onDismissRequest = { showDeleteDialog = false }
@@ -132,7 +132,7 @@ internal fun AiTranslationCacheDetailPage(route: Route.AiTranslationCacheDetail)
                     },
                     scrollBehavior = topAppBarScrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.back)
@@ -140,7 +140,7 @@ internal fun AiTranslationCacheDetailPage(route: Route.AiTranslationCacheDetail)
                         }
                     },
                     actions = {
-                        IconButton(
+                        AdaptiveIconButton(
                             onClick = { showDeleteDialog = true },
                             enabled = !requestInFlight
                         ) {

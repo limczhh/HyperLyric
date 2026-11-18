@@ -30,7 +30,7 @@ import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
@@ -99,6 +99,7 @@ internal fun XposedLyricSettingPage(
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
 
     Scaffold(
         snackbarHost = {
@@ -110,8 +111,9 @@ internal fun XposedLyricSettingPage(
                     color = barColor,
                     title = title,
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(id = R.string.back)
@@ -127,7 +129,6 @@ internal fun XposedLyricSettingPage(
         val topPadding = padding.calculateTopPadding()
         val bottomPadding = padding.calculateBottomPadding()
         val contentPadding = pageContentPadding(padding, extraBottom = 16.dp)
-        val lazyListState = rememberLazyListState()
         val pullToRefreshState = rememberPullToRefreshState()
         val contentReady = if (onRefresh != null) {
             rememberEntryTransitionContentReady()

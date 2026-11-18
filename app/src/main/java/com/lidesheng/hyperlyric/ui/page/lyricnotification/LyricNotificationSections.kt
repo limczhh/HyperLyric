@@ -27,9 +27,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.configSections(
@@ -104,7 +103,7 @@ fun LazyListScope.configSections(
                     )
                 }.map { stringResource(id = it) }
 
-                WindowDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_service_lyric_source),
                     items = lyricSourceOptions,
                     selectedIndex = lyricSource.takeIf { it in lyricSourceOptions.indices }
@@ -116,7 +115,7 @@ fun LazyListScope.configSections(
                     listOf(R.string.option_notification_live, R.string.option_notification_focus)
                 }.map { stringResource(id = it) }
 
-                OverlayDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_notification_type),
                     items = notificationTypeOptions,
                     selectedIndex = notificationType,
@@ -156,7 +155,7 @@ fun LazyListScope.configSections(
                     }
                 }.map { stringResource(id = it) }
 
-                WindowDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_island_left_icon),
                     items = iconStyleOptions,
                     selectedIndex = islandLeftIconStyle,
@@ -245,7 +244,7 @@ fun LazyListScope.configSections(
                     R.string.option_click_open_media
                 )
             }.map { stringResource(id = it) }
-            WindowDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(R.string.title_notification_click),
                 items = clickOptions,
                 selectedIndex = notificationClickAction,
@@ -276,7 +275,7 @@ fun LazyListScope.configSections(
 
             val focusStyleOptions = remember { listOf("OS2", "OS3") }
             AnimatedVisibility(visible = notificationType == 1) {
-                WindowDropdownPreference(
+                AdaptiveOverlayDropdownPreference(
                     title = stringResource(R.string.title_focus_style),
                     items = focusStyleOptions,
                     selectedIndex = 1 - focusNotificationType,
@@ -297,7 +296,7 @@ fun LazyListScope.configSections(
                     R.string.option_info_artist_album
                 )
             }.map { stringResource(id = it) }
-            WindowDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(R.string.title_song_info),
                 items = normalTitleOptions,
                 selectedIndex = normalNotificationTitleStyle,

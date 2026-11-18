@@ -27,6 +27,7 @@ import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -158,7 +159,7 @@ internal fun AiTranslationCachePage() {
         isRefreshing = isRefreshing,
         onRefresh = { loadEntries(refresh = true) },
         topBarActions = {
-            IconButton(
+            AdaptiveIconButton(
                 onClick = { showClearAllDialog = true },
                 enabled = !busy
             ) {

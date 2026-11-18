@@ -55,7 +55,7 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
+import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
 import kotlin.math.roundToInt
 
 @Composable
@@ -184,7 +184,7 @@ internal fun AiTranslationModelDialog(
         }
     }
 
-    WindowDialog(
+    AdaptiveDialog(
         modifier = Modifier.onGloballyPositioned { coordinates ->
             val position = coordinates.positionInWindow()
             dialogTopPx = position.y.roundToInt()

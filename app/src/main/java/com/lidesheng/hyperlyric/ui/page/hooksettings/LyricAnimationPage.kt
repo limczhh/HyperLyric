@@ -33,14 +33,14 @@ import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -90,7 +90,7 @@ fun LyricAnimationPage() {
                     title = stringResource(id = R.string.title_lyric_anim),
                     scrollBehavior = topAppBarScrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(id = R.string.back)
@@ -146,7 +146,7 @@ private fun LazyListScope.animationPageSections() {
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            OverlayDropdownPreference(
+            AdaptiveOverlayDropdownPreference(
                 title = stringResource(id = R.string.title_anim_speed),
                 items = animSpeedOptions,
                 selectedIndex = RootConstants.HOOK_ANIM_SPEED_RATES.indexOf(animSpeedRate),

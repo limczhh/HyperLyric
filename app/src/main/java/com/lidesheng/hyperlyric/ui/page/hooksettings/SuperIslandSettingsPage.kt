@@ -36,7 +36,7 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.RangeSlider
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -49,7 +49,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.roundToInt
@@ -528,7 +528,7 @@ fun SuperIslandSettingsPage() {
                     title = stringResource(id = R.string.title_super_island),
                     scrollBehavior = topAppBarScrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(id = R.string.back)
@@ -585,7 +585,7 @@ fun SuperIslandSettingsPage() {
                             .padding(bottom = 12.dp)
                             .fillMaxWidth()
                     ) {
-                        OverlayDropdownPreference(
+                        AdaptiveOverlayDropdownPreference(
                             title = stringResource(id = R.string.title_island_modification_scope),
                             items = islandModificationScopeOptions,
                             selectedIndex = islandModificationScope,
@@ -628,7 +628,7 @@ fun SuperIslandSettingsPage() {
                             .fillMaxWidth()
                     ) {
                         Column {
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_super_island_width),
                                 summary = islandWidthSummary,
                                 items = islandWidthModeOptions,
@@ -681,7 +681,7 @@ fun SuperIslandSettingsPage() {
                             AnimatedVisibility(
                                 visible = islandWidthMode == RootConstants.ISLAND_WIDTH_MODE_DYNAMIC
                             ) {
-                                OverlayDropdownPreference(
+                                AdaptiveOverlayDropdownPreference(
                                     title = stringResource(id = R.string.title_dynamic_width_basis),
                                     items = dynamicWidthBasisOptions,
                                     selectedIndex = dynamicWidthBasis,
@@ -779,7 +779,7 @@ fun SuperIslandSettingsPage() {
                             .fillMaxWidth()
                     ) {
                         Column {
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_audio_cover),
                                 items = audioCoverStyleOptions,
                                 selectedIndex = audioCoverStyleValues.indexOf(
@@ -790,7 +790,7 @@ fun SuperIslandSettingsPage() {
                                 }
                             )
                             if (!splitLyric) {
-                                OverlayDropdownPreference(
+                                AdaptiveOverlayDropdownPreference(
                                     title = stringResource(id = R.string.title_super_island_left),
                                     items = contentOptions,
                                     selectedIndex = contentModeValues.indexOf(islandContentLeft)
@@ -805,7 +805,7 @@ fun SuperIslandSettingsPage() {
                                         }
                                     }
                                 )
-                                OverlayDropdownPreference(
+                                AdaptiveOverlayDropdownPreference(
                                     title = stringResource(id = R.string.title_super_island_right),
                                     items = contentOptions,
                                     selectedIndex = contentModeValues.indexOf(islandContentRight)
@@ -821,7 +821,7 @@ fun SuperIslandSettingsPage() {
                                     }
                                 )
                             }
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_audio_rhythm),
                                 items = audioRhythmModeOptions,
                                 selectedIndex = audioRhythmModeValues.indexOf(
@@ -835,7 +835,7 @@ fun SuperIslandSettingsPage() {
                                 visible = audioRhythmMode !=
                                         RootConstants.ISLAND_MUSIC_WAVE_MODE_HIDDEN
                             ) {
-                                OverlayDropdownPreference(
+                                AdaptiveOverlayDropdownPreference(
                                     title = stringResource(id = R.string.title_audio_rhythm_color),
                                     items = audioRhythmColorStyleOptions,
                                     selectedIndex = audioRhythmColorStyleValues.indexOf(
@@ -862,7 +862,7 @@ fun SuperIslandSettingsPage() {
                             .fillMaxWidth()
                     ) {
                         Column {
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_island_swipe_behavior),
                                 items = swipeBehaviorOptions,
                                 selectedIndex = swipeBehaviorValues.indexOf(swipeBehavior)
@@ -921,7 +921,7 @@ fun SuperIslandSettingsPage() {
                                     }
                                 )
                             }
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_island_long_press_behavior),
                                 items = longPressBehaviorOptions,
                                 selectedIndex = longPressBehaviorValues.indexOf(longPressBehavior)
@@ -948,7 +948,7 @@ fun SuperIslandSettingsPage() {
                             .fillMaxWidth()
                     ) {
                         Column {
-                            OverlayDropdownPreference(
+                            AdaptiveOverlayDropdownPreference(
                                 title = stringResource(id = R.string.title_behavior_after_pause),
                                 items = afterPauseOptions,
                                 selectedIndex = afterPauseBehavior,
@@ -992,7 +992,7 @@ fun SuperIslandSettingsPage() {
                             )
                             AnimatedVisibility(visible = progressGlow) {
                                 Column {
-                                    OverlayDropdownPreference(
+                                    AdaptiveOverlayDropdownPreference(
                                         title = stringResource(id = R.string.title_island_progress_style),
                                         items = progressStyleOptions,
                                         selectedIndex = progressStyle,

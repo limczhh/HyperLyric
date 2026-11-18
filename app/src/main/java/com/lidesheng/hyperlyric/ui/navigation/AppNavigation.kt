@@ -1,5 +1,15 @@
 package com.lidesheng.hyperlyric.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
+import com.lidesheng.hyperlyric.ui.utils.LocalAppBackdrop
+import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -44,53 +54,58 @@ fun AppNavigation(startRoute: Route) {
     val backStack = rememberNavBackStack<Route>(startRoute)
     val navigator = remember { Navigator(backStack) }
     val systemCornerRadius = rememberNavSystemCornerRadius()
+    val backdrop = if (LocalGlassStyle.current) rememberBlurBackdrop() else null
 
-    CompositionLocalProvider(LocalNavigator provides navigator) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = { navigator.pop() },
-            effects = NavDisplayEffects(cornerClipRadius = systemCornerRadius)
-        ) {
-            entry<Route.Setup> {
-                SetupPage(onNavigateToMain = {
-                    navigator.popUpTo(Route.Setup, inclusive = true)
-                    navigator.navigate(Route.Main)
-                })
-            }
-            entry<Route.Main> { MainPage() }
+    CompositionLocalProvider(LocalNavigator provides navigator, LocalAppBackdrop provides backdrop) {
+        Scaffold(containerColor = Color.Transparent, contentWindowInsets = WindowInsets(0)) {
+            Box(Modifier.fillMaxSize().then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)) {
+                NavDisplay(
+                    backStack = backStack,
+                    onBack = { navigator.pop() },
+                    effects = NavDisplayEffects(cornerClipRadius = systemCornerRadius)
+                ) {
+                    entry<Route.Setup> {
+                        SetupPage(onNavigateToMain = {
+                            navigator.popUpTo(Route.Setup, inclusive = true)
+                            navigator.navigate(Route.Main)
+                        })
+                    }
+                    entry<Route.Main> { MainPage() }
 
-            entry<Route.Settings> { SettingsPage() }
-            entry<Route.LyricEnhancement> { LyricEnhancementPage() }
-            entry<Route.LyricEnhancementSettings> {
-                LyricEnhancementSettingsPage(it.featureId)
+                    entry<Route.Settings> { SettingsPage() }
+                    entry<Route.LyricEnhancement> { LyricEnhancementPage() }
+                    entry<Route.LyricEnhancementSettings> {
+                        LyricEnhancementSettingsPage(it.featureId)
+                    }
+                    entry<Route.AmllTtmlCache> { AmllTtmlCachePage() }
+                    entry<Route.AmllTtmlCacheDetail> { AmllTtmlCacheDetailPage(it) }
+                    entry<Route.AiTranslationCache> { AiTranslationCachePage() }
+                    entry<Route.AiTranslationCacheDetail> { AiTranslationCacheDetailPage(it) }
+                    entry<Route.HookSettings> { HookSettingsPage() }
+                    entry<Route.LyricSource> { LyricSourcePage() }
+                    entry<Route.LyricAnimation> { LyricAnimationPage() }
+                    entry<Route.LyricSettings> { LyricSettingsPage() }
+                    entry<Route.LyricDisplay> { LyricDisplayPage() }
+                    entry<Route.LyricScroll> { LyricScrollPage() }
+                    entry<Route.VerbatimLyric> { VerbatimLyricPage() }
+                    entry<Route.StatusBarLyricSettings> { StatusBarLyricSettingsPage() }
+                    entry<Route.StatusBarLyricDisplay> { LyricDisplayPage(statusBarLyrics = true) }
+                    entry<Route.SuperIslandSettings> { SuperIslandSettingsPage() }
+                    entry<Route.SuperIslandContentLayout> { ContentLayoutPage() }
+                    entry<Route.MediaCardSettings> { MediaCardSettingsPage() }
+                    entry<Route.ControlCenterMediaCardSettings> { ControlCenterMediaCardPage() }
+                    entry<Route.NotificationMediaCardSettings> { NotificationCenterMediaCardPage() }
+                    entry<Route.SuperIslandMediaCardSettings> { IslandExpandedMediaCardPage() }
+                    entry<Route.AlwaysOnDisplaySettings> { AlwaysOnDisplayPage() }
+                    entry<Route.DynamicIslandNotification> { DynamicIslandNotificationPage() }
+                    entry<Route.Log> { LogPage() }
+                    entry<Route.Licenses> { LicensesPage() }
+                    entry<Route.Poetry> { PoetryPage() }
+                    entry<Route.Help> { HelpPage() }
+                    entry<Route.Changelog> { ChangelogPage() }
+                    entry<Route.Contributors> { ContributorsPage() }
+                }
             }
-            entry<Route.AmllTtmlCache> { AmllTtmlCachePage() }
-            entry<Route.AmllTtmlCacheDetail> { AmllTtmlCacheDetailPage(it) }
-            entry<Route.AiTranslationCache> { AiTranslationCachePage() }
-            entry<Route.AiTranslationCacheDetail> { AiTranslationCacheDetailPage(it) }
-            entry<Route.HookSettings> { HookSettingsPage() }
-            entry<Route.LyricSource> { LyricSourcePage() }
-            entry<Route.LyricAnimation> { LyricAnimationPage() }
-            entry<Route.LyricSettings> { LyricSettingsPage() }
-            entry<Route.LyricDisplay> { LyricDisplayPage() }
-            entry<Route.LyricScroll> { LyricScrollPage() }
-            entry<Route.VerbatimLyric> { VerbatimLyricPage() }
-            entry<Route.StatusBarLyricSettings> { StatusBarLyricSettingsPage() }
-            entry<Route.StatusBarLyricDisplay> { LyricDisplayPage(statusBarLyrics = true) }
-            entry<Route.SuperIslandSettings> { SuperIslandSettingsPage() }
-            entry<Route.SuperIslandContentLayout> { ContentLayoutPage() }
-            entry<Route.MediaCardSettings> { MediaCardSettingsPage() }
-            entry<Route.ControlCenterMediaCardSettings> { ControlCenterMediaCardPage() }
-            entry<Route.NotificationMediaCardSettings> { NotificationCenterMediaCardPage() }
-            entry<Route.SuperIslandMediaCardSettings> { IslandExpandedMediaCardPage() }
-            entry<Route.AlwaysOnDisplaySettings> { AlwaysOnDisplayPage() }
-            entry<Route.DynamicIslandNotification> { DynamicIslandNotificationPage() }
-            entry<Route.Log> { LogPage() }
-            entry<Route.Licenses> { LicensesPage() }
-            entry<Route.Poetry> { PoetryPage() }
-            entry<Route.Help> { HelpPage() }
-            entry<Route.Changelog> { ChangelogPage() }
-            entry<Route.Contributors> { ContributorsPage() }
         }
     }
 }

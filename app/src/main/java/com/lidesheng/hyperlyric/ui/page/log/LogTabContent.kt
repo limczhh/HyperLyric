@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +38,7 @@ fun LogTabContent(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     topAppBarScrollBehavior: ScrollBehavior,
+    lazyListState: LazyListState,
     contentPadding: PaddingValues,
     copiedMsg: String,
     snackbarHostState: SnackbarHostState
@@ -68,7 +69,6 @@ fun LogTabContent(
             ),
             modifier = Modifier.fillMaxSize()
         ) {
-            val lazyListState = rememberLazyListState()
             Box {
                 LazyColumn(
                     state = lazyListState,

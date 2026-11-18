@@ -799,4 +799,8 @@
 
     <string name="open_system_settings_failed">Unable to open system settings. Please open them manually.</string>
 
+    <string name="title_ui_style">UI style</string>
+    <string name="ui_style_follow_system">Follow system</string>
+    <string name="ui_style_os3">OS 3</string>
+    <string name="ui_style_os4">OS 4</string>
 </resources>
