@@ -343,7 +343,7 @@ fun NotificationCenterMediaCardPage() {
                             }
                             AdaptiveTabRow(
                                 tabs = tabs,
-                                selectedTabIndex = pagerState.targetPage,
+                                selectedTabIndex = pagerState.currentPage,
                                 onTabSelected = { index ->
                                     coroutineScope.launch { pagerState.scrollToPage(index) }
                                 },
@@ -362,6 +362,7 @@ fun NotificationCenterMediaCardPage() {
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             HorizontalPager(
                 state = pagerState,
+                overscrollEffect = null,
                 verticalAlignment = Alignment.Top,
                 beyondViewportPageCount = 2
             ) { page ->

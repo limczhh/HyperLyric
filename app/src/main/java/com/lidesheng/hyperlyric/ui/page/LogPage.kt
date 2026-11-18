@@ -57,6 +57,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
+import com.lidesheng.hyperlyric.ui.utils.rememberNavPagerState
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -82,7 +83,8 @@ fun LogPage() {
     val tabs =
         listOf(stringResource(R.string.title_app_logs), stringResource(R.string.title_module_logs))
     val pagerState = rememberPagerState { tabs.size }
-    val isAppTab = pagerState.currentPage == 0
+    val navPagerState = rememberNavPagerState(pagerState)
+    val isAppTab = navPagerState.selectedIndex == 0
     val appListState = rememberLazyListState()
     val moduleListState = rememberLazyListState()
 
@@ -336,9 +338,9 @@ fun LogPage() {
                     bottomContent = {
                         AdaptiveTabRow(
                             tabs = tabs,
-                            selectedTabIndex = pagerState.targetPage,
+                            selectedTabIndex = navPagerState.selectedIndex,
                             onTabSelected = { index ->
-                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                navPagerState.animateToPage(index)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -354,6 +356,7 @@ fun LogPage() {
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             HorizontalPager(
                 state = pagerState,
+                overscrollEffect = null,
                 verticalAlignment = Alignment.Top,
                 beyondViewportPageCount = 1
             ) { page ->

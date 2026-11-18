@@ -68,6 +68,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
+import com.lidesheng.hyperlyric.ui.utils.rememberNavPagerState
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -155,6 +156,7 @@ fun DynamicIslandNotificationPage() {
         stringResource(R.string.title_lyric_whitelist)
     )
     val pagerState = rememberPagerState { tabs.size }
+    val navPagerState = rememberNavPagerState(pagerState)
     val coroutineScope = rememberCoroutineScope()
 
     val msgAppExists = stringResource(R.string.toast_app_exists)
@@ -376,7 +378,7 @@ fun DynamicIslandNotificationPage() {
                     color = barColor,
                     title = stringResource(R.string.title_dynamic_island_lyrics),
                     scrollBehavior = scrollBehavior,
-                    isContentScrolled = (if (pagerState.currentPage == 0) configLazyListState else whitelistLazyListState).canScrollBackward,
+                    isContentScrolled = (if (navPagerState.selectedIndex == 0) configLazyListState else whitelistLazyListState).canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -388,13 +390,9 @@ fun DynamicIslandNotificationPage() {
                     bottomContent = {
                         AdaptiveTabRow(
                             tabs = tabs,
-                            selectedTabIndex = pagerState.targetPage,
+                            selectedTabIndex = navPagerState.selectedIndex,
                             onTabSelected = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(
-                                        it
-                                    )
-                                }
+                                navPagerState.animateToPage(it)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -461,6 +459,7 @@ fun DynamicIslandNotificationPage() {
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 userScrollEnabled = true,
+                overscrollEffect = null,
                 beyondViewportPageCount = 1
             ) { page ->
                 when (page) {

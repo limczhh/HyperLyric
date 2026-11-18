@@ -40,6 +40,7 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
+import com.lidesheng.hyperlyric.ui.utils.rememberNavPagerState
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -60,6 +61,7 @@ fun HelpPage() {
         stringResource(R.string.title_dynamic_island_lyrics)
     )
     val pagerState = rememberPagerState { tabs.size }
+    val navPagerState = rememberNavPagerState(pagerState)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val onOpenDownloadLink = rememberExternalLinkOpener(snackbarHostState)
@@ -75,7 +77,7 @@ fun HelpPage() {
                     color = barColor,
                     title = stringResource(R.string.title_help),
                     scrollBehavior = topAppBarScrollBehavior,
-                    isContentScrolled = (if (pagerState.currentPage == 0) superIslandListState else dynamicIslandListState).canScrollBackward,
+                    isContentScrolled = (if (navPagerState.selectedIndex == 0) superIslandListState else dynamicIslandListState).canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -87,9 +89,9 @@ fun HelpPage() {
                     bottomContent = {
                         AdaptiveTabRow(
                             tabs = tabs,
-                            selectedTabIndex = pagerState.targetPage,
+                            selectedTabIndex = navPagerState.selectedIndex,
                             onTabSelected = { index ->
-                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                navPagerState.animateToPage(index)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -105,6 +107,7 @@ fun HelpPage() {
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             HorizontalPager(
                 state = pagerState,
+                overscrollEffect = null,
                 verticalAlignment = Alignment.Top,
                 beyondViewportPageCount = 1
             ) { page ->

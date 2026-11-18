@@ -355,6 +355,7 @@ fun IslandExpandedMediaCardPage() {
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             HorizontalPager(
                 state = pagerState,
+                overscrollEffect = null,
                 verticalAlignment = Alignment.Top,
                 beyondViewportPageCount = 2
             ) { page ->

@@ -19,6 +19,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.MutatePriority
+import kotlin.math.abs
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,6 +42,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.material.GlassShadow
 import top.yukonga.miuix.kmp.material.GlassShadows
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
@@ -473,6 +485,98 @@ fun AdaptiveTabRow(
             colors = colors,
         )
     }
+}
+
+@Stable
+class NavPagerState(
+    val pagerState: PagerState,
+    private val coroutineScope: CoroutineScope,
+) {
+    var selectedIndex by mutableIntStateOf(pagerState.currentPage)
+        private set
+
+    val selectedPage: Int
+        get() = selectedIndex
+
+    var isNavigating by mutableStateOf(false)
+        private set
+
+    private var navJob: Job? = null
+
+    fun animateToPage(targetIndex: Int) {
+        if (targetIndex == selectedIndex) return
+
+        navJob?.cancel()
+        selectedIndex = targetIndex
+        isNavigating = true
+
+        navJob = coroutineScope.launch {
+            val myJob = coroutineContext.job
+            try {
+                pagerState.scroll(MutatePriority.UserInput) {
+                    val distance = abs(targetIndex - pagerState.currentPage).coerceAtLeast(2)
+                    val duration = 100 * distance + 100
+                    val layoutInfo = pagerState.layoutInfo
+                    val pageSize = layoutInfo.pageSize + layoutInfo.pageSpacing
+                    val currentDistanceInPages =
+                        targetIndex - pagerState.currentPage - pagerState.currentPageOffsetFraction
+                    val scrollPixels = currentDistanceInPages * pageSize
+
+                    var previousValue = 0f
+                    animate(
+                        initialValue = 0f,
+                        targetValue = scrollPixels,
+                        animationSpec = tween(easing = EaseInOut, durationMillis = duration),
+                    ) { currentValue, _ ->
+                        previousValue += scrollBy(currentValue - previousValue)
+                    }
+                }
+
+                if (pagerState.currentPage != targetIndex) {
+                    pagerState.scrollToPage(targetIndex)
+                }
+            } finally {
+                if (navJob == myJob) {
+                    isNavigating = false
+                    if (pagerState.currentPage != targetIndex) {
+                        selectedIndex = pagerState.currentPage
+                    }
+                }
+            }
+        }
+    }
+
+    fun scrollToPage(targetIndex: Int) {
+        if (targetIndex == selectedIndex) return
+
+        navJob?.cancel()
+        selectedIndex = targetIndex
+        isNavigating = false
+
+        coroutineScope.launch {
+            pagerState.scrollToPage(targetIndex)
+        }
+    }
+
+    fun syncPage() {
+        if (!isNavigating && selectedIndex != pagerState.currentPage) {
+            selectedIndex = pagerState.currentPage
+        }
+    }
+}
+
+@Composable
+fun rememberNavPagerState(
+    pagerState: PagerState,
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
+): NavPagerState {
+    val state = remember(pagerState, coroutineScope) {
+        NavPagerState(pagerState, coroutineScope)
+    }
+    LaunchedEffect(pagerState.currentPage) {
+        state.syncPage()
+    }
+    return state
 }
 
 @Composable

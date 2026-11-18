@@ -70,7 +70,7 @@ import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.page.main.AboutPage
 import com.lidesheng.hyperlyric.ui.page.main.HomePage
-import com.lidesheng.hyperlyric.ui.page.main.rememberMainPagerState
+import com.lidesheng.hyperlyric.ui.utils.rememberNavPagerState
 import com.lidesheng.hyperlyric.ui.utils.QuotesData
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import com.lidesheng.hyperlyric.ui.utils.rememberExternalLinkOpener
@@ -131,10 +131,7 @@ fun MainPage() {
 
     // --- pager ---
     val pagerState = rememberPagerState(pageCount = { 2 })
-    val mainPagerState = rememberMainPagerState(pagerState)
-    LaunchedEffect(mainPagerState.pagerState.currentPage) {
-        mainPagerState.syncPage()
-    }
+    val mainPagerState = rememberNavPagerState(pagerState)
 
     // --- quote ---
     var randomQuote by rememberSaveable { mutableStateOf(QuotesData.list.random()) }
@@ -542,6 +539,7 @@ fun MainPage() {
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize().imePadding(),
+                        overscrollEffect = null,
                         beyondViewportPageCount = 1,
                         verticalAlignment = Alignment.Top,
                     ) { page ->

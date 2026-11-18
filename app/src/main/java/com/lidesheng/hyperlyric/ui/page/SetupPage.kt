@@ -172,6 +172,7 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+            overscrollEffect = null,
             userScrollEnabled = false
         ) { page ->
             when (page) {
