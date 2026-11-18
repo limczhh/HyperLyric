@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,12 +47,11 @@ import top.yukonga.miuix.kmp.glass.GlassIconDropdownMenu
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
+import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
+import top.yukonga.miuix.kmp.menu.OverlayIconCascadingDropdownMenu
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -65,7 +65,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.overlay.OverlayCascadingListPopup
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -102,7 +101,6 @@ fun LogPage() {
     var showMorePopup by remember { mutableStateOf(false) }
     val moreMenuAnchor = rememberGlassPopupAnchor()
     val glassStyle = LocalGlassStyle.current
-    var holdMorePopup by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
     val copiedMsg = stringResource(R.string.copied)
@@ -266,14 +264,29 @@ fun LogPage() {
                     ),
                     DropdownItem(
                         text = clearLabel,
-                        onClick = { showClearDialog = true }
+                        onClick = {
+                            showClearDialog = true
+                        }
                     )
                 )
             )
         )
     }
 
-    Box {
+    val activeListState = if (isAppTab) appListState else moduleListState
+    val visualContentOffset: () -> Float = remember(activeListState, topAppBarScrollBehavior) {
+        {
+            if (activeListState.firstVisibleItemIndex > 0) {
+                -1000f
+            } else if (activeListState.firstVisibleItemScrollOffset > 0) {
+                -activeListState.firstVisibleItemScrollOffset.toFloat() + topAppBarScrollBehavior.state.overscrollOffset
+            } else {
+                topAppBarScrollBehavior.state.overscrollOffset
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
@@ -282,7 +295,8 @@ fun LogPage() {
                     color = barColor,
                     title = stringResource(R.string.title_view_logs),
                     scrollBehavior = topAppBarScrollBehavior,
-                    isContentScrolled = (if (isAppTab) appListState else moduleListState).canScrollBackward,
+                    isContentScrolled = activeListState.canScrollBackward,
+                    visualContentOffset = visualContentOffset,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -292,30 +306,29 @@ fun LogPage() {
                         }
                     },
                     actions = {
-                        Box {
-                            if (glassStyle) {
-                                GlassIconButton(
-                                    onClick = { showMorePopup = true },
-                                    modifier = Modifier.glassPopupAnchor(moreMenuAnchor, 20.dp),
-                                    backdrop = backdrop,
-                                ) {
-                                    Icon(imageVector = MiuixIcons.More,
-                                        contentDescription = stringResource(R.string.more),
-                                        modifier = Modifier.glassPopupAnchorContent(moreMenuAnchor))
-                                }
-                            } else {
-                                IconButton(
-                                    onClick = { holdMorePopup = true; showMorePopup = true },
-                                    holdDownState = holdMorePopup,
-                                ) {
-                                    Icon(imageVector = MiuixIcons.More, contentDescription = stringResource(R.string.more))
-                                }
-                                OverlayCascadingListPopup(
-                                    show = showMorePopup, entries = logEntries,
-                                    alignment = PopupPositionProvider.Align.TopEnd,
-                                    popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                    onDismissRequest = { showMorePopup = false },
-                                    onDismissFinished = { if (!showMorePopup) holdMorePopup = false },
+                        if (glassStyle) {
+                            GlassIconButton(
+                                onClick = { showMorePopup = !showMorePopup },
+                                modifier = Modifier.glassPopupAnchor(
+                                    anchor = moreMenuAnchor,
+                                    cornerRadius = GlassTopAppBarDefaults.ButtonSize / 2,
+                                    floating = true,
+                                ),
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.More,
+                                    contentDescription = stringResource(R.string.more),
+                                    modifier = Modifier.glassPopupAnchorContent(moreMenuAnchor),
+                                )
+                            }
+                        } else {
+                            OverlayIconCascadingDropdownMenu(
+                                entries = logEntries,
+                                collapseOnSelection = true,
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.More,
+                                    contentDescription = stringResource(R.string.more),
                                 )
                             }
                         }
@@ -372,9 +385,15 @@ fun LogPage() {
             show = showMorePopup,
             onDismissRequest = { showMorePopup = false },
             anchor = moreMenuAnchor,
-            anchorContent = { Icon(imageVector = MiuixIcons.More, contentDescription = stringResource(R.string.more)) },
+            anchorContent = {
+                Icon(
+                    imageVector = MiuixIcons.More,
+                    contentDescription = null,
+                )
+            },
             entries = logEntries,
             backdrop = backdrop,
+            collapseOnSelection = true,
         )
     }
     }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -24,6 +25,7 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 val LocalAppDarkTheme = staticCompositionLocalOf { false }
 val LocalGlassStyle = staticCompositionLocalOf { false }
 val LocalUiStyle = staticCompositionLocalOf { UIConstants.DEFAULT_UI_STYLE }
+val LocalBlurEnabled = staticCompositionLocalOf { true }
 
 object ThemeUtils {
 
@@ -53,6 +55,9 @@ object ThemeUtils {
         var uiStyle by remember {
             mutableIntStateOf(prefs.getInt(UIConstants.KEY_UI_STYLE, UIConstants.DEFAULT_UI_STYLE))
         }
+        var blurEnabled by remember {
+            mutableStateOf(prefs.getBoolean(UIConstants.KEY_ENABLE_BLUR, UIConstants.DEFAULT_ENABLE_BLUR))
+        }
         val systemIsOs4 = remember {
             val version = runCatching {
                 Runtime.getRuntime().exec("getprop ro.build.version.incremental")
@@ -71,6 +76,9 @@ object ThemeUtils {
                 if (key == UIConstants.KEY_MONET_COLOR) {
                     monetColorIndex =
                         p.getInt(UIConstants.KEY_MONET_COLOR, UIConstants.DEFAULT_MONET_COLOR)
+                }
+                if (key == UIConstants.KEY_ENABLE_BLUR) {
+                    blurEnabled = p.getBoolean(UIConstants.KEY_ENABLE_BLUR, UIConstants.DEFAULT_ENABLE_BLUR)
                 }
             }
         }
@@ -142,6 +150,7 @@ object ThemeUtils {
                 LocalAppDarkTheme provides isDark,
                 LocalGlassStyle provides glassStyle,
                 LocalUiStyle provides uiStyle.coerceIn(UIConstants.UI_STYLE_FOLLOW_SYSTEM, UIConstants.UI_STYLE_OS4),
+                LocalBlurEnabled provides blurEnabled,
             ) { content() }
         }
     }

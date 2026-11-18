@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
+import com.lidesheng.hyperlyric.ui.utils.LocalBlurEnabled
 import com.lidesheng.hyperlyric.ui.utils.LocalAppBackdrop
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import androidx.compose.runtime.Composable
@@ -54,7 +55,8 @@ fun AppNavigation(startRoute: Route) {
     val backStack = rememberNavBackStack<Route>(startRoute)
     val navigator = remember { Navigator(backStack) }
     val systemCornerRadius = rememberNavSystemCornerRadius()
-    val backdrop = if (LocalGlassStyle.current) rememberBlurBackdrop() else null
+    val blurEnabled = LocalBlurEnabled.current
+    val backdrop = if (blurEnabled) rememberBlurBackdrop() else null
 
     CompositionLocalProvider(LocalNavigator provides navigator, LocalAppBackdrop provides backdrop) {
         Scaffold(containerColor = Color.Transparent, contentWindowInsets = WindowInsets(0)) {

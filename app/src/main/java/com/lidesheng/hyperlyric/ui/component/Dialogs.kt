@@ -46,7 +46,9 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.glass.glassDialogSurface
 import top.yukonga.miuix.kmp.glass.GlassDialogDefaults
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
+import com.lidesheng.hyperlyric.ui.utils.LocalBlurEnabled
 import com.lidesheng.hyperlyric.ui.utils.LocalAppBackdrop
+import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 
 
 private val LocalGlassDialog = staticCompositionLocalOf { false }
@@ -63,6 +65,7 @@ fun AdaptiveDialog(
 ) {
     val glassStyle = LocalGlassStyle.current
     val backdrop = LocalAppBackdrop.current
+    val isBlurActive = LocalBlurEnabled.current && isRuntimeShaderSupported() && backdrop != null
     OverlayDialog(
         show = show,
         title = title,
@@ -71,7 +74,7 @@ fun AdaptiveDialog(
         dimColor = if (glassStyle) GlassDialogDefaults.ScrimColor else MiuixTheme.colorScheme.windowDimming,
         onDismissRequest = onDismissRequest,
         onDismissFinished = onDismissFinished,
-        surface = if (glassStyle) glassDialogSurface(backdrop = backdrop) else null,
+        surface = if (glassStyle) glassDialogSurface(backdrop = if (isBlurActive) backdrop else null) else null,
     ) {
         CompositionLocalProvider(LocalGlassDialog provides glassStyle) {
             content()

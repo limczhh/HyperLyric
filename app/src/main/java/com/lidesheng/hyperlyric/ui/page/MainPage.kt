@@ -374,7 +374,8 @@ fun MainPage() {
             val bottomBarMargin = maxOf(20.dp, navigationBarInset + 4.dp)
             val surfaceColor = MiuixTheme.colorScheme.surface
             val gradientBrush = rememberAdaptiveBottomBarBandBrush()
-            val totalMaskHeight = GlassNavigationBarDefaults.Height + bottomBarMargin
+            val shadowOverhang = 16.dp
+            val totalMaskHeight = GlassNavigationBarDefaults.Height + bottomBarMargin + shadowOverhang
             AnimatedVisibility(
                 visible = !isWideScreen && glassStyle,
                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),

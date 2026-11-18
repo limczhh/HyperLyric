@@ -37,15 +37,17 @@ data class SearchStatus(
     fun TopAppBarAnim(
         modifier: Modifier = Modifier,
         visible: Boolean = shouldCollapsed(),
-        backgroundColor: Color = colorScheme.surface,
+        backgroundColor: Color = Color.Transparent,
         content: @Composable () -> Unit
     ) {
         Box(modifier = modifier) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(backgroundColor)
-            )
+            if (backgroundColor != Color.Transparent) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(backgroundColor)
+                )
+            }
             Box(
                 modifier = Modifier
                     .graphicsLayer { alpha = if (visible) 1f else 0f }

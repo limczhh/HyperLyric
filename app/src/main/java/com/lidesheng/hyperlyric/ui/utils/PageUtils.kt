@@ -65,6 +65,8 @@ import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.glass.GlassFloatingActionButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -174,18 +176,21 @@ private val LocalBarBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 private val LocalInGlassBar = staticCompositionLocalOf { false }
 private val LocalBarScrollBehavior = staticCompositionLocalOf<ScrollBehavior?> { null }
 private val LocalBarContentScrolled = staticCompositionLocalOf { false }
+private val LocalBarVisualContentOffset = staticCompositionLocalOf<(() -> Float)?> { null }
 
 @Composable
 fun BlurredBar(
-    backdrop: LayerBackdrop?,
-    blurEnabled: Boolean,
+    backdrop: LayerBackdrop? = null,
+    blurEnabled: Boolean = LocalBlurEnabled.current,
     content: @Composable () -> Unit,
 ) {
+    val actualBackdrop = backdrop ?: LocalBarBackdrop.current ?: LocalAppBackdrop.current
+    val actualBlurEnabled = blurEnabled && LocalBlurEnabled.current
     Box {
-        if (!LocalGlassStyle.current && blurEnabled && backdrop != null) {
+        if (!LocalGlassStyle.current && actualBlurEnabled && actualBackdrop != null) {
             Box(
                 modifier = Modifier.matchParentSize().textureBlur(
-                    backdrop = backdrop,
+                    backdrop = actualBackdrop,
                     shape = RectangleShape,
                     blurRadius = 25f,
                     colors = BlurColors(
@@ -196,7 +201,7 @@ fun BlurredBar(
                 ),
             )
         }
-        CompositionLocalProvider(LocalBarBackdrop provides backdrop) { content() }
+        CompositionLocalProvider(LocalBarBackdrop provides actualBackdrop) { content() }
     }
 }
 
@@ -237,40 +242,60 @@ fun rememberAdaptiveBottomBarBandBrush(): Brush {
 @Composable
 fun AdaptiveTopAppBar(
     title: String,
-    color: Color = MiuixTheme.colorScheme.surface,
+    color: Color = Color.Unspecified,
     scrollBehavior: ScrollBehavior? = null,
     isContentScrolled: Boolean? = null,
+    visualContentOffset: (() -> Float)? = null,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     bottomContent: @Composable () -> Unit = {},
 ) {
     val wide = isWideAppWindow()
     val inset = Modifier.windowInsetsPadding(WindowInsets.captionBar.only(WindowInsetsSides.Top))
+    val contentScrolled = isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < 0f)
+    val resolvedVisualContentOffset = visualContentOffset ?: if (!contentScrolled) {
+        if (scrollBehavior != null && scrollBehavior.state.overscrollOffset != 0f) {
+            { scrollBehavior.state.overscrollOffset }
+        } else {
+            { 0f }
+        }
+    } else null
+
     if (LocalGlassStyle.current) {
-        val backdrop = LocalBarBackdrop.current
-        val contentScrolled = isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < 0f)
+        val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
+        val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
+        val backdrop = if (isBlurActive) rawBackdrop else null
         GlassTopAppBar(
             title = title,
             isContentScrolled = contentScrolled,
             modifier = inset,
             expandable = !wide,
-            progressiveBlur = (backdrop != null),
+            progressiveBlur = isBlurActive,
             backdrop = backdrop,
             scrollBehavior = scrollBehavior,
+            visualContentOffset = resolvedVisualContentOffset,
             navigationIcon = { CompositionLocalProvider(LocalInGlassBar provides true) { navigationIcon() } },
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
             bottomContent = { CompositionLocalProvider(
                 LocalBarBackdrop provides backdrop,
                 LocalBarScrollBehavior provides scrollBehavior,
                 LocalBarContentScrolled provides contentScrolled,
+                LocalBarVisualContentOffset provides resolvedVisualContentOffset,
             ) { bottomContent() } },
         )
     } else {
+        val resolvedColor = if (color != Color.Unspecified) {
+            color
+        } else if (LocalBlurEnabled.current && (LocalBarBackdrop.current ?: LocalAppBackdrop.current) != null) {
+            Color.Transparent
+        } else {
+            MiuixTheme.colorScheme.surface
+        }
         TopAppBar(
             title = title,
             modifier = inset,
             expandable = !wide,
-            color = color,
+            color = resolvedColor,
             scrollBehavior = scrollBehavior,
             navigationIcon = navigationIcon,
             actions = actions,
@@ -294,9 +319,11 @@ fun AdaptiveSmallTopAppBar(
     isContentScrolled: Boolean? = null,
     defaultWindowInsetsPadding: Boolean = true,
 ) {
+    val contentScrolled = isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < 0f)
     if (LocalGlassStyle.current) {
-        val backdrop = LocalBarBackdrop.current
-        val contentScrolled = isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < 0f)
+        val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
+        val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
+        val backdrop = if (isBlurActive) rawBackdrop else null
         val resolvedTitleAlpha: () -> Float = if (titleAlpha != null) {
             titleAlpha
         } else if (titleColor != Color.Unspecified && titleColor.alpha < 1f) {
@@ -311,7 +338,7 @@ fun AdaptiveSmallTopAppBar(
             isContentScrolled = contentScrolled,
             backdrop = backdrop,
             scrollBehavior = scrollBehavior,
-            progressiveBlur = (backdrop != null),
+            progressiveBlur = isBlurActive,
             titleAlpha = resolvedTitleAlpha,
             backgroundAlpha = { if (!contentScrolled) 0f else 1f },
             defaultWindowInsetsPadding = defaultWindowInsetsPadding,
@@ -319,10 +346,17 @@ fun AdaptiveSmallTopAppBar(
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
         )
     } else {
+        val resolvedColor = if (color != Color.Transparent) {
+            color
+        } else if (LocalBlurEnabled.current && (LocalBarBackdrop.current ?: LocalAppBackdrop.current) != null) {
+            Color.Transparent
+        } else {
+            MiuixTheme.colorScheme.surface
+        }
         top.yukonga.miuix.kmp.basic.SmallTopAppBar(
             title = title,
             modifier = modifier,
-            color = color,
+            color = resolvedColor,
             titleColor = if (titleColor != Color.Unspecified) titleColor else MiuixTheme.colorScheme.onSurface,
             subtitle = subtitle,
             subtitleColor = if (subtitleColor != Color.Unspecified) subtitleColor else MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -384,7 +418,8 @@ fun AdaptiveTabRow(
 ) {
     if (LocalGlassStyle.current) {
         val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
-        val backdrop = rawBackdrop ?: NoOpBackdrop
+        val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
+        val backdrop = if (isBlurActive) rawBackdrop else NoOpBackdrop
         val inBar = LocalInGlassBar.current || LocalBarScrollBehavior.current != null
         val contentScrolled = LocalBarContentScrolled.current
         val scrollBehavior = LocalBarScrollBehavior.current
@@ -395,7 +430,7 @@ fun AdaptiveTabRow(
             transitionSpec = { GlassMotion.topBarButtonFloat() },
             label = "adaptiveTabRowMaterial",
         ) { if (it) 1f else 0f }
-        val ramp = GlassTopAppBarDefaults.collapseRamp(scrollBehavior)
+        val ramp = GlassTopAppBarDefaults.collapseRamp(scrollBehavior, LocalBarVisualContentOffset.current)
         val materialProgress by remember(scrolledMaterialProgress, scrollBehavior, ramp) {
             derivedStateOf {
                 val elasticProgress = if (scrollBehavior != null && scrollBehavior.state.overscrollOffset != 0f) {
@@ -406,7 +441,13 @@ fun AdaptiveTabRow(
                 maxOf(scrolledMaterialProgress.value, elasticProgress)
             }
         }
-        val surfaceAlpha = if (inBar) materialProgress else 1f
+        val surfaceAlpha = if (!isBlurActive) {
+            0f
+        } else if (inBar) {
+            materialProgress
+        } else {
+            1f
+        }
 
         GlassSegmentedTabRow(
             tabs = tabs,
@@ -442,6 +483,7 @@ fun AdaptiveBottomSheet(
 ) {
     val glassStyle = LocalGlassStyle.current
     val backdrop = LocalAppBackdrop.current
+    val isBlurActive = LocalBlurEnabled.current && isRuntimeShaderSupported() && backdrop != null
     OverlayBottomSheet(
         show = show,
         title = title,
@@ -452,7 +494,7 @@ fun AdaptiveBottomSheet(
         endAction = endAction,
         onDismissRequest = onDismissRequest,
         onDismissFinished = onDismissFinished,
-        surface = if (glassStyle) glassBottomSheetSurface(backdrop = backdrop) else null,
+        surface = if (glassStyle) glassBottomSheetSurface(backdrop = if (isBlurActive) backdrop else null) else null,
         content = content,
     )
 }
@@ -521,5 +563,34 @@ fun AdaptiveOverlayDropdownPreference(
             onExpandedChange = onExpandedChange,
             onSelectedIndexChange = onSelectedIndexChange,
         )
+    }
+}
+
+/** One floating action button, switching between glass and ordinary style. */
+@Composable
+fun AdaptiveFloatingActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    backdrop: Backdrop? = LocalAppBackdrop.current,
+    contentColor: Color = Color.White,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(top.yukonga.miuix.kmp.theme.LocalContentColor provides contentColor) {
+        if (LocalGlassStyle.current) {
+            val rawBackdrop = backdrop ?: LocalAppBackdrop.current
+            val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
+            GlassFloatingActionButton(
+                onClick = onClick,
+                modifier = modifier,
+                backdrop = if (isBlurActive) rawBackdrop else null,
+                content = content,
+            )
+        } else {
+            FloatingActionButton(
+                onClick = onClick,
+                modifier = modifier,
+                content = content,
+            )
+        }
     }
 }

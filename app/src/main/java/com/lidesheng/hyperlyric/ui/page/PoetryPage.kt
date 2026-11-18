@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,7 +40,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lidesheng.hyperlyric.R
@@ -57,12 +54,11 @@ import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.FloatingActionButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveFloatingActionButton
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.basic.VerticalScrollBar
@@ -71,6 +67,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
+import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -102,7 +99,8 @@ fun PoetryPage() {
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val glassStyle = LocalGlassStyle.current
+    val barColor = if (glassStyle || blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
         topBar = {
@@ -112,6 +110,7 @@ fun PoetryPage() {
                         color = barColor,
                         title = "HyperLyric",
                         scrollBehavior = topAppBarScrollBehavior,
+                        isContentScrolled = listState.canScrollBackward,
                         navigationIcon = {
                             AdaptiveIconButton(onClick = { navigator.pop() }) {
                                 Icon(
@@ -150,34 +149,20 @@ fun PoetryPage() {
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MiuixTheme.colorScheme.primary,
-                    shadowElevation = FloatingActionButtonDefaults.ShadowElevation,
+                AdaptiveFloatingActionButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    backdrop = backdrop,
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .defaultMinSize(
-                                minWidth = FloatingActionButtonDefaults.MinWidth,
-                                minHeight = FloatingActionButtonDefaults.MinHeight,
-                            )
-                            .clickable(
-                                role = Role.Button,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(0)
-                                    }
-                                },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = MiuixIcons.Back,
-                            contentDescription = stringResource(R.string.back_to_top),
-                            modifier = Modifier.rotate(90f),
-                            tint = Color.White
-                        )
-                    }
+                    Icon(
+                        imageVector = MiuixIcons.Back,
+                        contentDescription = stringResource(R.string.back_to_top),
+                        modifier = Modifier.rotate(90f),
+                        tint = Color.White,
+                    )
                 }
             }
         },
