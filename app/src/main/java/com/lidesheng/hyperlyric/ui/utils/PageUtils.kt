@@ -268,12 +268,21 @@ fun AdaptiveTopAppBar(
     bottomContent: @Composable () -> Unit = {},
 ) {
     val wide = isWideAppWindow()
-    val contentScrolled = isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < 0f)
-    val resolvedVisualContentOffset = visualContentOffset ?: if (!contentScrolled) {
-        if (scrollBehavior != null && scrollBehavior.state.overscrollOffset != 0f) {
-            { scrollBehavior.state.overscrollOffset }
-        } else {
-            { 0f }
+    val contentScrolled by remember(scrollBehavior, isContentScrolled) {
+        derivedStateOf {
+            isContentScrolled ?: (scrollBehavior?.state?.let {
+                it.contentOffset < 0f || it.overscrollOffset > 0f
+            } ?: false)
+        }
+    }
+    val resolvedVisualContentOffset = visualContentOffset ?: if (scrollBehavior != null) {
+        {
+            val state = scrollBehavior.state
+            if (state.overscrollOffset > 0f && state.contentOffset >= 0f) {
+                -state.overscrollOffset
+            } else {
+                state.visualContentOffset
+            }
         }
     } else null
 
@@ -281,6 +290,15 @@ fun AdaptiveTopAppBar(
         val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
         val backdrop = if (isBlurActive) rawBackdrop else null
+        val surfaceColor = MiuixTheme.colorScheme.surface
+        val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
+        val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive) {
+            { 1f }
+        } else if (scrollBehavior != null || resolvedVisualContentOffset != null) {
+            { 1f }
+        } else {
+            { if (!contentScrolled) 0f else 1f }
+        }
         GlassTopAppBar(
             title = title,
             isContentScrolled = contentScrolled,
@@ -290,8 +308,10 @@ fun AdaptiveTopAppBar(
             backdrop = backdrop,
             scrollBehavior = scrollBehavior,
             visualContentOffset = resolvedVisualContentOffset,
-            backgroundAlpha = { if (!isBlurActive) 1f else if (!contentScrolled) 0f else 1f },
-            fill = if (!isBlurActive) MiuixTheme.colorScheme.surface else GlassTopAppBarDefaults.buttonFill(),
+            backgroundAlpha = resolvedBackgroundAlpha,
+            bandBrush = bandBrush,
+            bandOverhang = GlassTopAppBarDefaults.BandOverhang,
+            fill = if (!isBlurActive) surfaceColor else GlassTopAppBarDefaults.buttonFill(),
             navigationIcon = { CompositionLocalProvider(LocalInGlassBar provides true) { navigationIcon() } },
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
             bottomContent = { CompositionLocalProvider(
@@ -337,17 +357,42 @@ fun AdaptiveSmallTopAppBar(
     isContentScrolled: Boolean? = null,
     defaultWindowInsetsPadding: Boolean = true,
 ) {
-    val contentScrolled = isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < 0f)
+    val contentScrolled by remember(scrollBehavior, isContentScrolled) {
+        derivedStateOf {
+            isContentScrolled ?: (scrollBehavior?.state?.let {
+                it.contentOffset < 0f || it.overscrollOffset > 0f
+            } ?: false)
+        }
+    }
+    val resolvedVisualContentOffset: (() -> Float)? = if (scrollBehavior != null) {
+        {
+            val state = scrollBehavior.state
+            if (state.overscrollOffset > 0f && state.contentOffset >= 0f) {
+                -state.overscrollOffset
+            } else {
+                state.visualContentOffset
+            }
+        }
+    } else null
     if (LocalGlassStyle.current) {
         val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
         val backdrop = if (isBlurActive) rawBackdrop else null
+        val surfaceColor = MiuixTheme.colorScheme.surface
+        val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
         val resolvedTitleAlpha: () -> Float = if (titleAlpha != null) {
             titleAlpha
         } else if (titleColor != Color.Unspecified && titleColor.alpha < 1f) {
             { titleColor.alpha }
         } else {
             { 1f }
+        }
+        val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive) {
+            { 1f }
+        } else if (scrollBehavior != null) {
+            { 1f }
+        } else {
+            { if (!contentScrolled) 0f else 1f }
         }
         GlassTopAppBar(
             title = title,
@@ -356,10 +401,13 @@ fun AdaptiveSmallTopAppBar(
             isContentScrolled = contentScrolled,
             backdrop = backdrop,
             scrollBehavior = scrollBehavior,
+            visualContentOffset = resolvedVisualContentOffset,
             progressiveBlur = isBlurActive,
             titleAlpha = resolvedTitleAlpha,
-            backgroundAlpha = { if (!isBlurActive) 1f else if (!contentScrolled) 0f else 1f },
-            fill = if (!isBlurActive) MiuixTheme.colorScheme.surface else GlassTopAppBarDefaults.buttonFill(),
+            backgroundAlpha = resolvedBackgroundAlpha,
+            bandBrush = bandBrush,
+            bandOverhang = GlassTopAppBarDefaults.BandOverhang,
+            fill = if (!isBlurActive) surfaceColor else GlassTopAppBarDefaults.buttonFill(),
             defaultWindowInsetsPadding = defaultWindowInsetsPadding,
             navigationIcon = { CompositionLocalProvider(LocalInGlassBar provides true) { navigationIcon() } },
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
