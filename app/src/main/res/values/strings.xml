@@ -622,13 +622,10 @@
     <string name="copied">已复制到剪贴板</string>
 
     <!-- Help Page -->
-    <string name="title_help_usage_tips">使用提示</string>
     <string name="title_help_config_steps">配置流程</string>
-    <string name="title_help_warm_tips">温馨提示</string>
     <string name="summary_help_dynamic_island_hint">读取音乐软件输出的 MediaSession 元数据，并通过实时通知或小米焦点通知显示歌词</string>
     <string name="summary_help_focus_whitelist_hint">焦点通知可能受到系统白名单限制，可使用 HyperLyric 提供的白名单解除功能</string>
-    <string name="summary_help_dynamic_island_steps">1、在 HyperLyric 应用内启用通知型灵动岛歌词\n2、授予通知监听和发送通知权限，并将音乐软件加入歌词白名单\n3、让音乐软件输出歌词元数据；“车载蓝牙歌词”只是部分软件提供元数据的方式，不一定需要开启或连接蓝牙设备\n4、如果 HyperLyric 被限制后台运行，请授予自启动或后台运行权限</string>
-    <string name="summary_help_salt_player">已支持 Salt Player，更多应用等你发现...</string>
+    <string name="summary_help_dynamic_island_steps">1、让音乐软件输出歌词元数据；“车载蓝牙歌词”只是部分软件提供元数据的方式，不一定需要开启或连接蓝牙设备\n2、如果 HyperLyric 被限制后台运行，请授予自启动或后台运行权限</string>
 
     <!-- Super Island Help -->
     <string name="summary_help_supported_devices">仅支持已安装 LSPosed v2.0+ 的 HyperOS 3 设备</string>

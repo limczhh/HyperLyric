@@ -11,7 +11,6 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -85,7 +84,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Help
 import top.yukonga.miuix.kmp.icon.extended.Ok
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
@@ -819,12 +817,12 @@ fun DynamicIslandNotificationPage() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.End
+                    .padding(top = 12.dp)
             ) {
                 AdaptiveDialogButton(
                     text = stringResource(R.string.close),
-                    onClick = { showHelpDialog = false }
+                    onClick = { showHelpDialog = false },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -915,13 +913,9 @@ fun DynamicIslandNotificationPage() {
 }
 
 private fun LazyListScope.dynamicIslandHelpSections() {
-    item(key = "dynamic_island_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_usage_tips))
-    }
     item(key = "dynamic_island_tips_content") {
         Card(
             modifier = Modifier
-                .padding(horizontal = 12.dp)
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
@@ -930,33 +924,11 @@ private fun LazyListScope.dynamicIslandHelpSections() {
                     title = stringResource(R.string.summary_help_dynamic_island_hint),
                     summary = stringResource(R.string.summary_help_focus_whitelist_hint)
                 )
+                BasicComponent(
+                    title = stringResource(R.string.title_help_config_steps),
+                    summary = stringResource(R.string.summary_help_dynamic_island_steps)
+                )
             }
-        }
-    }
-    item(key = "dynamic_island_steps_title") {
-        SmallTitle(text = stringResource(R.string.title_help_config_steps))
-    }
-    item(key = "dynamic_island_steps_content") {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            Column { BasicComponent(summary = stringResource(R.string.summary_help_dynamic_island_steps)) }
-        }
-    }
-    item(key = "dynamic_island_warm_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_warm_tips))
-    }
-    item(key = "dynamic_island_warm_tips_content") {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            Column { BasicComponent(summary = stringResource(R.string.summary_help_salt_player)) }
         }
     }
 }

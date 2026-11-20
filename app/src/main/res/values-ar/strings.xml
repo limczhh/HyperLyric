@@ -482,13 +482,10 @@
   <string name="all">الكل</string>
   <string name="close">إغلاق</string>
   <string name="copied">تم النسخ للحافظة</string>
-  <string name="title_help_usage_tips">نصائح الاستخدام</string>
   <string name="title_help_config_steps">خطوات الإعداد</string>
-  <string name="title_help_warm_tips">ملاحظات مهمة</string>
   <string name="summary_help_dynamic_island_hint">بيقرا البيانات الوصفية لـ MediaSession اللي بيصدرها تطبيق الموسيقى وبيعرض الكلمات عبر الإشعارات الفورية أو بؤرة شاومي</string>
   <string name="summary_help_focus_whitelist_hint">إشعارات البؤرة ممكن تكون مقيّدة بقائمة سماح للنظام؛ HyperLyric بيوفّر تجاوز لقائمة السماح دي</string>
-  <string name="summary_help_dynamic_island_steps">1. شغّل كلمات الجزيرة الديناميكية عبر الإشعارات في تطبيق HyperLyric\n2. امنح إذن الوصول للإشعارات وإذن إرسال الإشعارات، بعدين ضيف تطبيق الموسيقى لقائمة سماح الكلمات\n3. خلّي تطبيق الموسيقى يصدر بيانات الكلمات؛ ميزة كلمات البلوتوث في العربية هي طريقة واحدة بس ممكنة، مش كل تطبيق محتاج الميزة دي أو اتصال بلوتوث\n4. لو النظام بيقيّد HyperLyric في الخلفية، امنحه إذن التشغيل التلقائي أو العمل في الخلفية</string>
-  <string name="summary_help_salt_player">تطبيق Salt Player مدعوم، والمزيد من التطبيقات جاي قريب…</string>
+  <string name="summary_help_dynamic_island_steps">1. خلّي تطبيق الموسيقى يصدر بيانات الكلمات؛ ميزة كلمات البلوتوث في العربية هي طريقة واحدة بس ممكنة، مش كل تطبيق محتاج الميزة دي أو اتصال بلوتوث\n2. لو النظام بيقيّد HyperLyric في الخلفية، امنحه إذن التشغيل التلقائي أو العمل في الخلفية</string>
   <string name="summary_help_supported_devices">مدعوم بس على أجهزة HyperOS 3 اللي عليها LSPosed v2.0 أو أحدث</string>
   <string name="summary_help_prerequisites">① فعّل HyperLyric في LSPosed، بعدين شغّل \"كلمات Xiaomi HyperIsland\" في التطبيق\n② اختار مصدر الكلمات وحمّل وفعّل الاعتماديات المطلوبة\n③ اختار تطبيق الموسيقى في LSPosed\n④ أعد تشغيل واجهة النظام أو الهاتف أو تطبيق الموسيقى حسب متطلبات المصدر</string>
   <string name="title_help_lyric_sources">مصادر الكلمات</string>

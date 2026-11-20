@@ -614,13 +614,10 @@
     <string name="copied">Copied to clipboard</string>
 
     <!-- Help Page -->
-    <string name="title_help_usage_tips">Usage Tips</string>
     <string name="title_help_config_steps">Configuration Steps</string>
-    <string name="title_help_warm_tips">Warm Tips</string>
     <string name="summary_help_dynamic_island_hint">Reads MediaSession metadata output by the music app and displays lyrics through real-time or Xiaomi focus notifications.</string>
     <string name="summary_help_focus_whitelist_hint">Focus notifications may be restricted by a system allowlist; HyperLyric provides an allowlist bypass.</string>
-    <string name="summary_help_dynamic_island_steps">1. Turn on Notification Dynamic Island Lyrics in the HyperLyric app\n2. Grant notification listener and post notification permissions, then add the music app to the lyric whitelist\n3. Make the music app output lyric metadata; the car Bluetooth lyrics feature is only one possible method, and not every app requires that feature or a Bluetooth connection\n4. If the system restricts HyperLyric in the background, grant autostart or background-running permission</string>
-    <string name="summary_help_salt_player">Salt Player is supported, more apps coming soon…</string>
+    <string name="summary_help_dynamic_island_steps">1. Make the music app output lyric metadata; the car Bluetooth lyrics feature is only one possible method, and not every app requires that feature or a Bluetooth connection\n2. If the system restricts HyperLyric in the background, grant autostart or background-running permission</string>
 
     <!-- Super Island Help -->
     <string name="summary_help_supported_devices">Only supports HyperOS 3 devices with LSPosed v2.0+ installed</string>
