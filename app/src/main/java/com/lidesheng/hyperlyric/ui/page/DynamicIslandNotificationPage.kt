@@ -11,6 +11,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.app.NotificationManagerCompat
@@ -65,7 +67,7 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Text
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
@@ -817,7 +819,6 @@ fun DynamicIslandNotificationPage() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp)
             ) {
                 AdaptiveDialogButton(
                     text = stringResource(R.string.close),
@@ -913,20 +914,37 @@ fun DynamicIslandNotificationPage() {
 }
 
 private fun LazyListScope.dynamicIslandHelpSections() {
-    item(key = "dynamic_island_tips_content") {
+    item(key = "dynamic_island_help_content") {
         Card(
             modifier = Modifier
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
         ) {
-            Column {
-                BasicComponent(
-                    title = stringResource(R.string.summary_help_dynamic_island_hint),
-                    summary = stringResource(R.string.summary_help_focus_whitelist_hint)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.summary_help_dynamic_island_hint),
+                    style = MiuixTheme.textStyles.headline1.copy(fontWeight = FontWeight.Medium),
+                    color = MiuixTheme.colorScheme.onSurface
                 )
-                BasicComponent(
-                    title = stringResource(R.string.title_help_config_steps),
-                    summary = stringResource(R.string.summary_help_dynamic_island_steps)
+                Text(
+                    text = stringResource(R.string.summary_help_focus_whitelist_hint),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Text(
+                    text = stringResource(R.string.summary_help_dynamic_island_step_metadata),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Text(
+                    text = stringResource(R.string.summary_help_dynamic_island_step_background),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
         }
