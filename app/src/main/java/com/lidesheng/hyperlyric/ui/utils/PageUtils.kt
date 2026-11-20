@@ -259,6 +259,7 @@ fun rememberAdaptiveBottomBarBandBrush(): Brush {
 fun AdaptiveTopAppBar(
     title: String,
     modifier: Modifier = Modifier,
+    contentModifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
     scrollBehavior: ScrollBehavior? = null,
     isContentScrolled: Boolean? = null,
@@ -270,9 +271,9 @@ fun AdaptiveTopAppBar(
     val wide = isWideAppWindow()
     val contentScrolled by remember(scrollBehavior, isContentScrolled) {
         derivedStateOf {
-            isContentScrolled ?: (scrollBehavior?.state?.let {
-                it.contentOffset < 0f || it.overscrollOffset > 0f
-            } ?: false)
+            val overscrolled = scrollBehavior?.state?.overscrollOffset?.let { it > 0f } == true
+            (isContentScrolled ?: (scrollBehavior?.state?.contentOffset?.let { it < 0f } == true)) ||
+                overscrolled
         }
     }
     val resolvedVisualContentOffset = visualContentOffset ?: if (scrollBehavior != null) {
@@ -303,6 +304,7 @@ fun AdaptiveTopAppBar(
             title = title,
             isContentScrolled = contentScrolled,
             modifier = modifier,
+            contentModifier = contentModifier,
             expandable = !wide,
             progressiveBlur = isBlurActive,
             backdrop = backdrop,
@@ -331,7 +333,7 @@ fun AdaptiveTopAppBar(
         }
         TopAppBar(
             title = title,
-            modifier = modifier,
+            modifier = modifier.then(contentModifier),
             expandable = !wide,
             color = resolvedColor,
             scrollBehavior = scrollBehavior,
@@ -359,9 +361,9 @@ fun AdaptiveSmallTopAppBar(
 ) {
     val contentScrolled by remember(scrollBehavior, isContentScrolled) {
         derivedStateOf {
-            isContentScrolled ?: (scrollBehavior?.state?.let {
-                it.contentOffset < 0f || it.overscrollOffset > 0f
-            } ?: false)
+            val overscrolled = scrollBehavior?.state?.overscrollOffset?.let { it > 0f } == true
+            (isContentScrolled ?: (scrollBehavior?.state?.contentOffset?.let { it < 0f } == true)) ||
+                overscrolled
         }
     }
     val resolvedVisualContentOffset: (() -> Float)? = if (scrollBehavior != null) {

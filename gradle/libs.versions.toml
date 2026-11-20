@@ -57,6 +57,7 @@ miuix-preference-android = { group = "top.yukonga.miuix.kmp", name = "miuix-pref
 miuix-blur-android = { group = "top.yukonga.miuix.kmp", name = "miuix-blur-android", version.ref = "miuix" }
 miuix-glass-android = { group = "top.yukonga.miuix.kmp", name = "miuix-glass-android", version.ref = "miuix" }
 miuix-icons-android = { group = "top.yukonga.miuix.kmp", name = "miuix-icons-android", version.ref = "miuix" }
+miuix-glass-icons-android = { group = "top.yukonga.miuix.kmp", name = "miuix-glass-icons-android", version.ref = "miuix" }
 miuix-nav-android = { group = "top.yukonga.miuix.kmp", name = "miuix-nav-android", version.ref = "miuix" }
 
 # --- Network & Serialization ---

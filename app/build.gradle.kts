@@ -104,6 +104,7 @@ dependencies {
     implementation(libs.miuix.blur.android)
     implementation(libs.miuix.glass.android)
     implementation(libs.miuix.icons.android)
+    implementation(libs.miuix.glass.icons.android)
     implementation(libs.miuix.nav.android)
     implementation(libs.androidx.compose.animation.graphics)
 
