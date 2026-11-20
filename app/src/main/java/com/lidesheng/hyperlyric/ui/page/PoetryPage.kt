@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -118,6 +119,7 @@ fun PoetryPage() {
                             Icon(
                                 imageVector = MiuixIcons.Basic.Search,
                                 contentDescription = stringResource(R.string.search),
+                                modifier = Modifier.size(24.dp),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
