@@ -293,7 +293,6 @@ fun NotificationCenterMediaCardPage() {
                     color = barColor,
                     title = stringResource(id = R.string.title_notification_center),
                     scrollBehavior = topAppBarScrollBehavior,
-                    isContentScrolled = (when (pagerState.currentPage) { 0 -> backgroundListState; 1 -> elementListState; else -> layoutListState }).canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(

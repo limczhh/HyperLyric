@@ -389,7 +389,6 @@ fun DynamicIslandNotificationPage() {
                     color = barColor,
                     title = stringResource(R.string.title_dynamic_island_lyrics),
                     scrollBehavior = scrollBehavior,
-                    isContentScrolled = (if (navPagerState.selectedIndex == 0) configLazyListState else whitelistLazyListState).canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(

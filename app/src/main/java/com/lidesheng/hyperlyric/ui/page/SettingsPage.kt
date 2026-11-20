@@ -78,7 +78,6 @@ fun SettingsPage() {
                     color = barColor,
                     title = stringResource(R.string.title_settings_page),
                     scrollBehavior = topAppBarScrollBehavior,
-                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(

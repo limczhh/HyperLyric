@@ -8,10 +8,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,8 +27,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -42,22 +37,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lidesheng.hyperlyric.R
-import com.lidesheng.hyperlyric.ui.component.SearchBarFake
-import com.lidesheng.hyperlyric.ui.component.SearchBox
-import com.lidesheng.hyperlyric.ui.component.SearchPager
-import com.lidesheng.hyperlyric.ui.component.SearchStatus
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.QuotesData
@@ -80,11 +66,9 @@ import top.yukonga.miuix.kmp.glass.GlassSearchOverlayDefaults
 import top.yukonga.miuix.kmp.glass.glassSearchBarTransition
 import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.glass.Close
-import top.yukonga.miuix.kmp.icon.glass.Search
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
-import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private val SearchResultVerticalPadding = 4.dp
@@ -93,125 +77,59 @@ private val SearchResultVerticalPadding = 4.dp
 fun PoetryPage() {
     val navigator = LocalNavigator.current
     val searchLabel = stringResource(R.string.search)
-    val searchSaver = remember {
-        listSaver<SearchStatus, String>(
-            save = { listOf(it.searchText, if (it.shouldExpand()) "expanded" else "collapsed") },
-            restore = { SearchStatus(label = "", searchText = it[0], current =
-                if (it[1] == "expanded") SearchStatus.Status.EXPANDED else SearchStatus.Status.COLLAPSED) },
-        )
-    }
-    var searchStatus by rememberSaveable(stateSaver = searchSaver) {
-        mutableStateOf(SearchStatus(label = searchLabel))
-    }
-    LaunchedEffect(searchLabel) { searchStatus = searchStatus.copy(label = searchLabel) }
-
-    val filteredQuotes = remember(searchStatus.searchText) {
-        if (searchStatus.searchText.isBlank()) QuotesData.list
-        else QuotesData.list.filter { it.contains(searchStatus.searchText, ignoreCase = true) }
-    }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
 
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
-    val density = LocalDensity.current
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val glassStyle = LocalGlassStyle.current
-    val barColor = if (glassStyle || blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
-    var glassSearchExpanded by rememberSaveable { mutableStateOf(false) }
-    val glassSearchBarAlpha = rememberGlassSearchBarAlpha(glassSearchExpanded && glassStyle)
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val searchSafeInsets = WindowInsets.systemBars
         .union(WindowInsets.captionBar)
         .union(WindowInsets.displayCutout)
     val searchTopInsets = searchSafeInsets.only(WindowInsetsSides.Top)
     val searchHorizontalInsets = searchSafeInsets.only(WindowInsetsSides.Horizontal)
-    LaunchedEffect(glassStyle) {
-        if (glassStyle) {
-            if (!searchStatus.isCollapsed()) {
-                searchStatus = searchStatus.copy(
-                    searchText = "",
-                    current = SearchStatus.Status.COLLAPSED,
-                )
-            }
-        } else {
-            glassSearchExpanded = false
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = if (glassStyle) {
-                Modifier.graphicsLayer { alpha = glassSearchBarAlpha.value }
-            } else {
-                Modifier
-            },
+            modifier = Modifier.graphicsLayer { alpha = searchBarAlpha.value },
         topBar = {
             BlurredBar(backdrop, blurActive) {
-                searchStatus.TopAppBarAnim(backgroundColor = barColor) {
-                    AdaptiveTopAppBar(
-                        color = barColor,
-                        contentModifier = if (glassStyle) {
-                            Modifier.glassSearchBarTransition(
-                                glassSearchExpanded,
-                                blurEnabled = blurActive,
-                            ) { 1f }
-                        } else {
-                            Modifier
-                        },
-                        title = "HyperLyric",
-                        scrollBehavior = topAppBarScrollBehavior,
-                        isContentScrolled = listState.canScrollBackward,
-                        navigationIcon = {
-                            AdaptiveIconButton(onClick = { navigator.pop() }) {
-                                Icon(
-                                    imageVector = MiuixIcons.Back,
-                                    contentDescription = stringResource(R.string.back)
-                                )
-                            }
-                        },
-                        actions = {
-                            if (glassStyle) {
-                                AdaptiveIconButton(onClick = { glassSearchExpanded = true }) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Glass.Search,
-                                        contentDescription = stringResource(R.string.search),
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MiuixTheme.colorScheme.onSurface,
-                                    )
-                                }
-                            }
-                        },
-                        bottomContent = {
-                            if (!glassStyle) {
-                                Box(
-                                    modifier = Modifier
-                                        .alpha(if (searchStatus.isCollapsed()) 1f else 0f)
-                                        .onGloballyPositioned { coordinates ->
-                                            with(density) {
-                                                searchStatus =
-                                                    searchStatus.copy(offsetY = coordinates.positionInWindow().y.toDp())
-                                            }
-                                        }
-                                        .then(
-                                            if (searchStatus.isCollapsed()) Modifier.pointerInput(Unit) {
-                                                detectTapGestures {
-                                                    searchStatus =
-                                                        searchStatus.copy(current = SearchStatus.Status.EXPANDING)
-                                                }
-                                            } else Modifier
-                                        )
-                                ) { SearchBarFake(stringResource(R.string.search)) }
-                            }
+                AdaptiveTopAppBar(
+                    color = barColor,
+                    contentModifier = Modifier.glassSearchBarTransition(
+                        searchExpanded,
+                        blurEnabled = blurActive,
+                    ) { 1f },
+                    title = "HyperLyric",
+                    scrollBehavior = topAppBarScrollBehavior,
+                    navigationIcon = {
+                        AdaptiveIconButton(onClick = { navigator.pop() }) {
+                            Icon(
+                                imageVector = MiuixIcons.Back,
+                                contentDescription = stringResource(R.string.back)
+                            )
                         }
-                    )
-                }
+                    },
+                    actions = {
+                        AdaptiveIconButton(onClick = { searchExpanded = true }) {
+                            Icon(
+                                imageVector = MiuixIcons.Basic.Search,
+                                contentDescription = stringResource(R.string.search),
+                                modifier = Modifier.size(28.dp),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                            )
+                        }
+                    },
+                )
             }
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = showFab && searchStatus.shouldCollapsed(),
+                visible = showFab && !searchExpanded,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
@@ -232,125 +150,24 @@ fun PoetryPage() {
                 }
             }
         },
-        popupHost = {
-            if (!glassStyle) {
-                val resultStatus = when {
-                    searchStatus.searchText.isBlank() -> SearchStatus.ResultStatus.DEFAULT
-                    filteredQuotes.isEmpty() -> SearchStatus.ResultStatus.EMPTY
-                    else -> SearchStatus.ResultStatus.SHOW
-                }
-                searchStatus.copy(resultStatus = resultStatus).SearchPager(
-                    onSearchStatusChange = { searchStatus = it },
-                    offsetY = searchStatus.offsetY,
-                    defaultResult = {},
-                ) {
-                    if (searchStatus.searchText.isNotBlank()) {
-                        items(filteredQuotes, key = { it }) { quote ->
-                            Card(
-                                modifier = Modifier
-                                    .padding(horizontal = 12.dp)
-                                    .padding(bottom = 12.dp)
-                                    .fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = quote,
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp,
-                                    color = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
-                        }
-                        item { Spacer(Modifier.height(16.dp)) }
-                    }
-                }
-            }
-        }
         ) { padding ->
-            searchStatus.SearchBox {
-                Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
-                    val contentPadding = pageContentPadding(padding, extraBottom = 16.dp)
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.pageScrollModifiers(
-                            enableScrollEndHaptic = true,
-                            showTopAppBar = true,
-                            topAppBarScrollBehavior = topAppBarScrollBehavior
-                        ),
-                        contentPadding = contentPadding,
-                    ) {
-                        items(filteredQuotes, key = { it }) { quote ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp)
-                                    .padding(bottom = 12.dp)
-                            ) {
-                                Text(
-                                    text = quote,
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp,
-                                    color = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
-                        }
-                    }
-                    VerticalScrollBar(
-                        adapter = rememberScrollBarAdapter(scrollState = listState),
-                        topAppBarScrollBehavior = topAppBarScrollBehavior,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .fillMaxHeight(),
-                        trackPadding = contentPadding,
-                    )
-                }
-            }
-        }
-        if (glassStyle) {
-            val searchListState = rememberLazyListState()
-            val searchBarSpace = GlassSearchOverlayDefaults.BarHeight +
-                GlassSearchOverlayDefaults.VerticalPadding * 2
-            GlassSearchOverlay(
-                expanded = glassSearchExpanded,
-                onDismissRequest = { glassSearchExpanded = false },
-                scrollMaterialThreshold = GlassSearchOverlayDefaults.VerticalPadding + SearchResultVerticalPadding,
-                label = searchLabel,
-                scrollOffset = {
-                    when {
-                        searchListState.layoutInfo.totalItemsCount == 0 -> 0f
-                        searchListState.firstVisibleItemIndex > 0 -> Float.MAX_VALUE
-                        else -> searchListState.firstVisibleItemScrollOffset.toFloat()
-                    }
-                },
-                topInsets = searchTopInsets,
-                blurEnabled = blurActive,
-                horizontalInsetsModifier = Modifier.windowInsetsPadding(searchHorizontalInsets),
-                searchIcon = MiuixIcons.Glass.Search,
-                closeIcon = MiuixIcons.Glass.Close,
-            ) { query ->
-                val searchQuotes = remember(query) {
-                    if (query.isBlank()) {
-                        emptyList()
-                    } else {
-                        QuotesData.list.filter { it.contains(query, ignoreCase = true) }
-                    }
-                }
+            Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+                val contentPadding = pageContentPadding(padding, extraBottom = 16.dp)
                 LazyColumn(
-                    state = searchListState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(searchHorizontalInsets),
-                    contentPadding = PaddingValues(
-                        top = searchTopInsets.asPaddingValues().calculateTopPadding() + searchBarSpace,
-                        bottom = 16.dp,
+                    state = listState,
+                    modifier = Modifier.pageScrollModifiers(
+                        enableScrollEndHaptic = true,
+                        showTopAppBar = true,
+                        topAppBarScrollBehavior = topAppBarScrollBehavior
                     ),
+                    contentPadding = contentPadding,
                 ) {
-                    items(searchQuotes, key = { it }) { quote ->
+                    items(QuotesData.list, key = { it }) { quote ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = SearchResultVerticalPadding)
+                                .padding(horizontal = 12.dp)
+                                .padding(bottom = 12.dp)
                         ) {
                             Text(
                                 text = quote,
@@ -360,6 +177,67 @@ fun PoetryPage() {
                                 modifier = Modifier.padding(16.dp)
                             )
                         }
+                    }
+                }
+                VerticalScrollBar(
+                    adapter = rememberScrollBarAdapter(scrollState = listState),
+                    topAppBarScrollBehavior = topAppBarScrollBehavior,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight(),
+                    trackPadding = contentPadding,
+                )
+            }
+        }
+        val searchListState = rememberLazyListState()
+        val searchBarSpace = GlassSearchOverlayDefaults.BarHeight +
+            GlassSearchOverlayDefaults.VerticalPadding * 2
+        GlassSearchOverlay(
+            expanded = searchExpanded,
+            onDismissRequest = { searchExpanded = false },
+            scrollMaterialThreshold = GlassSearchOverlayDefaults.VerticalPadding + SearchResultVerticalPadding,
+            label = searchLabel,
+            scrollOffset = {
+                when {
+                    searchListState.layoutInfo.totalItemsCount == 0 -> 0f
+                    searchListState.firstVisibleItemIndex > 0 -> Float.MAX_VALUE
+                    else -> searchListState.firstVisibleItemScrollOffset.toFloat()
+                }
+            },
+            topInsets = searchTopInsets,
+            blurEnabled = blurActive,
+            horizontalInsetsModifier = Modifier.windowInsetsPadding(searchHorizontalInsets),
+        ) { query ->
+            val searchQuotes = remember(query) {
+                if (query.isBlank()) {
+                    emptyList()
+                } else {
+                    QuotesData.list.filter { it.contains(query, ignoreCase = true) }
+                }
+            }
+            LazyColumn(
+                state = searchListState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(searchHorizontalInsets),
+                contentPadding = PaddingValues(
+                    top = searchTopInsets.asPaddingValues().calculateTopPadding() + searchBarSpace,
+                    bottom = 16.dp,
+                ),
+            ) {
+                items(searchQuotes, key = { it }) { quote ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = SearchResultVerticalPadding)
+                    ) {
+                        Text(
+                            text = quote,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
                 }
             }

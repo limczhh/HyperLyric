@@ -297,7 +297,6 @@ fun LogPage() {
                     color = barColor,
                     title = stringResource(R.string.title_view_logs),
                     scrollBehavior = topAppBarScrollBehavior,
-                    isContentScrolled = activeListState.canScrollBackward,
                     visualContentOffset = visualContentOffset,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {

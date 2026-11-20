@@ -271,20 +271,13 @@ fun AdaptiveTopAppBar(
     val wide = isWideAppWindow()
     val contentScrolled by remember(scrollBehavior, isContentScrolled) {
         derivedStateOf {
-            val overscrolled = scrollBehavior?.state?.overscrollOffset?.let { it > 0f } == true
-            (isContentScrolled ?: (scrollBehavior?.state?.contentOffset?.let { it < 0f } == true)) ||
-                overscrolled
+            isContentScrolled ?: (scrollBehavior?.state?.let {
+                it.contentOffset < -1f || it.overscrollOffset < -1f
+            } ?: false)
         }
     }
     val resolvedVisualContentOffset = visualContentOffset ?: if (scrollBehavior != null) {
-        {
-            val state = scrollBehavior.state
-            if (state.overscrollOffset > 0f && state.contentOffset >= 0f) {
-                -state.overscrollOffset
-            } else {
-                state.visualContentOffset
-            }
-        }
+        { scrollBehavior.state.visualContentOffset }
     } else null
 
     if (LocalGlassStyle.current) {
@@ -298,7 +291,7 @@ fun AdaptiveTopAppBar(
         } else if (scrollBehavior != null || resolvedVisualContentOffset != null) {
             { 1f }
         } else {
-            { if (!contentScrolled) 0f else 1f }
+            { if (contentScrolled) 1f else 0f }
         }
         GlassTopAppBar(
             title = title,
@@ -361,20 +354,13 @@ fun AdaptiveSmallTopAppBar(
 ) {
     val contentScrolled by remember(scrollBehavior, isContentScrolled) {
         derivedStateOf {
-            val overscrolled = scrollBehavior?.state?.overscrollOffset?.let { it > 0f } == true
-            (isContentScrolled ?: (scrollBehavior?.state?.contentOffset?.let { it < 0f } == true)) ||
-                overscrolled
+            isContentScrolled ?: (scrollBehavior?.state?.let {
+                it.contentOffset < -1f || it.overscrollOffset < -1f
+            } ?: false)
         }
     }
     val resolvedVisualContentOffset: (() -> Float)? = if (scrollBehavior != null) {
-        {
-            val state = scrollBehavior.state
-            if (state.overscrollOffset > 0f && state.contentOffset >= 0f) {
-                -state.overscrollOffset
-            } else {
-                state.visualContentOffset
-            }
-        }
+        { scrollBehavior.state.visualContentOffset }
     } else null
     if (LocalGlassStyle.current) {
         val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
@@ -394,7 +380,7 @@ fun AdaptiveSmallTopAppBar(
         } else if (scrollBehavior != null) {
             { 1f }
         } else {
-            { if (!contentScrolled) 0f else 1f }
+            { if (contentScrolled) 1f else 0f }
         }
         GlassTopAppBar(
             title = title,
