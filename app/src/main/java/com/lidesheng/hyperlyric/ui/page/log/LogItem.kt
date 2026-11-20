@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -84,16 +85,21 @@ fun LogItem(
             }
             Spacer(Modifier.width(6.dp))
             Text(
+                modifier = Modifier.weight(1f),
                 text = entry.displaySource,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = MiuixTheme.colorScheme.onSurface
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
             Text(
                 text = formatTimestamp(entry.timestamp),
                 fontSize = 11.sp,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary
+                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                maxLines = 1,
+                softWrap = false,
             )
         }
         Spacer(Modifier.height(4.dp))

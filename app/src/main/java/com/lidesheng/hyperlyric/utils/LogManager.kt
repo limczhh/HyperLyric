@@ -164,7 +164,11 @@ object LogManager : HyperLogger {
 
             val dirsArg = foundDir
             val listProcess = Runtime.getRuntime().exec(
-                arrayOf("su", "-c", "find $dirsArg -name '*.log' ! -name 'kmsg*' -type f 2>/dev/null")
+                arrayOf(
+                    "su",
+                    "-c",
+                    "find '$dirsArg' -maxdepth 1 -type f -name 'modules_*.log' 2>/dev/null"
+                )
             )
             val logFiles = BufferedReader(InputStreamReader(listProcess.inputStream))
                 .readLines().filter { it.isNotBlank() }
