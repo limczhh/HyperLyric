@@ -50,9 +50,9 @@ import kotlin.math.roundToInt
 private val STATUS_BAR_LYRIC_PADDING_INPUT_PATTERN = Regex("-?\\d*(\\.\\d*)?")
 
 private object StatusBarLyricPaddingInputTransformation : InputTransformation {
-    override fun transformInput(input: TextFieldBuffer) {
-        if (!STATUS_BAR_LYRIC_PADDING_INPUT_PATTERN.matches(input.asCharSequence())) {
-            input.revertAllChanges()
+    override fun TextFieldBuffer.transformInput() {
+        if (!STATUS_BAR_LYRIC_PADDING_INPUT_PATTERN.matches(asCharSequence())) {
+            revertAllChanges()
         }
     }
 }

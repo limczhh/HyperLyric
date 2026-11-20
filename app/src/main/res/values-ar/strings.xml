@@ -577,14 +577,6 @@
   <string name="title_lyric_enhancement_cache">ذاكرة التخزين المؤقت</string>
   <string name="title_lyric_enhancement_cache_manage">إدارة الذاكرة المؤقتة</string>
   <string name="summary_lyric_enhancement_cache_manage">عرض إدخالات ذاكرة التخزين المؤقت لتحسين الكلمات وإدارتها</string>
-  <string name="title_lyric_enhancement_cache_detail">تفاصيل الذاكرة المؤقتة</string>
-  <string name="label_lyric_enhancement_cache_song">الأغنية</string>
-  <string name="label_lyric_enhancement_cache_artist">الفنان</string>
-  <string name="label_lyric_enhancement_cache_updated_at">وقت التحديث</string>
-  <string name="label_lyric_enhancement_cache_size">حجم الذاكرة المؤقتة</string>
-  <string name="label_lyric_enhancement_cache_target_language">اللغة المستهدفة</string>
-  <string name="label_lyric_enhancement_cache_model">نموذج الترجمة</string>
-  <string name="label_lyric_enhancement_cache_source_type">نوع الكلمات</string>
   <string name="lyric_enhancement_cache_empty">لا توجد إدخالات في الذاكرة المؤقتة</string>
   <string name="lyric_enhancement_cache_unknown_artist">فنان غير معروف</string>
   <string name="lyric_enhancement_cache_unknown_value">غير معروف</string>

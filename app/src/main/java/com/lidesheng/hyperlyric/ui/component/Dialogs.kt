@@ -143,24 +143,24 @@ internal fun AdaptiveTextField(
 }
 
 private object DigitsOnlyInputTransformation : InputTransformation {
-    override fun transformInput(input: TextFieldBuffer) {
-        if (!input.asCharSequence().all { it.isDigit() }) input.revertAllChanges()
+    override fun TextFieldBuffer.transformInput() {
+        if (!asCharSequence().all { it.isDigit() }) revertAllChanges()
     }
 }
 
 private object SignedIntegerInputTransformation : InputTransformation {
-    override fun transformInput(input: TextFieldBuffer) {
-        val text = input.asCharSequence().toString()
+    override fun TextFieldBuffer.transformInput() {
+        val text = asCharSequence().toString()
         if (text.isNotEmpty() && text != "-" && text.toIntOrNull() == null) {
-            input.revertAllChanges()
+            revertAllChanges()
         }
     }
 }
 
 private object DecimalInputTransformation : InputTransformation {
-    override fun transformInput(input: TextFieldBuffer) {
-        if (!input.asCharSequence().toString().isValidDecimalInput()) {
-            input.revertAllChanges()
+    override fun TextFieldBuffer.transformInput() {
+        if (!asCharSequence().toString().isValidDecimalInput()) {
+            revertAllChanges()
         }
     }
 }
