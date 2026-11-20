@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -42,6 +43,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -672,15 +674,30 @@ fun AdaptiveOverlayDropdownPreference(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     onSelectedIndexChange: ((Int) -> Unit)? = null,
 ) {
-    if (LocalGlassStyle.current) {
+    val glassStyle = LocalGlassStyle.current
+    val glassModifier = if (glassStyle) {
+        Modifier
+    } else {
+        Modifier.alpha(0f).clearAndSetSemantics { }
+    }
+    val ordinaryModifier = if (glassStyle) {
+        Modifier.alpha(0f).clearAndSetSemantics { }
+    } else {
+        Modifier
+    }
+
+    // Keep both renderers composed while the style changes. GlassDropdownPreference's popup
+    // owns an exit animation and must remain composed until that animation finishes; switching
+    // branches here would dispose it midway and make the popup jump to a new position.
+    Box(modifier = modifier) {
         GlassDropdownPreference(
             onSelectedIndexChange = { index -> onSelectedIndexChange?.invoke(index) },
             items = items,
             selectedIndex = selectedIndex,
             title = title,
             backdrop = LocalAppBackdrop.current,
-            modifier = modifier,
-            enabled = enabled,
+            modifier = glassModifier,
+            enabled = enabled && glassStyle,
             showValue = showValue,
             renderInRootScaffold = renderInRootScaffold,
             titleColor = titleColor,
@@ -694,14 +711,13 @@ fun AdaptiveOverlayDropdownPreference(
             } else {
                 GlassPopupSizing(maxHeight = maxHeight)
             },
-            onExpandedChange = onExpandedChange,
+            onExpandedChange = if (glassStyle) onExpandedChange else null,
         )
-    } else {
         top.yukonga.miuix.kmp.preference.OverlayDropdownPreference(
-            items = items,
+            items = if (glassStyle) emptyList() else items,
             selectedIndex = selectedIndex,
             title = title,
-            modifier = modifier,
+            modifier = ordinaryModifier,
             titleColor = titleColor,
             summary = summary,
             summaryColor = summaryColor,
@@ -710,10 +726,10 @@ fun AdaptiveOverlayDropdownPreference(
             bottomAction = bottomAction,
             insideMargin = insideMargin,
             maxHeight = maxHeight,
-            enabled = enabled,
+            enabled = enabled && !glassStyle,
             showValue = showValue,
             renderInRootScaffold = renderInRootScaffold,
-            onExpandedChange = onExpandedChange,
+            onExpandedChange = if (!glassStyle) onExpandedChange else null,
             onSelectedIndexChange = onSelectedIndexChange,
         )
     }
