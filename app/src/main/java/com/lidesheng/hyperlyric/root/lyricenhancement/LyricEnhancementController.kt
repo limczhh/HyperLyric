@@ -202,7 +202,10 @@ internal class LyricEnhancementController(
         )
         currentCoordinator.enhance(
             song = enhancementSnapshot,
-            input = LyricEnhancementInput(mediaInfo = processingMediaInfo),
+            input = LyricEnhancementInput(
+                mediaInfo = processingMediaInfo,
+                mediaIdentity = activeMediaIdentity?.normalized(),
+            ),
         ) { processedSong: Song? ->
             mainHandler.post {
                 if (closed) return@post

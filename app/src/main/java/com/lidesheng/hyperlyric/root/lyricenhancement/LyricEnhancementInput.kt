@@ -1,5 +1,6 @@
 package com.lidesheng.hyperlyric.root.lyricenhancement
 
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.common.media.MediaMetadataHelper
 
 internal data class LyricEnhancementMediaInfo(
@@ -12,6 +13,8 @@ internal data class LyricEnhancementMediaInfo(
 
 internal data class LyricEnhancementInput(
     val mediaInfo: LyricEnhancementMediaInfo? = null,
+    /** Identifies the current media item; it is not an AMLL query parameter. */
+    val mediaIdentity: MediaIdentity? = null,
 )
 
 /** Keeps the lyric source package separate from any package inferred from MediaSession metadata. */

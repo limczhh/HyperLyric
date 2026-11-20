@@ -3,18 +3,102 @@ package com.lidesheng.hyperlyric.root.lyricenhancement.amll
 import android.content.SharedPreferences
 import com.lidesheng.hyperlyric.common.LyricEnhancementCacheEntry
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.common.media.MediaIdentity
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
 import com.lidesheng.hyperlyric.lyric.model.Song
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementInput
 import com.lidesheng.hyperlyric.root.lyricenhancement.LyricEnhancementCacheStore
 import com.lidesheng.hyperlyric.root.utils.HookLogger
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /** 命中结果：TTML 原文 + 来源标记（缓存命中/网络获取），用于日志准确上报 */
 internal data class TtmlFetch(
     val ttml: String,
     val fromCache: Boolean,
 )
+
+/**
+ * Identity of one AMLL lookup.
+ *
+ * The source lyric body is deliberately absent. LyricInfo and SuperLyric can publish a metadata
+ * snapshot before the complete lyric body. The media identity prevents two known media items
+ * from sharing a result, while the platform IDs are kept out of this key because a later snapshot
+ * may only be adding those optional lookup hints. As long as the media and metadata are the same,
+ * snapshots share one lookup instead of starting another network search.
+ */
+internal data class AmllTtmlRequestKey(
+    val mediaIdentity: MediaIdentity?,
+    val title: String?,
+    val artist: String?,
+    val album: String?,
+    val sourcePackageName: String?,
+    val platformProbe: Boolean,
+    val apiBaseUrl: String,
+) {
+    /**
+     * Media identity can be completed between two source snapshots. Treat missing identity
+     * fields as unknown, but reject an actual conflict so a previous song cannot provide the
+     * current song's result.
+     */
+    fun isCompatibleWith(other: AmllTtmlRequestKey): Boolean {
+        if (title != other.title || artist != other.artist || album != other.album ||
+            sourcePackageName != other.sourcePackageName ||
+            platformProbe != other.platformProbe || apiBaseUrl != other.apiBaseUrl
+        ) {
+            return false
+        }
+        return when {
+            mediaIdentity == null || other.mediaIdentity == null ->
+                mediaIdentity == other.mediaIdentity
+            else -> mediaIdentity.isCompatibleWith(other.mediaIdentity)
+        }
+    }
+}
+
+internal data class AmllTtmlLookupRequest(
+    val key: AmllTtmlRequestKey,
+    /** Optional platform-specific hints. They are not part of [key] because snapshots can add them. */
+    val songId: String?,
+    val songMid: String?,
+    val config: AmllTtmlConfig,
+) {
+    companion object {
+        fun from(
+            song: Song,
+            input: LyricEnhancementInput,
+            config: AmllTtmlConfig,
+        ): AmllTtmlLookupRequest {
+            val mediaInfo = input.mediaInfo
+            val title = mediaInfo?.title?.takeIf { it.isNotBlank() }
+                ?: song.name?.takeIf { it.isNotBlank() }
+            val artist = mediaInfo?.artist?.takeIf { it.isNotBlank() }
+                ?: song.artist?.takeIf { it.isNotBlank() }
+            val album = mediaInfo?.album?.takeIf { it.isNotBlank() }
+            val songId = song.id?.takeIf { it.isNotBlank() }
+            val songMid = song.songMid?.takeIf { it.isNotBlank() }
+            val sourcePackageName = mediaInfo?.sourcePackageName?.takeIf { it.isNotBlank() }
+            return AmllTtmlLookupRequest(
+                key = AmllTtmlRequestKey(
+                    mediaIdentity = input.mediaIdentity?.normalized(),
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    sourcePackageName = sourcePackageName,
+                    platformProbe = config.platformProbe,
+                    apiBaseUrl = config.apiBaseUrl.trim().trimEnd('/'),
+                ),
+                songId = songId,
+                songMid = songMid,
+                config = config,
+            )
+        }
+    }
+}
 
 /**
  * AMLL TTML 歌词增强功能
@@ -38,9 +122,16 @@ internal class AmllTtmlFeature(
     private val onConfigChanged: () -> Unit,
 ) : AutoCloseable {
 
-    private val client = AmllTtmlClient()
     private val parser = TtmlParser()
     private val cache = TtmlCache(cacheStore)
+    private val requestExecutor: ExecutorService = Executors.newCachedThreadPool { runnable ->
+        Thread(runnable, "HyperLyric-AmllTtml").apply { isDaemon = true }
+    }
+    private val inFlightLock = Any()
+    private val inFlight = HashMap<AmllTtmlRequestKey, InFlightRequest>()
+
+    @Volatile
+    private var closed = false
 
     private companion object {
         const val LOG_TAG = "LyricEnhancement/AmllTtml"
@@ -79,7 +170,20 @@ internal class AmllTtmlFeature(
         input: LyricEnhancementInput,
     ): Song? {
         return try {
-            processSongInternal(song, input)
+            if (closed) return null
+            val config = AmllTtmlConfig.from(preferences)
+            if (!config.enabled) {
+                HookLogger.d(LOG_TAG, "跳过处理: 功能已禁用, song=${song.name}")
+                return null
+            }
+            val request = AmllTtmlLookupRequest.from(song, input, config)
+            val fetch = getOrStartFetch(request) ?: return null
+            buildResult(
+                song = song,
+                ttml = fetch.ttml,
+                fromCache = fetch.fromCache,
+                duetPerformance = config.duetPerformance,
+            )
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             HookLogger.d(LOG_TAG, "处理被中断")
@@ -95,68 +199,110 @@ internal class AmllTtmlFeature(
         }
     }
 
-    private fun processSongInternal(
-        song: Song,
-        input: LyricEnhancementInput,
-    ): Song? {
-        val config = AmllTtmlConfig.from(preferences)
-        if (!config.enabled) {
-            HookLogger.d(LOG_TAG, "跳过处理: 功能已禁用, song=${song.name}")
-            return null
-        }
+    private fun resolveTtml(request: AmllTtmlLookupRequest): TtmlFetch? {
+        val config = request.config
+        val key = request.key
+        val client = AmllTtmlClient()
         client.updateBaseUrl(config.apiBaseUrl)
-
         val budget = ProcessingBudget(BUDGET_MS)
-        val mediaInfo = input.mediaInfo
-
-        // 查询参数优先级：Core 组装确认过的 mediaInfo 优先，缺失回落歌词源 Song 字段
-        val title = mediaInfo?.title?.takeIf { it.isNotBlank() }
-            ?: song.name?.takeIf { it.isNotBlank() }
-        val artist = mediaInfo?.artist?.takeIf { it.isNotBlank() }
-            ?: song.artist?.takeIf { it.isNotBlank() }
-        val album = mediaInfo?.album?.takeIf { it.isNotBlank() }
-        val songId = song.id?.takeIf { it.isNotBlank() }
-        val songMid = song.songMid?.takeIf { it.isNotBlank() }
-        // 歌词源包名：宿主仅透传本次歌词源提供的 packageName（无 MediaSession 推断），
-        // 可信度高，映射到平台后单次精确直查（spec §7.1 宿主建议已落地）
-        val sourcePackageName = mediaInfo?.sourcePackageName?.takeIf { it.isNotBlank() }
 
         HookLogger.d(
             LOG_TAG,
-            "开始处理: song=\"${song.name.orEmpty()}\", songId=${songId ?: "null"}, " +
-                    "songMid=${songMid ?: "null"}, " +
-                    "package=${sourcePackageName ?: "null"}, " +
-                    "title=${title ?: "null"}, artist=${artist ?: "null"}, album=${album ?: "null"}"
+            "开始处理: song=\"${key.title.orEmpty()}\", songId=${request.songId ?: "null"}, " +
+                    "songMid=${request.songMid ?: "null"}, " +
+                    "package=${key.sourcePackageName ?: "null"}, " +
+                    "title=${key.title ?: "null"}, artist=${key.artist ?: "null"}, " +
+                    "album=${key.album ?: "null"}"
         )
 
         // 1. 平台探测：songId 非空、开关开启；包名直查无需 title/artist（平台已明确），
         //    逐平台探测需至少一个用于交叉校验（无法验证即不冒险——spec §3.3）
-        if (songId != null && config.platformProbe &&
-            (sourcePackageName != null || title != null || artist != null)
+        if (request.songId != null && config.platformProbe &&
+            (key.sourcePackageName != null || key.title != null || key.artist != null)
         ) {
-            val probeTtml = probePlatforms(songId, songMid, title, artist, sourcePackageName, budget)
+            val probeTtml = probePlatforms(
+                client,
+                request.songId,
+                request.songMid,
+                key.title,
+                key.artist,
+                key.sourcePackageName,
+                budget,
+            )
             if (probeTtml != null) {
-                return buildResult(
-                    song = song,
-                    ttml = probeTtml.ttml,
-                    fromCache = probeTtml.fromCache,
-                    duetPerformance = config.duetPerformance
-                )
+                return probeTtml
             }
         }
 
         // 2. 搜索回退：title 或 artist 至少一个可用（对齐 main：二者皆空不触发搜索）
-        if (title == null && artist == null) {
+        if (key.title == null && key.artist == null) {
             HookLogger.d(LOG_TAG, "搜索未触发: 无标题与歌手")
             return null
         }
-        val searchTtml = searchFallback(title, artist, album, budget) ?: return null
-        return buildResult(
-            song = song,
-            ttml = searchTtml.ttml,
-            fromCache = searchTtml.fromCache,
-            duetPerformance = config.duetPerformance
-        )
+        return searchFallback(client, key.title, key.artist, key.album, budget)
+    }
+
+    /**
+     * Shares a lookup while it is in progress. The worker deliberately lives outside the caller's
+     * enhancement Future: a newer source snapshot cancels that caller, but must not cancel the
+     * shared AMLL lookup that the newer snapshot can consume.
+     */
+    private fun getOrStartFetch(request: AmllTtmlLookupRequest): TtmlFetch? {
+        val entry = synchronized(inFlightLock) {
+            if (closed) return@synchronized null
+            val existing = inFlight.entries
+                .firstOrNull { (key, _) -> key.isCompatibleWith(request.key) }
+                ?.value
+            existing?.also {
+                HookLogger.d(
+                    LOG_TAG,
+                    "复用进行中的请求: fingerprint=${request.key.hashCode()}"
+                )
+            } ?: run {
+                val created = InFlightRequest()
+                val staleKeys = inFlight.keys.filter { !it.isCompatibleWith(request.key) }
+                val staleRequests = staleKeys.mapNotNull { staleKey ->
+                    inFlight.remove(staleKey)
+                }
+                staleRequests.forEach { stale ->
+                    stale.future.complete(null)
+                    stale.task?.cancel(true)
+                }
+                inFlight[request.key] = created
+                try {
+                    created.task = requestExecutor.submit {
+                        val result = try {
+                            resolveTtml(request)
+                        } catch (_: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            null
+                        } catch (error: Exception) {
+                            HookLogger.w(LOG_TAG, "AMLL 请求处理失败", error)
+                            null
+                        }
+                        created.future.complete(result)
+                        synchronized(inFlightLock) {
+                            inFlight.remove(request.key, created)
+                        }
+                    }
+                    created
+                } catch (error: Exception) {
+                    inFlight.remove(request.key, created)
+                    HookLogger.w(LOG_TAG, "AMLL 请求任务启动失败", error)
+                    created.future.complete(null)
+                    null
+                }
+            }
+        } ?: return null
+
+        return try {
+            entry.future.get()
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            null
+        } catch (_: ExecutionException) {
+            null
+        }
     }
 
     /**
@@ -172,6 +318,7 @@ internal class AmllTtmlFeature(
      * 命中结果，不写负缓存。
      */
     private fun probePlatforms(
+        client: AmllTtmlClient,
         songId: String,
         songMid: String?,
         title: String?,
@@ -312,6 +459,7 @@ internal class AmllTtmlFeature(
 
     /** 搜索回退：search 缓存 → 模糊搜索 + 交叉校验 → 按 id 取完整 TTML → 缓存 */
     private fun searchFallback(
+        client: AmllTtmlClient,
         title: String?,
         artist: String?,
         album: String?,
@@ -387,7 +535,23 @@ internal class AmllTtmlFeature(
     }
 
     override fun close() {
+        closed = true
         preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener)
+        val requests = synchronized(inFlightLock) {
+            val current = inFlight.values.toList()
+            inFlight.clear()
+            current
+        }
+        requests.forEach { request ->
+            request.future.complete(null)
+            request.task?.cancel(true)
+        }
+        requestExecutor.shutdownNow()
+    }
+
+    private class InFlightRequest {
+        val future = CompletableFuture<TtmlFetch?>()
+        var task: Future<*>? = null
     }
 
 }
