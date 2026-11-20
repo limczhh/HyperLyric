@@ -231,7 +231,8 @@ fun PoetryPage() {
                     }
                 }
                 VerticalScrollBar(
-                    adapter = rememberScrollBarAdapter(listState),
+                    adapter = rememberScrollBarAdapter(scrollState = listState),
+                    topAppBarScrollBehavior = topAppBarScrollBehavior,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(),

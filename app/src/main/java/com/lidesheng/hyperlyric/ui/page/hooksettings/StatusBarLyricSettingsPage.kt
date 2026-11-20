@@ -9,6 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.ui.component.NumberInputDialog
+import com.lidesheng.hyperlyric.ui.component.AdaptiveTextField
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookConfigSaver
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.rememberHookPrefs
 import com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.common.XposedLyricSettingPage
@@ -33,7 +40,6 @@ import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -42,6 +48,14 @@ import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
 import kotlin.math.roundToInt
 
 private val STATUS_BAR_LYRIC_PADDING_INPUT_PATTERN = Regex("-?\\d*(\\.\\d*)?")
+
+private object StatusBarLyricPaddingInputTransformation : InputTransformation {
+    override fun transformInput(input: TextFieldBuffer) {
+        if (!STATUS_BAR_LYRIC_PADDING_INPUT_PATTERN.matches(input.asCharSequence())) {
+            input.revertAllChanges()
+        }
+    }
+}
 
 private data class StatusBarLyricGestureDropdown(
     val title: String,
@@ -906,13 +920,15 @@ private fun StatusBarLyricPaddingDialog(
     onConfirm: (leftDp: Float, rightDp: Float) -> Unit,
 ) {
 
-    val initialValues = listOf(leftDp, rightDp)
-    var inputValues by remember {
-        mutableStateOf(initialValues.map(::formatStatusBarLyricPaddingDp))
-    }
+    val leftState = rememberTextFieldState(formatStatusBarLyricPaddingDp(leftDp))
+    val rightState = rememberTextFieldState(formatStatusBarLyricPaddingDp(rightDp))
     LaunchedEffect(show) {
-        if (show) inputValues = initialValues.map(::formatStatusBarLyricPaddingDp)
+        if (show) {
+            leftState.setTextAndPlaceCursorAtEnd(formatStatusBarLyricPaddingDp(leftDp))
+            rightState.setTextAndPlaceCursorAtEnd(formatStatusBarLyricPaddingDp(rightDp))
+        }
     }
+    val inputValues = listOf(leftState.text.toString(), rightState.text.toString())
     val parsedValues = inputValues.map { it.toFloatOrNull() }
     val canConfirm = parsedValues.all { value ->
         value != null && value.isFinite() &&
@@ -934,26 +950,19 @@ private fun StatusBarLyricPaddingDialog(
         show = show,
         onDismissRequest = onDismiss,
     ) {
-        fun updateValue(index: Int, value: String) {
-            if (!STATUS_BAR_LYRIC_PADDING_INPUT_PATTERN.matches(value)) return
-            inputValues = inputValues.toMutableList().also { it[index] = value }
-        }
-
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 StatusBarLyricPaddingField(
-                    value = inputValues[0],
+                    state = leftState,
                     label = labels[0],
-                    onValueChange = { updateValue(0, it) },
                     modifier = Modifier.weight(1f),
                 )
                 StatusBarLyricPaddingField(
-                    value = inputValues[1],
+                    state = rightState,
                     label = labels[1],
-                    onValueChange = { updateValue(1, it) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -989,18 +998,17 @@ private fun StatusBarLyricPaddingDialog(
 
 @Composable
 private fun StatusBarLyricPaddingField(
-    value: String,
+    state: TextFieldState,
     label: String,
-    onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
+    AdaptiveTextField(
+        state = state,
         label = label,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+        inputTransformation = StatusBarLyricPaddingInputTransformation,
+        lineLimits = TextFieldLineLimits.SingleLine,
         modifier = modifier,
-        maxLines = 1,
     )
 }
 

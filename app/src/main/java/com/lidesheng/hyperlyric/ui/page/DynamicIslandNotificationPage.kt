@@ -399,10 +399,7 @@ fun DynamicIslandNotificationPage() {
                         }
                     },
                     actions = {
-                        AdaptiveIconButton(
-                            onClick = { showHelpDialog = true },
-                            holdDownState = showHelpDialog
-                        ) {
+                        AdaptiveIconButton(onClick = { showHelpDialog = true }) {
                             Icon(
                                 imageVector = MiuixIcons.Help,
                                 contentDescription = stringResource(R.string.title_help)

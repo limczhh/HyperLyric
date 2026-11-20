@@ -9,6 +9,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.Composable
@@ -24,9 +30,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -40,6 +44,7 @@ import top.yukonga.miuix.kmp.basic.ButtonColors
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonDefaults
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
@@ -104,6 +109,59 @@ fun AdaptiveDialogButton(
     } else {
         TextButton(text = text, onClick = onClick, modifier = modifier, enabled = enabled,
             colors = colors ?: ButtonDefaults.textButtonColors())
+    }
+}
+
+@Composable
+internal fun AdaptiveTextField(
+    state: TextFieldState,
+    modifier: Modifier = Modifier,
+    label: String = "",
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    inputTransformation: InputTransformation? = null,
+    lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
+) {
+    if (LocalGlassDialog.current) {
+        GlassTextField(
+            state = state,
+            modifier = modifier,
+            label = label,
+            keyboardOptions = keyboardOptions,
+            inputTransformation = inputTransformation,
+            lineLimits = lineLimits,
+        )
+    } else {
+        TextField(
+            state = state,
+            modifier = modifier,
+            label = label,
+            keyboardOptions = keyboardOptions,
+            inputTransformation = inputTransformation,
+            lineLimits = lineLimits,
+        )
+    }
+}
+
+private object DigitsOnlyInputTransformation : InputTransformation {
+    override fun transformInput(input: TextFieldBuffer) {
+        if (!input.asCharSequence().all { it.isDigit() }) input.revertAllChanges()
+    }
+}
+
+private object SignedIntegerInputTransformation : InputTransformation {
+    override fun transformInput(input: TextFieldBuffer) {
+        val text = input.asCharSequence().toString()
+        if (text.isNotEmpty() && text != "-" && text.toIntOrNull() == null) {
+            input.revertAllChanges()
+        }
+    }
+}
+
+private object DecimalInputTransformation : InputTransformation {
+    override fun transformInput(input: TextFieldBuffer) {
+        if (!input.asCharSequence().toString().isValidDecimalInput()) {
+            input.revertAllChanges()
+        }
     }
 }
 
@@ -212,14 +270,10 @@ fun NumberInputDialog(
     onDismissFinished: () -> Unit = {},
     onConfirm: (Int) -> Unit
 ) {
-    var inputValue by remember {
-        val text = initialValue.toString()
-        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
-    }
+    val inputState = rememberTextFieldState(initialValue.toString())
     LaunchedEffect(show) {
         if (show) {
-            val text = initialValue.toString()
-            inputValue = TextFieldValue(text, selection = TextRange(text.length))
+            inputState.setTextAndPlaceCursorAtEnd(initialValue.toString())
         }
     }
 
@@ -232,17 +286,15 @@ fun NumberInputDialog(
     ) {
         val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = inputValue,
-                onValueChange = { newValue ->
-                    if (newValue.text.all { it.isDigit() }) inputValue = newValue
-                },
+            AdaptiveTextField(
+                state = inputState,
                 label = label,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                inputTransformation = DigitsOnlyInputTransformation,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = inputFocusModifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                maxLines = 1
             )
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -257,7 +309,7 @@ fun NumberInputDialog(
                 AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
-                        inputValue.text.toIntOrNull()?.let {
+                        inputState.text.toString().toIntOrNull()?.let {
                             onConfirm(it.coerceIn(min, max))
                             onDismiss()
                         }
@@ -283,13 +335,9 @@ fun TextInputDialog(
     onDismissFinished: () -> Unit = {},
     onConfirm: (String) -> Unit
 ) {
-    var inputValue by remember {
-        mutableStateOf(
-            TextFieldValue(initialValue, selection = TextRange(initialValue.length))
-        )
-    }
+    val inputState = rememberTextFieldState(initialValue)
     LaunchedEffect(show) {
-        if (show) inputValue = TextFieldValue(initialValue, selection = TextRange(initialValue.length))
+        if (show) inputState.setTextAndPlaceCursorAtEnd(initialValue)
     }
 
     AdaptiveDialog(
@@ -301,15 +349,14 @@ fun TextInputDialog(
     ) {
         val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = inputValue,
-                onValueChange = { inputValue = it },
+            AdaptiveTextField(
+                state = inputState,
                 label = label,
                 keyboardOptions = keyboardOptions,
                 modifier = inputFocusModifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                maxLines = 15
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 15),
             )
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -323,7 +370,7 @@ fun TextInputDialog(
                 Spacer(Modifier.width(20.dp))
                 AdaptiveDialogButton(
                     text = confirmText,
-                    onClick = { onConfirm(inputValue.text); onDismiss() },
+                    onClick = { onConfirm(inputState.text.toString()); onDismiss() },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary()
                 )
@@ -380,14 +427,10 @@ fun FloatInputDialog(
     onDismissFinished: () -> Unit = {},
     onConfirm: (Float) -> Unit
 ) {
-    var inputValue by remember {
-        val text = initialValue.toString()
-        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
-    }
+    val inputState = rememberTextFieldState(initialValue.toString())
     LaunchedEffect(show) {
         if (show) {
-            val text = initialValue.toString()
-            inputValue = TextFieldValue(text, selection = TextRange(text.length))
+            inputState.setTextAndPlaceCursorAtEnd(initialValue.toString())
         }
     }
 
@@ -400,17 +443,15 @@ fun FloatInputDialog(
     ) {
         val inputFocusModifier = rememberDialogInputFocusModifier()
         Column(modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = inputValue,
-                onValueChange = { newValue ->
-                    if (newValue.text.isValidDecimalInput()) inputValue = newValue
-                },
+            AdaptiveTextField(
+                state = inputState,
                 label = label,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                inputTransformation = DecimalInputTransformation,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = inputFocusModifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                maxLines = 1
             )
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -425,7 +466,7 @@ fun FloatInputDialog(
                 AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
-                        inputValue.text.toFloatOrNull()?.let {
+                        inputState.text.toString().toFloatOrNull()?.let {
                             onConfirm(it.coerceIn(min, max))
                             onDismiss()
                         }
@@ -463,38 +504,34 @@ fun PaddingInputDialog(
     onDismissFinished: () -> Unit = {},
     onConfirm: (Int, Int) -> Unit
 ) {
-    var leftValue by remember { mutableStateOf(initialLeft.toString()) }
-    var rightValue by remember { mutableStateOf(initialRight.toString()) }
+    val leftState = rememberTextFieldState(initialLeft.toString())
+    val rightState = rememberTextFieldState(initialRight.toString())
     LaunchedEffect(show) {
         if (show) {
-            leftValue = initialLeft.toString()
-            rightValue = initialRight.toString()
+            leftState.setTextAndPlaceCursorAtEnd(initialLeft.toString())
+            rightState.setTextAndPlaceCursorAtEnd(initialRight.toString())
         }
     }
 
     AdaptiveDialog(title = title, show = show, onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            val filter = { text: String ->
-                if (text == "-" || text.isEmpty()) true
-                else text.toIntOrNull() != null
-            }
-            TextField(
-                value = leftValue,
-                onValueChange = { if (filter(it)) leftValue = it },
+            AdaptiveTextField(
+                state = leftState,
                 label = stringResource(id = R.string.label_left_padding),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                inputTransformation = SignedIntegerInputTransformation,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = Modifier.fillMaxWidth(),
-                maxLines = 1
             )
             Spacer(modifier = Modifier.height(12.dp))
-            TextField(
-                value = rightValue,
-                onValueChange = { if (filter(it)) rightValue = it },
+            AdaptiveTextField(
+                state = rightState,
                 label = stringResource(id = R.string.label_right_padding),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                inputTransformation = SignedIntegerInputTransformation,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = Modifier.fillMaxWidth(),
-                maxLines = 1
             )
             Spacer(modifier = Modifier.height(24.dp))
             Row(
@@ -510,8 +547,8 @@ fun PaddingInputDialog(
                 AdaptiveDialogButton(
                     text = stringResource(id = R.string.confirm),
                     onClick = {
-                        val l = leftValue.toIntOrNull() ?: 0
-                        val r = rightValue.toIntOrNull() ?: 0
+                        val l = leftState.text.toString().toIntOrNull() ?: 0
+                        val r = rightState.text.toString().toIntOrNull() ?: 0
                         onConfirm(l.coerceIn(-50, 100), r.coerceIn(-50, 100))
                         onDismiss()
                     },

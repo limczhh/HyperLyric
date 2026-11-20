@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +42,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.lidesheng.hyperlyric.R
 import com.lidesheng.hyperlyric.common.RootConstants
+import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
+import com.lidesheng.hyperlyric.ui.component.AdaptiveTextField
 import com.lidesheng.hyperlyric.ui.component.rememberDialogInputFocusModifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -51,11 +56,9 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
 import kotlin.math.roundToInt
 
 @Composable
@@ -95,7 +98,7 @@ internal fun AiTranslationModelDialog(
             }
         }
     }
-    var inputValue by remember { mutableStateOf(currentModel) }
+    val inputState = rememberTextFieldState(currentModel)
     var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var pendingSnackbarCount by remember { mutableIntStateOf(0) }
@@ -106,7 +109,7 @@ internal fun AiTranslationModelDialog(
         searchJob?.cancel()
         searchJob = null
         if (show) {
-            inputValue = currentModel
+            inputState.setTextAndPlaceCursorAtEnd(currentModel)
             availableModels = emptyList()
             isLoading = false
         }
@@ -144,7 +147,7 @@ internal fun AiTranslationModelDialog(
             apiKey.isBlank() -> showSearchMessage(apiKeyRequiredMessage)
             baseUrl.isBlank() -> showSearchMessage(baseUrlRequiredMessage)
             else -> {
-                val selectedModel = inputValue
+                val selectedModel = inputState.text.toString()
                 availableModels = emptyList()
                 isLoading = true
                 val requestId = ++requestGeneration
@@ -219,12 +222,11 @@ internal fun AiTranslationModelDialog(
                     .fillMaxWidth()
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    TextField(
-                        value = inputValue,
-                        onValueChange = { inputValue = it },
+                    AdaptiveTextField(
+                        state = inputState,
                         label = stringResource(R.string.title_ai_translation_model),
                         modifier = inputFocusModifier.fillMaxWidth(),
-                        maxLines = 1
+                        lineLimits = TextFieldLineLimits.SingleLine,
                     )
                 }
             }
@@ -254,9 +256,9 @@ internal fun AiTranslationModelDialog(
                         items(availableModels, key = { it }) { availableModel ->
                             CheckboxPreference(
                                 title = availableModel,
-                                checked = inputValue == availableModel,
+                                checked = inputState.text.toString() == availableModel,
                                 onCheckedChange = { checked ->
-                                    if (checked) inputValue = availableModel
+                                    if (checked) inputState.setTextAndPlaceCursorAtEnd(availableModel)
                                 },
                                 checkboxLocation = CheckboxLocation.End
                             )
@@ -288,7 +290,7 @@ internal fun AiTranslationModelDialog(
                     Spacer(Modifier.width(20.dp))
                     TextButton(
                         text = stringResource(R.string.confirm),
-                        onClick = { onConfirm(inputValue) },
+                        onClick = { onConfirm(inputState.text.toString()) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.textButtonColorsPrimary()
                     )

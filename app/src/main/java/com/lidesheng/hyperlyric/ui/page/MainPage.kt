@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.union
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -103,6 +105,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
@@ -374,9 +377,20 @@ fun MainPage() {
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            val navigationBarInset = with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() }
-            val bottomBarMargin = maxOf(20.dp, navigationBarInset + 4.dp)
+            val bottomSystemInset = with(LocalDensity.current) {
+                maxOf(
+                    WindowInsets.navigationBars.getBottom(this),
+                    WindowInsets.captionBar.getBottom(this),
+                ).toDp()
+            }
+            val bottomBarMargin = maxOf(20.dp, bottomSystemInset + 4.dp)
             val surfaceColor = MiuixTheme.colorScheme.surface
+            val progressiveBlendColors = remember(surfaceColor) {
+                listOf(BlendColorEntry(surfaceColor.copy(alpha = 0.3f)))
+            }
+            val progressiveBlurColors = BlurDefaults.blurColors(
+                blendColors = progressiveBlendColors,
+            )
             val gradientBrush = rememberAdaptiveBottomBarBandBrush()
             val shadowOverhang = 16.dp
             val totalMaskHeight = GlassNavigationBarDefaults.Height + bottomBarMargin + shadowOverhang
@@ -395,18 +409,19 @@ fun MainPage() {
                                     backdrop = outerBackdrop,
                                     shape = RectangleShape,
                                     blurRadius = GlassTopAppBarDefaults.ProgressiveBlurRadius.value,
-                                    gradient = ProgressiveBlur.Bottom.copy(curve = 0.5f),
-                                    colors = BlurColors(
-                                        blendColors = listOf(
-                                            BlendColorEntry(color = surfaceColor.copy(alpha = 0.8f))
-                                        )
-                                    ),
+                                    gradient = ProgressiveBlur.Bottom.copy(curve = 0.25f),
+                                    colors = progressiveBlurColors,
                                 )
                             } else {
                                 Modifier.background(gradientBrush)
                             }
                         )
-                        .padding(bottom = bottomBarMargin),
+                        .padding(bottom = bottomBarMargin)
+                        .windowInsetsPadding(
+                            WindowInsets.displayCutout
+                                .union(WindowInsets.navigationBars)
+                                .only(WindowInsetsSides.Horizontal)
+                        ),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     GlassNavigationBar(

@@ -108,7 +108,8 @@ fun LogTabContent(
                     item { Spacer(Modifier.height(16.dp)) }
                 }
                 VerticalScrollBar(
-                    adapter = rememberScrollBarAdapter(lazyListState),
+                    adapter = rememberScrollBarAdapter(scrollState = lazyListState),
+                    topAppBarScrollBehavior = topAppBarScrollBehavior,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(),

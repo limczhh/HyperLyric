@@ -84,7 +84,8 @@ fun ChangelogPage() {
                 changelogPageSections(changelogs)
             }
             VerticalScrollBar(
-                adapter = rememberScrollBarAdapter(lazyListState),
+                adapter = rememberScrollBarAdapter(scrollState = lazyListState),
+                topAppBarScrollBehavior = topAppBarScrollBehavior,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight(),

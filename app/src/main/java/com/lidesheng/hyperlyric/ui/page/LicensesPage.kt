@@ -90,7 +90,8 @@ fun LicensesPage() {
                 licensesPageSections(onOpenLink)
             }
             VerticalScrollBar(
-                adapter = rememberScrollBarAdapter(lazyListState),
+                adapter = rememberScrollBarAdapter(scrollState = lazyListState),
+                topAppBarScrollBehavior = topAppBarScrollBehavior,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight(),
