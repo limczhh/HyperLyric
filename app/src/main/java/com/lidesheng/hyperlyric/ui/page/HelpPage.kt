@@ -7,18 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -29,7 +24,6 @@ import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
-import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -39,9 +33,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
-import com.lidesheng.hyperlyric.ui.utils.rememberNavPagerState
-import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -55,19 +46,9 @@ fun HelpPage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
-
-    val tabs = listOf(
-        stringResource(R.string.title_super_island_lyrics),
-        stringResource(R.string.title_dynamic_island_lyrics)
-    )
-    val pagerState = rememberPagerState { tabs.size }
-    val navPagerState = rememberNavPagerState(pagerState)
-    val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val onOpenDownloadLink = rememberExternalLinkOpener(snackbarHostState)
-
     val superIslandListState = rememberLazyListState()
-    val dynamicIslandListState = rememberLazyListState()
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
@@ -77,7 +58,7 @@ fun HelpPage() {
                     color = barColor,
                     title = stringResource(R.string.title_help),
                     scrollBehavior = topAppBarScrollBehavior,
-                    isContentScrolled = (if (navPagerState.selectedIndex == 0) superIslandListState else dynamicIslandListState).canScrollBackward,
+                    isContentScrolled = superIslandListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -85,50 +66,23 @@ fun HelpPage() {
                                 contentDescription = stringResource(R.string.back)
                             )
                         }
-                    },
-                    bottomContent = {
-                        AdaptiveTabRow(
-                            tabs = tabs,
-                            selectedTabIndex = navPagerState.selectedIndex,
-                            onTabSelected = { index ->
-                                navPagerState.animateToPage(index)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .padding(bottom = 12.dp),
-                            colors = TabRowDefaults.tabRowColors(backgroundColor = Color.Transparent)
-                        )
                     }
                 )
             }
         }
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
-            HorizontalPager(
-                state = pagerState,
-                overscrollEffect = null,
-                verticalAlignment = Alignment.Top,
-                beyondViewportPageCount = 1
-            ) { page ->
-                val listState = if (page == 0) superIslandListState else dynamicIslandListState
-                val topPadding = innerPadding.calculateTopPadding()
-                val bottomPadding = innerPadding.calculateBottomPadding()
-                val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.pageScrollModifiers(
-                        enableScrollEndHaptic = true,
-                        showTopAppBar = true,
-                        topAppBarScrollBehavior = topAppBarScrollBehavior
-                    ),
-                    contentPadding = contentPadding,
-                ) {
-                    when (page) {
-                        0 -> superIslandHelpSections(onOpenDownloadLink)
-                        1 -> dynamicIslandHelpSections()
-                    }
-                }
+            val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)
+            LazyColumn(
+                state = superIslandListState,
+                modifier = Modifier.pageScrollModifiers(
+                    enableScrollEndHaptic = true,
+                    showTopAppBar = true,
+                    topAppBarScrollBehavior = topAppBarScrollBehavior
+                ),
+                contentPadding = contentPadding,
+            ) {
+                superIslandHelpSections(onOpenDownloadLink)
             }
         }
     }
@@ -242,53 +196,6 @@ private fun LazyListScope.superIslandHelpSections(onOpenDownloadLink: (String) -
                     )
                 }
             }
-        }
-    }
-}
-
-private fun LazyListScope.dynamicIslandHelpSections() {
-    item(key = "dynamic_island_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_usage_tips))
-    }
-    item(key = "dynamic_island_tips_content") {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            Column {
-                BasicComponent(
-                    title = stringResource(R.string.summary_help_dynamic_island_hint),
-                    summary = stringResource(R.string.summary_help_focus_whitelist_hint)
-                )
-            }
-        }
-    }
-    item(key = "dynamic_island_steps_title") {
-        SmallTitle(text = stringResource(R.string.title_help_config_steps))
-    }
-    item(key = "dynamic_island_steps_content") {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            Column { BasicComponent(summary = stringResource(R.string.summary_help_dynamic_island_steps)) }
-        }
-    }
-    item(key = "dynamic_island_warm_tips_title") {
-        SmallTitle(text = stringResource(R.string.title_help_warm_tips))
-    }
-    item(key = "dynamic_island_warm_tips_content") {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp)
-                .fillMaxWidth()
-        ) {
-            Column { BasicComponent(summary = stringResource(R.string.summary_help_salt_player)) }
         }
     }
 }

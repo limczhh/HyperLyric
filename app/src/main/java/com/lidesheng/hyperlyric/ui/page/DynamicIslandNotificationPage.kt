@@ -11,12 +11,17 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -49,6 +54,8 @@ import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.lyric.ConfigRepository
 import com.lidesheng.hyperlyric.service.LiveLyricService
 import com.lidesheng.hyperlyric.service.utils.shizuku.ShizukuManager
+import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
+import com.lidesheng.hyperlyric.ui.component.AdaptiveDialogButton
 import com.lidesheng.hyperlyric.ui.component.SimpleDialog
 import com.lidesheng.hyperlyric.ui.component.TextInputDialog
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
@@ -59,6 +66,7 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
@@ -75,7 +83,9 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.Help
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
@@ -105,6 +115,7 @@ fun DynamicIslandNotificationPage() {
         )
     }
     var showPermissionSheet by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     var lyricSource by remember {
         mutableIntStateOf(
@@ -384,6 +395,17 @@ fun DynamicIslandNotificationPage() {
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.back)
+                            )
+                        }
+                    },
+                    actions = {
+                        AdaptiveIconButton(
+                            onClick = { showHelpDialog = true },
+                            holdDownState = showHelpDialog
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.Help,
+                                contentDescription = stringResource(R.string.title_help)
                             )
                         }
                     },
@@ -780,6 +802,34 @@ fun DynamicIslandNotificationPage() {
         }
     }
 
+    AdaptiveDialog(
+        show = showHelpDialog,
+        title = stringResource(R.string.title_help),
+        maxWidth = 560.dp,
+        onDismissRequest = { showHelpDialog = false }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 560.dp)
+            ) {
+                dynamicIslandHelpSections()
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                AdaptiveDialogButton(
+                    text = stringResource(R.string.close),
+                    onClick = { showHelpDialog = false }
+                )
+            }
+        }
+    }
+
     AdaptiveBottomSheet(
         show = showPermissionSheet,
         title = stringResource(R.string.sheet_permission_title),
@@ -860,6 +910,53 @@ fun DynamicIslandNotificationPage() {
                 state = sheetSnackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+        }
+    }
+}
+
+private fun LazyListScope.dynamicIslandHelpSections() {
+    item(key = "dynamic_island_tips_title") {
+        SmallTitle(text = stringResource(R.string.title_help_usage_tips))
+    }
+    item(key = "dynamic_island_tips_content") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Column {
+                BasicComponent(
+                    title = stringResource(R.string.summary_help_dynamic_island_hint),
+                    summary = stringResource(R.string.summary_help_focus_whitelist_hint)
+                )
+            }
+        }
+    }
+    item(key = "dynamic_island_steps_title") {
+        SmallTitle(text = stringResource(R.string.title_help_config_steps))
+    }
+    item(key = "dynamic_island_steps_content") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Column { BasicComponent(summary = stringResource(R.string.summary_help_dynamic_island_steps)) }
+        }
+    }
+    item(key = "dynamic_island_warm_tips_title") {
+        SmallTitle(text = stringResource(R.string.title_help_warm_tips))
+    }
+    item(key = "dynamic_island_warm_tips_content") {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Column { BasicComponent(summary = stringResource(R.string.summary_help_salt_player)) }
         }
     }
 }

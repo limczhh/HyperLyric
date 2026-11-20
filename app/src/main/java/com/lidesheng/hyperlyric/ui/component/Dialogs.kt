@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.lidesheng.hyperlyric.R
@@ -40,6 +41,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -60,6 +62,7 @@ fun AdaptiveDialog(
     title: String? = null,
     summary: String? = null,
     modifier: Modifier = Modifier,
+    maxWidth: Dp = DialogDefaults.MaxWidth,
     onDismissRequest: () -> Unit,
     onDismissFinished: () -> Unit = {},
     content: @Composable () -> Unit,
@@ -76,6 +79,7 @@ fun AdaptiveDialog(
         onDismissRequest = onDismissRequest,
         onDismissFinished = onDismissFinished,
         surface = if (glassStyle) glassDialogSurface(backdrop = if (isBlurActive) backdrop else null) else null,
+        maxWidth = maxWidth,
     ) {
         CompositionLocalProvider(LocalGlassDialog provides glassStyle) {
             content()
