@@ -80,8 +80,7 @@
     <string name="title_monet">强调色</string>
     <string name="title_predictive_back">预测性返回手势</string>
     <string name="title_floating_nav">悬浮底栏</string>
-    <string name="title_enable_blur">模糊</string>
-    <string name="summary_enable_blur">启用顶栏和底栏的模糊效果</string>
+    <string name="title_enable_blur">模糊效果</string>
     <string name="title_exclude_from_recents">隐藏后台卡片</string>
     <string name="title_hide_launcher_icon">隐藏桌面图标</string>
     <string name="title_hide_home_poetry_card">隐藏主页诗词卡片</string>

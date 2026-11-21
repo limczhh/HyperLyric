@@ -76,7 +76,6 @@
   <string name="title_predictive_back">إيماءة الرجوع التنبؤية</string>
   <string name="title_floating_nav">شريط التنقل العائم</string>
   <string name="title_enable_blur">تأثير التمويه</string>
-  <string name="summary_enable_blur">تمكين تأثيرات التمويه للشريطين العلوي والسفلي</string>
   <string name="title_exclude_from_recents">إخفاء من التطبيقات الأخيرة</string>
   <string name="title_hide_launcher_icon">إخفاء أيقونة المشغّل</string>
   <string name="title_config_management">إدارة الإعدادات</string>

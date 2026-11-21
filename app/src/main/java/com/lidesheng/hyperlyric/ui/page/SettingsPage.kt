@@ -229,7 +229,6 @@ private fun LazyListScope.settingsSections(
                 }
                 SwitchPreference(
                     title = stringResource(R.string.title_enable_blur),
-                    summary = stringResource(R.string.summary_enable_blur),
                     checked = enableBlur,
                     onCheckedChange = {
                         enableBlur = it; prefs.edit { putBoolean(UIConstants.KEY_ENABLE_BLUR, it) }
