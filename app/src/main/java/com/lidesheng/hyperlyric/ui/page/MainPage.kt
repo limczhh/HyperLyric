@@ -49,7 +49,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import top.yukonga.miuix.kmp.material.GlassShadows
 import androidx.compose.ui.graphics.Color
@@ -105,13 +104,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.BlurColors
-import top.yukonga.miuix.kmp.blur.ProgressiveBlur
-import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
-import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
-import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
-import androidx.compose.ui.graphics.RectangleShape
 import top.yukonga.miuix.kmp.material.EdgeStrokes
 import top.yukonga.miuix.kmp.material.edgeStroke
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -384,13 +377,6 @@ fun MainPage() {
                 ).toDp()
             }
             val bottomBarMargin = maxOf(20.dp, bottomSystemInset + 4.dp)
-            val surfaceColor = MiuixTheme.colorScheme.surface
-            val progressiveBlendColors = remember(surfaceColor) {
-                listOf(BlendColorEntry(surfaceColor.copy(alpha = 0.3f)))
-            }
-            val progressiveBlurColors = BlurDefaults.blurColors(
-                blendColors = progressiveBlendColors,
-            )
             val gradientBrush = rememberAdaptiveBottomBarBandBrush()
             val shadowOverhang = 16.dp
             val totalMaskHeight = GlassNavigationBarDefaults.Height + bottomBarMargin + shadowOverhang
@@ -403,19 +389,7 @@ fun MainPage() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(totalMaskHeight)
-                        .then(
-                            if (isRuntimeShaderSupported() && outerBackdrop != null) {
-                                Modifier.progressiveTextureBlur(
-                                    backdrop = outerBackdrop,
-                                    shape = RectangleShape,
-                                    blurRadius = GlassTopAppBarDefaults.ProgressiveBlurRadius.value,
-                                    gradient = ProgressiveBlur.Bottom.copy(curve = 0.25f),
-                                    colors = progressiveBlurColors,
-                                )
-                            } else {
-                                Modifier.background(gradientBrush)
-                            }
-                        )
+                        .background(gradientBrush)
                         .padding(bottom = bottomBarMargin)
                         .windowInsetsPadding(
                             WindowInsets.displayCutout
