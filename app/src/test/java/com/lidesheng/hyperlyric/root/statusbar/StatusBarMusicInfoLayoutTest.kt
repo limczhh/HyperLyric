@@ -3,10 +3,13 @@ package com.lidesheng.hyperlyric.root.statusbar
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Rect
 import android.os.Looper
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.lidesheng.hyperlyric.common.RootConstants
@@ -168,6 +171,53 @@ class StatusBarMusicInfoLayoutTest {
 
         assertEquals(committedWidth, wrapper.width)
         assertEquals(committedWidth, wrapper.desiredWidthPx)
+    }
+
+    @Test
+    fun coverIconReservesItsConfiguredWidthBeforeArtworkArrives() {
+        prefs.edit()
+            .putBoolean(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_ENABLED, true)
+            .putInt(
+                RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_ICON_STYLE,
+                RootConstants.STATUS_BAR_LYRIC_ICON_MUSIC_COVER,
+            )
+            .commit()
+        val row = LinearLayout(activity.get())
+        val icon = ImageView(activity.get())
+        val controller = StatusBarLyricIconController(row, icon)
+        val config = StatusBarLyricLayoutConfig.from(prefs, root)
+        val reservedWidth = config.iconSizePx + config.iconSpacingPx
+
+        assertEquals(
+            reservedWidth,
+            controller.update(
+                config = config,
+                mediaPackage = null,
+                artwork = null,
+                lyricColor = Color.WHITE,
+                isPlaying = false,
+                contentWidthLimitPx = config.widthLimitPx,
+            )
+        )
+        assertEquals(View.VISIBLE, icon.visibility)
+        assertEquals(config.iconSizePx, icon.layoutParams.width)
+        assertNull(icon.drawable)
+
+        val artwork = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        assertEquals(
+            reservedWidth,
+            controller.update(
+                config = config,
+                mediaPackage = null,
+                artwork = artwork,
+                lyricColor = Color.WHITE,
+                isPlaying = false,
+                contentWidthLimitPx = config.widthLimitPx,
+            )
+        )
+        assertNotNull(icon.drawable)
+        controller.clear()
+        artwork.recycle()
     }
 
     private fun checkIslandAvoidance(mode: Int) {

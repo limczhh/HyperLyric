@@ -38,7 +38,8 @@ internal class StatusBarLyricIconController(
         isPlaying: Boolean,
         contentWidthLimitPx: Int,
     ): Int {
-        val requiredWidth = config.iconSizePx + config.iconSpacingPx + 1
+        val reservedWidth = config.iconSizePx + config.iconSpacingPx
+        val requiredWidth = reservedWidth + 1
         val fits = config.iconEnabled && contentWidthLimitPx >= requiredWidth
         val nextOrder = config.iconOrder
         if (currentOrder != nextOrder || row.indexOfChild(iconView) < 0) {
@@ -102,9 +103,14 @@ internal class StatusBarLyricIconController(
             else -> false
         }
         if (!hasImage) {
-            iconView.visibility = View.GONE
+            clearImage()
             shouldRotateWhenVisible = false
             stopRotation(reset = true)
+            if (coverStyle) {
+                iconView.visibility = View.VISIBLE
+                return reservedWidth
+            }
+            iconView.visibility = View.GONE
             return 0
         }
 
@@ -122,7 +128,7 @@ internal class StatusBarLyricIconController(
                         usableArtwork == null,
             )
         }
-        return config.iconSizePx + config.iconSpacingPx
+        return reservedWidth
     }
 
     fun updateTint(color: Int) {
@@ -148,14 +154,7 @@ internal class StatusBarLyricIconController(
 
     fun clear() {
         stopRotation(reset = true)
-        iconView.clearColorFilter()
-        iconView.setImageDrawable(null)
-        imageKind = ImageKind.NONE
-        imageStyle = -1
-        lastArtwork = null
-        lastAppPackage = null
-        renderedAsTintedIcon = false
-        lastTintColor = null
+        clearImage()
         hostVisible = false
         shouldRotateWhenVisible = false
         currentStyle = -1
@@ -163,6 +162,16 @@ internal class StatusBarLyricIconController(
         currentSizePx = -1
         shapeStyle = -1
         shapeSizePx = -1
+    }
+
+    private fun clearImage() {
+        clearTintCache()
+        iconView.setImageDrawable(null)
+        imageKind = ImageKind.NONE
+        imageStyle = -1
+        lastArtwork = null
+        lastAppPackage = null
+        renderedAsTintedIcon = false
     }
 
     private fun iconLayoutParams(config: StatusBarLyricLayoutConfig) =
