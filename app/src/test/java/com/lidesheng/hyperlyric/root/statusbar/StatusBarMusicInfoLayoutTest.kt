@@ -4,12 +4,16 @@ import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Rect
+import android.os.Looper
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.lyric.model.LyricMediaMetadata
+import com.lidesheng.hyperlyric.lyric.model.RichLyricLine
+import com.lidesheng.hyperlyric.lyric.model.Song
+import com.lidesheng.hyperlyric.lyric.view.RichLyricLineView
 import com.lidesheng.hyperlyric.root.LyriconDataBridge
 import com.lidesheng.hyperlyric.root.island.view.MaxWidthFrameLayout
 import org.junit.After
@@ -19,6 +23,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -100,6 +105,71 @@ class StatusBarMusicInfoLayoutTest {
         assertTrue(rightInWindow(wrapper) <= bounds.left)
     }
 
+    @Test
+    fun musicInfoToLyricCommitsTheNewWidthBeforeTheNextLayout() {
+        prefs.edit()
+            .putInt(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CONTENT_MODE,
+                RootConstants.ISLAND_CONTENT_MODE_LYRIC)
+            .commit()
+        LyriconDataBridge.updateMediaMetadata(
+            LyricMediaMetadata(
+                sourceId = "test",
+                title = "T",
+                artist = "Artist",
+                duration = 100_000L,
+            )
+        )
+        host.render(prefs, force = true, suppressAnimation = true)
+        layout()
+        val metadataWidth = wrapper().width
+
+        LyriconDataBridge.updateSong(
+            Song(
+                name = "T",
+                duration = 100_000L,
+                lyrics = listOf(
+                    RichLyricLine(
+                        text = "A deliberately longer lyric line for the width transition",
+                        begin = 0L,
+                        end = 100_000L,
+                    )
+                ),
+            )
+        )
+        LyriconDataBridge.updatePosition(1_000L)
+        host.render(prefs, force = true, suppressAnimation = true)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        layout()
+
+        val wrapper = wrapper()
+        assertTrue("metadata width=$metadataWidth, lyric width=${wrapper.width}",
+            wrapper.width > metadataWidth)
+        assertEquals(wrapper.desiredWidthPx, wrapper.width)
+        assertTrue(host.isShowingLyric())
+    }
+
+    @Test
+    fun cancelledLyricWidthPreflightDoesNotKeepTheUncommittedWidth() {
+        prefs.edit()
+            .putInt(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CONTENT_MODE,
+                RootConstants.ISLAND_CONTENT_MODE_LYRIC)
+            .commit()
+        loadSong("Short", 0L)
+        host.render(prefs, force = true, suppressAnimation = true)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        layout()
+        val wrapper = wrapper()
+        val committedWidth = wrapper.width
+
+        loadSong("A deliberately much longer lyric line for cancellation", 1_000L)
+        host.render(prefs, force = true, suppressAnimation = true)
+        lyricView().resetTransitionAnimations()
+        layout()
+
+        assertEquals(committedWidth, wrapper.width)
+        assertEquals(committedWidth, wrapper.desiredWidthPx)
+    }
+
     private fun checkIslandAvoidance(mode: Int) {
         prefs.edit().putInt(RootConstants.KEY_HOOK_STATUS_BAR_LYRIC_CONTENT_MODE, mode).commit()
         host.render(prefs, force = true, suppressAnimation = true)
@@ -128,6 +198,20 @@ class StatusBarMusicInfoLayoutTest {
 
     private fun wrapper() = (0 until parent.childCount)
         .map { parent.getChildAt(it) }.filterIsInstance<MaxWidthFrameLayout>().single()
+
+    private fun lyricView() = wrapper().getChildAt(0)
+        .let { row -> (row as LinearLayout).getChildAt(1) as RichLyricLineView }
+
+    private fun loadSong(text: String, position: Long) {
+        LyriconDataBridge.updateSong(
+            Song(
+                name = "T",
+                duration = 100_000L,
+                lyrics = listOf(RichLyricLine(text = text, begin = 0L, end = 100_000L)),
+            )
+        )
+        LyriconDataBridge.updatePosition(position)
+    }
 
     private fun islandAt(wrapper: View, available: Int): Rect {
         val location = IntArray(2)
