@@ -192,7 +192,6 @@ private val LocalBarBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 private val LocalInGlassBar = staticCompositionLocalOf { false }
 private val LocalBarScrollBehavior = staticCompositionLocalOf<ScrollBehavior?> { null }
 private val LocalBarContentScrolled = staticCompositionLocalOf { false }
-private val LocalBarVisualContentOffset = staticCompositionLocalOf<(() -> Float)?> { null }
 
 @Composable
 fun BlurredBar(
@@ -265,7 +264,6 @@ fun AdaptiveTopAppBar(
     color: Color = Color.Unspecified,
     scrollBehavior: ScrollBehavior? = null,
     isContentScrolled: Boolean? = null,
-    visualContentOffset: (() -> Float)? = null,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     bottomContent: @Composable () -> Unit = {},
@@ -278,10 +276,6 @@ fun AdaptiveTopAppBar(
             } ?: false)
         }
     }
-    val resolvedVisualContentOffset = visualContentOffset ?: if (scrollBehavior != null) {
-        { scrollBehavior.state.visualContentOffset }
-    } else null
-
     if (LocalGlassStyle.current) {
         val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
@@ -290,21 +284,20 @@ fun AdaptiveTopAppBar(
         val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
         val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive) {
             { 1f }
-        } else if (scrollBehavior != null || resolvedVisualContentOffset != null) {
+        } else if (scrollBehavior != null) {
             { 1f }
         } else {
             { if (contentScrolled) 1f else 0f }
         }
         GlassTopAppBar(
             title = title,
-            isContentScrolled = contentScrolled,
+            contentScrolled,
             modifier = modifier,
             contentModifier = contentModifier,
             expandable = !wide,
             progressiveBlur = isBlurActive,
             backdrop = backdrop,
             scrollBehavior = scrollBehavior,
-            visualContentOffset = resolvedVisualContentOffset,
             backgroundAlpha = resolvedBackgroundAlpha,
             bandBrush = bandBrush,
             bandOverhang = GlassTopAppBarDefaults.BandOverhang,
@@ -315,7 +308,6 @@ fun AdaptiveTopAppBar(
                 LocalBarBackdrop provides backdrop,
                 LocalBarScrollBehavior provides scrollBehavior,
                 LocalBarContentScrolled provides contentScrolled,
-                LocalBarVisualContentOffset provides resolvedVisualContentOffset,
             ) { bottomContent() } },
         )
     } else {
@@ -361,9 +353,6 @@ fun AdaptiveSmallTopAppBar(
             } ?: false)
         }
     }
-    val resolvedVisualContentOffset: (() -> Float)? = if (scrollBehavior != null) {
-        { scrollBehavior.state.visualContentOffset }
-    } else null
     if (LocalGlassStyle.current) {
         val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
@@ -386,12 +375,11 @@ fun AdaptiveSmallTopAppBar(
         }
         GlassTopAppBar(
             title = title,
+            contentScrolled,
             modifier = modifier,
             expandable = false,
-            isContentScrolled = contentScrolled,
             backdrop = backdrop,
             scrollBehavior = scrollBehavior,
-            visualContentOffset = resolvedVisualContentOffset,
             progressiveBlur = isBlurActive,
             titleAlpha = resolvedTitleAlpha,
             backgroundAlpha = resolvedBackgroundAlpha,
@@ -487,7 +475,7 @@ fun AdaptiveTabRow(
             transitionSpec = { GlassMotion.topBarButtonFloat() },
             label = "adaptiveTabRowMaterial",
         ) { if (it) 1f else 0f }
-        val ramp = GlassTopAppBarDefaults.collapseRamp(scrollBehavior, LocalBarVisualContentOffset.current)
+        val ramp = GlassTopAppBarDefaults.collapseRamp(scrollBehavior)
         val materialProgress by remember(scrolledMaterialProgress, scrollBehavior, ramp) {
             derivedStateOf {
                 val elasticProgress = if (scrollBehavior != null && scrollBehavior.state.overscrollOffset != 0f) {

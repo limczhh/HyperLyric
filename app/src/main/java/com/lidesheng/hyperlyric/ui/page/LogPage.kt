@@ -276,18 +276,6 @@ fun LogPage() {
     }
 
     val activeListState = if (isAppTab) appListState else moduleListState
-    val visualContentOffset: () -> Float = remember(activeListState, topAppBarScrollBehavior) {
-        {
-            if (activeListState.firstVisibleItemIndex > 0) {
-                -1000f
-            } else if (activeListState.firstVisibleItemScrollOffset > 0) {
-                -activeListState.firstVisibleItemScrollOffset.toFloat() + topAppBarScrollBehavior.state.overscrollOffset
-            } else {
-                topAppBarScrollBehavior.state.overscrollOffset
-            }
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
@@ -297,7 +285,6 @@ fun LogPage() {
                     color = barColor,
                     title = stringResource(R.string.title_view_logs),
                     scrollBehavior = topAppBarScrollBehavior,
-                    visualContentOffset = visualContentOffset,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
