@@ -50,6 +50,8 @@ import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBackIcon
 import top.yukonga.miuix.kmp.menu.OverlayIconCascadingDropdownMenu
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -62,8 +64,8 @@ import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.More
+import top.yukonga.miuix.kmp.icon.glass.More
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalDateTime
@@ -288,7 +290,7 @@ fun LogPage() {
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
-                                imageVector = MiuixIcons.Back,
+                                imageVector = adaptiveBackIcon(),
                                 contentDescription = stringResource(R.string.back)
                             )
                         }
@@ -303,8 +305,9 @@ fun LogPage() {
                                     floating = true,
                                 ),
                             ) {
-                                Icon(
-                                    imageVector = MiuixIcons.More,
+                                AdaptiveTopBarIcon(
+                                    normalIcon = MiuixIcons.More,
+                                    glassIcon = MiuixIcons.Glass.More,
                                     contentDescription = stringResource(R.string.more),
                                     modifier = Modifier.glassPopupAnchorContent(moreMenuAnchor),
                                 )

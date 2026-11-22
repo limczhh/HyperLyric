@@ -21,11 +21,11 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBackIcon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -65,7 +65,7 @@ fun LyricSourcePage() {
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
-                                imageVector = MiuixIcons.Back,
+                                imageVector = adaptiveBackIcon(),
                                 contentDescription = stringResource(R.string.back)
                             )
                         }

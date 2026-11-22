@@ -42,6 +42,8 @@ import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBackIcon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
@@ -52,8 +54,8 @@ import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -281,16 +283,17 @@ fun IslandExpandedMediaCardPage() {
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
-                                imageVector = MiuixIcons.Back,
+                                imageVector = adaptiveBackIcon(),
                                 contentDescription = stringResource(id = R.string.back)
                             )
                         }
                     },
                     actions = {
                         AdaptiveIconButton(onClick = { showRestartDialog = true }) {
-                            Icon(
-                                imageVector = MiuixIcons.Refresh,
-                                contentDescription = stringResource(id = R.string.dialog_restart_title)
+                            AdaptiveTopBarIcon(
+                                normalIcon = MiuixIcons.Refresh,
+                                glassIcon = MiuixIcons.Glass.Refresh,
+                                contentDescription = stringResource(id = R.string.dialog_restart_title),
                             )
                         }
                     },

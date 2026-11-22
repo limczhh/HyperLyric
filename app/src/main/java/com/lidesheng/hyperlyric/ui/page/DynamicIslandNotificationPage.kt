@@ -71,6 +71,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBackIcon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
@@ -82,9 +84,9 @@ import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Help
+import top.yukonga.miuix.kmp.icon.glass.Help
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -392,16 +394,17 @@ fun DynamicIslandNotificationPage() {
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
-                                imageVector = MiuixIcons.Back,
+                                imageVector = adaptiveBackIcon(),
                                 contentDescription = stringResource(R.string.back)
                             )
                         }
                     },
                     actions = {
                         AdaptiveIconButton(onClick = { showHelpDialog = true }) {
-                            Icon(
-                                imageVector = MiuixIcons.Help,
-                                contentDescription = stringResource(R.string.title_help)
+                            AdaptiveTopBarIcon(
+                                normalIcon = MiuixIcons.Help,
+                                glassIcon = MiuixIcons.Glass.Help,
+                                contentDescription = stringResource(R.string.title_help),
                             )
                         }
                     },

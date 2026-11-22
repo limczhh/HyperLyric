@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.captionBar
@@ -36,6 +37,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -72,6 +74,10 @@ import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.IconButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.glass.ChevronBackward
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
@@ -81,6 +87,7 @@ import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.glass.GlassFloatingActionButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
@@ -301,7 +308,6 @@ fun AdaptiveTopAppBar(
             backgroundAlpha = resolvedBackgroundAlpha,
             bandBrush = bandBrush,
             bandOverhang = GlassTopAppBarDefaults.BandOverhang,
-            fill = if (!isBlurActive) surfaceColor else GlassTopAppBarDefaults.buttonFill(),
             navigationIcon = { CompositionLocalProvider(LocalInGlassBar provides true) { navigationIcon() } },
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
             bottomContent = { CompositionLocalProvider(
@@ -385,7 +391,6 @@ fun AdaptiveSmallTopAppBar(
             backgroundAlpha = resolvedBackgroundAlpha,
             bandBrush = bandBrush,
             bandOverhang = GlassTopAppBarDefaults.BandOverhang,
-            fill = if (!isBlurActive) surfaceColor else GlassTopAppBarDefaults.buttonFill(),
             defaultWindowInsetsPadding = defaultWindowInsetsPadding,
             navigationIcon = { CompositionLocalProvider(LocalInGlassBar provides true) { navigationIcon() } },
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
@@ -432,7 +437,6 @@ fun AdaptiveIconButton(
         GlassIconButton(
             onClick = onClick,
             modifier = modifier,
-            backdrop = LocalBarBackdrop.current,
             surfaceAlpha = surfaceAlpha,
             shadow = shadow,
             content = content,
@@ -442,6 +446,33 @@ fun AdaptiveIconButton(
             backgroundColor = backgroundColor, cornerRadius = cornerRadius, minHeight = minHeight, minWidth = minWidth, content = content)
     }
 }
+
+@Composable
+fun AdaptiveTopBarIcon(
+    normalIcon: ImageVector,
+    glassIcon: ImageVector? = null,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+) {
+    val isGlassStyle = LocalGlassStyle.current
+    Icon(
+        imageVector = if (isGlassStyle && glassIcon != null) glassIcon else normalIcon,
+        contentDescription = contentDescription,
+        modifier = modifier.then(if (isGlassStyle) Modifier.size(28.dp) else Modifier),
+        tint = tint,
+    )
+}
+
+@Composable
+fun adaptiveBackIcon(): ImageVector = adaptiveTopBarIcon(
+    normalIcon = MiuixIcons.Back,
+    glassIcon = MiuixIcons.Glass.ChevronBackward,
+)
+
+@Composable
+private fun adaptiveTopBarIcon(normalIcon: ImageVector, glassIcon: ImageVector): ImageVector =
+    if (LocalGlassStyle.current) glassIcon else normalIcon
 
 private object NoOpBackdrop : Backdrop {
     override val isCoordinatesDependent: Boolean = false

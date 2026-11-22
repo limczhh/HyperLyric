@@ -39,6 +39,8 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBackIcon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
@@ -49,8 +51,8 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
 import java.text.DateFormat
@@ -134,7 +136,7 @@ internal fun AiTranslationCacheDetailPage(route: Route.AiTranslationCacheDetail)
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
-                                imageVector = MiuixIcons.Back,
+                                imageVector = adaptiveBackIcon(),
                                 contentDescription = stringResource(R.string.back)
                             )
                         }
@@ -144,9 +146,10 @@ internal fun AiTranslationCacheDetailPage(route: Route.AiTranslationCacheDetail)
                             onClick = { showDeleteDialog = true },
                             enabled = !requestInFlight
                         ) {
-                            Icon(
-                                imageVector = MiuixIcons.Delete,
-                                contentDescription = deleteText
+                            AdaptiveTopBarIcon(
+                                normalIcon = MiuixIcons.Delete,
+                                glassIcon = MiuixIcons.Glass.Delete,
+                                contentDescription = deleteText,
                             )
                         }
                     }
