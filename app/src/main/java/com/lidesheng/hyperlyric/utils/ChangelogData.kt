@@ -10,6 +10,18 @@ object ChangelogData {
     fun getChangelog(): List<ChangelogItem> {
         return listOf(
             ChangelogItem(
+                version = "8.0-1945",
+                title = "优化了一些体验",
+                summary = "- 占位符格式新增 AMLL 样式倒计时圆点\n" +
+                        "- 新增玻璃组件并优化多处应用界面\n" +
+                        "- 适配 superlyric api 4.0 及 superlyric 4.2\n" +
+                        "- 优化歌词源与歌词的接收\n" +
+                        "- 优化状态栏歌词的稳定性\n" +
+                        "- 优化日志页面读取和显示\n" +
+                        "- 通知型歌词使用提示从帮助页移至通知型歌词页面弹窗\n" +
+                        "- 修复同一首歌触发多次 amll 搜索的问题"
+            ),
+            ChangelogItem(
                 version = "7.11-1944",
                 title = "优化了一些体验",
                 summary = "- 新增超级岛媒体卡片切换功能\n" +
