@@ -298,7 +298,7 @@
   <string name="title_marquee_loop">فاصل التكرار</string>
   <string name="label_marquee_loop_range">مللي ثانية، النطاق: 0 ~ 10000</string>
   <string name="title_text_size_ratio">نسبة حجم النص في وضع السطور المتعددة</string>
-  <string name="label_text_size_ratio_range">النطاق: 10 ~ 100</string>
+  <string name="label_text_size_ratio_range">النطاق: 0.10 ~ 1.00</string>
   <string name="title_italic">مائل</string>
   <string name="title_narrow_latin_font">تضييق الحروف اللاتينية والأرقام</string>
   <string name="title_gradient_progress">نمط تدرّج شريط التقدّم</string>

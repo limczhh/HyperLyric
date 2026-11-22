@@ -129,16 +129,16 @@ internal fun LyricDisplaySettings(
             saveConfig(RootConstants.KEY_HOOK_TEXT_SIZE, value)
         }
     )
-    NumberInputDialog(
+    FloatInputDialog(
         show = showTextSizeRatioDialog,
         title = stringResource(id = R.string.title_text_size_ratio),
         label = stringResource(id = R.string.label_text_size_ratio_range),
-        initialValue = (textSizeRatio * 100).toInt(),
-        min = 10,
-        max = 100,
+        initialValue = textSizeRatio,
+        min = 0.10f,
+        max = 1.00f,
         onDismiss = { showTextSizeRatioDialog = false },
         onConfirm = { value ->
-            textSizeRatio = value.toFloat() / 100f
+            textSizeRatio = value
             saveConfig(RootConstants.KEY_HOOK_TEXT_SIZE_RATIO, textSizeRatio)
         }
     )

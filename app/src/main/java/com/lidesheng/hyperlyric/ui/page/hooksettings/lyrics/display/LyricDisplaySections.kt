@@ -84,10 +84,7 @@ fun LazyListScope.lyricDisplaySections(
                     title = stringResource(id = R.string.title_text_size_ratio),
                     endActions = {
                         Text(
-                            stringResource(
-                                id = R.string.format_percent,
-                                (textSizeRatio * 100).toInt()
-                            ),
+                            String.format("%.2f", textSizeRatio),
                             fontSize = MiuixTheme.textStyles.body2.fontSize,
                             color = MiuixTheme.colorScheme.onSurfaceVariantActions
                         )
