@@ -9,6 +9,7 @@ package com.lidesheng.hyperlyric.lyric.view.line
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.Shader
 import android.text.TextPaint
 import android.util.AttributeSet
@@ -26,6 +27,7 @@ import com.lidesheng.hyperlyric.lyric.view.UpdatableColor
 import com.lidesheng.hyperlyric.lyric.view.WordHighlight
 import com.lidesheng.hyperlyric.lyric.view.WordMotion
 import com.lidesheng.hyperlyric.lyric.view.dp
+import com.lidesheng.hyperlyric.lyric.view.drawWithinFadingEdges
 import com.lidesheng.hyperlyric.lyric.view.isAmllCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.isCountdownLine
 import com.lidesheng.hyperlyric.lyric.view.line.model.LyricModel
@@ -52,6 +54,7 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
 
     val textPaint: TextPaint = TextPaintX().apply { textSize = 24f.sp }
+    private val drawingClipBounds = Rect()
 
     val model: LyricModel get() = _model
     private var _model: LyricModel = emptyLyricModel()
@@ -615,7 +618,9 @@ open class SpaceGateLyricLineView(context: Context, attrs: AttributeSet? = null)
 
     override fun onDraw(canvas: Canvas) {
         if (!spaceGateEnabled) {
-            activeRenderer.draw(canvas, _model, textPaint, lineState, measuredWidth, measuredHeight)
+            drawWithinFadingEdges(canvas, lineWidth, drawingClipBounds) {
+                activeRenderer.draw(canvas, _model, textPaint, lineState, measuredWidth, measuredHeight)
+            }
             return
         }
 

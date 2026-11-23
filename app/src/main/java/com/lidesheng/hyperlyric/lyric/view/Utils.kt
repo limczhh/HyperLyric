@@ -9,12 +9,38 @@
 package com.lidesheng.hyperlyric.lyric.view
 
 import android.content.res.Resources
+import android.graphics.Canvas
+import android.graphics.Rect
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.graphics.withClip
 import androidx.core.view.isVisible
 import androidx.core.view.size
 import kotlin.math.roundToInt
+
+internal inline fun View.drawWithinFadingEdges(
+    canvas: Canvas,
+    lineWidth: Float,
+    clipBounds: Rect,
+    draw: () -> Unit,
+) {
+    if (horizontalFadingEdgeLength <= 0 || lineWidth <= width) {
+        draw()
+        return
+    }
+
+    // Both drawing and the View's fade must end at the row edge before any parent scaling.
+    canvas.getClipBounds(clipBounds)
+    canvas.withClip(
+        scrollX + paddingLeft,
+        clipBounds.top,
+        scrollX + width - paddingRight,
+        clipBounds.bottom,
+    ) {
+        draw()
+    }
+}
 
 fun ViewGroup.getChildAtOrNull(index: Int): View? =
     if (index in 0..<size) getChildAt(index) else null
