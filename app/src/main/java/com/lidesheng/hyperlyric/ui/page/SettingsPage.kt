@@ -30,6 +30,7 @@ import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
+import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
@@ -187,6 +188,27 @@ private fun LazyListScope.settingsSections(
                     selectedIndex = uiStyle,
                     onSelectedIndexChange = { prefs.edit { putInt(UIConstants.KEY_UI_STYLE, it) } },
                 )
+                var floatingNavBarEnabled by remember {
+                    mutableStateOf(
+                        prefs.getBoolean(
+                            UIConstants.KEY_FLOATING_NAV_BAR,
+                            UIConstants.DEFAULT_FLOATING_NAV_BAR
+                        )
+                    )
+                }
+                if (!LocalGlassStyle.current) {
+                    SwitchPreference(
+                        title = stringResource(R.string.title_floating_nav),
+                        checked = floatingNavBarEnabled,
+                        onCheckedChange = {
+                            floatingNavBarEnabled = it; prefs.edit {
+                            putBoolean(
+                                UIConstants.KEY_FLOATING_NAV_BAR,
+                                it
+                            )
+                        }
+                        })
+                }
                 AnimatedVisibility(visible = themeMode >= 3) {
                     var monetColorIndex by remember {
                         mutableIntStateOf(
@@ -263,25 +285,6 @@ private fun LazyListScope.settingsSections(
                                 ); m.isAccessible = true; m.invoke(context.applicationInfo, it)
                         }
                         activity?.recreate()
-                    })
-                var floatingNavBarEnabled by remember {
-                    mutableStateOf(
-                        prefs.getBoolean(
-                            UIConstants.KEY_FLOATING_NAV_BAR,
-                            UIConstants.DEFAULT_FLOATING_NAV_BAR
-                        )
-                    )
-                }
-                SwitchPreference(
-                    title = stringResource(R.string.title_floating_nav),
-                    checked = floatingNavBarEnabled,
-                    onCheckedChange = {
-                        floatingNavBarEnabled = it; prefs.edit {
-                        putBoolean(
-                            UIConstants.KEY_FLOATING_NAV_BAR,
-                            it
-                        )
-                    }
                     })
                 var excludeFromRecents by remember {
                     mutableStateOf(
