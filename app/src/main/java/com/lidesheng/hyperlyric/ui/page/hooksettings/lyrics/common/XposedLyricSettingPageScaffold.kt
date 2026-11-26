@@ -111,6 +111,7 @@ internal fun XposedLyricSettingPage(
                     color = barColor,
                     title = title,
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(

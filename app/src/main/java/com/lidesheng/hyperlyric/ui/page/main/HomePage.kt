@@ -55,6 +55,7 @@ fun HomePage(
                     color = barColor,
                     title = "HyperLyric",
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     actions = {
                         AdaptiveIconButton(onClick = onRestartClick) {
                             AdaptiveTopBarIcon(

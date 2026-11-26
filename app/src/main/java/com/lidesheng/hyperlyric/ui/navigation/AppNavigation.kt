@@ -51,6 +51,7 @@ import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 
 @Composable
 fun AppNavigation(startRoute: Route) {
@@ -59,6 +60,7 @@ fun AppNavigation(startRoute: Route) {
     val systemCornerRadius = rememberNavSystemCornerRadius()
     val blurEnabled = LocalBlurEnabled.current
     val backdrop = if (blurEnabled) rememberBlurBackdrop() else null
+    val surfaceColor = MiuixTheme.colorScheme.surface
 
     CompositionLocalProvider(LocalNavigator provides navigator, LocalAppBackdrop provides backdrop) {
         Scaffold(containerColor = MiuixTheme.colorScheme.surface, contentWindowInsets = WindowInsets(0)) {
@@ -109,7 +111,9 @@ fun AppNavigation(startRoute: Route) {
                     entry<Route.DynamicIslandNotification> { DynamicIslandNotificationPage() }
                     entry<Route.Log> { LogPage() }
                     entry<Route.Licenses> { LicensesPage() }
-                    entry<Route.Poetry> { PoetryPage() }
+                    entry<Route.Poetry>(
+                        transition = NavTransitions.expansion(containerColor = surfaceColor),
+                    ) { PoetryPage() }
                     entry<Route.Help> { HelpPage() }
                     entry<Route.Changelog> { ChangelogPage() }
                     entry<Route.Contributors> { ContributorsPage() }

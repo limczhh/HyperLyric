@@ -10,10 +10,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lidesheng.hyperlyric.R
+import com.lidesheng.hyperlyric.ui.navigation.Route
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.nav.transition.navTransitionSource
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -33,13 +35,24 @@ fun LazyListScope.homePageSections(
 ) {
     if (!hidePoetryCard) {
         item(key = "quote") {
+            val sourceContainerColor = if (isDateSpecificQuote) {
+                colorResource(R.color.quote_special_card_red)
+            } else {
+                MiuixTheme.colorScheme.surfaceContainer
+            }
             Card(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .navTransitionSource(
+                        route = Route.Poetry,
+                        cornerRadius = CardDefaults.CornerRadius,
+                        containerColor = sourceContainerColor,
+                        sourceKey = "home_quote",
+                    ),
                 colors = if (isDateSpecificQuote) {
                     CardDefaults.defaultColors(
-                        color = colorResource(R.color.quote_special_card_red),
+                        color = sourceContainerColor,
                         contentColor = colorResource(R.color.quote_special_text_red),
                     )
                 } else {

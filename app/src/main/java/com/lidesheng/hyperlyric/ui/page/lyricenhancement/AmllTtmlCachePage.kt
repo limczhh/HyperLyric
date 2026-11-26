@@ -34,9 +34,11 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import com.lidesheng.hyperlyric.ui.component.AdaptiveDialog
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
 
 @Composable
 internal fun AmllTtmlCachePage() {
@@ -173,8 +175,9 @@ internal fun AmllTtmlCachePage() {
                 onClick = { showClearAllDialog = true },
                 enabled = !busy
             ) {
-                Icon(
-                    imageVector = MiuixIcons.Delete,
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.Delete,
+                    glassIcon = MiuixIcons.Glass.Delete,
                     contentDescription = clearAllText
                 )
             }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTabRow
+import com.lidesheng.hyperlyric.ui.utils.rememberNavPagerState
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -263,6 +265,7 @@ fun IslandExpandedMediaCardPage() {
         stringResource(R.string.tab_layout)
     )
     val pagerState = rememberPagerState { tabs.size }
+    val navPagerState = rememberNavPagerState(pagerState)
     val coroutineScope = rememberCoroutineScope()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -271,6 +274,16 @@ fun IslandExpandedMediaCardPage() {
     val backgroundListState = rememberLazyListState()
     val elementListState = rememberLazyListState()
     val layoutListState = rememberLazyListState()
+    val isContentScrolled by remember(pagerState, backgroundListState, elementListState, layoutListState) {
+        derivedStateOf {
+            val activeState = when (pagerState.currentPage) {
+                0 -> backgroundListState
+                1 -> elementListState
+                else -> layoutListState
+            }
+            activeState.canScrollBackward
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
@@ -280,6 +293,7 @@ fun IslandExpandedMediaCardPage() {
                     color = barColor,
                     title = stringResource(id = R.string.title_super_island),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = isContentScrolled,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -338,9 +352,9 @@ fun IslandExpandedMediaCardPage() {
                             }
                             AdaptiveTabRow(
                                 tabs = tabs,
-                                selectedTabIndex = pagerState.currentPage,
+                                selectedTabIndex = navPagerState.selectedIndex,
                                 onTabSelected = { index ->
-                                    coroutineScope.launch { pagerState.scrollToPage(index) }
+                                    navPagerState.scrollToPage(index)
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()

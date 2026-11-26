@@ -1,7 +1,6 @@
 package com.lidesheng.hyperlyric.ui.page.hooksettings.lyrics.contentlayout
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -9,9 +8,11 @@ import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -31,19 +31,23 @@ import com.lidesheng.hyperlyric.common.lyric.LyricContentDisplaySettings
 import com.lidesheng.hyperlyric.common.lyric.LyricSecondaryContent
 import com.lidesheng.hyperlyric.ui.component.ReorderableCheckboxItem
 import com.lidesheng.hyperlyric.ui.component.ReorderableCheckboxList
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBottomSheetCardColors
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.glass.Close
+import top.yukonga.miuix.kmp.icon.glass.Ok
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveOverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
 
 internal enum class ContentLayoutField(
     val key: String,
@@ -441,8 +445,9 @@ internal fun LyricContentDisplayBottomSheet(
         WindowInsets.captionBar.asPaddingValues().calculateTopPadding(),
         WindowInsets.displayCutout.asPaddingValues().calculateTopPadding(),
     )
+    val listState = rememberLazyListState()
     val maxSheetHeight = (windowHeight - safeTopInset).coerceAtLeast(0.dp)
-    val maxListHeight = (maxSheetHeight - 122.dp).coerceAtLeast(0.dp)
+    val maxListHeight = (maxSheetHeight - 110.dp).coerceAtLeast(0.dp)
 
     AdaptiveBottomSheet(
         show = show,
@@ -450,17 +455,22 @@ internal fun LyricContentDisplayBottomSheet(
         title = stringResource(id = R.string.title_double_line_content),
         backgroundColor = MiuixTheme.colorScheme.surface,
         enableNestedScroll = false,
+        scrollOffset = {
+            if (listState.firstVisibleItemIndex > 0) 1000f
+            else listState.firstVisibleItemScrollOffset.toFloat()
+        },
         startAction = {
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    imageVector = MiuixIcons.Close,
+            AdaptiveIconButton(onClick = onDismiss) {
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.Close,
+                    glassIcon = MiuixIcons.Glass.Close,
                     contentDescription = stringResource(id = R.string.cancel),
-                    tint = MiuixTheme.colorScheme.onBackground
+                    tint = MiuixTheme.colorScheme.onSurface
                 )
             }
         },
         endAction = {
-            IconButton(
+            AdaptiveIconButton(
                 onClick = {
                     val settings = LyricContentDisplaySettings(
                         showTranslation = LyricSecondaryContent.TRANSLATION in draftSelection,
@@ -476,56 +486,45 @@ internal fun LyricContentDisplayBottomSheet(
                     onDismiss()
                 }
             ) {
-                Icon(
-                    imageVector = MiuixIcons.Ok,
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.Ok,
+                    glassIcon = MiuixIcons.Glass.Ok,
                     contentDescription = stringResource(id = R.string.confirm),
-                    tint = MiuixTheme.colorScheme.onBackground
+                    tint = MiuixTheme.colorScheme.onSurface
                 )
             }
         },
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished
-    ) {
-        Box(
+    ) { innerPadding ->
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val paddingPx = 24.dp.roundToPx()
-                    val placeable = measurable.measure(
-                        constraints.copy(maxWidth = constraints.maxWidth + paddingPx * 2)
-                    )
-                    layout(constraints.maxWidth, placeable.height) {
-                        placeable.place(-paddingPx, 0)
-                    }
-                }
+                .padding(innerPadding)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 40.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = adaptiveBottomSheetCardColors(),
             ) {
-                Card(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .fillMaxWidth()
-                ) {
-                    ReorderableCheckboxList(
-                        items = checkboxItems,
-                        onCheckedChange = { key, checked ->
-                            LyricSecondaryContent.fromPreferenceValue(key)?.let { content ->
-                                draftSelection = if (checked) {
-                                    draftSelection + content
-                                } else {
-                                    draftSelection - content
-                                }
+                ReorderableCheckboxList(
+                    items = checkboxItems,
+                    onCheckedChange = { key, checked ->
+                        LyricSecondaryContent.fromPreferenceValue(key)?.let { content ->
+                            draftSelection = if (checked) {
+                                draftSelection + content
+                            } else {
+                                draftSelection - content
                             }
-                        },
-                        onMove = { fromIndex, toIndex ->
-                            draftOrder = draftOrder.move(fromIndex, toIndex)
-                        },
-                        maxHeight = maxListHeight
-                    )
-                }
+                        }
+                    },
+                    onMove = { fromIndex, toIndex ->
+                        draftOrder = draftOrder.move(fromIndex, toIndex)
+                    },
+                    maxHeight = maxListHeight,
+                    state = listState
+                )
             }
         }
     }

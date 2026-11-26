@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -95,7 +96,11 @@ fun PoetryPage() {
         .union(WindowInsets.displayCutout)
     val searchTopInsets = searchSafeInsets.only(WindowInsetsSides.Top)
     val searchHorizontalInsets = searchSafeInsets.only(WindowInsetsSides.Horizontal)
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MiuixTheme.colorScheme.surface),
+    ) {
         Scaffold(
             modifier = Modifier.graphicsLayer { alpha = searchBarAlpha.value },
         topBar = {
@@ -108,6 +113,7 @@ fun PoetryPage() {
                     ) { 1f },
                     title = "HyperLyric",
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = listState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -29,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -68,7 +70,6 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
-import com.lidesheng.hyperlyric.ui.utils.LocalGlassStyle
 import top.yukonga.miuix.kmp.basic.Icon
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
@@ -86,11 +87,14 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Help
+import top.yukonga.miuix.kmp.icon.glass.Close
 import top.yukonga.miuix.kmp.icon.glass.Help
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.glass.Ok
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveBottomSheet
+import com.lidesheng.hyperlyric.ui.utils.adaptiveBottomSheetCardColors
 
 @SuppressLint("BatteryLife")
 @Composable
@@ -383,6 +387,13 @@ fun DynamicIslandNotificationPage() {
         )
     }
 
+    val isContentScrolled by remember(pagerState, configLazyListState, whitelistLazyListState) {
+        derivedStateOf {
+            val activeState = if (pagerState.currentPage == 0) configLazyListState else whitelistLazyListState
+            activeState.canScrollBackward
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
@@ -391,6 +402,7 @@ fun DynamicIslandNotificationPage() {
                     color = barColor,
                     title = stringResource(R.string.title_dynamic_island_lyrics),
                     scrollBehavior = scrollBehavior,
+                    isContentScrolled = isContentScrolled,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -834,51 +846,37 @@ fun DynamicIslandNotificationPage() {
         backgroundColor = MiuixTheme.colorScheme.surface,
         startAction = {
             AdaptiveIconButton(onClick = { showPermissionSheet = false }) {
-                Icon(
-                    imageVector = MiuixIcons.Close,
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.Close,
+                    glassIcon = MiuixIcons.Glass.Close,
                     contentDescription = stringResource(R.string.close),
-                    tint = MiuixTheme.colorScheme.onBackground
+                    tint = MiuixTheme.colorScheme.onSurface
                 )
             }
         },
         endAction = {
             AdaptiveIconButton(onClick = confirmPermissionSheet) {
-                Icon(
-                    imageVector = MiuixIcons.Ok,
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.Ok,
+                    glassIcon = MiuixIcons.Glass.Ok,
                     contentDescription = stringResource(R.string.confirm),
-                    tint = MiuixTheme.colorScheme.onBackground
+                    tint = MiuixTheme.colorScheme.onSurface
                 )
             }
         },
         onDismissRequest = { showPermissionSheet = false }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val paddingPx = 24.dp.roundToPx()
-                    val placeable = measurable.measure(
-                        constraints.copy(maxWidth = constraints.maxWidth + paddingPx * 2)
-                    )
-                    layout(constraints.maxWidth, placeable.height) {
-                        placeable.place(-paddingPx, 0)
-                    }
-                }
-        ) {
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 40.dp)
+                    .padding(innerPadding)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp)
             ) {
-                val glassStyle = LocalGlassStyle.current
                 Card(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .fillMaxWidth(),
-                    colors = CardDefaults.defaultColors(
-                        color = if (glassStyle) Color.Transparent else MiuixTheme.colorScheme.surface,
-                        contentColor = MiuixTheme.colorScheme.onSurface
-                    )
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = adaptiveBottomSheetCardColors()
                 ) {
                     ArrowPreference(
                         title = stringResource(R.string.title_permission_post_notification),
@@ -906,7 +904,10 @@ fun DynamicIslandNotificationPage() {
             }
             SnackbarHost(
                 state = sheetSnackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .imePadding()
             )
         }
     }

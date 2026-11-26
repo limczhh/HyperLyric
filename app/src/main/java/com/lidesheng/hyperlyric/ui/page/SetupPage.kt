@@ -48,6 +48,7 @@ import com.lidesheng.hyperlyric.common.RootConstants
 import com.lidesheng.hyperlyric.common.UIConstants
 import com.lidesheng.hyperlyric.root.RootApplication
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopAppBar
+import com.lidesheng.hyperlyric.ui.utils.BlurredBar
 import com.lidesheng.hyperlyric.ui.utils.rememberExternalLinkOpener
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -112,7 +113,12 @@ fun SetupPage(onNavigateToMain: () -> Unit) {
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
-            AdaptiveTopAppBar(title = stringResource(pageTitle))
+            BlurredBar(null, false) {
+                AdaptiveTopAppBar(
+                    title = stringResource(pageTitle),
+                    isContentScrolled = false,
+                )
+            }
         },
         bottomBar = {
             Column {

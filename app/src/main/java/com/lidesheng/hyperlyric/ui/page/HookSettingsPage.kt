@@ -142,6 +142,7 @@ fun HookSettingsPage() {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val xposedNotActiveMessage = stringResource(R.string.toast_xposed_module_not_active)
+    val lazyListState = rememberLazyListState()
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
@@ -150,6 +151,7 @@ fun HookSettingsPage() {
                     color = barColor,
                     title = stringResource(R.string.title_lyric_settings),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -162,7 +164,6 @@ fun HookSettingsPage() {
             }
         }
     ) { innerPadding ->
-        val lazyListState = rememberLazyListState()
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
         val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,9 +48,9 @@ internal fun LyricSourcePromptContent(
     lyricSource: String,
     innerPadding: PaddingValues,
     topAppBarScrollBehavior: ScrollBehavior,
-    backdrop: LayerBackdrop?
+    backdrop: LayerBackdrop?,
+    listState: LazyListState = rememberLazyListState(),
 ) {
-    val lazyListState = rememberLazyListState()
     val top = innerPadding.calculateTopPadding()
     val bottom = innerPadding.calculateBottomPadding()
     val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)
@@ -59,7 +60,7 @@ internal fun LyricSourcePromptContent(
             .fillMaxSize()
     ) {
         LazyColumn(
-            state = lazyListState,
+            state = listState,
             modifier = Modifier.pageScrollModifiers(
                 enableScrollEndHaptic = true,
                 showTopAppBar = true,

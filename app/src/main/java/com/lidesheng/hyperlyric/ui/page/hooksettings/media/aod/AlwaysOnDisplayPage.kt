@@ -50,6 +50,7 @@ fun AlwaysOnDisplayPage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
 
     Scaffold(
         topBar = {
@@ -58,6 +59,7 @@ fun AlwaysOnDisplayPage() {
                     color = barColor,
                     title = stringResource(id = R.string.title_always_on_display),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -73,7 +75,6 @@ fun AlwaysOnDisplayPage() {
         val topPadding = padding.calculateTopPadding()
         val bottomPadding = padding.calculateBottomPadding()
         val contentPadding = pageContentPadding(padding, extraBottom = 16.dp)
-        val lazyListState = rememberLazyListState()
 
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             LazyColumn(

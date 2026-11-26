@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.lidesheng.hyperlyric.ui.utils.AdaptiveIconButton
+import com.lidesheng.hyperlyric.ui.utils.AdaptiveTopBarIcon
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -37,6 +38,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 @Composable
@@ -163,8 +165,9 @@ internal fun AiTranslationCachePage() {
                 onClick = { showClearAllDialog = true },
                 enabled = !busy
             ) {
-                Icon(
-                    imageVector = MiuixIcons.Delete,
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.Delete,
+                    glassIcon = MiuixIcons.Glass.Delete,
                     contentDescription = stringResource(R.string.delete)
                 )
             }

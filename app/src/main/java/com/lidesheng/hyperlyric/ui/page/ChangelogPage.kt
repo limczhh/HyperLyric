@@ -46,6 +46,7 @@ fun ChangelogPage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
     val changelogs = remember { ChangelogData.getChangelog() }
 
     Scaffold(
@@ -55,6 +56,7 @@ fun ChangelogPage() {
                     color = barColor,
                     title = stringResource(R.string.title_changelog),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -67,7 +69,6 @@ fun ChangelogPage() {
             }
         }
     ) { innerPadding ->
-        val lazyListState = rememberLazyListState()
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
         val contentPadding = pageContentPadding(innerPadding, extraBottom = 20.dp)

@@ -2,7 +2,9 @@ package com.lidesheng.hyperlyric.ui.page.hooksettings
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,7 +55,24 @@ fun LyricSourcePage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lyriconListState = rememberLazyListState()
+    val superLyricListState = rememberLazyListState()
+    val promptListState = rememberLazyListState()
     val selectedSourceIndex = sourceIds.indexOf(lyricSource).coerceAtLeast(0)
+    val isContentScrolled by remember(
+        lyricSource,
+        lyriconListState,
+        superLyricListState,
+        promptListState,
+    ) {
+        derivedStateOf {
+            when (lyricSource) {
+                "lyricon" -> lyriconListState.canScrollBackward
+                "superlyric" -> superLyricListState.canScrollBackward
+                else -> promptListState.canScrollBackward
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -62,6 +81,7 @@ fun LyricSourcePage() {
                     color = barColor,
                     title = stringResource(R.string.title_lyric_source),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = isContentScrolled,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -102,6 +122,7 @@ fun LyricSourcePage() {
                 innerPadding = innerPadding,
                 topAppBarScrollBehavior = topAppBarScrollBehavior,
                 backdrop = backdrop,
+                listState = lyriconListState,
                 promptContent = { LyricSourcePromptCard(lyricSource) }
             )
 
@@ -109,6 +130,7 @@ fun LyricSourcePage() {
                 innerPadding = innerPadding,
                 topAppBarScrollBehavior = topAppBarScrollBehavior,
                 backdrop = backdrop,
+                listState = superLyricListState,
                 promptContent = { LyricSourcePromptCard(lyricSource) }
             )
 
@@ -116,7 +138,8 @@ fun LyricSourcePage() {
                 lyricSource = lyricSource,
                 innerPadding = innerPadding,
                 topAppBarScrollBehavior = topAppBarScrollBehavior,
-                backdrop = backdrop
+                backdrop = backdrop,
+                listState = promptListState,
             )
         }
     }

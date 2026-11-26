@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +71,7 @@ internal fun SuperLyricAppSection(
     innerPadding: PaddingValues,
     topAppBarScrollBehavior: ScrollBehavior,
     backdrop: LayerBackdrop?,
+    listState: LazyListState = rememberLazyListState(),
     promptContent: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -139,7 +141,6 @@ internal fun SuperLyricAppSection(
                 refreshTexts = refreshTexts,
                 modifier = Modifier.fillMaxSize()
             ) {
-                val lazyListState = rememberLazyListState()
                 val top = innerPadding.calculateTopPadding()
                 val bottom = innerPadding.calculateBottomPadding()
                 val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)
@@ -149,7 +150,7 @@ internal fun SuperLyricAppSection(
                     remember { isSuperLyricInstalled(context) }
                 }
                 LazyColumn(
-                    state = lazyListState,
+                    state = listState,
                     modifier = Modifier.pageScrollModifiers(
                         enableScrollEndHaptic = true,
                         showTopAppBar = true,

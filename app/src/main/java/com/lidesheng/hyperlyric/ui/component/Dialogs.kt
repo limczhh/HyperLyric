@@ -47,6 +47,7 @@ import top.yukonga.miuix.kmp.glass.GlassDialogButtonDefaults
 import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.layout.DialogDefaults
+import top.yukonga.miuix.kmp.layout.DialogMotion
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -83,6 +84,7 @@ fun AdaptiveDialog(
         dimColor = if (glassStyle) GlassDialogDefaults.ScrimColor else MiuixTheme.colorScheme.windowDimming,
         onDismissRequest = onDismissRequest,
         onDismissFinished = onDismissFinished,
+        motion = if (glassStyle) DialogMotion.Glass else DialogMotion.Default,
         surface = if (glassStyle) glassDialogSurface(backdrop = if (isBlurActive) backdrop else null) else null,
         maxWidth = maxWidth,
     ) {

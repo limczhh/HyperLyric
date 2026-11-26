@@ -277,7 +277,12 @@ fun LogPage() {
         )
     }
 
-    val activeListState = if (isAppTab) appListState else moduleListState
+    val activeListState by remember(pagerState, appListState, moduleListState) {
+        derivedStateOf { if (pagerState.currentPage == 0) appListState else moduleListState }
+    }
+    val isContentScrolled by remember(activeListState) {
+        derivedStateOf { activeListState.canScrollBackward }
+    }
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
@@ -287,6 +292,7 @@ fun LogPage() {
                     color = barColor,
                     title = stringResource(R.string.title_view_logs),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = isContentScrolled,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -378,8 +384,9 @@ fun LogPage() {
             onDismissRequest = { showMorePopup = false },
             anchor = moreMenuAnchor,
             anchorContent = {
-                Icon(
-                    imageVector = MiuixIcons.More,
+                AdaptiveTopBarIcon(
+                    normalIcon = MiuixIcons.More,
+                    glassIcon = MiuixIcons.Glass.More,
                     contentDescription = null,
                 )
             },

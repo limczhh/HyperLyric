@@ -82,6 +82,7 @@ fun LyricAnimationPage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
     Scaffold(
         topBar = {
             BlurredBar(backdrop, blurActive) {
@@ -89,6 +90,7 @@ fun LyricAnimationPage() {
                     color = barColor,
                     title = stringResource(id = R.string.title_lyric_anim),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -101,7 +103,6 @@ fun LyricAnimationPage() {
             }
         }
     ) { innerPadding ->
-        val lazyListState = rememberLazyListState()
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
         val contentPadding = pageContentPadding(innerPadding, extraBottom = 0.dp)

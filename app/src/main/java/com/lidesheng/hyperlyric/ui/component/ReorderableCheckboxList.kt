@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,7 +26,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
-import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.IconButtonDefaults
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
@@ -75,18 +73,15 @@ fun ReorderableCheckboxList(
             ) { isDragging ->
                 val interactionSource = remember { MutableInteractionSource() }
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MiuixTheme.colorScheme.surfaceContainer,
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    CheckboxPreference(
-                        title = item.title,
-                        checked = item.checked,
-                        onCheckedChange = { checked ->
-                            onCheckedChange(item.key, checked)
-                        },
-                        modifier = Modifier.longPressDraggableHandle(
+                CheckboxPreference(
+                    title = item.title,
+                    checked = item.checked,
+                    onCheckedChange = { checked ->
+                        onCheckedChange(item.key, checked)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .longPressDraggableHandle(
                             onDragStarted = {
                                 hapticFeedback.performHapticFeedback(
                                     HapticFeedbackType.LongPress
@@ -94,13 +89,12 @@ fun ReorderableCheckboxList(
                             },
                             interactionSource = interactionSource
                         ),
-                        endActions = {
-                            DragHandleIcon()
-                        },
-                        checkboxLocation = CheckboxLocation.Start,
-                        holdDownState = isDragging
-                    )
-                }
+                    endActions = {
+                        DragHandleIcon()
+                    },
+                    checkboxLocation = CheckboxLocation.Start,
+                    holdDownState = isDragging
+                )
             }
         }
     }

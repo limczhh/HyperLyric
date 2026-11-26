@@ -58,6 +58,7 @@ fun HelpPage() {
                     color = barColor,
                     title = stringResource(R.string.title_help),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = superIslandListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(

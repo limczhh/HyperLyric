@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -124,6 +125,7 @@ internal fun AmllTtmlCacheDetailPage(route: Route.AmllTtmlCacheDetail) {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
@@ -134,6 +136,7 @@ internal fun AmllTtmlCacheDetailPage(route: Route.AmllTtmlCacheDetail) {
                         stringResource(R.string.title_amll_ttml_cache_detail)
                     },
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -161,6 +164,7 @@ internal fun AmllTtmlCacheDetailPage(route: Route.AmllTtmlCacheDetail) {
         val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             LazyColumn(
+                state = lazyListState,
                 modifier = Modifier.pageScrollModifiers(
                     enableScrollEndHaptic = true,
                     showTopAppBar = true,

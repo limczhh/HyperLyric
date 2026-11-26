@@ -1,13 +1,21 @@
 package com.lidesheng.hyperlyric.ui.utils
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.captionBar
@@ -16,6 +24,8 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.updateTransition
@@ -31,19 +41,29 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.pager.PagerState
@@ -51,21 +71,40 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.material.GlassShadow
 import top.yukonga.miuix.kmp.material.GlassShadows
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
+import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
+import top.yukonga.miuix.kmp.basic.CardColors
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.DropdownArrowEndAction
 import top.yukonga.miuix.kmp.basic.DropdownColors
 import top.yukonga.miuix.kmp.basic.DropdownDefaults
-import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
-import top.yukonga.miuix.kmp.glass.GlassMotion
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.verticalScrollBar
+import top.yukonga.miuix.kmp.glass.GlassBottomSheet
+import top.yukonga.miuix.kmp.glass.GlassBottomSheetDefaults
+import top.yukonga.miuix.kmp.glass.GlassCardDefaults
+import top.yukonga.miuix.kmp.glass.GlassDropdownDefaults
+import top.yukonga.miuix.kmp.glass.GlassDropdownPopup
+import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
+import top.yukonga.miuix.kmp.glass.GlassPopupItem
 import top.yukonga.miuix.kmp.glass.GlassPopupSizing
+import top.yukonga.miuix.kmp.glass.glassPopupAnchorValue
+import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
+import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
+import top.yukonga.miuix.kmp.popup.OverlayDropdownPopup
+import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.PopupLayout
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
-import top.yukonga.miuix.kmp.glass.glassBottomSheetSurface
-import top.yukonga.miuix.kmp.glass.GlassDialogDefaults
+import top.yukonga.miuix.kmp.layout.SheetMotion
 import com.lidesheng.hyperlyric.ui.component.LocalGlassDialog
 import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRow
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -197,6 +236,8 @@ fun rememberBlurBackdrop(): LayerBackdrop? {
 val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 private val LocalBarBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 private val LocalInGlassBar = staticCompositionLocalOf { false }
+private val LocalInGlassBottomContent = staticCompositionLocalOf { false }
+private val LocalBottomSheetBlurActive = staticCompositionLocalOf { false }
 private val LocalBarScrollBehavior = staticCompositionLocalOf<ScrollBehavior?> { null }
 private val LocalBarContentScrolled = staticCompositionLocalOf { false }
 
@@ -206,8 +247,12 @@ fun BlurredBar(
     blurEnabled: Boolean = LocalBlurEnabled.current,
     content: @Composable () -> Unit,
 ) {
-    val actualBackdrop = backdrop ?: LocalBarBackdrop.current ?: LocalAppBackdrop.current
     val actualBlurEnabled = blurEnabled && LocalBlurEnabled.current
+    val actualBackdrop = if (actualBlurEnabled) {
+        backdrop ?: LocalBarBackdrop.current ?: LocalAppBackdrop.current
+    } else {
+        null
+    }
     Box {
         if (!LocalGlassStyle.current && actualBlurEnabled && actualBackdrop != null) {
             Box(
@@ -278,23 +323,20 @@ fun AdaptiveTopAppBar(
     val wide = isWideAppWindow()
     val contentScrolled by remember(scrollBehavior, isContentScrolled) {
         derivedStateOf {
-            isContentScrolled ?: (scrollBehavior?.state?.let {
-                it.contentOffset < -1f || it.overscrollOffset < -1f
-            } ?: false)
+            (isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < -1f)) ||
+                (scrollBehavior?.state?.overscrollOffset ?: 0f) < -1f
         }
     }
     if (LocalGlassStyle.current) {
-        val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
+        val rawBackdrop = LocalBarBackdrop.current
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
         val backdrop = if (isBlurActive) rawBackdrop else null
         val surfaceColor = MiuixTheme.colorScheme.surface
         val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
-        val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive) {
-            { 1f }
-        } else if (scrollBehavior != null) {
+        val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive || scrollBehavior != null || contentScrolled) {
             { 1f }
         } else {
-            { if (contentScrolled) 1f else 0f }
+            { 0f }
         }
         GlassTopAppBar(
             title = title,
@@ -310,16 +352,19 @@ fun AdaptiveTopAppBar(
             bandOverhang = GlassTopAppBarDefaults.BandOverhang,
             navigationIcon = { CompositionLocalProvider(LocalInGlassBar provides true) { navigationIcon() } },
             actions = { CompositionLocalProvider(LocalInGlassBar provides true) { actions() } },
-            bottomContent = { CompositionLocalProvider(
-                LocalBarBackdrop provides backdrop,
-                LocalBarScrollBehavior provides scrollBehavior,
-                LocalBarContentScrolled provides contentScrolled,
-            ) { bottomContent() } },
+            bottomContent = {
+                CompositionLocalProvider(
+                    LocalBarBackdrop provides backdrop,
+                    LocalInGlassBottomContent provides true,
+                    LocalBarScrollBehavior provides scrollBehavior,
+                    LocalBarContentScrolled provides contentScrolled,
+                ) { bottomContent() }
+            },
         )
     } else {
         val resolvedColor = if (color != Color.Unspecified && color != Color.Transparent) {
             color
-        } else if (LocalBlurEnabled.current && (LocalBarBackdrop.current ?: LocalAppBackdrop.current) != null) {
+        } else if (LocalBlurEnabled.current && LocalBarBackdrop.current != null) {
             if (!contentScrolled) MiuixTheme.colorScheme.surface else Color.Transparent
         } else {
             MiuixTheme.colorScheme.surface
@@ -354,13 +399,12 @@ fun AdaptiveSmallTopAppBar(
 ) {
     val contentScrolled by remember(scrollBehavior, isContentScrolled) {
         derivedStateOf {
-            isContentScrolled ?: (scrollBehavior?.state?.let {
-                it.contentOffset < -1f || it.overscrollOffset < -1f
-            } ?: false)
+            (isContentScrolled ?: ((scrollBehavior?.state?.contentOffset ?: 0f) < -1f)) ||
+                (scrollBehavior?.state?.overscrollOffset ?: 0f) < -1f
         }
     }
     if (LocalGlassStyle.current) {
-        val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
+        val rawBackdrop = LocalBarBackdrop.current
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
         val backdrop = if (isBlurActive) rawBackdrop else null
         val surfaceColor = MiuixTheme.colorScheme.surface
@@ -372,12 +416,10 @@ fun AdaptiveSmallTopAppBar(
         } else {
             { 1f }
         }
-        val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive) {
-            { 1f }
-        } else if (scrollBehavior != null) {
+        val resolvedBackgroundAlpha: () -> Float = if (!isBlurActive || scrollBehavior != null || contentScrolled) {
             { 1f }
         } else {
-            { if (contentScrolled) 1f else 0f }
+            { 0f }
         }
         GlassTopAppBar(
             title = title,
@@ -398,7 +440,7 @@ fun AdaptiveSmallTopAppBar(
     } else {
         val resolvedColor = if (color != Color.Transparent) {
             color
-        } else if (LocalBlurEnabled.current && (LocalBarBackdrop.current ?: LocalAppBackdrop.current) != null) {
+        } else if (LocalBlurEnabled.current && LocalBarBackdrop.current != null) {
             if (!contentScrolled) MiuixTheme.colorScheme.surface else Color.Transparent
         } else {
             MiuixTheme.colorScheme.surface
@@ -493,37 +535,11 @@ fun AdaptiveTabRow(
     colors: TabRowColors = TabRowDefaults.tabRowColors(),
 ) {
     if (LocalGlassStyle.current) {
-        val rawBackdrop = LocalBarBackdrop.current ?: LocalAppBackdrop.current
+        val inBar = LocalInGlassBar.current || LocalInGlassBottomContent.current || LocalBarScrollBehavior.current != null
+        val rawBackdrop = if (inBar) LocalBarBackdrop.current else null
         val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
         val backdrop = if (isBlurActive) rawBackdrop else NoOpBackdrop
-        val inBar = LocalInGlassBar.current || LocalBarScrollBehavior.current != null
-        val contentScrolled = LocalBarContentScrolled.current
-        val scrollBehavior = LocalBarScrollBehavior.current
-
-        // 浮起动画与过度滚动（overscroll）弹性感知
-        val transition = updateTransition(contentScrolled, label = "adaptiveTabRowFloat")
-        val scrolledMaterialProgress = transition.animateFloat(
-            transitionSpec = { GlassMotion.topBarButtonFloat() },
-            label = "adaptiveTabRowMaterial",
-        ) { if (it) 1f else 0f }
-        val ramp = GlassTopAppBarDefaults.collapseRamp(scrollBehavior)
-        val materialProgress by remember(scrolledMaterialProgress, scrollBehavior, ramp) {
-            derivedStateOf {
-                val elasticProgress = if (scrollBehavior != null && scrollBehavior.state.overscrollOffset != 0f) {
-                    ramp.value
-                } else {
-                    0f
-                }
-                maxOf(scrolledMaterialProgress.value, elasticProgress)
-            }
-        }
-        val surfaceAlpha = if (!isBlurActive) {
-            0f
-        } else if (inBar) {
-            materialProgress
-        } else {
-            1f
-        }
+        val surfaceAlpha = if (inBar && isBlurActive && LocalBarContentScrolled.current) 1f else 0f
 
         GlassSegmentedTabRow(
             tabs = tabs,
@@ -644,48 +660,88 @@ fun AdaptiveBottomSheet(
     modifier: Modifier = Modifier,
     backgroundColor: Color = MiuixTheme.colorScheme.surface,
     enableNestedScroll: Boolean = true,
+    insideMargin: DpSize = GlassBottomSheetDefaults.InsideMargin,
+    scrollOffset: (() -> Float)? = null,
     startAction: @Composable (() -> Unit)? = null,
     endAction: @Composable (() -> Unit)? = null,
     onDismissFinished: (() -> Unit)? = null,
-    content: @Composable () -> Unit,
+    content: @Composable (PaddingValues) -> Unit,
 ) {
     val glassStyle = LocalGlassStyle.current
-    val backdrop = LocalAppBackdrop.current
-    val isBlurActive = LocalBlurEnabled.current && isRuntimeShaderSupported() && backdrop != null
-    val effectiveBackgroundColor = if (glassStyle) Color.Transparent else backgroundColor
-    OverlayBottomSheet(
-        show = show,
-        title = title,
-        modifier = modifier,
-        backgroundColor = effectiveBackgroundColor,
-        dimColor = if (glassStyle) GlassDialogDefaults.ScrimColor else MiuixTheme.colorScheme.windowDimming,
-        enableNestedScroll = enableNestedScroll,
-        startAction = startAction,
-        endAction = endAction,
-        onDismissRequest = onDismissRequest,
-        onDismissFinished = onDismissFinished,
-        surface = if (glassStyle) glassBottomSheetSurface(backdrop = if (isBlurActive) backdrop else null) else null,
-        content = {
-            CompositionLocalProvider(LocalGlassDialog provides glassStyle) {
-                content()
-            }
-        },
-    )
+    if (glassStyle) {
+        val rawBackdrop = LocalAppBackdrop.current
+        val isBlurActive = LocalBlurEnabled.current && isRuntimeShaderSupported() && rawBackdrop != null
+        GlassBottomSheet(
+            onDismissRequest = onDismissRequest,
+            show = show,
+            backdrop = if (isBlurActive) rawBackdrop else null,
+            modifier = modifier,
+            enableNestedScroll = enableNestedScroll,
+            progressiveBlur = isBlurActive,
+            title = title,
+            startAction = startAction,
+            endAction = endAction,
+            insideMargin = insideMargin,
+            containerColor = backgroundColor,
+            onDismissFinished = onDismissFinished,
+            scrollOffset = scrollOffset,
+            content = { innerPadding ->
+                CompositionLocalProvider(
+                    LocalGlassDialog provides true,
+                    LocalBottomSheetBlurActive provides isBlurActive,
+                ) {
+                    content(innerPadding)
+                }
+            },
+        )
+    } else {
+        OverlayBottomSheet(
+            show = show,
+            title = title,
+            modifier = modifier,
+            backgroundColor = backgroundColor,
+            dimColor = MiuixTheme.colorScheme.windowDimming,
+            insideMargin = insideMargin,
+            enableNestedScroll = enableNestedScroll,
+            startAction = startAction,
+            endAction = endAction,
+            onDismissRequest = onDismissRequest,
+            onDismissFinished = onDismissFinished,
+            motion = SheetMotion.Default,
+            content = {
+                CompositionLocalProvider(
+                    LocalGlassDialog provides false,
+                    LocalBottomSheetBlurActive provides false,
+                ) {
+                    content(PaddingValues(0.dp))
+                }
+            },
+        )
+    }
 }
 
+@Composable
+fun adaptiveBottomSheetCardColors(): CardColors =
+    if (LocalGlassStyle.current && LocalBottomSheetBlurActive.current) {
+        GlassCardDefaults.colors()
+    } else {
+        CardDefaults.defaultColors()
+    }
+
+@OptIn(ExperimentalScrollBarApi::class)
 @Composable
 fun AdaptiveOverlayDropdownPreference(
     items: List<String>,
     selectedIndex: Int,
     title: String,
     modifier: Modifier = Modifier,
-    titleColor: BasicComponentColors = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.titleColor(),
+    titleColor: BasicComponentColors = BasicComponentDefaults.titleColor(),
     summary: String? = null,
-    summaryColor: BasicComponentColors = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.summaryColor(),
+    summaryColor: BasicComponentColors = BasicComponentDefaults.summaryColor(),
     dropdownColors: DropdownColors = DropdownDefaults.dropdownColors(),
     startAction: @Composable (() -> Unit)? = null,
     bottomAction: (@Composable () -> Unit)? = null,
-    insideMargin: PaddingValues = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.InsideMargin,
+    insideMargin: PaddingValues = BasicComponentDefaults.InsideMargin,
     maxHeight: Dp? = null,
     enabled: Boolean = true,
     showValue: Boolean = true,
@@ -694,63 +750,196 @@ fun AdaptiveOverlayDropdownPreference(
     onSelectedIndexChange: ((Int) -> Unit)? = null,
 ) {
     val glassStyle = LocalGlassStyle.current
-    val glassModifier = if (glassStyle) {
-        Modifier
-    } else {
-        Modifier.alpha(0f).clearAndSetSemantics { }
-    }
-    val ordinaryModifier = if (glassStyle) {
-        Modifier.alpha(0f).clearAndSetSemantics { }
-    } else {
-        Modifier
+    val actualEnabled = enabled && items.isNotEmpty()
+    var expanded by remember { mutableStateOf(false) }
+    val mounted = remember { mutableStateOf(false) }
+    var activePopupIsGlass by remember { mutableStateOf<Boolean?>(null) }
+    var anchorBounds by remember { mutableStateOf(Rect.Zero) }
+    val anchor = rememberGlassPopupAnchor()
+    val hapticFeedback = LocalHapticFeedback.current
+    val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
+    val currentOnSelectedIndexChange by rememberUpdatedState(onSelectedIndexChange)
+
+    val setExpanded: (Boolean) -> Unit = remember {
+        { next ->
+            if (expanded != next) {
+                expanded = next
+                if (next) {
+                    if (!mounted.value) {
+                        activePopupIsGlass = glassStyle
+                    }
+                    mounted.value = true
+                }
+                currentOnExpandedChange?.invoke(next)
+            }
+        }
     }
 
-    // Keep both renderers composed while the style changes. GlassDropdownPreference's popup
-    // owns an exit animation and must remain composed until that animation finishes; switching
-    // branches here would dispose it midway and make the popup jump to a new position.
-    Box(modifier = modifier) {
-        GlassDropdownPreference(
-            onSelectedIndexChange = { index -> onSelectedIndexChange?.invoke(index) },
-            items = items,
-            selectedIndex = selectedIndex,
-            title = title,
-            backdrop = LocalAppBackdrop.current,
-            modifier = glassModifier,
-            enabled = enabled && glassStyle,
-            showValue = showValue,
-            renderInRootScaffold = renderInRootScaffold,
-            titleColor = titleColor,
-            summary = summary,
-            summaryColor = summaryColor,
-            startAction = startAction,
-            bottomAction = bottomAction,
-            insideMargin = insideMargin,
-            sizing = if (maxHeight == null) {
-                GlassPopupSizing()
-            } else {
-                GlassPopupSizing(maxHeight = maxHeight)
+    LaunchedEffect(actualEnabled) {
+        if (!actualEnabled && expanded) {
+            setExpanded(false)
+        }
+    }
+
+    LaunchedEffect(expanded, mounted.value, activePopupIsGlass) {
+        if (!expanded && mounted.value && activePopupIsGlass == true) {
+            delay(420L)
+            mounted.value = false
+            activePopupIsGlass = null
+        }
+    }
+
+    val actionColor = if (actualEnabled) {
+        MiuixTheme.colorScheme.onSurfaceVariantActions
+    } else {
+        MiuixTheme.colorScheme.disabledOnSecondaryVariant
+    }
+
+    val overlayEntry = remember(items, selectedIndex) {
+        DropdownEntry(
+            items.mapIndexed { index, item ->
+                DropdownItem(
+                    text = item,
+                    selected = index == selectedIndex,
+                    onClick = { currentOnSelectedIndexChange?.invoke(index) },
+                )
             },
-            onExpandedChange = if (glassStyle) onExpandedChange else null,
         )
-        top.yukonga.miuix.kmp.preference.OverlayDropdownPreference(
-            items = if (glassStyle) emptyList() else items,
-            selectedIndex = selectedIndex,
-            title = title,
-            modifier = ordinaryModifier,
-            titleColor = titleColor,
-            summary = summary,
-            summaryColor = summaryColor,
-            dropdownColors = dropdownColors,
-            startAction = startAction,
-            bottomAction = bottomAction,
-            insideMargin = insideMargin,
-            maxHeight = maxHeight,
-            enabled = enabled && !glassStyle,
-            showValue = showValue,
-            renderInRootScaffold = renderInRootScaffold,
-            onExpandedChange = if (!glassStyle) onExpandedChange else null,
-            onSelectedIndexChange = onSelectedIndexChange,
-        )
+    }
+
+    BasicComponent(
+        modifier = modifier.onGloballyPositioned { coords ->
+            if (coords.isAttached) {
+                anchorBounds = coords.boundsInWindow()
+            }
+        },
+        title = title,
+        titleColor = titleColor,
+        summary = summary,
+        summaryColor = summaryColor,
+        startAction = startAction,
+        endActions = {
+            Row(
+                modifier = if (glassStyle || activePopupIsGlass == true) {
+                    Modifier.glassPopupAnchorValue(anchor)
+                } else {
+                    Modifier
+                },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val value = items.getOrNull(selectedIndex)
+                if (showValue && !value.isNullOrEmpty()) {
+                    Text(
+                        text = value,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .weight(1f, fill = false),
+                        fontSize = MiuixTheme.textStyles.body2.fontSize,
+                        color = actionColor,
+                        textAlign = TextAlign.End,
+                    )
+                }
+                DropdownArrowEndAction(actionColor = actionColor)
+            }
+            if (items.isNotEmpty() && (!glassStyle || activePopupIsGlass == false)) {
+                OverlayDropdownPopup(
+                    entry = overlayEntry,
+                    show = expanded && actualEnabled && activePopupIsGlass == false,
+                    onDismiss = { setExpanded(false) },
+                    onDismissFinished = {
+                        mounted.value = false
+                        if (activePopupIsGlass == false) {
+                            activePopupIsGlass = null
+                        }
+                    },
+                    maxHeight = maxHeight,
+                    dropdownColors = dropdownColors,
+                    renderInRootScaffold = renderInRootScaffold,
+                )
+            }
+        },
+        bottomAction = bottomAction,
+        insideMargin = insideMargin,
+        onClick = {
+            if (actualEnabled) {
+                val next = !expanded
+                setExpanded(next)
+                if (next) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
+                }
+            }
+        },
+        role = Role.DropdownList,
+        holdDownState = mounted.value,
+        enabled = actualEnabled,
+    )
+
+    if (!mounted.value || activePopupIsGlass != true) return
+
+    val rawBackdrop = LocalAppBackdrop.current
+    val isBlurActive = rawBackdrop != null && LocalBlurEnabled.current && isRuntimeShaderSupported()
+    val resolvedBackdrop = if (isBlurActive) rawBackdrop else null
+    val sizing = remember(maxHeight) {
+        if (maxHeight == null) GlassPopupSizing() else GlassPopupSizing(maxHeight = maxHeight)
+    }
+
+    PopupLayout(
+        visible = mounted,
+        enableWindowDim = false,
+        enableBackHandler = false,
+        enterTransition = EnterTransition.None,
+        exitTransition = ExitTransition.None,
+        renderInRootScaffold = renderInRootScaffold,
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            GlassDropdownPopup(
+                show = expanded && actualEnabled,
+                onDismissRequest = { setExpanded(false) },
+                anchorBounds = anchorBounds,
+                backdrop = resolvedBackdrop,
+                anchor = anchor,
+                sizing = sizing,
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                val scrollState = rememberScrollState()
+                val windowInfo = LocalWindowInfo.current
+                val density = LocalDensity.current
+                val statusTopPx = WindowInsets.statusBars.getTop(density)
+                val navBottomPx = WindowInsets.navigationBars.getBottom(density)
+                val captionBottomPx = WindowInsets.captionBar.getBottom(density)
+                val safeWindowMaxHeight = with(density) {
+                    ((windowInfo.containerSize.height - statusTopPx - navBottomPx - captionBottomPx).toDp() - sizing.safeMargin * 2)
+                        .coerceAtLeast(0.dp)
+                }
+                val effectiveMaxHeight = minOf(sizing.maxHeight, safeWindowMaxHeight)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = effectiveMaxHeight)
+                        .verticalScrollBar(
+                            state = scrollState,
+                            isFadeEnabled = false,
+                            trackPadding = PaddingValues(vertical = GlassDropdownDefaults.CornerRadius / 2),
+                        )
+                        .verticalScroll(scrollState)
+                        .padding(vertical = GlassPopupDefaults.ContentPaddingVertical),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        items.forEachIndexed { index, item ->
+                            GlassPopupItem(
+                                text = item,
+                                selected = selectedIndex == index,
+                                onClick = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
+                                    setExpanded(false)
+                                    currentOnSelectedIndexChange?.invoke(index)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

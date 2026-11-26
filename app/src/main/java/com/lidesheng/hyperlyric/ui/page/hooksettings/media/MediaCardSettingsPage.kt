@@ -30,6 +30,7 @@ import com.lidesheng.hyperlyric.ui.component.SimpleDialog
 import com.lidesheng.hyperlyric.ui.navigation.LocalNavigator
 import com.lidesheng.hyperlyric.ui.navigation.Route
 import com.lidesheng.hyperlyric.ui.utils.BlurredBar
+import com.lidesheng.hyperlyric.ui.utils.pageContentPadding
 import com.lidesheng.hyperlyric.ui.utils.pageScrollModifiers
 import com.lidesheng.hyperlyric.ui.utils.rememberBlurBackdrop
 import kotlinx.coroutines.launch
@@ -139,6 +140,7 @@ fun MediaCardSettingsPage() {
     var showRestartDialog by remember { mutableStateOf(false) }
     var showMaxCountDialog by remember { mutableStateOf(false) }
     var showIslandMediaCardSwitcherMaxCountDialog by remember { mutableStateOf(false) }
+    val lazyListState = rememberLazyListState()
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
@@ -148,6 +150,7 @@ fun MediaCardSettingsPage() {
                     color = barColor,
                     title = stringResource(id = R.string.title_media_cards),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -170,7 +173,7 @@ fun MediaCardSettingsPage() {
             }
         }
     ) { innerPadding ->
-        val lazyListState = rememberLazyListState()
+        val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             LazyColumn(
                 state = lazyListState,
@@ -179,7 +182,7 @@ fun MediaCardSettingsPage() {
                     showTopAppBar = true,
                     topAppBarScrollBehavior = topAppBarScrollBehavior
                 ),
-                contentPadding = innerPadding
+                contentPadding = contentPadding
             ) {
                 item(key = "media_card_sections") {
                     Card(

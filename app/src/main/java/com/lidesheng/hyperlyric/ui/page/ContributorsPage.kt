@@ -59,6 +59,7 @@ fun ContributorsPage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val onOpenLink = rememberExternalLinkOpener(snackbarHostState)
     Scaffold(
@@ -69,6 +70,7 @@ fun ContributorsPage() {
                     color = barColor,
                     title = stringResource(R.string.title_contributors),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -81,7 +83,6 @@ fun ContributorsPage() {
             }
         }
     ) { innerPadding ->
-        val lazyListState = rememberLazyListState()
         val top = innerPadding.calculateTopPadding()
         val bottom = innerPadding.calculateBottomPadding()
         val contentPadding = pageContentPadding(innerPadding, extraBottom = 16.dp)

@@ -520,6 +520,7 @@ fun SuperIslandSettingsPage() {
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
     Scaffold(
         topBar = {
             BlurredBar(backdrop, blurActive) {
@@ -527,6 +528,7 @@ fun SuperIslandSettingsPage() {
                     color = barColor,
                     title = stringResource(id = R.string.title_super_island),
                     scrollBehavior = topAppBarScrollBehavior,
+                    isContentScrolled = lazyListState.canScrollBackward,
                     navigationIcon = {
                         AdaptiveIconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -539,7 +541,6 @@ fun SuperIslandSettingsPage() {
             }
         }
     ) { innerPadding ->
-        val lazyListState = rememberLazyListState()
         PaddingInputDialog(
             show = showLeftPaddingDialog,
             title = stringResource(id = R.string.title_left_padding),
