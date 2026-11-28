@@ -11,27 +11,18 @@ body:
 
         提示：请在导出日志前，先在应用设置内将“日志输出等级”改为“调试日志”，然后复现一次您遇到的问题，再行导出日志。
         Tip: Before exporting logs, please change "Log Level" to "Debug" in the app settings, reproduce the issue, and then export the logs.
-  - type: dropdown
-    id: system_platform
+  - type: input
+    id: system_version
     attributes:
-      label: 系统平台 / System Platform
-      options:
-        - HyperOS 3
-        - HyperOS 2
-        - 其他安卓系统 (Other Android Systems)
+      label: 系统版本 / System Version
+      placeholder: 例如：HyperOS 4 / e.g., HyperOS 4
     validations:
       required: true
   - type: input
-    id: system_platform_other
-    attributes:
-      label: 具体系统平台说明 / Detailed System Platform Specification
-  - type: dropdown
     id: bug_aspect
     attributes:
       label: 问题属于哪一方面 / Which part does the bug relate to?
-      options:
-        - 通知型歌词相关的 Bug (Notification Lyric related Bug)
-        - Xposed 模块相关的 Bug (Xposed module related Bug)
+      placeholder: 例如：超级岛歌词 / e.g., HyperIsland lyrics
     validations:
       required: true
   - type: dropdown
@@ -42,7 +33,6 @@ body:
         - Lyricon
         - SuperLyric
         - LyricInfo
-        - 其他（或未使用歌词源） (Other / No source used)
   - type: textarea
     id: description
     attributes:
