@@ -2,7 +2,6 @@ package com.lidesheng.hyperlyric.ui.utils
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Box
@@ -12,11 +11,8 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.displayCutout
@@ -24,8 +20,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.updateTransition
@@ -87,18 +81,14 @@ import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.verticalScrollBar
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.glass.GlassBottomSheetDefaults
 import top.yukonga.miuix.kmp.glass.GlassCardDefaults
-import top.yukonga.miuix.kmp.glass.GlassDropdownDefaults
 import top.yukonga.miuix.kmp.glass.GlassDropdownPopup
-import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
 import top.yukonga.miuix.kmp.glass.GlassPopupItem
 import top.yukonga.miuix.kmp.glass.GlassPopupSizing
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorValue
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
-import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.popup.OverlayDropdownPopup
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.PopupLayout
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
@@ -226,11 +216,7 @@ fun rememberBlurBackdrop(): LayerBackdrop? {
 
     if (!isBlurEnabled) return null
 
-    val surfaceColor = MiuixTheme.colorScheme.surface
-    return rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
+    return rememberLayerBackdrop(backgroundColor = MiuixTheme.colorScheme.surface)
 }
 
 val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
@@ -728,7 +714,6 @@ fun adaptiveBottomSheetCardColors(): CardColors =
         CardDefaults.defaultColors()
     }
 
-@OptIn(ExperimentalScrollBarApi::class)
 @Composable
 fun AdaptiveOverlayDropdownPreference(
     items: List<String>,
@@ -899,44 +884,17 @@ fun AdaptiveOverlayDropdownPreference(
                 backdrop = resolvedBackdrop,
                 anchor = anchor,
                 sizing = sizing,
-                contentPadding = PaddingValues(0.dp),
             ) {
-                val scrollState = rememberScrollState()
-                val windowInfo = LocalWindowInfo.current
-                val density = LocalDensity.current
-                val statusTopPx = WindowInsets.statusBars.getTop(density)
-                val navBottomPx = WindowInsets.navigationBars.getBottom(density)
-                val captionBottomPx = WindowInsets.captionBar.getBottom(density)
-                val safeWindowMaxHeight = with(density) {
-                    ((windowInfo.containerSize.height - statusTopPx - navBottomPx - captionBottomPx).toDp() - sizing.safeMargin * 2)
-                        .coerceAtLeast(0.dp)
-                }
-                val effectiveMaxHeight = minOf(sizing.maxHeight, safeWindowMaxHeight)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = effectiveMaxHeight)
-                        .verticalScrollBar(
-                            state = scrollState,
-                            isFadeEnabled = false,
-                            trackPadding = PaddingValues(vertical = GlassDropdownDefaults.CornerRadius / 2),
-                        )
-                        .verticalScroll(scrollState)
-                        .padding(vertical = GlassPopupDefaults.ContentPaddingVertical),
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        items.forEachIndexed { index, item ->
-                            GlassPopupItem(
-                                text = item,
-                                selected = selectedIndex == index,
-                                onClick = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
-                                    setExpanded(false)
-                                    currentOnSelectedIndexChange?.invoke(index)
-                                },
-                            )
-                        }
-                    }
+                items.forEachIndexed { index, item ->
+                    GlassPopupItem(
+                        text = item,
+                        selected = selectedIndex == index,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
+                            setExpanded(false)
+                            currentOnSelectedIndexChange?.invoke(index)
+                        },
+                    )
                 }
             }
         }
